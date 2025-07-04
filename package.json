@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "netlify:dev": "netlify dev"    
+    "netlify:dev": "netlify dev"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.7",
@@ -21,7 +21,8 @@
     "react-dom": "^18.3.1",
     "react-icons": "^5.0.1",
     "react-router-dom": "^6.22.3",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "@sendgrid/mail": "^7.7.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
@@ -43,6 +44,4 @@
     "vite": "^5.4.2"
   }
 }
-    "vite": "^5.4.2"
-  }
-}
+
