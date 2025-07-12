@@ -1,10 +1,5 @@
 import React, { useState } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  "https://nszeiidkuzqphujyovnx.supabase.co",
-  "VITE_SUPABASE_ANON_KEY" // Se usi Vite, altrimenti sostituiscila con la chiave reale
-);
+import { supabase } from "@/lib/supabaseClient";
 
 const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState("");
