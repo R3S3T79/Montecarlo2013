@@ -1,0 +1,3 @@
+{
+  "body": "{\"to\":\"marcomiressi@gmail.com\",\"subject\":\"Test SMTP\",\"text\":\"Se senti questo, funziona!\",\"html\":\"<strong>Se funziona, vedo HTML</strong>\"}"
+}
