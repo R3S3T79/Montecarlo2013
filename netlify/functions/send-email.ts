@@ -1,44 +1,67 @@
 import nodemailer from 'nodemailer';
 
 export const handler = async (event: any) => {
-  try {
-    const { to, subject, html } = JSON.parse(event.body || '{}');
+  // --- LOG VARIABILI D’AMBIENTE SMTP ---
+  console.log('SMTP_HOST =', process.env.SMTP_HOST);
+  console.log('SMTP_PORT =', process.env.SMTP_PORT);
+  console.log('SMTP_SECURE =', process.env.SMTP_SECURE);
+  console.log('SMTP_USER =', process.env.SMTP_USER);
+  console.log('SMTP_PASS is set? →', Boolean(process.env.SMTP_PASS));
+  console.log('SMTP_FROM =', process.env.SMTP_FROM);
+  // ----------------------------------------
 
-    if (!to || !subject || !html) {
+  try {
+    // Legge sia html sia text per maggiore flessibilità
+    const { to, subject, text, html } = JSON.parse(event.body || '{}');
+
+    if (!to || !subject || (!html && !text)) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ message: 'Dati mancanti: to, subject e html obbligatori' }),
+        body: JSON.stringify({
+          message: 'Dati mancanti: to, subject e html o text obbligatori',
+        }),
       };
     }
 
     // Configura il transporter SMTP
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST, // es. smtp.aruba.it o smtp.mailgun.org
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: false, // true se port 465
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT) || 465,
+      secure: process.env.SMTP_SECURE === 'true', // true se porta 465
       auth: {
-        user: process.env.SMTP_USER, // notifications@montecarlo.it
-        pass: process.env.SMTP_PASS, // la password o app password
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
       },
     });
 
-    const info = await transporter.sendMail({
-      from: `"Montecarlo 2013" <${process.env.SMTP_USER}>`,
+    // Prepara il contenuto dell’email
+    const mailOptions: { from: string; to: string; subject: string; text?: string; html?: string } = {
+      from: process.env.SMTP_FROM!,
       to,
       subject,
-      html,
-    });
+    };
+    if (text) mailOptions.text = text;
+    if (html) mailOptions.html = html;
 
-    console.log('Email inviata:', info.messageId);
+    // Invia
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Email inviata, messageId =', info.messageId);
+
     return {
       statusCode: 200,
-      body: JSON.stringify({ message: 'Email inviata con successo' }),
+      body: JSON.stringify({
+        message: 'Email inviata con successo',
+        messageId: info.messageId,
+      }),
     };
-  } catch (err) {
+  } catch (err: any) {
     console.error('Errore invio email:', err);
     return {
       statusCode: 500,
-      body: JSON.stringify({ message: 'Errore interno nel server email' }),
+      body: JSON.stringify({
+        message: 'Errore interno nel server email',
+        error: err.message,
+      }),
     };
   }
 };
