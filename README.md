@@ -49,3 +49,4 @@
 +npm run build        # Build for production
 +npm run netlify:dev  # Test with Netlify Functions locally
 +```# Montecarlo2013
+# Test deploy Sat Jul 12 12:08:17     2025
