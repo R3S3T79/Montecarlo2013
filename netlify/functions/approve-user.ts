@@ -22,19 +22,20 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
+  // Verifica header Authorization
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!authHeader?.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Missing or invalid authorization header' });
   }
-
   const token = authHeader.replace('Bearer ', '');
-  let decoded;
+
+  // Decodifica e controlla ruolo
+  let decoded: any;
   try {
     decoded = jwt.verify(token, process.env.SUPABASE_JWT_SECRET!);
-  } catch (err) {
+  } catch {
     return res.status(401).json({ error: 'Invalid token' });
   }
-
   if (decoded.role !== 'admin') {
     return res.status(403).json({ error: 'Access denied: Admins only' });
   }
@@ -44,9 +45,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing email' });
   }
 
+  // Recupera pending_user confermato
   const { data: pendingUser, error } = await supabase
     .from('pending_users')
-    .select('*')
+    .select('id, username, password')
     .eq('email', email)
     .eq('confirmed', true)
     .single();
@@ -55,11 +57,12 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: 'Pending user not found or not confirmed' });
   }
 
-  const { password_hash, username } = pendingUser;
+  const { username, password } = pendingUser;
 
+  // Crea utente in auth.users con password in chiaro
   const { data: createdUser, error: createError } = await supabase.auth.admin.createUser({
     email,
-    password: password_hash, // già hashata, compatibile con Supabase solo se supportata
+    password,
     user_metadata: { username },
     email_confirm: true,
   });
@@ -68,6 +71,12 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Error creating user', details: createError.message });
   }
 
+  // Pulisce la password dalla tabella pending_users
+  await supabase
+    .from('pending_users')
+    .update({ password: '' })
+    .eq('email', email);
+
   // Invia email di benvenuto
   await transporter.sendMail({
     from: process.env.SMTP_FROM,
@@ -75,7 +84,7 @@ export default async function handler(req, res) {
     subject: 'Benvenuto su Montecarlo 2013',
     html: `
       <p>Ciao ${username},</p>
-      <p>La tua registrazione è stata approvata. Ora puoi accedere a Montecarlo 2013!</p>
+      <p>La tua registrazione è stata approvata. Ora puoi accedere con email e password.</p>
       <p><a href="https://montecarlo2013.it/login">Accedi</a></p>
     `,
   });
