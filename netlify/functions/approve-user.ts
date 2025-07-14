@@ -1,92 +1,93 @@
 import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 
-// In Netlify Functions, export handler as AWS Lambda
-export const handler = async (event, context) => {
-  // Only POST allowed
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ error: 'Method Not Allowed' }),
-    };
+const supabase = createClient(
+  process.env.VITE_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: parseInt(process.env.SMTP_PORT || '465'),
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  let body;
+  // Verifica header Authorization
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid authorization header' });
+  }
+  const token = authHeader.replace('Bearer ', '');
+
+  // Decodifica e controlla ruolo
+  let decoded: any;
   try {
-    body = JSON.parse(event.body || '{}');
-  } catch (e) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: 'Invalid JSON body' }),
-    };
+    decoded = jwt.verify(token, process.env.SUPABASE_JWT_SECRET!);
+  } catch {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+  if (decoded.role !== 'admin') {
+    return res.status(403).json({ error: 'Access denied: Admins only' });
   }
 
-  const { email, username, password } = body;
-  if (!email || !username || !password) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: 'Missing required fields' }),
-    };
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Missing email' });
   }
 
-  // Initialize Supabase client with service role
-  const supabase = createClient(
-    process.env.VITE_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // Recupera pending_user confermato
+  const { data: pendingUser, error } = await supabase
+    .from('pending_users')
+    .select('id, username, password')
+    .eq('email', email)
+    .eq('confirmed', true)
+    .single();
 
-  // Setup SMTP transporter
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '465'),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
+  if (error || !pendingUser) {
+    return res.status(404).json({ error: 'Pending user not found or not confirmed' });
+  }
+
+  const { username, password } = pendingUser;
+
+  // Crea utente in auth.users con password in chiaro
+  const { data: createdUser, error: createError } = await supabase.auth.admin.createUser({
+    email,
+    password,
+    user_metadata: { username },
+    email_confirm: true,
   });
 
-  try {
-    // Generate confirmation token
-    const confirmation_token = crypto.randomBytes(32).toString('hex');
-
-    // Insert pending user
-    const { error: insertError } = await supabase
-      .from('pending_users')
-      .insert({ email, username, password, confirmation_token });
-    if (insertError) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: insertError.message }),
-      };
-    }
-
-    // Build confirmation URL
-    const confirmUrl = `https://${process.env.URL ?? 'montecarlo2013.netlify.app'}/.netlify/functions/confirm?token=${confirmation_token}`;
-
-    // Send confirmation email
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM,
-      to: email,
-      subject: 'Conferma la tua registrazione – Montecarlo 2013',
-      html: `
-        <p>Ciao ${username},</p>
-        <p>Per completare la registrazione, clicca qui:</p>
-        <p><a href="${confirmUrl}">${confirmUrl}</a></p>
-        <p>Il link scade tra 24 ore.</p>
-      `,
-    });
-
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ success: true }),
-    };
-  } catch (err: any) {
-    console.error('Register Error:', err);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error', details: err.message }),
-    };
+  if (createError) {
+    return res.status(500).json({ error: 'Error creating user', details: createError.message });
   }
-};
+
+  // Pulisce la password dalla tabella pending_users
+  await supabase
+    .from('pending_users')
+    .update({ password: '' })
+    .eq('email', email);
+
+  // Invia email di benvenuto
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM,
+    to: email,
+    subject: 'Benvenuto su Montecarlo 2013',
+    html: `
+      <p>Ciao ${username},</p>
+      <p>La tua registrazione è stata approvata. Ora puoi accedere con email e password.</p>
+      <p><a href="https://montecarlo2013.it/login">Accedi</a></p>
+    `,
+  });
+
+  return res.status(200).json({ success: true });
+}
