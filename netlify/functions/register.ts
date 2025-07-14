@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 
@@ -23,36 +22,35 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { email, password, username } = req.body;
-
-  if (!email || !password || !username) {
+  const { email, username, password } = req.body;
+  if (!email || !username || !password) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
   try {
-    const password_hash = await bcrypt.hash(password, 10);
+    // Genera token di conferma
     const confirmation_token = crypto.randomBytes(32).toString('hex');
 
-    const { error } = await supabase.from('pending_users').insert({
-      email,
-      password_hash,
-      confirmation_token,
-      username,
-    });
+    // Inserisce pending_user con password in chiaro
+    const { error } = await supabase
+      .from('pending_users')
+      .insert({ email, username, password, confirmation_token });
 
     if (error) {
       return res.status(400).json({ error: error.message });
     }
 
+    // Prepara link di conferma
     const confirmUrl = `https://montecarlo2013.it/api/confirm?token=${confirmation_token}`;
 
+    // Invia email di conferma
     await transporter.sendMail({
       from: process.env.SMTP_FROM,
       to: email,
       subject: 'Conferma la tua registrazione – Montecarlo 2013',
       html: `
         <p>Ciao ${username},</p>
-        <p>Conferma la tua registrazione cliccando sul link qui sotto:</p>
+        <p>Per completare la registrazione clicca qui:</p>
         <p><a href="${confirmUrl}">${confirmUrl}</a></p>
         <p>Il link scade tra 24 ore.</p>
       `,
