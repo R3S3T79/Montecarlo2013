@@ -1,4 +1,5 @@
 // src/routes.tsx
+
 import React from 'react';
 import {
   Home,
@@ -21,13 +22,13 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { UserRole } from './lib/roles';
 
 export const routes = [
-  // pagine pubbliche
-  { path: '/login',          element: <LoginPage /> },
-  { path: '/register',       element: <RegisterPage /> },
-  { path: '/confirm',        element: <ConfirmPage /> },
-  { path: '/auth/callback',  element: <AuthCallback /> },
+  // pubbliche
+  { path: '/login',         element: <LoginPage /> },
+  { path: '/register',      element: <RegisterPage /> },
+  { path: '/confirm',       element: <ConfirmPage /> },
+  { path: '/auth/callback', element: <AuthCallback /> },
 
-  // pagine protette: serve almeno l'autenticazione
+  // protette (qualsiasi utente autenticato)
   {
     path: '/',
     element: (
@@ -101,7 +102,7 @@ export const routes = [
     )
   },
 
-  // pagine admin: serve il ruolo creator
+  // riservate a creator
   {
     path: '/admin',
     element: (
