@@ -1,54 +1,85 @@
-import { createClient } from '@supabase/supabase-js';
+// netlify/functions/confirm.ts
+
+import { Handler } from "@netlify/functions";
+import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export default async function handler(req, res) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+export const handler: Handler = async (event) => {
+  // 1) Metodo
+  if (event.httpMethod !== "GET") {
+    return {
+      statusCode: 405,
+      body: JSON.stringify({ error: "Method Not Allowed" }),
+    };
   }
 
-  const { token } = req.query;
-
-  if (!token || typeof token !== 'string') {
-    return res.status(400).json({ error: 'Token mancante o non valido' });
+  // 2) Token
+  const token = event.queryStringParameters?.token;
+  if (!token) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ error: "Token mancante o non valido" }),
+    };
   }
 
   try {
+    // 3) Cerco il pending_user
     const { data, error: fetchError } = await supabase
-      .from('pending_users')
-      .select('*')
-      .eq('confirmation_token', token)
+      .from("pending_users")
+      .select("id, confirmed, expires_at")
+      .eq("confirmation_token", token)
       .single();
 
     if (fetchError || !data) {
-      return res.status(400).json({ error: 'Token non valido o già confermato' });
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: "Token non valido o già confermato" }),
+      };
     }
 
+    // 4) Se già confermato
     if (data.confirmed) {
-      return res.status(200).json({ message: 'Utente già confermato' });
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ message: "Utente già confermato" }),
+      };
     }
 
-    const now = new Date();
-    const expires = new Date(data.expires_at);
-    if (now > expires) {
-      return res.status(410).json({ error: 'Link scaduto' });
+    // 5) Controllo scadenza
+    if (new Date() > new Date(data.expires_at)) {
+      return {
+        statusCode: 410,
+        body: JSON.stringify({ error: "Link scaduto" }),
+      };
     }
 
+    // 6) Aggiorno la conferma
     const { error: updateError } = await supabase
-      .from('pending_users')
+      .from("pending_users")
       .update({ confirmed: true })
-      .eq('id', data.id);
+      .eq("id", data.id);
 
     if (updateError) {
-      return res.status(500).json({ error: 'Errore durante la conferma' });
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: "Errore durante la conferma" }),
+      };
     }
 
-    // Redireziona dopo la conferma
-    return res.redirect(302, '/welcome');
-  } catch (err) {
-    return res.status(500).json({ error: 'Errore interno', details: err.message });
+    // 7) Redirect al welcome
+    return {
+      statusCode: 302,
+      headers: { Location: "/welcome" },
+      body: "",
+    };
+  } catch (err: any) {
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Errore interno", details: err.message }),
+    };
   }
-}
+};
