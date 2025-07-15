@@ -1,0 +1,28 @@
+// src/components/ProtectedRoute.tsx
+import React from 'react';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { UserRole } from '../lib/roles';
+
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  // Se vuoto => basta essere autenticati
+  roles?: UserRole[];
+}
+
+export function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
+  const { user } = useAuth();
+
+  // non loggato → login
+  if (!user) return <Navigate to="/login" replace />;
+
+  // se ho una whitelist di ruoli e il mio role non c’è → nope
+  const myRole = user.app_metadata?.role as UserRole
+              || user.user_metadata?.role as UserRole; 
+  if (roles && roles.length > 0 && !roles.includes(myRole)) {
+    return <Navigate to="/" replace />;
+  }
+
+  // ok
+  return <>{children}</>;
+}
