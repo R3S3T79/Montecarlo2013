@@ -3,7 +3,7 @@ import React from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import SidebarLayout from './components/SidebarLayout';
-import { routes } from './routes';
+import routes from './routes';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 export default function App() {
