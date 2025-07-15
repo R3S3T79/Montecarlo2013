@@ -1,9 +1,10 @@
 // src/App.tsx
+
 import React from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import SidebarLayout from './components/SidebarLayout';
-import { routes } from './routes';            // named import corretto
+import { routes } from './routes';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 export default function App() {
@@ -24,7 +25,7 @@ export default function App() {
               />
             ))}
 
-            {/* fallback 404 senza creare file separato */}
+            {/* fallback 404 inline */}
             <Route
               path="*"
               element={
