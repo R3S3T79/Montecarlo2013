@@ -1,39 +1,29 @@
-// src/components/SidebarLayout.tsx
-
 import React, { useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { Menu } from "lucide-react";
 import {
-  useSession,
   useUser,
   useSupabaseClient,
 } from "@supabase/auth-helpers-react";
 
 export default function SidebarLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const session = useSession();
-  const user = useUser();
   const supabase = useSupabaseClient();
+  const user = useUser();
   const navigate = useNavigate();
 
+  // Controlla se ha ruolo "creator"
+  const isCreator = user?.user_metadata?.role === "creator";
+
+  // Effettua il logout
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/");
+    setDrawerOpen(false);
   };
 
-  // Estrai il ruolo dai metadata
-  const role = (user?.app_metadata as any)?.role as
-    | "user"
-    | "creator"
-    | "admin"
-    | undefined;
-
-  // Estrai lo username o fallback all’email
-  const username =
-    (user?.user_metadata as any)?.username || user?.email || "Utente";
-
-  // Link sempre visibili
-  const baseLinks = [
+  // Definizione di tutti i link, con metadata per ruoli e autenticazione
+  const allLinks = [
     { to: "/", label: "Home" },
     { to: "/risultati", label: "Risultati" },
     { to: "/calendario", label: "Calendario" },
@@ -43,23 +33,25 @@ export default function SidebarLayout() {
     { to: "/statistiche/giocatori", label: "Statistiche Giocatori" },
     { to: "/prossima-partita", label: "Prossima Partita" },
     { to: "/tornei", label: "Tornei" },
+
+    // Link protetto: solo creator
+    { to: "/admin-panel", label: "Admin Panel", roles: ["creator"] },
+
+    // Link di autenticazione (solo per non-loggati)
+    { to: "/login", label: "Accedi", auth: false },
+    { to: "/register", label: "Registrati", auth: false },
   ];
 
-  // Se non loggato, mostra Accedi/Registrati
-  const guestLinks = [
-    { to: "/login", label: "Accedi" },
-    { to: "/register", label: "Registrati" },
-  ];
-
-  // Se sei creator, mostra Admin Panel
-  const adminLinks =
-    session && role === "creator"
-      ? [{ to: "/admin-panel", label: "Admin Panel" }]
-      : [];
-
-  const links = session
-    ? [...baseLinks, ...adminLinks]
-    : [...baseLinks, ...guestLinks];
+  // Filtro i link in base a login/ruolo
+  const links = allLinks.filter((link) => {
+    if (link.roles) {
+      return user && link.roles.includes(user.user_metadata.role);
+    }
+    if (link.auth === false) {
+      return !user;
+    }
+    return true;
+  });
 
   return (
     <div className="relative h-screen flex overflow-hidden">
@@ -103,23 +95,20 @@ export default function SidebarLayout() {
           </nav>
 
           <div className="px-6 py-4 border-t border-white/20 text-sm">
-            {session ? (
-              <div className="flex flex-col space-y-2">
-                <span>Ciao, {username}</span>
+            {user ? (
+              <div className="space-y-2">
+                <div className="font-medium">
+                  {user.user_metadata.username}
+                </div>
                 <button
                   onClick={handleLogout}
-                  className="self-start bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-white"
+                  className="w-full text-left py-1 rounded hover:bg-white/20"
                 >
                   Logout
                 </button>
               </div>
             ) : (
-              <NavLink
-                to="/public-access"
-                className="block p-2 rounded hover:bg-white/20 hover:backdrop-blur-sm"
-              >
-                Accesso Pubblico
-              </NavLink>
+              <div>Accesso Pubblico</div>
             )}
           </div>
         </div>
