@@ -1,29 +1,17 @@
+// src/components/SidebarLayout.tsx
+
 import React, { useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { Menu } from "lucide-react";
-import {
-  useUser,
-  useSupabaseClient,
-} from "@supabase/auth-helpers-react";
+import { useAuth } from "../context/AuthContext";
 
 export default function SidebarLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const supabase = useSupabaseClient();
-  const user = useUser();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
-  // Controlla se ha ruolo "creator"
-  const isCreator = user?.user_metadata?.role === "creator";
-
-  // Effettua il logout
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/");
-    setDrawerOpen(false);
-  };
-
-  // Definizione di tutti i link, con metadata per ruoli e autenticazione
-  const allLinks = [
+  // the always-visible links
+  const baseLinks = [
     { to: "/", label: "Home" },
     { to: "/risultati", label: "Risultati" },
     { to: "/calendario", label: "Calendario" },
@@ -33,25 +21,38 @@ export default function SidebarLayout() {
     { to: "/statistiche/giocatori", label: "Statistiche Giocatori" },
     { to: "/prossima-partita", label: "Prossima Partita" },
     { to: "/tornei", label: "Tornei" },
-
-    // Link protetto: solo creator
-    { to: "/admin-panel", label: "Admin Panel", roles: ["creator"] },
-
-    // Link di autenticazione (solo per non-loggati)
-    { to: "/login", label: "Accedi", auth: false },
-    { to: "/register", label: "Registrati", auth: false },
   ];
 
-  // Filtro i link in base a login/ruolo
-  const links = allLinks.filter((link) => {
-    if (link.roles) {
-      return user && link.roles.includes(user.user_metadata.role);
+  // only for creators
+  const creatorLinks = [
+    { to: "/admin", label: "Admin" },
+    { to: "/admin-panel", label: "Admin Panel" },
+  ];
+
+  // public auth-links
+  const publicLinks = [
+    { to: "/login", label: "Accedi" },
+    { to: "/register", label: "Registrati" },
+  ];
+
+  // build final array
+  let links = [...baseLinks];
+  if (user) {
+    if (user.user_metadata.role === "creator") {
+      links = links.concat(creatorLinks);
     }
-    if (link.auth === false) {
-      return !user;
-    }
-    return true;
-  });
+  } else {
+    links = links.concat(publicLinks);
+  }
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/login", { replace: true });
+    setDrawerOpen(false);
+  };
+
+  // display the part before the "@" as a pseudo-username
+  const displayName = user?.email.split("@")[0] ?? "";
 
   return (
     <div className="relative h-screen flex overflow-hidden">
@@ -96,13 +97,11 @@ export default function SidebarLayout() {
 
           <div className="px-6 py-4 border-t border-white/20 text-sm">
             {user ? (
-              <div className="space-y-2">
-                <div className="font-medium">
-                  {user.user_metadata.username}
-                </div>
+              <div className="flex justify-between items-center">
+                <span>{displayName}</span>
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left py-1 rounded hover:bg-white/20"
+                  className="underline hover:text-gray-200"
                 >
                   Logout
                 </button>
@@ -127,3 +126,4 @@ export default function SidebarLayout() {
     </div>
   );
 }
+
