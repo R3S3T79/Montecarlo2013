@@ -3,39 +3,41 @@ import React from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import SidebarLayout from './components/SidebarLayout';
-import { routes } from './routes';                // <-- named import
+import { routes } from './routes';            // named import corretto
 import { ProtectedRoute } from './components/ProtectedRoute';
-import NotFoundPage from './pages/NotFoundPage';   // <-- assicurati di avere questa pagina
 
 export default function App() {
   return (
     <Router>
       <AuthProvider>
-        <Routes>
-          {routes.map(({ path, element, roles }) => (
+        <SidebarLayout>
+          <Routes>
+            {routes.map(({ path, element, roles }) => (
+              <Route
+                key={path}
+                path={path}
+                element={
+                  roles
+                    ? <ProtectedRoute roles={roles}>{element}</ProtectedRoute>
+                    : element
+                }
+              />
+            ))}
+
+            {/* fallback 404 senza creare file separato */}
             <Route
-              key={path}
-              path={path}
+              path="*"
               element={
-                roles
-                  // se ci sono ruoli, incapsula in ProtectedRoute
-                  ? <ProtectedRoute roles={roles}>{element}</ProtectedRoute>
-                  // altrimenti rende semplicemente la pagina (es. login/register)
-                  : element
+                <ProtectedRoute>
+                  <div style={{ padding: 40, textAlign: 'center' }}>
+                    <h1>404</h1>
+                    <p>Pagina non trovata</p>
+                  </div>
+                </ProtectedRoute>
               }
             />
-          ))}
-
-          {/* fallback 404 */}
-          <Route
-            path="*"
-            element={
-              <ProtectedRoute>
-                <NotFoundPage />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
+          </Routes>
+        </SidebarLayout>
       </AuthProvider>
     </Router>
   );
