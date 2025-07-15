@@ -1,3 +1,5 @@
+// src/components/SidebarLayout.tsx
+
 import React, { useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { Menu } from "lucide-react";
@@ -16,17 +18,17 @@ export default function SidebarLayout() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    navigate("/"); // torna alla home
+    navigate("/");
   };
 
-  // ricava il ruolo dal JWT
+  // Estrai il ruolo dai metadata
   const role = (user?.app_metadata as any)?.role as
     | "user"
     | "creator"
     | "admin"
     | undefined;
 
-  // Username da mostrare in footer
+  // Estrai lo username o fallback all’email
   const username =
     (user?.user_metadata as any)?.username || user?.email || "Utente";
 
@@ -43,19 +45,21 @@ export default function SidebarLayout() {
     { to: "/tornei", label: "Tornei" },
   ];
 
-  // Link condizionali
-  const authLinks = session
-    ? // se loggato, mostro Admin Panel solo ai creator
-      role === "creator"
-      ? [{ to: "/admin-panel", label: "Admin Panel" }]
-      : []
-    : // se non loggato, mostro Accedi/Registrati
-      [
-        { to: "/login", label: "Accedi" },
-        { to: "/register", label: "Registrati" },
-      ];
+  // Se non loggato, mostra Accedi/Registrati
+  const guestLinks = [
+    { to: "/login", label: "Accedi" },
+    { to: "/register", label: "Registrati" },
+  ];
 
-  const links = [...baseLinks, ...authLinks];
+  // Se sei creator, mostra Admin Panel
+  const adminLinks =
+    session && role === "creator"
+      ? [{ to: "/admin-panel", label: "Admin Panel" }]
+      : [];
+
+  const links = session
+    ? [...baseLinks, ...adminLinks]
+    : [...baseLinks, ...guestLinks];
 
   return (
     <div className="relative h-screen flex overflow-hidden">
