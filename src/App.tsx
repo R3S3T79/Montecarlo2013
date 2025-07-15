@@ -1,14 +1,13 @@
 // src/App.tsx
 
 import React from "react";
-import { HashRouter as Router, Routes, Route } from "react-router-dom";
+import { HashRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
 // --- Auth ---
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ConfirmPage from "./pages/ConfirmPage";
-import AdminPanel from "./pages/AdminPanel";
 import AuthCallback from "./pages/AuthCallback";
 
 // --- Layout ---
@@ -34,8 +33,9 @@ import StatisticheSquadra from "./pages/StatisticheSquadra";
 import StatisticheGiocatori from "./pages/StatisticheGiocatori";
 import MatchHandler from "./components/MatchHandler";
 
-// --- Admin ---
+// --- Admin Pages ---
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminPanel from "./pages/AdminPanel";
 
 // --- Tornei workflow ---
 import Tornei from "./pages/tornei/NuovoTorneo/Tornei";
@@ -60,20 +60,40 @@ import EditGironeUnicoPartita from "./pages/tornei/NuovoTorneo/EditGironeUnicoPa
 import EditFaseGironiPartita from "./pages/tornei/NuovoTorneo/EditFaseGironiPartita";
 import Step7_FaseGironi from "./pages/tornei/NuovoTorneo/Step7_FaseGironi";
 
+function RequireAuth({ children, role }: { children: JSX.Element; role?: string }) {
+  const { user } = useAuth();
+
+  if (!user) {
+    // non autenticato → rimanda a login
+    return <Navigate to="/login" replace />;
+  }
+
+  if (role && user.user_metadata.role !== role) {
+    // autenticato ma ruolo non corretto → home o 403
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
 export default function App() {
   return (
     <Router>
       <AuthProvider>
         <Routes>
-          {/* Route pubbliche */}
+
+          {/* — Public routes — */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/confirm" element={<ConfirmPage />} />
-          <Route path="/admin-panel" element={<AdminPanel />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
 
-          {/* Tutto il resto sotto layout protetto */}
-          <Route path="/*" element={<SidebarLayout />}>
+          {/* — All the rest under SidebarLayout — */}
+          <Route path="/*" element={
+            <RequireAuth>
+              <SidebarLayout />
+            </RequireAuth>
+          }>
             {/* Dashboard */}
             <Route index element={<Home />} />
             <Route path="calendario" element={<Calendario />} />
@@ -123,9 +143,24 @@ export default function App() {
             <Route path="tornei/nuovo/step6-gironeunico/:torneoId/edit/:matchId" element={<EditGironeUnicoPartita />} />
             <Route path="tornei/nuovo/step7-fasegironi/:torneoId" element={<Step7_FaseGironi />} />
 
-            {/* Admin area */}
-            <Route path="admin" element={<AdminDashboard />} />
-            <Route path="admin-panel" element={<AdminPanel />} />
+            {/* — Admin-only routes — */}
+            <Route
+              path="admin"
+              element={
+                <RequireAuth role="creator">
+                  <AdminDashboard />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="admin-panel"
+              element={
+                <RequireAuth role="creator">
+                  <AdminPanel />
+                </RequireAuth>
+              }
+            />
+
           </Route>
         </Routes>
       </AuthProvider>
