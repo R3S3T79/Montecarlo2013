@@ -1,11 +1,37 @@
 import React, { useState } from "react";
-import { Outlet, NavLink } from "react-router-dom";
+import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { Menu } from "lucide-react";
+import {
+  useSession,
+  useUser,
+  useSupabaseClient,
+} from "@supabase/auth-helpers-react";
 
 export default function SidebarLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const session = useSession();
+  const user = useUser();
+  const supabase = useSupabaseClient();
+  const navigate = useNavigate();
 
-  const links = [
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/"); // torna alla home
+  };
+
+  // ricava il ruolo dal JWT
+  const role = (user?.app_metadata as any)?.role as
+    | "user"
+    | "creator"
+    | "admin"
+    | undefined;
+
+  // Username da mostrare in footer
+  const username =
+    (user?.user_metadata as any)?.username || user?.email || "Utente";
+
+  // Link sempre visibili
+  const baseLinks = [
     { to: "/", label: "Home" },
     { to: "/risultati", label: "Risultati" },
     { to: "/calendario", label: "Calendario" },
@@ -15,12 +41,21 @@ export default function SidebarLayout() {
     { to: "/statistiche/giocatori", label: "Statistiche Giocatori" },
     { to: "/prossima-partita", label: "Prossima Partita" },
     { to: "/tornei", label: "Tornei" },
-    { to: "/admin", label: "Admin" },
-    { to: "/admin-panel", label: "Admin Panel" },
-    // Aggiungi qui link per login / register se vuoi esporli nel menu
-    { to: "/login", label: "Accedi" },
-    { to: "/register", label: "Registrati" },
   ];
+
+  // Link condizionali
+  const authLinks = session
+    ? // se loggato, mostro Admin Panel solo ai creator
+      role === "creator"
+      ? [{ to: "/admin-panel", label: "Admin Panel" }]
+      : []
+    : // se non loggato, mostro Accedi/Registrati
+      [
+        { to: "/login", label: "Accedi" },
+        { to: "/register", label: "Registrati" },
+      ];
+
+  const links = [...baseLinks, ...authLinks];
 
   return (
     <div className="relative h-screen flex overflow-hidden">
@@ -51,7 +86,9 @@ export default function SidebarLayout() {
                 to={to}
                 className={({ isActive }) =>
                   `block p-2 rounded ${
-                    isActive ? "bg-white text-gray-800" : "hover:bg-white/20 hover:backdrop-blur-sm"
+                    isActive
+                      ? "bg-white text-gray-800"
+                      : "hover:bg-white/20 hover:backdrop-blur-sm"
                   }`
                 }
                 onClick={() => setDrawerOpen(false)}
@@ -62,7 +99,24 @@ export default function SidebarLayout() {
           </nav>
 
           <div className="px-6 py-4 border-t border-white/20 text-sm">
-            <div className="mb-2">Accesso Pubblico</div>
+            {session ? (
+              <div className="flex flex-col space-y-2">
+                <span>Ciao, {username}</span>
+                <button
+                  onClick={handleLogout}
+                  className="self-start bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-white"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <NavLink
+                to="/public-access"
+                className="block p-2 rounded hover:bg-white/20 hover:backdrop-blur-sm"
+              >
+                Accesso Pubblico
+              </NavLink>
+            )}
           </div>
         </div>
       </aside>
