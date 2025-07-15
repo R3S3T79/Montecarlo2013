@@ -1,2 +1,21 @@
-# Local Netlify folder
-.netlify
+# dipendenze e build
+node_modules/
+dist/
+dist-ssr/
+
+# file locali di configurazione
+.env
+.env.*
+.vscode/
+.idea/
+*.local
+
+# cache, log, lock-file
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+pnpm-lock.yaml
+
+# cartelle strumenti
+.netlify/
