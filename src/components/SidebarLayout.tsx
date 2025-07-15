@@ -1,7 +1,7 @@
 // src/components/SidebarLayout.tsx
 
 import React, { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 import { Menu } from "lucide-react";
 import { useUser, useSupabaseClient } from "@supabase/auth-helpers-react";
 
@@ -10,7 +10,7 @@ export default function SidebarLayout() {
   const supabase = useSupabaseClient();
   const user = useUser();
 
-  // link di base sempre visibili
+  // Link sempre visibili a tutti
   const baseLinks = [
     { to: "/", label: "Home" },
     { to: "/risultati", label: "Risultati" },
@@ -23,21 +23,23 @@ export default function SidebarLayout() {
     { to: "/tornei", label: "Tornei" },
   ];
 
-  // link per login / register (solo se non loggati)
+  // Link di Login/Register (solo se NON loggati)
   const authLinks = [
     { to: "/login", label: "Accedi" },
     { to: "/register", label: "Registrati" },
   ];
 
-  // link admin (solo se loggati e role = 'creator')
-  const adminLinks = user?.user_metadata.role === "creator"
-    ? [
-        { to: "/admin", label: "Admin" },
-        { to: "/admin-panel", label: "Admin Panel" },
-      ]
-    : [];
+  // Link Admin (solo se loggati e ruolo = creator)
+  const role = user?.app_metadata?.role;  // Supabase conserva i ruoli in app_metadata
+  const adminLinks =
+    user && role === "creator"
+      ? [
+          { to: "/admin", label: "Admin" },
+          { to: "/admin-panel", label: "Admin Panel" },
+        ]
+      : [];
 
-  // combina i menu
+  // Combina i menu
   const links = [
     ...baseLinks,
     ...(user ? adminLinks : authLinks),
@@ -45,13 +47,12 @@ export default function SidebarLayout() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    // ricarica la pagina oppure rimanda a login
     window.location.href = "/login";
   };
 
   return (
     <div className="relative h-screen flex overflow-hidden">
-      {/* pulsante per aprire il drawer */}
+      {/* Bottone per aprire il drawer */}
       <button
         onClick={() => setDrawerOpen(true)}
         className="fixed top-4 left-4 z-30 text-white"
@@ -60,7 +61,7 @@ export default function SidebarLayout() {
         <Menu size={24} />
       </button>
 
-      {/* sidebar */}
+      {/* Sidebar */}
       <aside
         className={`
           fixed inset-y-0 left-0 w-64 bg-gradient-to-br from-[#bfb9b9] to-[#6B7280]
@@ -69,12 +70,12 @@ export default function SidebarLayout() {
         `}
       >
         <div className="flex flex-col h-full">
-          {/* header */}
+          {/* Header */}
           <div className="px-6 py-4">
             <h2 className="text-2xl font-bold">Montecarlo2013</h2>
           </div>
 
-          {/* navigazione */}
+          {/* Navigazione */}
           <nav className="flex-1 overflow-auto px-6 space-y-2">
             {links.map(({ to, label }) => (
               <NavLink
@@ -94,7 +95,7 @@ export default function SidebarLayout() {
             ))}
           </nav>
 
-          {/* footer */}
+          {/* Footer */}
           <div className="px-6 py-4 border-t border-white/20 text-sm">
             {user ? (
               <div className="flex items-center justify-between">
@@ -113,7 +114,7 @@ export default function SidebarLayout() {
         </div>
       </aside>
 
-      {/* overlay chiusura drawer */}
+      {/* Overlay per chiudere il drawer */}
       {drawerOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-25 z-30"
@@ -121,10 +122,9 @@ export default function SidebarLayout() {
         />
       )}
 
-      {/* contenuto principale */}
+      {/* Contenuto principale */}
       <main className="flex-1 bg-transparent overflow-auto m-0 p-0">
-        {/* qui verrà renderizzato l'Outlet di react-router */}
-        {/* <Outlet /> */}
+        <Outlet />
       </main>
     </div>
   );
