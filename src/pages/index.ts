@@ -8,7 +8,10 @@ export { default as ListaSquadre } from './ListaSquadre';
 export { default as StatisticheSquadra } from './StatisticheSquadra';
 export { default as StatisticheGiocatori } from './StatisticheGiocatori';
 export { default as ProssimaPartita } from './ProssimaPartita';
-export { default as Tornei } from './tornei/Tornei';
+
+// qui punta alla cartella "tornei/NuovoTorneo"
+export { default as Tornei } from './tornei/NuovoTorneo/Tornei';
+
 export { default as AdminDashboard } from './AdminDashboard';
 export { default as AdminPanel } from './AdminPanel';
 
