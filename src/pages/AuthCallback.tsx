@@ -1,23 +1,25 @@
-import { useEffect } from "react"
-import { useNavigate } from "react-router-dom"
-import { supabase } from "../lib/supabaseClient"
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabaseClient";
 
 export default function AuthCallback() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const verifyLogin = async () => {
-      const { error } = await supabase.auth.exchangeCodeForSession(window.location.href)
+    const handleAuth = async () => {
+      // Estrae il token dall'URL e salva la sessione internamente
+      const { data, error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
       if (error) {
-        console.error("Errore conferma email:", error.message)
-        navigate("/errore-verifica")
+        console.error("Errore conferma email:", error.message);
+        navigate("/errore-verifica");
       } else {
-        navigate("/") // oppure dove vuoi portare l'utente dopo verifica
+        // Redirect alla home una volta autenticato
+        navigate("/");
       }
-    }
+    };
 
-    verifyLogin()
-  }, [navigate])
+    handleAuth();
+  }, [navigate]);
 
-  return <p>Verifica in corso...</p>
+  return <p>Verifica in corso...</p>;
 }
