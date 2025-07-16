@@ -15,7 +15,7 @@ export { default as Tornei }                from './tornei/NuovoTorneo/Tornei';
 export { default as AdminDashboard }        from './AdminDashboard';
 export { default as AdminPanel }            from './AdminPanel';
 
-export { default as LoginPage }             from './LoginPage';
+export { default as LoginPage }             from './auth/Login';
 export { default as RegisterPage }          from './RegisterPage';
 export { default as ConfirmPage }           from './ConfirmPage';
 export { default as AuthCallback }          from './AuthCallback';
