@@ -1,46 +1,35 @@
-// src/routes.tsx
 import React from 'react';
-import {
-  Home,
-  Calendario,
-  Risultati,
-  RosaGiocatori,
-  ListaSquadre,
-  StatisticheSquadra,
-  StatisticheGiocatori,
-  ProssimaPartita,
-  Tornei,
-  AdminDashboard,
-  AdminPanel,
-  LoginPage,
-  RegisterPage,
-  ConfirmPage,
-  AuthCallback
-} from './pages';
-import { ProtectedRoute } from './components/ProtectedRoute';
-import { UserRole } from './lib/roles';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { UserRole } from '../lib/roles';
 
-export const routes = [
-  // pubbliche
-  { path: '/login',         element: <LoginPage /> },
-  { path: '/register',      element: <RegisterPage /> },
-  { path: '/confirm',       element: <ConfirmPage /> },
-  { path: '/auth/callback', element: <AuthCallback /> },
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  roles?: UserRole[];
+}
 
-  // **ROUTA `/` SENZA PROTECTEDROUTE**
-  {
-    path: '/',
-    element: <Home />
-  },
+export function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
+  const { user } = useAuth();
 
-  // protette (qualsiasi utente autenticato)
-  {
-    path: '/calendario',
-    element: (
-      <ProtectedRoute roles={[UserRole.Authenticated]}>
-        <Calendario />
-      </ProtectedRoute>
-    )
-  },
-  // ... lascia tutte le altre rotte invariate
-];
+  // debug: verifica il valore di `user`
+  console.log('[ProtectedRoute] user:', user);
+
+  // non autenticato → login
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // utente autenticato di default
+  const myRole =
+    (user.app_metadata?.role as UserRole) ||
+    (user.user_metadata?.role as UserRole) ||
+    UserRole.Authenticated;
+
+  // se ho una whitelist e il mio ruolo non è incluso → homepage
+  if (roles && roles.length > 0 && !roles.includes(myRole)) {
+    return <Navigate to="/" replace />;
+  }
+
+  // ok: renderizza i figli
+  return <>{children}</>;
+}
