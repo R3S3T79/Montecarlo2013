@@ -1,10 +1,14 @@
-import React, { useState } from "react";
-import { Outlet, NavLink } from "react-router-dom";
+import React, { useState, ReactNode } from "react";
+import { NavLink } from "react-router-dom";
 import { Menu } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabaseClient";
 
-export default function SidebarLayout() {
+interface SidebarLayoutProps {
+  children: ReactNode;
+}
+
+export default function SidebarLayout({ children }: SidebarLayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { user } = useAuth();
 
@@ -111,7 +115,7 @@ export default function SidebarLayout() {
       )}
 
       <main className="flex-1 bg-transparent overflow-auto m-0 p-0">
-        <Outlet />
+        {children}
       </main>
     </div>
   );
