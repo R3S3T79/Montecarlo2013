@@ -9,10 +9,12 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
-  // debug: verifica il valore di `user`
-  console.log('[ProtectedRoute] user:', user);
+  // attendi che supabase recuperi lo stato
+  if (loading) {
+    return null; // oppure un piccolo spinner...
+  }
 
   // non autenticato → login
   if (!user) {
