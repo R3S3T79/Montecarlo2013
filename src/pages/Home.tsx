@@ -1,7 +1,12 @@
-import React from 'react';
+// src/pages/Home.tsx
+import React, { useEffect } from 'react';
 import backgroundImage from '../assets/StemmaMontecarlo.jpg';
 
 export default function Home() {
+  useEffect(() => {
+    console.log('[Home] renderizzato');
+  }, []);
+
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Background con overlay gradient */}
