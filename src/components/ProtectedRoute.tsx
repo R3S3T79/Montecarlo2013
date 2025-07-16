@@ -11,27 +11,29 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
 
-  // attendi che supabase recuperi lo stato
+  console.log(
+    "[ProtectedRoute] loading:",
+    loading,
+    "user:",
+    user ? user.email : null
+  );
+
   if (loading) {
-    return null; // oppure un piccolo spinner...
+    return null; // o uno spinner
   }
 
-  // non autenticato → login
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // utente autenticato di default
   const myRole =
     (user.app_metadata?.role as UserRole) ||
     (user.user_metadata?.role as UserRole) ||
     UserRole.Authenticated;
 
-  // se ho una whitelist e il mio ruolo non è incluso → homepage
   if (roles && roles.length > 0 && !roles.includes(myRole)) {
     return <Navigate to="/" replace />;
   }
 
-  // ok: renderizza i figli
   return <>{children}</>;
 }
