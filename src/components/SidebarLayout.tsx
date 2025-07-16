@@ -9,6 +9,9 @@ interface SidebarLayoutProps {
 }
 
 export default function SidebarLayout({ children }: SidebarLayoutProps) {
+  // debug: verifica cosa arriva come children
+  console.log('[SidebarLayout] children:', children);
+
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { user } = useAuth();
 
@@ -119,4 +122,6 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
       </main>
     </div>
   );
+}
+
 }
