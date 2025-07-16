@@ -13,16 +13,18 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
   const { user } = useAuth();
 
-  // non autenticato → Login
+  // non autenticato → login
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // determina ruolo (app_metadata o user_metadata)
-  const myRole = (user.app_metadata?.role as UserRole)
-              || (user.user_metadata?.role as UserRole);
+  // utente autenticato di default
+  const myRole = 
+    (user.app_metadata?.role as UserRole)
+    || (user.user_metadata?.role as UserRole)
+    || UserRole.Authenticated;
 
-  // se ho una whitelist e il mio ruolo non è incluso → Homepage
+  // se ho una whitelist e il mio ruolo non è incluso → homepage
   if (roles && roles.length > 0 && !roles.includes(myRole)) {
     return <Navigate to="/" replace />;
   }
