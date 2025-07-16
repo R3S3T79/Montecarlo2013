@@ -1,6 +1,6 @@
 // src/App.tsx
 import React from 'react';
-import { Routes, Route, Outlet } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import SidebarLayout from './components/SidebarLayout';
 import { UserRole } from './lib/roles';
@@ -61,7 +61,54 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-          {/* ...altre rotte protette identiche */}
+          <Route
+            path="rosa"
+            element={
+              <ProtectedRoute roles={[UserRole.Authenticated]}>
+                <RosaGiocatori />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="squadre"
+            element={
+              <ProtectedRoute roles={[UserRole.Authenticated]}>
+                <ListaSquadre />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="statistiche/squadra"
+            element={
+              <ProtectedRoute roles={[UserRole.Authenticated]}>
+                <StatisticheSquadra />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="statistiche/giocatori"
+            element={
+              <ProtectedRoute roles={[UserRole.Authenticated]}>
+                <StatisticheGiocatori />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="prossima-partita"
+            element={
+              <ProtectedRoute roles={[UserRole.Authenticated]}>
+                <ProssimaPartita />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="tornei"
+            element={
+              <ProtectedRoute roles={[UserRole.Authenticated]}>
+                <Tornei />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="admin"
             element={
