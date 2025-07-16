@@ -15,7 +15,7 @@ import Tornei from './pages/tornei/NuovoTorneo/Tornei';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminPanel from './pages/AdminPanel';
 
-import LoginPage from './pages/auth/Login';
+import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ConfirmPage from './pages/ConfirmPage';
 import AuthCallback from './pages/AuthCallback';
