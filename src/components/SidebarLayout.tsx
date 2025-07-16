@@ -1,16 +1,12 @@
-import React, { useState, ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import React, { useState } from "react";
+import { NavLink, Outlet } from "react-router-dom";
 import { Menu } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabaseClient";
 
-interface SidebarLayoutProps {
-  children: ReactNode;
-}
-
-export default function SidebarLayout({ children }: SidebarLayoutProps) {
-  // debug: verifica cosa arriva come children
-  console.log('[SidebarLayout] children:', children);
+export default function SidebarLayout() {
+  // debug: verifica che Outlet venga renderizzato
+  console.log('[SidebarLayout] rendering Outlet');
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { user } = useAuth();
@@ -118,10 +114,9 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
       )}
 
       <main className="flex-1 bg-transparent overflow-auto m-0 p-0">
-        {children}
+        {/* Nested routes render here */}
+        <Outlet />
       </main>
     </div>
   );
-}
-
 }
