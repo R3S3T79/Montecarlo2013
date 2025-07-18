@@ -35,11 +35,11 @@ export default function App() {
         <Route path="/confirm"       element={<ConfirmPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
 
-        {/* PROTETTE */}
+        {/* PROTETTE – qualsiasi utente autenticato */}
         <Route
           path="/"
           element={
-            <ProtectedRoute roles={[UserRole.Authenticated]}>
+            <ProtectedRoute>
               <SidebarLayout />
             </ProtectedRoute>
           }
@@ -53,6 +53,8 @@ export default function App() {
           <Route path="statistiche/giocatori" element={<StatisticheGiocatori />} />
           <Route path="prossima-partita" element={<ProssimaPartita />} />
           <Route path="tornei"          element={<Tornei />} />
+
+          {/* ADMIN – solo creator */}
           <Route
             path="admin"
             element={
@@ -75,5 +77,5 @@ export default function App() {
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </AuthProvider>
-);
+  );
 }
