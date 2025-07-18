@@ -1,4 +1,5 @@
 // src/App.tsx
+
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
@@ -141,5 +142,5 @@ export default function App() {
         />
       </Routes>
     </AuthProvider>
-  );
+);
 }
