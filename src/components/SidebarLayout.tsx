@@ -6,9 +6,8 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 
 export default function SidebarLayout() {
-  console.log('[SidebarLayout] mounted');
-  // Sidebar aperta di default
-  const [drawerOpen, setDrawerOpen] = useState(true);
+  // sidebar chiusa di default
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const { user } = useAuth();
 
   const handleLogout = async () => {
@@ -46,6 +45,7 @@ export default function SidebarLayout() {
 
   return (
     <div className="relative h-screen flex overflow-hidden">
+      {/* hamburger */}
       <button
         onClick={() => setDrawerOpen(true)}
         className="fixed top-4 left-4 z-50 text-white"
@@ -54,12 +54,11 @@ export default function SidebarLayout() {
         <Menu size={24} />
       </button>
 
+      {/* sidebar */}
       <aside
-        className={`
-          fixed inset-y-0 left-0 w-64 bg-gradient-to-br from-[#bfb9b9] to-[#6B7280]
+        className={`fixed inset-y-0 left-0 w-64 bg-gradient-to-br from-[#bfb9b9] to-[#6B7280]
           text-white z-40 transform transition-transform duration-200 ease-in-out
-          ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}
-        `}
+          ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="flex flex-col h-full">
           <div className="px-6 py-4">
@@ -101,6 +100,7 @@ export default function SidebarLayout() {
         </div>
       </aside>
 
+      {/* backdrop */}
       {drawerOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-25 z-30"
@@ -108,7 +108,12 @@ export default function SidebarLayout() {
         />
       )}
 
-      <main className="ml-64 flex-1 bg-transparent overflow-auto m-0 p-0">
+      {/* contenuto: margin-left solo se sidebar aperta */}
+      <main
+        className={`flex-1 bg-transparent overflow-auto m-0 p-0 transition-all duration-200 ${
+          drawerOpen ? 'ml-64' : 'ml-0'
+        }`}
+      >
         <Outlet />
       </main>
     </div>
