@@ -1,12 +1,12 @@
 // src/App.tsx
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import SidebarLayout from './components/SidebarLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { UserRole } from './lib/roles';
 
-// Pagine utente
+// Pagine
 import Home from './pages/Home';
 import Calendario from './pages/Calendario';
 import Risultati from './pages/Risultati';
@@ -35,43 +35,45 @@ export default function App() {
         <Route path="/confirm"       element={<ConfirmPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
 
-        {/* PROTETTE – layout + guardiano */}
+        {/* 1) LIVELLO GUARDIA: blocca se non autenticato */}
         <Route
-          path="/"
           element={
             <ProtectedRoute roles={[UserRole.Authenticated]}>
-              <SidebarLayout />
+              <Outlet />
             </ProtectedRoute>
           }
         >
-          <Route index element={<Home />} />
-          <Route path="calendario"     element={<Calendario />} />
-          <Route path="risultati"      element={<Risultati />} />
-          <Route path="rosa"           element={<RosaGiocatori />} />
-          <Route path="squadre"        element={<ListaSquadre />} />
-          <Route path="statistiche/squadra" element={<StatisticheSquadra />} />
-          <Route path="statistiche/giocatori" element={<StatisticheGiocatori />} />
-          <Route path="prossima-partita" element={<ProssimaPartita />} />
-          <Route path="tornei"         element={<Tornei />} />
-          <Route
-            path="admin"
-            element={
-              <ProtectedRoute roles={[UserRole.Creator]}>
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="admin-panel"
-            element={
-              <ProtectedRoute roles={[UserRole.Creator]}>
-                <AdminPanel />
-              </ProtectedRoute>
-            }
-          />
+          {/* 2) LIVELLO LAYOUT: Sidebar + sottorotte */}
+          <Route element={<SidebarLayout />}>
+            <Route index element={<Home />} />
+            <Route path="calendario" element={<Calendario />} />
+            <Route path="risultati" element={<Risultati />} />
+            <Route path="rosa" element={<RosaGiocatori />} />
+            <Route path="squadre" element={<ListaSquadre />} />
+            <Route path="statistiche/squadra" element={<StatisticheSquadra />} />
+            <Route path="statistiche/giocatori" element={<StatisticheGiocatori />} />
+            <Route path="prossima-partita" element={<ProssimaPartita />} />
+            <Route path="tornei" element={<Tornei />} />
+            <Route
+              path="admin"
+              element={
+                <ProtectedRoute roles={[UserRole.Creator]}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="admin-panel"
+              element={
+                <ProtectedRoute roles={[UserRole.Creator]}>
+                  <AdminPanel />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
         </Route>
 
-        {/* REDIRECT 404 */}
+        {/* 404 e redirect non autenticati */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </AuthProvider>
