@@ -19,25 +19,23 @@ const transporter = nodemailer.createTransport({
 });
 
 export const handler: Handler = async (event) => {
-  // 1) Prendo il token dalla query string
+  // 1) Leggo il token dalla query string
   const token = event.queryStringParameters?.token;
   if (!token) {
     return {
       statusCode: 400,
       headers: { "Content-Type": "text/html" },
       body: `
-        <html>
-          <head><title>Errore conferma</title></head>
-          <body style="font-family:sans-serif;text-align:center;padding:2rem;">
-            <h1>Token mancante</h1>
-            <p>Il link di conferma non è valido.</p>
-          </body>
-        </html>
+        <html><head><title>Errore conferma</title></head>
+        <body style="font-family:sans-serif;text-align:center;padding:2rem;">
+          <h1>Token mancante</h1>
+          <p>Il link di conferma non è valido.</p>
+        </body></html>
       `,
     };
   }
 
-  // 2) Trovo il pending_user
+  // 2) Cerco il record in pending_users
   const { data: pending, error: selErr } = await supabase
     .from("pending_users")
     .select("email, username, created_at, expires_at")
@@ -49,41 +47,43 @@ export const handler: Handler = async (event) => {
       statusCode: 404,
       headers: { "Content-Type": "text/html" },
       body: `
-        <html>
-          <head><title>Link non valido</title></head>
-          <body style="font-family:sans-serif;text-align:center;padding:2rem;">
-            <h1>Link non valido o già utilizzato</h1>
-            <p>Il link di conferma non esiste o è già stato usato.</p>
-          </body>
-        </html>
+        <html><head><title>Link non valido</title></head>
+        <body style="font-family:sans-serif;text-align:center;padding:2rem;">
+          <h1>Link non valido o già utilizzato</h1>
+          <p>Il link di conferma non esiste o è già stato usato.</p>
+        </body></html>
       `,
     };
   }
 
-  // 3) Controllo scadenza
+  // 3) Verifico la scadenza
   if (new Date(pending.expires_at) < new Date()) {
     return {
       statusCode: 410,
       headers: { "Content-Type": "text/html" },
       body: `
-        <html>
-          <head><title>Link scaduto</title></head>
-          <body style="font-family:sans-serif;text-align:center;padding:2rem;">
-            <h1>Link scaduto</h1>
-            <p>Il link di conferma è scaduto. Registrati di nuovo.</p>
-          </body>
-        </html>
+        <html><head><title>Link scaduto</title></head>
+        <body style="font-family:sans-serif;text-align:center;padding:2rem;">
+          <h1>Link scaduto</h1>
+          <p>Il link di conferma è scaduto. Registrati di nuovo.</p>
+        </body></html>
       `,
     };
   }
 
-  // 4) Marco come confermato
-  await supabase
+  // 4) Marco come confermato e rimuovo il token, con debug
+  const { data: updatedRows, error: upErr } = await supabase
     .from("pending_users")
     .update({ confirmed: true, confirmation_token: null })
     .eq("confirmation_token", token);
 
-  // 5) Notifica via email all'admin
+  if (upErr) {
+    console.error("❌ Errore nell'UPDATE confirmed:", upErr);
+  } else {
+    console.log(`✅ pending_users aggiornati (${updatedRows?.length || 0} row)`);
+  }
+
+  // 5) Mando notifica email all'admin
   await transporter.sendMail({
     from: process.env.SMTP_FROM,
     to: "marcomiressi@gmail.com",
@@ -100,7 +100,7 @@ export const handler: Handler = async (event) => {
     `,
   });
 
-  // 6) Risposta HTML carina
+  // 6) Risposta HTML finale
   return {
     statusCode: 200,
     headers: { "Content-Type": "text/html" },
@@ -112,7 +112,8 @@ export const handler: Handler = async (event) => {
           <style>
             body { font-family: sans-serif; text-align: center; background: #f5f5f5; margin: 0; padding: 0; }
             .container { max-width: 400px; margin: 5rem auto; background: white; padding: 2rem; border-radius: 8px; }
-            h1 { color: #2a9d8f; }
+            h1 { color: #2a9d8f; margin-bottom: 1rem; }
+            p { margin: 0.5rem 0; }
             a { display: inline-block; margin-top: 1.5rem; text-decoration: none; color: white; background: #264653; padding: 0.75rem 1.5rem; border-radius: 4px; }
           </style>
         </head>
