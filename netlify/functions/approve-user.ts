@@ -38,8 +38,11 @@ export const handler: Handler = async (event) => {
   } catch (e: any) {
     return { statusCode: 401, body: JSON.stringify({ error: 'Invalid token', details: e.message }) }
   }
-  if (decoded.role !== 'admin') {
-    return { statusCode: 403, body: JSON.stringify({ error: 'Access denied: Admins only' }) }
+
+  // Verifica ruolo "creator"
+  const userRole = decoded.raw_app_meta_data?.role
+  if (userRole !== 'creator') {
+    return { statusCode: 403, body: JSON.stringify({ error: 'Access denied: Creators only' }) }
   }
 
   // 3) Body
@@ -54,7 +57,7 @@ export const handler: Handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing email' }) }
   }
 
-  // 4) Recupera pending_user
+  // 4) Recupera pending_user confermato
   const { data: pendingUser, error: selectError } = await supabase
     .from('pending_users')
     .select('username, password')
