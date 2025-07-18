@@ -20,12 +20,10 @@ const transporter = nodemailer.createTransport({
 })
 
 export const handler: Handler = async (event) => {
-  // 1) Metodo
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) }
   }
 
-  // 2) Autorizzazione
   const authHeader = event.headers.authorization || ''
   if (!authHeader.startsWith('Bearer ')) {
     return { statusCode: 401, body: JSON.stringify({ error: 'Missing or invalid authorization header' }) }
@@ -39,13 +37,12 @@ export const handler: Handler = async (event) => {
     return { statusCode: 401, body: JSON.stringify({ error: 'Invalid token', details: e.message }) }
   }
 
-  // Verifica ruolo "creator"
-  const userRole = decoded.raw_app_meta_data?.role
+  // Controllo ruolo "creator"
+  const userRole = decoded.app_metadata?.role || decoded.raw_app_meta_data?.role
   if (userRole !== 'creator') {
     return { statusCode: 403, body: JSON.stringify({ error: 'Access denied: Creators only' }) }
   }
 
-  // 3) Body
   let body: { email?: string }
   try {
     body = JSON.parse(event.body || '{}')
@@ -57,7 +54,6 @@ export const handler: Handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing email' }) }
   }
 
-  // 4) Recupera pending_user confermato
   const { data: pendingUser, error: selectError } = await supabase
     .from('pending_users')
     .select('username, password')
@@ -70,7 +66,6 @@ export const handler: Handler = async (event) => {
   }
   const { username, password } = pendingUser
 
-  // 5) Crea utente in Auth
   const { data: createdUser, error: createError } = await supabase.auth.admin.createUser({
     email,
     password,
@@ -81,7 +76,6 @@ export const handler: Handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: 'Error creating user', details: createError.message }) }
   }
 
-  // 6) Pulizia e email di benvenuto
   await supabase.from('pending_users').update({ password: '' }).eq('email', email)
   await transporter.sendMail({
     from: process.env.SMTP_FROM,
@@ -90,9 +84,10 @@ export const handler: Handler = async (event) => {
     html: `
       <p>Ciao ${username},</p>
       <p>La tua registrazione è stata approvata. Ora puoi accedere con email e password.</p>
-      <p><a href="https://montecarlo2013.it/login">Accedi</a></p>
+      <p><a href=\"https://montecarlo2013.it/login\">Accedi</a></p>
     `,
   })
 
   return { statusCode: 200, body: JSON.stringify({ success: true }) }
 }
+
