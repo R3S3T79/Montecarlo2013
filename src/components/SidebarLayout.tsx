@@ -1,3 +1,5 @@
+// src/components/SidebarLayout.tsx
+
 import React, { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { Menu } from "lucide-react";
@@ -31,16 +33,15 @@ export default function SidebarLayout() {
   ];
 
   const creatorLinks =
-    user?.user_metadata.role === "creator"
+    user?.app_metadata?.role === "creator" ||
+    user?.user_metadata?.role === "creator"
       ? [
           { to: "/admin", label: "Admin" },
           { to: "/admin-panel", label: "Admin Panel" },
         ]
       : [];
 
-  const links = user
-    ? [...baseLinks, ...creatorLinks]
-    : [...baseLinks, ...authLinks];
+  const links = user ? [...baseLinks, ...creatorLinks] : [...baseLinks, ...authLinks];
 
   return (
     <div className="relative h-screen flex overflow-hidden">
@@ -70,7 +71,11 @@ export default function SidebarLayout() {
                 key={to}
                 to={to}
                 className={({ isActive }) =>
-                  `block p-2 rounded ${isActive ? "bg-white text-gray-800" : "hover:bg-white/20 hover:backdrop-blur-sm"}`
+                  `block p-2 rounded ${
+                    isActive
+                      ? "bg-white text-gray-800"
+                      : "hover:bg-white/20 hover:backdrop-blur-sm"
+                  }`
                 }
                 onClick={() => setDrawerOpen(false)}
               >
@@ -82,7 +87,7 @@ export default function SidebarLayout() {
           <div className="px-6 py-4 border-t border-white/20 text-sm">
             {user ? (
               <div className="flex items-center justify-between">
-                <span>{user.user_metadata.username ?? user.email}</span>
+                <span>{user.user_metadata?.username ?? user.email}</span>
                 <button
                   onClick={handleLogout}
                   className="text-sm underline hover:text-gray-200"
@@ -104,7 +109,8 @@ export default function SidebarLayout() {
         />
       )}
 
-      <main className="flex-1 bg-transparent overflow-auto m-0 p-0">
+      <main className="flex-1 bg-transparent overflow-auto p-0">
+        {/* Forziamo remount su cambio di loading/user */}
         <Outlet key={`${loading}-${user?.id ?? 'anon'}`} />
       </main>
     </div>
