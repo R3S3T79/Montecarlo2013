@@ -1,81 +1,111 @@
-// src/App.tsx
-import React from 'react';
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
-import SidebarLayout from './components/SidebarLayout';
-import { ProtectedRoute } from './components/ProtectedRoute';
-import { UserRole } from './lib/roles';
+// src/components/SidebarLayout.tsx
+import React, { useState } from 'react';
+import { NavLink, Outlet } from 'react-router-dom';
+import { Menu } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabaseClient';
 
-// Pagine
-import Home from './pages/Home';
-import Calendario from './pages/Calendario';
-import Risultati from './pages/Risultati';
-import RosaGiocatori from './pages/RosaGiocatori';
-import ListaSquadre from './pages/ListaSquadre';
-import StatisticheSquadra from './pages/StatisticheSquadra';
-import StatisticheGiocatori from './pages/StatisticheGiocatori';
-import ProssimaPartita from './pages/ProssimaPartita';
-import Tornei from './pages/tornei/NuovoTorneo/Tornei';
-import AdminDashboard from './pages/AdminDashboard';
-import AdminPanel from './pages/AdminPanel';
+export default function SidebarLayout() {
+  console.log('[SidebarLayout] mounted');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const { user } = useAuth();
 
-// Auth
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import ConfirmPage from './pages/ConfirmPage';
-import AuthCallback from './pages/AuthCallback';
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/#/login';
+  };
 
-export default function App() {
+  const baseLinks = [
+    { to: '/', label: 'Home' },
+    { to: '/risultati', label: 'Risultati' },
+    { to: '/calendario', label: 'Calendario' },
+    { to: '/rosa', label: 'Rosa Giocatori' },
+    { to: '/squadre', label: 'Lista Squadre' },
+    { to: '/statistiche/squadra', label: 'Statistiche Squadra' },
+    { to: '/statistiche/giocatori', label: 'Statistiche Giocatori' },
+    { to: '/prossima-partita', label: 'Prossima Partita' },
+    { to: '/tornei', label: 'Tornei' },
+  ];
+
+  const authLinks = [
+    { to: '/login', label: 'Accedi' },
+    { to: '/register', label: 'Registrati' },
+  ];
+
+  const creatorLinks =
+    user?.app_metadata?.role === 'creator' ||
+    user?.user_metadata?.role === 'creator'
+      ? [
+          { to: '/admin', label: 'Admin' },
+          { to: '/admin-panel', label: 'Admin Panel' },
+        ]
+      : [];
+
+  const links = user ? [...baseLinks, ...creatorLinks] : [...baseLinks, ...authLinks];
+
   return (
-    <AuthProvider>
-      <Routes>
-        {/* PUBBLICHE */}
-        <Route path="/login"         element={<LoginPage />} />
-        <Route path="/register"      element={<RegisterPage />} />
-        <Route path="/confirm"       element={<ConfirmPage />} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
+    <div className="relative h-screen flex overflow-hidden">
+      <button
+        onClick={() => setDrawerOpen(true)}
+        className="fixed top-4 left-4 z-30 text-white"
+        aria-label="Apri menu"
+      >
+        <Menu size={24} />
+      </button>
 
-        {/* 1) LIVELLO GUARDIA: blocca se non autenticato */}
-        <Route
-          element={
-            <ProtectedRoute roles={[UserRole.Authenticated]}>
-              <Outlet />
-            </ProtectedRoute>
-          }
-        >
-          {/* 2) LIVELLO LAYOUT: Sidebar + sottorotte */}
-          <Route element={<SidebarLayout />}>
-            <Route index element={<Home />} />
-            <Route path="calendario" element={<Calendario />} />
-            <Route path="risultati" element={<Risultati />} />
-            <Route path="rosa" element={<RosaGiocatori />} />
-            <Route path="squadre" element={<ListaSquadre />} />
-            <Route path="statistiche/squadra" element={<StatisticheSquadra />} />
-            <Route path="statistiche/giocatori" element={<StatisticheGiocatori />} />
-            <Route path="prossima-partita" element={<ProssimaPartita />} />
-            <Route path="tornei" element={<Tornei />} />
-            <Route
-              path="admin"
-              element={
-                <ProtectedRoute roles={[UserRole.Creator]}>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="admin-panel"
-              element={
-                <ProtectedRoute roles={[UserRole.Creator]}>
-                  <AdminPanel />
-                </ProtectedRoute>
-              }
-            />
-          </Route>
-        </Route>
+      <aside
+        className={`fixed inset-y-0 left-0 w-64 bg-gradient-to-br from-[#bfb9b9] to-[#6B7280]
+          text-white z-40 transform transition-transform duration-200 ease-in-out
+          ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <div className="flex flex-col h-full">
+          <div className="px-6 py-4">
+            <h2 className="text-2xl font-bold">Montecarlo2013</h2>
+          </div>
+          <nav className="flex-1 overflow-auto px-6 space-y-2">
+            {links.map(({ to, label }) => (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) =>
+                  `block p-2 rounded ${
+                    isActive ? 'bg-white text-gray-800' : 'hover:bg-white/20 hover:backdrop-blur-sm'
+                  }`
+                }
+                onClick={() => setDrawerOpen(false)}
+              >
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+          <div className="px-6 py-4 border-t border-white/20 text-sm">
+            {user ? (
+              <div className="flex items-center justify-between">
+                <span>{user.user_metadata?.username ?? user.email}</span>
+                <button
+                  onClick={handleLogout}
+                  className="text-sm underline hover:text-gray-200"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <span>Accesso Pubblico</span>
+            )}
+          </div>
+        </div>
+      </aside>
 
-        {/* 404 e redirect non autenticati */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </AuthProvider>
+      {drawerOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-25 z-30"
+          onClick={() => setDrawerOpen(false)}
+        />
+      )}
+
+      <main className="flex-1 bg-transparent overflow-auto m-0 p-0">
+        <Outlet />
+      </main>
+    </div>
   );
 }
