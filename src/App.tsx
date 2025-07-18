@@ -35,7 +35,7 @@ export default function App() {
         <Route path="/confirm"       element={<ConfirmPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
 
-        {/* PROTETTE – qualsiasi utente autenticato */}
+        {/* PROTETTE – qualunque utente autenticato */}
         <Route
           path="/"
           element={
@@ -73,7 +73,7 @@ export default function App() {
           />
         </Route>
 
-        {/* FALLBACK */}
+        {/* REDIRECT PER TUTTO IL RESTO */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </AuthProvider>
