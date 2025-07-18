@@ -7,7 +7,8 @@ import { supabase } from '../lib/supabaseClient';
 
 export default function SidebarLayout() {
   console.log('[SidebarLayout] mounted');
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  // Sidebar aperta di default
+  const [drawerOpen, setDrawerOpen] = useState(true);
   const { user } = useAuth();
 
   const handleLogout = async () => {
