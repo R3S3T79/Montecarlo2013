@@ -1,4 +1,4 @@
-// netlify/functions/confirm.ts
+// netlify/functions/resend-confirm.ts
 import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
@@ -10,7 +10,7 @@ const supabase = createClient(
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || "465"),
+  port: parseInt(process.env.SMTP_PORT!),
   secure: process.env.SMTP_SECURE === "true",
   auth: {
     user: process.env.SMTP_USER,
@@ -19,113 +19,37 @@ const transporter = nodemailer.createTransport({
 });
 
 export const handler: Handler = async (event) => {
-  // 1) Leggo il token dalla query string
-  const token = event.queryStringParameters?.token;
-  if (!token) {
-    return {
-      statusCode: 400,
-      headers: { "Content-Type": "text/html" },
-      body: `
-        <html><head><title>Errore conferma</title></head>
-        <body style="font-family:sans-serif;text-align:center;padding:2rem;">
-          <h1>Token mancante</h1>
-          <p>Il link di conferma non è valido.</p>
-        </body></html>
-      `,
-    };
+  if (event.httpMethod !== "POST") {
+    return { statusCode: 405, body: "Method Not Allowed" };
+  }
+  const { email } = JSON.parse(event.body || "{}");
+  if (!email) {
+    return { statusCode: 400, body: JSON.stringify({ error: "Missing email" }) };
   }
 
-  // 2) Cerco il record in pending_users
-  const { data: pending, error: selErr } = await supabase
+  // Trovo il user in pending_users
+  const { data: pending, error } = await supabase
     .from("pending_users")
-    .select("email, username, created_at, expires_at")
-    .eq("confirmation_token", token)
+    .select("username, confirmation_token")
+    .eq("email", email)
     .single();
 
-  if (selErr || !pending) {
-    return {
-      statusCode: 404,
-      headers: { "Content-Type": "text/html" },
-      body: `
-        <html><head><title>Link non valido</title></head>
-        <body style="font-family:sans-serif;text-align:center;padding:2rem;">
-          <h1>Link non valido o già utilizzato</h1>
-          <p>Il link di conferma non esiste o è già stato usato.</p>
-        </body></html>
-      `,
-    };
+  if (error || !pending) {
+    return { statusCode: 404, body: JSON.stringify({ error: "User not found" }) };
   }
 
-  // 3) Verifico la scadenza
-  if (new Date(pending.expires_at) < new Date()) {
-    return {
-      statusCode: 410,
-      headers: { "Content-Type": "text/html" },
-      body: `
-        <html><head><title>Link scaduto</title></head>
-        <body style="font-family:sans-serif;text-align:center;padding:2rem;">
-          <h1>Link scaduto</h1>
-          <p>Il link di conferma è scaduto. Registrati di nuovo.</p>
-        </body></html>
-      `,
-    };
-  }
-
-  // 4) Marco come confermato (non tocco più confirmation_token)
-  const { data: updatedRows, error: upErr } = await supabase
-    .from("pending_users")
-    .update({ confirmed: true })
-    .eq("confirmation_token", token);
-
-  if (upErr) {
-    console.error("❌ Errore nell'UPDATE confirmed:", upErr);
-  } else {
-    console.log(`✅ pending_users aggiornati (${updatedRows?.length || 0} row)`);
-  }
-
-  // 5) Notifica email all'admin
+  const confirmUrl = `https://montecarlo2013.it/api/confirm?token=${pending.confirmation_token}`;
   await transporter.sendMail({
     from: process.env.SMTP_FROM,
-    to: "marcomiressi@gmail.com",
-    subject: "Nuova registrazione in attesa di approvazione",
+    to: email,
+    subject: "Reinvia link di conferma – Montecarlo 2013",
     html: `
-      <p>Ciao Admin,</p>
-      <p>Un nuovo utente ha confermato la propria email e attende la tua approvazione.</p>
-      <ul>
-        <li><strong>Username:</strong> ${pending.username}</li>
-        <li><strong>Email:</strong> ${pending.email}</li>
-        <li><strong>Registrato il:</strong> ${new Date(pending.created_at).toLocaleString('it-IT')}</li>
-      </ul>
-      <p>Vai al <a href="https://montecarlo2013.it/#/admin-panel">Pannello Admin</a> per approvarlo.</p>
+      <p>Ciao ${pending.username},</p>
+      <p>Hai richiesto di reinviare il link di conferma:</p>
+      <p><a href="${confirmUrl}">${confirmUrl}</a></p>
+      <p>Il link scade in 24 ore dalla registrazione.</p>
     `,
   });
 
-  // 6) Risposta HTML finale
-  return {
-    statusCode: 200,
-    headers: { "Content-Type": "text/html" },
-    body: `
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <title>Email Confermata</title>
-          <style>
-            body { font-family: sans-serif; text-align: center; background: #f5f5f5; margin: 0; padding: 0; }
-            .container { max-width: 400px; margin: 5rem auto; background: white; padding: 2rem; border-radius: 8px; }
-            h1 { color: #2a9d8f; margin-bottom: 1rem; }
-            p { margin: 0.5rem 0; }
-            a { display: inline-block; margin-top: 1.5rem; text-decoration: none; color: white; background: #264653; padding: 0.75rem 1.5rem; border-radius: 4px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h1>Email Confermata!</h1>
-            <p>Grazie, la tua email è stata confermata con successo.</p>
-            <p>Attendi l'approvazione dell'amministratore.</p>
-            <a href="https://montecarlo2013.it/#/login">Vai al Login</a>
-          </div>
-        </body>
-      </html>
-    `,
-  };
+  return { statusCode: 200, body: JSON.stringify({ success: true }) };
 };
