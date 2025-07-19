@@ -1,18 +1,17 @@
-// src/components/SidebarLayout.tsx
 import React, { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 
 export default function SidebarLayout() {
-  // sidebar chiusa di default
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    window.location.href = '/#/login';
+    navigate('/login', { replace: true });
   };
 
   const baseLinks = [
@@ -108,7 +107,7 @@ export default function SidebarLayout() {
         />
       )}
 
-      {/* contenuto: margin-left solo se sidebar aperta */}
+      {/* contenuto */}
       <main
         className={`flex-1 bg-transparent overflow-auto m-0 p-0 transition-all duration-200 ${
           drawerOpen ? 'ml-64' : 'ml-0'
