@@ -53,17 +53,20 @@ export default function DettaglioPartita() {
     null;
   const canEdit = role === 'admin' || role === 'creator';
 
-  // Se non loggato, vai a login
+  // Redirect se non loggato
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/login', { replace: true });
     }
   }, [user, authLoading, navigate]);
 
-  // Fetch dati partita e marcatori
+  // Fetch dati
   useEffect(() => {
     async function fetchDetail() {
-      if (!id) return setLoading(false);
+      if (!id) {
+        setLoading(false);
+        return;
+      }
 
       try {
         const { data: pd, error: pe } = await supabase
@@ -88,7 +91,8 @@ export default function DettaglioPartita() {
           .single();
         if (pe || !pd) {
           console.error(pe);
-          return setLoading(false);
+          setLoading(false);
+          return;
         }
 
         const { data: md, error: me } = await supabase
@@ -99,15 +103,15 @@ export default function DettaglioPartita() {
 
         let marcWithNames: MarcatoriEntry[] = [];
         if (md?.length) {
-          const ids = Array.from(new Set(md.map((m) => m.giocatore_id)));
+          const ids = Array.from(new Set(md.map(m => m.giocatore_id)));
           const { data: gd, error: ge } = await supabase
             .from('giocatori')
             .select('id, nome, cognome')
             .in('id', ids);
           if (ge) console.error(ge);
           if (gd) {
-            marcWithNames = md.map((m) => {
-              const g = gd.find((x) => x.id === m.giocatore_id)!;
+            marcWithNames = md.map(m => {
+              const g = gd.find(x => x.id === m.giocatore_id)!;
               return {
                 id: m.giocatore_id,
                 periodo: m.periodo,
@@ -125,7 +129,9 @@ export default function DettaglioPartita() {
       }
     }
 
-    if (user) fetchDetail();
+    if (user) {
+      fetchDetail();
+    }
   }, [id, user, navigate]);
 
   if (authLoading || loading) {
@@ -164,12 +170,10 @@ export default function DettaglioPartita() {
     <div className="min-h-screen bg-white">
       {/* Top bar */}
       <div className="flex items-center p-4 border-b">
-        <button
-          onClick={() => navigate('/risultati')}
-          className="text-gray-700 text-2xl"
-        >
+        {/* Freccia spostata a destra con ml-12 */}
+        <Link to="/risultati" className="text-gray-700 text-2xl ml-12">
           ←
-        </button>
+        </Link>
         <div className="flex-1 text-center text-gray-800 text-lg font-semibold">
           {formatData(partita.data_ora)}
         </div>
@@ -208,17 +212,16 @@ export default function DettaglioPartita() {
             <div key={i} className="pb-1">
               <div className="flex justify-between items-center py-1">
                 <span className="font-bold text-gray-600">{t.label}</span>
-                <span className="text-lg font-medium text-gray-900">{t.casa}</span>
+                <span className="text-lg font-medium text-gray-900">
+                  {t.casa}
+                </span>
               </div>
               {isCasa &&
                 partita.marcatori
-                  .filter((m) => m.periodo === i + 1)
-                  .map((m) => (
+                  .filter(m => m.periodo === i + 1)
+                  .map(m => (
                     <div key={m.id} className="mt-1 ml-4 italic text-gray-700">
-                      <Link
-                        to={`/giocatore/${m.id}`}
-                        className="hover:text-blue-600"
-                      >
+                      <Link to={`/giocatore/${m.id}`} className="hover:text-blue-600">
                         {m.giocatore.cognome} {m.giocatore.nome}
                       </Link>
                     </div>
@@ -249,17 +252,16 @@ export default function DettaglioPartita() {
             <div key={i} className="pb-1">
               <div className="flex justify-between items-center py-1">
                 <span className="font-bold text-gray-600">{t.label}</span>
-                <span className="text-lg font-medium text-gray-900">{t.ospite}</span>
+                <span className="text-lg font-medium text-gray-900">
+                  {t.ospite}
+                </span>
               </div>
               {!isCasa &&
                 partita.marcatori
-                  .filter((m) => m.periodo === i + 1)
-                  .map((m) => (
+                  .filter(m => m.periodo === i + 1)
+                  .map(m => (
                     <div key={m.id} className="mt-1 ml-4 italic text-gray-700">
-                      <Link
-                        to={`/giocatore/${m.id}`}
-                        className="hover:text-blue-600"
-                      >
+                      <Link to={`/giocatore/${m.id}`} className="hover:text-blue-600">
                         {m.giocatore.cognome} {m.giocatore.nome}
                       </Link>
                     </div>
