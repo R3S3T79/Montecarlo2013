@@ -27,51 +27,49 @@ export default function AdminPanel() {
   const [processing, setProcessing] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
-  // Carica gli utenti in attesa
+  // 1) Carica gli utenti in attesa
   useEffect(() => {
     (async () => {
       setLoading(true);
       const { data, error } = await supabase
         .from<PendingUser>("pending_users")
         .select("id, email, username, created_at, confirmed");
-      if (error) {
-        console.error("Errore fetch pending_users:", error);
-      } else {
-        setPendingUsers(data || []);
-      }
+      if (error) console.error("Errore fetch pending_users:", error);
+      setPendingUsers(data || []);
       setLoading(false);
     })();
   }, []);
 
-  // Reinvia il link di conferma all'utente
+  // 2) Reinvia il link di conferma
   const resendEmail = async (email: string) => {
     if (processing.has(email)) return;
     setProcessing((s) => new Set(s).add(email));
     try {
-      const res = await fetch("/.netlify/functions/resend-confirm", {
+      const res = await fetch("/api/resend-confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
+      const json = await res.json();
       if (res.ok) {
         alert("Link di conferma reinviato!");
       } else {
-        const { error } = await res.json();
-        alert("Errore: " + error);
+        console.error("resend-confirm error:", json);
+        alert("Errore: " + (json.error || "Unknown"));
       }
-    } catch (err) {
-      console.error("Errore rete:", err);
-      alert("Errore di connessione");
+    } catch (err: any) {
+      console.error("Errore rete resend-confirm:", err);
+      alert("Errore di connessione: " + err.message);
     } finally {
       setProcessing((s) => {
-        const next = new Set(s);
-        next.delete(email);
-        return next;
+        const n = new Set(s);
+        n.delete(email);
+        return n;
       });
     }
   };
 
-  // Imposta il ruolo dell'utente (user / creator / admin)
+  // 3) Imposta il ruolo (user / creator / admin)
   const approveUser = async (email: string, role: UserRole) => {
     if (processing.has(email)) return;
     setProcessing((s) => new Set(s).add(email));
@@ -82,15 +80,15 @@ export default function AdminPanel() {
     if (!session?.access_token) {
       alert("Sessione scaduta. Effettua di nuovo il login.");
       setProcessing((s) => {
-        const next = new Set(s);
-        next.delete(email);
-        return next;
+        const n = new Set(s);
+        n.delete(email);
+        return n;
       });
       return;
     }
 
     try {
-      const res = await fetch("/.netlify/functions/set-role", {
+      const res = await fetch("/api/set-role", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -100,22 +98,20 @@ export default function AdminPanel() {
       });
       const json = await res.json();
       if (res.ok) {
-        // Rimuove l'utente dalla lista dei pending
-        setPendingUsers((prev) =>
-          prev.filter((u) => u.email !== email)
-        );
+        setPendingUsers((prev) => prev.filter((u) => u.email !== email));
         alert(`Utente ${email} promosso a ${role}`);
       } else {
-        alert(`Errore: ${json.error || json.message}`);
+        console.error("set-role error:", json);
+        alert("Errore: " + (json.error || json.message || "Unknown"));
       }
-    } catch (err) {
-      console.error("Errore set-role:", err);
-      alert("Errore di connessione");
+    } catch (err: any) {
+      console.error("Errore rete set-role:", err);
+      alert("Errore di connessione: " + err.message);
     } finally {
       setProcessing((s) => {
-        const next = new Set(s);
-        next.delete(email);
-        return next;
+        const n = new Set(s);
+        n.delete(email);
+        return n;
       });
     }
   };
@@ -139,7 +135,9 @@ export default function AdminPanel() {
 
   return (
     <div className="max-w-4xl mx-auto py-8">
-      <h2 className="text-2xl font-bold mb-6">Utenti in Attesa di Approvazione</h2>
+      <h2 className="text-2xl font-bold mb-6">
+        Utenti in Attesa di Approvazione
+      </h2>
       {pendingUsers.length === 0 ? (
         <p>Nessuna richiesta in attesa.</p>
       ) : (
@@ -178,21 +176,27 @@ export default function AdminPanel() {
                     {u.confirmed ? (
                       <>
                         <button
-                          onClick={() => approveUser(u.email, UserRole.User)}
+                          onClick={() =>
+                            approveUser(u.email, UserRole.Authenticated)
+                          }
                           disabled={processing.has(u.email)}
                           className="px-3 py-1 border rounded text-sm inline-flex items-center"
                         >
                           <User className="mr-1" size={14} /> User
                         </button>
                         <button
-                          onClick={() => approveUser(u.email, UserRole.Creator)}
+                          onClick={() =>
+                            approveUser(u.email, UserRole.Creator)
+                          }
                           disabled={processing.has(u.email)}
                           className="px-3 py-1 border rounded text-sm inline-flex items-center"
                         >
                           <Shield className="mr-1" size={14} /> Creator
                         </button>
                         <button
-                          onClick={() => approveUser(u.email, UserRole.Admin)}
+                          onClick={() =>
+                            approveUser(u.email, UserRole.Admin)
+                          }
                           disabled={processing.has(u.email)}
                           className="px-3 py-1 border rounded text-sm inline-flex items-center"
                         >
