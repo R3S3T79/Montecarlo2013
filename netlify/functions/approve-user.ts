@@ -1,107 +1,92 @@
-// netlify/functions/confirm.ts
-import { Handler } from "@netlify/functions";
-import { createClient } from "@supabase/supabase-js";
-import nodemailer from "nodemailer";
+// netlify/functions/approve-user.ts
+import { Handler } from '@netlify/functions'
+import { createClient } from '@supabase/supabase-js'
+import jwt from 'jsonwebtoken'
+import nodemailer from 'nodemailer'
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+)
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || "465"),
-  secure: process.env.SMTP_SECURE === "true",
+  port: parseInt(process.env.SMTP_PORT || '465'),
+  secure: process.env.SMTP_SECURE === 'true',
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
-});
+})
 
 export const handler: Handler = async (event) => {
-  // Accetto solo GET
-  if (event.httpMethod !== "GET") {
-    return {
-      statusCode: 405,
-      headers: { "Content-Type": "text/html" },
-      body: `<h1>405 Method Not Allowed</h1>`,
-    };
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) }
   }
 
-  // 1. Leggo il token
-  const token = event.queryStringParameters?.token;
-  if (!token) {
-    return {
-      statusCode: 400,
-      headers: { "Content-Type": "text/html" },
-      body: `<h1>Token mancante</h1><p>Link non valido.</p>`,
-    };
+  const authHeader = event.headers.authorization || ''
+  if (!authHeader.startsWith('Bearer ')) {
+    return { statusCode: 401, body: JSON.stringify({ error: 'Missing or invalid authorization header' }) }
+  }
+  const token = authHeader.replace('Bearer ', '')
+
+  let decoded: any
+  try {
+    decoded = jwt.verify(token, process.env.SUPABASE_JWT_SECRET!)
+  } catch (e: any) {
+    return { statusCode: 401, body: JSON.stringify({ error: 'Invalid token', details: e.message }) }
   }
 
-  // 2. Cerco in pending_users
-  const { data: pending, error: selErr } = await supabase
-    .from("pending_users")
-    .select("email, username, created_at, expires_at")
-    .eq("confirmation_token", token)
-    .single();
-
-  if (selErr || !pending) {
-    return {
-      statusCode: 404,
-      headers: { "Content-Type": "text/html" },
-      body: `<h1>Link non valido o già usato</h1>`,
-    };
+  // Controllo ruolo "creator"
+  const userRole = decoded.app_metadata?.role || decoded.raw_app_meta_data?.role
+  if (userRole !== 'creator') {
+    return { statusCode: 403, body: JSON.stringify({ error: 'Access denied: Creators only' }) }
   }
 
-  // 3. Controllo scadenza
-  if (new Date(pending.expires_at) < new Date()) {
-    return {
-      statusCode: 410,
-      headers: { "Content-Type": "text/html" },
-      body: `<h1>Link scaduto</h1><p>Registrati di nuovo.</p>`,
-    };
+  let body: { email?: string }
+  try {
+    body = JSON.parse(event.body || '{}')
+  } catch {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON body' }) }
+  }
+  const { email } = body
+  if (!email) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Missing email' }) }
   }
 
-  // 4. Aggiorno confirmed = true
-  const { data: updatedRows, error: upErr } = await supabase
-    .from("pending_users")
-    .update({ confirmed: true })
-    .eq("confirmation_token", token);
+  const { data: pendingUser, error: selectError } = await supabase
+    .from('pending_users')
+    .select('username, password')
+    .eq('email', email)
+    .eq('confirmed', true)
+    .single()
 
-  if (upErr) {
-    console.error("❌ Errore UPDATE confirmed:", upErr);
-  } else {
-    console.log(`✅ pending_users aggiornati (${updatedRows?.length || 0} row)`);
+  if (selectError || !pendingUser) {
+    return { statusCode: 404, body: JSON.stringify({ error: 'Pending user not found or not confirmed' }) }
+  }
+  const { username, password } = pendingUser
+
+  const { data: createdUser, error: createError } = await supabase.auth.admin.createUser({
+    email,
+    password,
+    user_metadata: { username },
+    email_confirm: true,
+  })
+  if (createError) {
+    return { statusCode: 500, body: JSON.stringify({ error: 'Error creating user', details: createError.message }) }
   }
 
-  // 5. Notifica email all'admin
+  await supabase.from('pending_users').update({ password: '' }).eq('email', email)
   await transporter.sendMail({
     from: process.env.SMTP_FROM,
-    to: "marcomiressi@gmail.com",
-    subject: "Nuova registrazione in attesa di approvazione",
+    to: email,
+    subject: 'Benvenuto su Montecarlo 2013',
     html: `
-      <p>Ciao Admin,</p>
-      <p>L'utente <strong>${pending.username}</strong> (${pending.email}) ha confermato l'email.</p>
-      <p>Vai al <a href="https://montecarlo2013.it/#/admin-panel">Pannello Admin</a>.</p>
+      <p>Ciao ${username},</p>
+      <p>La tua registrazione è stata approvata. Ora puoi accedere con email e password.</p>
+      <p><a href=\"https://montecarlo2013.it/login\">Accedi</a></p>
     `,
-  });
+  })
 
-  // 6. Risposta HTML
-  return {
-    statusCode: 200,
-    headers: { "Content-Type": "text/html" },
-    body: `
-      <html>
-        <head><meta charset="utf-8"><title>Email Confermata</title></head>
-        <body style="font-family:sans-serif;text-align:center;padding:2rem">
-          <h1 style="color:#2a9d8f">Email Confermata!</h1>
-          <p>Grazie, la tua email è stata confermata.</p>
-          <p>Attendi l'approvazione dell'amministratore.</p>
-          <a href="https://montecarlo2013.it/#/login" style="display:inline-block;margin-top:1rem;padding:0.75rem 1.5rem;background:#264653;color:#fff;text-decoration:none;border-radius:4px">
-            Vai al Login
-          </a>
-        </body>
-      </html>
-    `,
-  };
-};
+  return { statusCode: 200, body: JSON.stringify({ success: true }) }
+}
