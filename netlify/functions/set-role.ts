@@ -8,10 +8,12 @@ const supabaseAdmin = createClient(
 );
 
 export const handler: Handler = async (event) => {
+  // 1) Solo POST
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
+  // 2) Leggi e valida body
   let body: { email?: string; role?: string };
   try {
     body = JSON.parse(event.body || "{}");
@@ -23,13 +25,12 @@ export const handler: Handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: "Missing email or role" }) };
   }
 
-  // 1) Recupera il pending_user confermato
+  // 3) Recupera il pending_user
   const { data: pending, error: pErr } = await supabaseAdmin
     .from("pending_users")
     .select("username, password, confirmed")
     .eq("email", email)
     .single();
-
   if (pErr || !pending) {
     return { statusCode: 404, body: JSON.stringify({ error: "Pending user not found" }) };
   }
@@ -37,15 +38,20 @@ export const handler: Handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: "Email not yet confirmed" }) };
   }
 
-  // 2) Verifica se esiste già su auth.users
-  const { data: authUser, error: uErr } = await supabaseAdmin
-    .from("auth.users")
-    .select("id, raw_app_meta_data")
-    .eq("email", email)
-    .single();
+  // 4) Verifica in Auth se l'utente esiste
+  const { data: listRes, error: listErr } = await supabaseAdmin.auth.admin.listUsers({
+    filter: `email=eq.${email}`,
+  });
+  if (listErr) {
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Error listing users", details: listErr.message }),
+    };
+  }
 
-  if (uErr || !authUser) {
-    // 2a) se non esiste, lo creo
+  let userId: string;
+  if (listRes.users.length === 0) {
+    // 4a) Non esiste → crea utente
     const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: pending.password,
@@ -58,30 +64,30 @@ export const handler: Handler = async (event) => {
         body: JSON.stringify({ error: "Error creating user", details: createErr.message }),
       };
     }
+    userId = newUser.id;
   } else {
-    // 2b) se esiste, aggiorno solo il role
-    const updatedMeta = {
-      ...(authUser.raw_app_meta_data || {}),
-      role,
-    };
-    const { error: upErr } = await supabaseAdmin
-      .from("auth.users")
-      .update({ raw_app_meta_data: updatedMeta })
-      .eq("id", authUser.id);
-    if (upErr) {
+    // 4b) Esiste → aggiorna solo il role
+    const existing = listRes.users[0];
+    userId = existing.id;
+    const existingMeta = existing.user_metadata || {};
+    const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      user_metadata: { ...existingMeta, role },
+    });
+    if (updateErr) {
       return {
         statusCode: 500,
-        body: JSON.stringify({ error: "Error updating role", details: upErr.message }),
+        body: JSON.stringify({ error: "Error updating role", details: updateErr.message }),
       };
     }
   }
 
-  // 3) (Opzionale) Pulisci la password da pending_users
+  // 5) Pulisci la password dalla tabella pending_users
   await supabaseAdmin
     .from("pending_users")
     .update({ password: null })
     .eq("email", email);
 
+  // 6) Tutto OK
   return {
     statusCode: 200,
     body: JSON.stringify({ success: true }),
