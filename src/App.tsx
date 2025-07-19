@@ -45,14 +45,15 @@ export default function App() {
           }
         >
           <Route index element={<Home />} />
-          <Route path="calendario"      element={<Calendario />} />
-          <Route path="risultati"       element={<Risultati />} />
-          <Route path="rosa"            element={<RosaGiocatori />} />
-          <Route path="squadre"         element={<ListaSquadre />} />
-          <Route path="statistiche/squadra"  element={<StatisticheSquadra />} />
+          <Route path="calendario"            element={<Calendario />} />
+          <Route path="risultati"             element={<Risultati />} />
+          <Route path="rosa"                  element={<RosaGiocatori />} />
+          <Route path="squadre"               element={<ListaSquadre />} />
+          <Route path="squadre/:id"           element={<ListaSquadre />} />
+          <Route path="statistiche/squadra"   element={<StatisticheSquadra />} />
           <Route path="statistiche/giocatori" element={<StatisticheGiocatori />} />
-          <Route path="prossima-partita" element={<ProssimaPartita />} />
-          <Route path="tornei"          element={<Tornei />} />
+          <Route path="prossima-partita"      element={<ProssimaPartita />} />
+          <Route path="tornei"                element={<Tornei />} />
 
           {/* ADMIN – solo creator */}
           <Route
