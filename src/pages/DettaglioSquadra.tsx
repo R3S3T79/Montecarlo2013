@@ -1,9 +1,11 @@
 // src/pages/DettaglioSquadra.tsx
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { ArrowLeft, Trash2, ExternalLink, Edit } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { UserRole } from '../lib/roles';
 
 interface Squadra {
   id: string;
@@ -17,9 +19,19 @@ interface Squadra {
 export default function DettaglioSquadra(): JSX.Element {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+
   const [squadra, setSquadra] = useState<Squadra | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
+  // Ricava il ruolo e decide se mostrare Modifica/Elimina
+  const role =
+    (user?.user_metadata?.role as UserRole) ||
+    (user?.app_metadata?.role as UserRole) ||
+    UserRole.Authenticated;
+  const canEdit = role === UserRole.Admin || role === UserRole.Creator;
+
+  // Fetch dati squadra
   useEffect(() => {
     if (!id) {
       setLoading(false);
@@ -40,6 +52,7 @@ export default function DettaglioSquadra(): JSX.Element {
     })();
   }, [id]);
 
+  // Handlers
   const handleDelete = async (): Promise<void> => {
     if (!id) return;
     if (!window.confirm('Sei sicuro di voler eliminare questa squadra?')) return;
@@ -48,7 +61,7 @@ export default function DettaglioSquadra(): JSX.Element {
       console.error('Errore eliminazione:', error);
       alert('Eliminazione fallita');
     } else {
-      navigate('/squadre');
+      navigate('/squadre', { replace: true });
     }
   };
 
@@ -65,14 +78,14 @@ export default function DettaglioSquadra(): JSX.Element {
     navigate(`/squadre/${id}/edit`);
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return <div className="p-4 text-center">Caricamento…</div>;
   }
   if (!squadra) {
     return <div className="p-4 text-center">Squadra non trovata</div>;
   }
 
-  // Solo vero embed di Google Maps: contiene "/maps/embed?pb="
+  // Valida embed mappa
   const validMap =
     typeof squadra.mappa_url === 'string' &&
     squadra.mappa_url.includes('/maps/embed?pb=');
@@ -81,34 +94,37 @@ export default function DettaglioSquadra(): JSX.Element {
     <div className="min-h-screen bg-white">
       {/* Top bar: back + edit + delete */}
       <div className="flex items-center justify-between p-4 border-b">
-        <button
-          onClick={() => navigate('/squadre')}
+        <Link
+          to="/squadre"
           className="flex items-center text-gray-600 hover:text-gray-900"
         >
           <ArrowLeft size={20} />
           <span className="ml-2">Lista Squadre</span>
-        </button>
-        <div className="flex space-x-2">
-          <button
-            onClick={handleEdit}
-            className="flex items-center text-blue-600 hover:text-blue-800"
-          >
-            <Edit size={20} />
-            <span className="ml-2">Modifica</span>
-          </button>
-          <button
-            onClick={handleDelete}
-            className="flex items-center text-red-600 hover:text-red-800"
-          >
-            <Trash2 size={20} />
-            <span className="ml-2">Elimina</span>
-          </button>
-        </div>
+        </Link>
+
+        {canEdit && (
+          <div className="flex space-x-2">
+            <button
+              onClick={handleEdit}
+              className="flex items-center text-blue-600 hover:text-blue-800"
+            >
+              <Edit size={20} />
+              <span className="ml-2">Modifica</span>
+            </button>
+            <button
+              onClick={handleDelete}
+              className="flex items-center text-red-600 hover:text-red-800"
+            >
+              <Trash2 size={20} />
+              <span className="ml-2">Elimina</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Contenuto */}
       <div className="max-w-3xl mx-auto p-6 space-y-8">
-        {/* Logo e nome (nome sotto il logo) */}
+        {/* Logo e nome */}
         <div className="flex flex-col items-center space-y-4">
           {squadra.logo_url ? (
             <img
@@ -128,15 +144,19 @@ export default function DettaglioSquadra(): JSX.Element {
         <div className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold">Stadio</h2>
-            <p className="text-gray-700">{squadra.nome_stadio ?? 'Da inserire'}</p>
+            <p className="text-gray-700">
+              {squadra.nome_stadio ?? 'Da inserire'}
+            </p>
           </div>
           <div>
             <h2 className="text-lg font-semibold">Indirizzo</h2>
-            <p className="text-gray-700">{squadra.indirizzo ?? 'Da inserire'}</p>
+            <p className="text-gray-700">
+              {squadra.indirizzo ?? 'Da inserire'}
+            </p>
           </div>
         </div>
 
-        {/* Mappa e bottone Naviga (solo se validMap = true) */}
+        {/* Mappa e navigazione */}
         {validMap && (
           <div>
             <h2 className="text-lg font-semibold mb-2">Mappa</h2>
