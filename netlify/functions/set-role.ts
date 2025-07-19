@@ -8,12 +8,10 @@ const supabaseAdmin = createClient(
 );
 
 export const handler: Handler = async (event) => {
-  // 1) Solo POST
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
-  // 2) Leggi e valida body
   let body: { email?: string; role?: string };
   try {
     body = JSON.parse(event.body || "{}");
@@ -25,7 +23,7 @@ export const handler: Handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: "Missing email or role" }) };
   }
 
-  // 3) Recupera il pending_user
+  // 1. Recupera pending_user confermato
   const { data: pending, error: pErr } = await supabaseAdmin
     .from("pending_users")
     .select("username, password, confirmed")
@@ -38,7 +36,7 @@ export const handler: Handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: "Email not yet confirmed" }) };
   }
 
-  // 4) Verifica in Auth se l'utente esiste
+  // 2. Cerca in Auth con listUsers()
   const { data: listRes, error: listErr } = await supabaseAdmin.auth.admin.listUsers({
     filter: `email=eq.${email}`,
   });
@@ -51,10 +49,10 @@ export const handler: Handler = async (event) => {
 
   let userId: string;
   if (listRes.users.length === 0) {
-    // 4a) Non esiste → crea utente
+    // 2a. Non esiste → crea
     const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password: pending.password,
+      password: pending.password!,
       user_metadata: { username: pending.username, role },
       email_confirm: true,
     });
@@ -66,7 +64,7 @@ export const handler: Handler = async (event) => {
     }
     userId = newUser.id;
   } else {
-    // 4b) Esiste → aggiorna solo il role
+    // 2b. Esiste → aggiorna il solo role
     const existing = listRes.users[0];
     userId = existing.id;
     const existingMeta = existing.user_metadata || {};
@@ -81,13 +79,12 @@ export const handler: Handler = async (event) => {
     }
   }
 
-  // 5) Pulisci la password dalla tabella pending_users
+  // 3. Pulisci la password e salva il role in pending_users
   await supabaseAdmin
     .from("pending_users")
-    .update({ password: null })
+    .update({ password: null, role })
     .eq("email", email);
 
-  // 6) Tutto OK
   return {
     statusCode: 200,
     body: JSON.stringify({ success: true }),
