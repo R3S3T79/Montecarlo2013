@@ -1,3 +1,4 @@
+// src/App.tsx
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
@@ -10,15 +11,16 @@ import Home from './pages/Home';
 import Calendario from './pages/Calendario';
 import Risultati from './pages/Risultati';
 import RosaGiocatori from './pages/RosaGiocatori';
-import DettaglioGiocatore from './pages/DettaglioGiocatore';
 import ListaSquadre from './pages/ListaSquadre';
-import DettaglioSquadra from './pages/DettaglioSquadra';
 import StatisticheSquadra from './pages/StatisticheSquadra';
 import StatisticheGiocatori from './pages/StatisticheGiocatori';
 import ProssimaPartita from './pages/ProssimaPartita';
 import Tornei from './pages/tornei/NuovoTorneo/Tornei';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminPanel from './pages/AdminPanel';
+import DettaglioGiocatore from './pages/DettaglioGiocatore';
+import AggiungiGiocatore from './pages/AggiungiGiocatore';
+import DettaglioSquadra from './pages/DettaglioSquadra';
 
 // Auth
 import LoginPage from './pages/LoginPage';
@@ -36,6 +38,11 @@ export default function App() {
         <Route path="/confirm"       element={<ConfirmPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
 
+        {/* PUBBLICHE NON PROTETTE */}
+        <Route path="/rosa"               element={<RosaGiocatori />} />
+        <Route path="/giocatore/:id"     element={<DettaglioGiocatore />} />
+        <Route path="/aggiungi-giocatore" element={<AggiungiGiocatore />} />
+
         {/* PROTETTE – qualunque utente autenticato */}
         <Route
           path="/"
@@ -48,8 +55,6 @@ export default function App() {
           <Route index element={<Home />} />
           <Route path="calendario"            element={<Calendario />} />
           <Route path="risultati"             element={<Risultati />} />
-          <Route path="rosa"                  element={<RosaGiocatori />} />
-          <Route path="rosa/:id"              element={<DettaglioGiocatore />} />
           <Route path="squadre"               element={<ListaSquadre />} />
           <Route path="squadre/:id"           element={<DettaglioSquadra />} />
           <Route path="statistiche/squadra"   element={<StatisticheSquadra />} />
