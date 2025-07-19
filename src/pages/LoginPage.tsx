@@ -1,7 +1,6 @@
-// src/pages/auth/Login.tsx
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { supabase } from "../lib/supabaseClient"; // adatta il path al tuo progetto
+import { supabase } from "../../lib/supabaseClient";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -20,13 +19,22 @@ export default function Login() {
       password,
     });
 
-    setLoading(false);
-
     if (error) {
       setErrorMsg(error.message);
+      setLoading(false);
     } else {
-      // Login avvenuto con successo
-      navigate("/");
+      // Aspetta che la sessione venga caricata prima di navigare
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        navigate("/");
+      } else {
+        setErrorMsg("Login riuscito, ma sessione non trovata");
+      }
+
+      setLoading(false);
     }
   };
 
@@ -80,10 +88,7 @@ export default function Login() {
 
         <p className="mt-4 text-center text-sm">
           Non hai un account?{" "}
-          <Link
-            to="/register"
-            className="text-blue-600 hover:underline"
-          >
+          <Link to="/register" className="text-blue-600 hover:underline">
             Registrati
           </Link>
         </p>
