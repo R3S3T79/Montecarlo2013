@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Calendar } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { UserRole } from '../lib/roles';
 
 interface Partita {
   id: string;
@@ -16,9 +18,17 @@ export default function Calendario(): JSX.Element {
   const [partite, setPartite] = useState<Partita[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+
+  // Ricava il ruolo e stabilisci se mostrare il pulsante "+"
+  const role =
+    (user?.user_metadata?.role as UserRole) ||
+    (user?.app_metadata?.role as UserRole) ||
+    UserRole.Authenticated;
+  const canAdd = role === UserRole.Admin || role === UserRole.Creator;
 
   useEffect(() => {
-    const fetchPartite = async () => {
+    async function fetchPartite() {
       const now = new Date().toISOString();
       const { data, error } = await supabase
         .from('partite')
@@ -33,16 +43,21 @@ export default function Calendario(): JSX.Element {
         .order('data_ora', { ascending: true });
 
       if (error) console.error('Errore fetch partite:', error);
-      else setPartite(data || []);
+      else setPartite(data ?? []);
       setLoading(false);
-    };
+    }
     fetchPartite();
   }, []);
 
-  // ❌ vecchio: navigate(`/prepartita/${id}`)
-  // ✅ corretto: usa il trattino per abbinare la route definita in App.tsx
-  const handleClick = (id: string) =>
-    navigate(`/pre-partita/${id}`);
+  const handleClick = (id: string) => navigate(`/pre-partita/${id}`);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Caricamento…
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-montecarlo-light">
@@ -51,18 +66,23 @@ export default function Calendario(): JSX.Element {
         <div className="relative mb-6">
           <div className="bg-white rounded-xl shadow-montecarlo p-6">
             <div className="flex items-center justify-center mb-4">
-              <Calendar className="text-montecarlo-secondary mr-3" size={28} />
+              <Calendar
+                className="text-montecarlo-secondary mr-3"
+                size={28}
+              />
               <h2 className="text-2xl font-bold text-montecarlo-secondary">
                 Calendario Partite
               </h2>
             </div>
-            <button
-              onClick={() => navigate('/nuova-partita')}
-              className="absolute right-2 top-2 w-10 h-10 bg-gradient-montecarlo text-white rounded-full flex items-center justify-center hover:shadow-montecarlo-lg transition-all duration-300 transform hover:scale-105"
-              aria-label="Nuova Partita"
-            >
-              <Plus size={20} />
-            </button>
+            {canAdd && (
+              <button
+                onClick={() => navigate('/nuova-partita')}
+                className="absolute right-2 top-2 w-10 h-10 bg-gradient-montecarlo text-white rounded-full flex items-center justify-center hover:shadow-montecarlo-lg transition-all duration-300 transform hover:scale-105"
+                aria-label="Nuova Partita"
+              >
+                <Plus size={20} />
+              </button>
+            )}
           </div>
         </div>
 
