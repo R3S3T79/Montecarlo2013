@@ -1,4 +1,3 @@
-// src/App.tsx
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
@@ -11,7 +10,9 @@ import Home from './pages/Home';
 import Calendario from './pages/Calendario';
 import Risultati from './pages/Risultati';
 import RosaGiocatori from './pages/RosaGiocatori';
+import DettaglioGiocatore from './pages/DettaglioGiocatore';
 import ListaSquadre from './pages/ListaSquadre';
+import DettaglioSquadra from './pages/DettaglioSquadra';
 import StatisticheSquadra from './pages/StatisticheSquadra';
 import StatisticheGiocatori from './pages/StatisticheGiocatori';
 import ProssimaPartita from './pages/ProssimaPartita';
@@ -48,8 +49,9 @@ export default function App() {
           <Route path="calendario"            element={<Calendario />} />
           <Route path="risultati"             element={<Risultati />} />
           <Route path="rosa"                  element={<RosaGiocatori />} />
+          <Route path="rosa/:id"              element={<DettaglioGiocatore />} />
           <Route path="squadre"               element={<ListaSquadre />} />
-          <Route path="squadre/:id"           element={<ListaSquadre />} />
+          <Route path="squadre/:id"           element={<DettaglioSquadra />} />
           <Route path="statistiche/squadra"   element={<StatisticheSquadra />} />
           <Route path="statistiche/giocatori" element={<StatisticheGiocatori />} />
           <Route path="prossima-partita"      element={<ProssimaPartita />} />
