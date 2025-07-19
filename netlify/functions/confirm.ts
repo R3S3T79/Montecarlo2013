@@ -19,7 +19,7 @@ const transporter = nodemailer.createTransport({
 });
 
 export const handler: Handler = async (event) => {
-  // Accetto solo GET
+  // 1) Rifiuto tutto tranne GET
   if (event.httpMethod !== "GET") {
     return {
       statusCode: 405,
@@ -28,20 +28,20 @@ export const handler: Handler = async (event) => {
     };
   }
 
-  // 1. Leggo il token
+  // 2) Leggo il token
   const token = event.queryStringParameters?.token;
   if (!token) {
     return {
       statusCode: 400,
       headers: { "Content-Type": "text/html" },
-      body: `<h1>Token mancante</h1><p>Link non valido.</p>`,
+      body: `<h1>Token mancante</h1><p>Il link non è valido.</p>`,
     };
   }
 
-  // 2. Cerco in pending_users
+  // 3) Cerco il record, includendo il flag `confirmed`
   const { data: pending, error: selErr } = await supabase
     .from("pending_users")
-    .select("email, username, created_at, expires_at")
+    .select("email, username, created_at, expires_at, confirmed")
     .eq("confirmation_token", token)
     .single();
 
@@ -53,7 +53,28 @@ export const handler: Handler = async (event) => {
     };
   }
 
-  // 3. Controllo scadenza
+  // 4) Se era già confermato, mostro solo un messaggio senza inviare altre mail
+  if (pending.confirmed) {
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "text/html" },
+      body: `
+        <html><head><meta charset="utf-8"><title>Email già confermata</title></head>
+        <body style="font-family:sans-serif;text-align:center;padding:2rem">
+          <h1 style="color:#2a9d8f">Email già confermata!</h1>
+          <p>Hai già confermato la tua email.</p>
+          <a href="https://montecarlo2013.it/#/login"
+             style="display:inline-block;margin-top:1rem;
+                    padding:0.75rem 1.5rem;background:#264653;
+                    color:#fff;text-decoration:none;border-radius:4px">
+            Vai al Login
+          </a>
+        </body></html>
+      `,
+    };
+  }
+
+  // 5) Controllo scadenza
   if (new Date(pending.expires_at) < new Date()) {
     return {
       statusCode: 410,
@@ -62,31 +83,32 @@ export const handler: Handler = async (event) => {
     };
   }
 
-  // 4. Aggiorno confirmed = true
-  const { data: updatedRows, error: upErr } = await supabase
+  // 6) Marco come confermato
+  const { error: upErr } = await supabase
     .from("pending_users")
     .update({ confirmed: true })
     .eq("confirmation_token", token);
 
   if (upErr) {
     console.error("❌ Errore UPDATE confirmed:", upErr);
-  } else {
-    console.log(`✅ pending_users aggiornati (${updatedRows?.length || 0} row)`);
+    // procedo comunque a mostrare la pagina
   }
 
-  // 5. Notifica email all'admin
+  // 7) Invio **una sola** mail all’admin
   await transporter.sendMail({
     from: process.env.SMTP_FROM,
     to: "marcomiressi@gmail.com",
     subject: "Nuova registrazione in attesa di approvazione",
     html: `
       <p>Ciao Admin,</p>
-      <p>L'utente <strong>${pending.username}</strong> (${pending.email}) ha confermato l'email.</p>
+      <p>L'utente <strong>${pending.username}</strong> 
+      (<a href="mailto:${pending.email}">${pending.email}</a>) 
+      ha confermato l'email.</p>
       <p>Vai al <a href="https://montecarlo2013.it/#/admin-panel">Pannello Admin</a>.</p>
     `,
   });
 
-  // 6. Risposta HTML
+  // 8) Rendo la pagina di conferma all’utente
   return {
     statusCode: 200,
     headers: { "Content-Type": "text/html" },
@@ -97,7 +119,10 @@ export const handler: Handler = async (event) => {
           <h1 style="color:#2a9d8f">Email Confermata!</h1>
           <p>Grazie, la tua email è stata confermata.</p>
           <p>Attendi l'approvazione dell'amministratore.</p>
-          <a href="https://montecarlo2013.it/#/login" style="display:inline-block;margin-top:1rem;padding:0.75rem 1.5rem;background:#264653;color:#fff;text-decoration:none;border-radius:4px">
+          <a href="https://montecarlo2013.it/#/login"
+             style="display:inline-block;margin-top:1rem;
+                    padding:0.75rem 1.5rem;background:#264653;
+                    color:#fff;text-decoration:none;border-radius:4px">
             Vai al Login
           </a>
         </body>
