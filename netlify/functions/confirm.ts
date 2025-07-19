@@ -71,10 +71,10 @@ export const handler: Handler = async (event) => {
     };
   }
 
-  // 4) Marco come confermato e rimuovo il token, con debug
+  // 4) Marco come confermato (non tocco più confirmation_token)
   const { data: updatedRows, error: upErr } = await supabase
     .from("pending_users")
-    .update({ confirmed: true, confirmation_token: null })
+    .update({ confirmed: true })
     .eq("confirmation_token", token);
 
   if (upErr) {
@@ -83,7 +83,7 @@ export const handler: Handler = async (event) => {
     console.log(`✅ pending_users aggiornati (${updatedRows?.length || 0} row)`);
   }
 
-  // 5) Mando notifica email all'admin
+  // 5) Notifica email all'admin
   await transporter.sendMail({
     from: process.env.SMTP_FROM,
     to: "marcomiressi@gmail.com",
