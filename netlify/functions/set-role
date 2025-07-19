@@ -1,0 +1,47 @@
+  const approveUser = async (email: string, role: UserRole) => {
+    if (processingUsers.has(email)) return;
+    setProcessingUsers((prev) => new Set(prev).add(email));
+
+    // Ottieni il token di sessione
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      alert("Sessione scaduta. Esegui di nuovo il login.");
+      setProcessingUsers((prev) => {
+        const next = new Set(prev);
+        next.delete(email);
+        return next;
+      });
+      return;
+    }
+
+    try {
+-     const res = await fetch("/.netlify/functions/approve-user", {
++     const res = await fetch("/.netlify/functions/set-role", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ email, role }),
+      });
+      const result = await res.json();
+
+      if (res.ok) {
+        setPendingUsers((prev) => prev.filter((u) => u.email !== email));
+        alert(`Utente ${email} promosso a ${role}`);
+      } else {
+        alert(`Errore: ${result.error || result.message}`);
+      }
+    } catch (err) {
+      console.error("Errore nel set-role:", err);
+      alert("Errore di connessione");
+    } finally {
+      setProcessingUsers((prev) => {
+        const next = new Set(prev);
+        next.delete(email);
+        return next;
+      });
+    }
+  };
