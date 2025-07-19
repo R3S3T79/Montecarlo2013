@@ -1,9 +1,11 @@
 // src/pages/DettaglioPrePartita.tsx
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { ArrowLeft, Edit2, Trash2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { UserRole } from '../lib/roles';
 
 interface Squadra {
   id: string;
@@ -23,10 +25,27 @@ interface Partita {
 export default function DettaglioPrePartita(): JSX.Element {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+
   const [partita, setPartita] = useState<Partita | null>(null);
   const [precedenti, setPrecedenti] = useState<Partita[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Ruolo e permessi
+  const role =
+    (user?.user_metadata?.role as UserRole) ||
+    (user?.app_metadata?.role as UserRole) ||
+    UserRole.Authenticated;
+  const canEdit = role === UserRole.Admin || role === UserRole.Creator;
+
+  // Redirect se non autenticato
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/login', { replace: true });
+    }
+  }, [user, authLoading, navigate]);
+
+  // Carica i dati della partita
   useEffect(() => {
     if (!id) {
       setLoading(false);
@@ -54,6 +73,7 @@ export default function DettaglioPrePartita(): JSX.Element {
     })();
   }, [id]);
 
+  // Carica gli scontri precedenti
   useEffect(() => {
     if (!partita) return;
     (async () => {
@@ -87,12 +107,16 @@ export default function DettaglioPrePartita(): JSX.Element {
       console.error('Errore eliminazione:', error);
       alert('Eliminazione fallita');
     } else {
-      navigate('/calendario');
+      navigate('/calendario', { replace: true });
     }
   };
 
-  if (loading) return <div className="text-center p-4">Caricamento…</div>;
-  if (!partita) return <div className="text-center p-4">Partita non trovata</div>;
+  if (authLoading || loading) {
+    return <div className="text-center p-4">Caricamento…</div>;
+  }
+  if (!partita) {
+    return <div className="text-center p-4">Partita non trovata</div>;
+  }
 
   const formattedDate = new Date(partita.data_ora).toLocaleDateString(undefined, {
     day: '2-digit',
@@ -103,27 +127,26 @@ export default function DettaglioPrePartita(): JSX.Element {
   return (
     <>
       {/* top bar */}
-      <div className="flex items-center justify-between mb-6">
-        <button
-          onClick={() => navigate(-1)}
-          className="text-gray-600 hover:text-gray-900"
-        >
+      <div className="flex items-center justify-between mb-6 px-4">
+        <Link to="/calendario" className="text-gray-600 hover:text-gray-900">
           <ArrowLeft size={20} />
-        </button>
-        <div className="flex space-x-2">
-          <button
-            onClick={() => navigate(`/edit-partita/${id}`)}
-            className="flex items-center px-2 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
-          >
-            <Edit2 size={14} />
-          </button>
-          <button
-            onClick={handleDelete}
-            className="flex items-center px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
+        </Link>
+        {canEdit && (
+          <div className="flex space-x-2">
+            <button
+              onClick={() => navigate(`/edit-partita/${id}`)}
+              className="flex items-center px-2 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
+            >
+              <Edit2 size={14} />
+            </button>
+            <button
+              onClick={handleDelete}
+              className="flex items-center px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* data */}
@@ -164,7 +187,7 @@ export default function DettaglioPrePartita(): JSX.Element {
 
       {/* scontri precedenti */}
       {precedenti.length > 0 && (
-        <div className="mb-6 text-justify">
+        <div className="mb-6 text-justify px-4">
           <h3 className="text-base font-semibold mb-3 text-center">
             Scontri precedenti
           </h3>
