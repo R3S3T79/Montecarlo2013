@@ -19,7 +19,7 @@ const transporter = nodemailer.createTransport({
 });
 
 export const handler: Handler = async (event) => {
-  // 1) Rifiuto tutto tranne GET
+  // 1) Solo GET
   if (event.httpMethod !== "GET") {
     return {
       statusCode: 405,
@@ -28,17 +28,17 @@ export const handler: Handler = async (event) => {
     };
   }
 
-  // 2) Leggo il token
+  // 2) Leggi token
   const token = event.queryStringParameters?.token;
   if (!token) {
     return {
       statusCode: 400,
       headers: { "Content-Type": "text/html" },
-      body: `<h1>Token mancante</h1><p>Il link non è valido.</p>`,
+      body: `<h1>Token mancante</h1><p>Link non valido.</p>`,
     };
   }
 
-  // 3) Cerco il record, includendo il flag `confirmed`
+  // 3) Recupera pending_user
   const { data: pending, error: selErr } = await supabase
     .from("pending_users")
     .select("email, username, created_at, expires_at, confirmed")
@@ -49,20 +49,20 @@ export const handler: Handler = async (event) => {
     return {
       statusCode: 404,
       headers: { "Content-Type": "text/html" },
-      body: `<h1>Link non valido o già usato</h1>`,
+      body: `<h1>Link non valido o già utilizzato</h1>`,
     };
   }
 
-  // 4) Se era già confermato, mostro solo un messaggio senza inviare altre mail
+  // 4) Se già confermato, mostra pagina “già confermato”
   if (pending.confirmed) {
     return {
       statusCode: 200,
       headers: { "Content-Type": "text/html" },
       body: `
-        <html><head><meta charset="utf-8"><title>Email già confermata</title></head>
+        <html><head><meta charset="utf-8"><title>Già confermato</title></head>
         <body style="font-family:sans-serif;text-align:center;padding:2rem">
           <h1 style="color:#2a9d8f">Email già confermata!</h1>
-          <p>Hai già confermato la tua email.</p>
+          <p>Hai già completato la conferma.</p>
           <a href="https://montecarlo2013.it/#/login"
              style="display:inline-block;margin-top:1rem;
                     padding:0.75rem 1.5rem;background:#264653;
@@ -74,7 +74,7 @@ export const handler: Handler = async (event) => {
     };
   }
 
-  // 5) Controllo scadenza
+  // 5) Controlla scadenza
   if (new Date(pending.expires_at) < new Date()) {
     return {
       statusCode: 410,
@@ -83,18 +83,17 @@ export const handler: Handler = async (event) => {
     };
   }
 
-  // 6) Marco come confermato
+  // 6) Marca come confermato
   const { error: upErr } = await supabase
     .from("pending_users")
     .update({ confirmed: true })
     .eq("confirmation_token", token);
 
   if (upErr) {
-    console.error("❌ Errore UPDATE confirmed:", upErr);
-    // procedo comunque a mostrare la pagina
+    console.error("Errore UPDATE confirmed:", upErr);
   }
 
-  // 7) Invio **una sola** mail all’admin
+  // 7) Notifica admin
   await transporter.sendMail({
     from: process.env.SMTP_FROM,
     to: "marcomiressi@gmail.com",
@@ -108,7 +107,7 @@ export const handler: Handler = async (event) => {
     `,
   });
 
-  // 8) Rendo la pagina di conferma all’utente
+  // 8) Mostra pagina di conferma
   return {
     statusCode: 200,
     headers: { "Content-Type": "text/html" },
