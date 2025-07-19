@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { PlusCircle } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { UserRole } from '../lib/roles';
 
 interface Squadra {
   id: string;
@@ -19,6 +21,14 @@ export default function ListaSquadre() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { id } = useParams<{ id?: string }>();
+  const { user, loading: authLoading } = useAuth();
+
+  // Ricava il ruolo e decide se mostrare il pulsante “+”
+  const role =
+    (user?.user_metadata?.role as UserRole) ||
+    (user?.app_metadata?.role as UserRole) ||
+    UserRole.Authenticated;
+  const canAdd = role === UserRole.Admin || role === UserRole.Creator;
 
   useEffect(() => {
     if (id) {
@@ -41,29 +51,31 @@ export default function ListaSquadre() {
     fetchSquadre();
   }, [id]);
 
-  if (loading) {
+  if (loading || authLoading) {
     return <div className="p-4 text-center">Caricamento...</div>;
   }
 
   return (
     <div className="container mx-auto px-4 py-6">
-      {/* Header: titolo centrato + pulsante “+” a destra */}
+      {/* Header: titolo centrato + pulsante “+” a destra (solo per admin/creator) */}
       <div className="flex justify-center items-center mb-6 space-x-4">
         <h1 className="text-xl font-bold">Lista Squadre</h1>
-        <button
-          onClick={() => navigate('/squadre/nuova')}
-          title="Nuova Squadra"
-          className="
-            flex items-center justify-center
-            w-10 h-10
-            bg-blue-600 text-white
-            rounded-full
-            hover:bg-blue-700
-            transition-colors
-          "
-        >
-          <PlusCircle size={20} />
-        </button>
+        {canAdd && (
+          <button
+            onClick={() => navigate('/squadre/nuova')}
+            title="Nuova Squadra"
+            className="
+              flex items-center justify-center
+              w-10 h-10
+              bg-blue-600 text-white
+              rounded-full
+              hover:bg-blue-700
+              transition-colors
+            "
+          >
+            <PlusCircle size={20} />
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
