@@ -63,7 +63,7 @@ export default function RosaGiocatori(): JSX.Element {
             {giocatori.map((g) => (
               <div
                 key={g.id}
-                onClick={() => navigate(`/rosa/${g.id}`)}  {/* ✅ CORRETTO */}
+                onClick={() => navigate(`/rosa/${g.id}`)}
                 className="bg-white rounded-lg shadow-montecarlo hover:shadow-montecarlo-lg border-l-4 border-montecarlo-secondary cursor-pointer transition-all duration-300 transform hover:scale-[1.02] p-4"
               >
                 <div className="flex items-center space-x-4">
