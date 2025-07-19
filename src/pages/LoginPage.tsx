@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { supabase } from "../../lib/supabaseClient";
+import { supabase } from "../lib/supabaseClient";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -23,7 +23,6 @@ export default function Login() {
       setErrorMsg(error.message);
       setLoading(false);
     } else {
-      // Aspetta che la sessione venga caricata prima di navigare
       const {
         data: { user },
       } = await supabase.auth.getUser();
