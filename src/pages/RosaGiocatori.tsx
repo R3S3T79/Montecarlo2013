@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { Users, Plus } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { UserRole } from '../lib/roles';
 
 interface Giocatore {
   id: string;
@@ -17,6 +19,13 @@ export default function RosaGiocatori(): JSX.Element {
   const [giocatori, setGiocatori] = useState<Giocatore[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const canEdit =
+    user?.app_metadata?.role === UserRole.Admin ||
+    user?.app_metadata?.role === UserRole.Creator ||
+    user?.user_metadata?.role === UserRole.Admin ||
+    user?.user_metadata?.role === UserRole.Creator;
 
   useEffect(() => {
     const fetchGiocatori = async () => {
@@ -44,13 +53,16 @@ export default function RosaGiocatori(): JSX.Element {
               <Users className="text-montecarlo-secondary mr-3" size={28} />
               <h1 className="text-2xl font-bold text-montecarlo-secondary">Rosa Giocatori</h1>
             </div>
-            <button
-              onClick={() => navigate('/aggiungi-giocatore')}
-              className="absolute right-2 top-2 w-10 h-10 bg-gradient-montecarlo text-white rounded-full flex items-center justify-center hover:shadow-montecarlo-lg transition-all duration-300 transform hover:scale-105"
-              aria-label="Aggiungi Giocatore"
-            >
-              <Plus size={20} />
-            </button>
+
+            {canEdit && (
+              <button
+                onClick={() => navigate('/aggiungi-giocatore')}
+                className="absolute right-2 top-2 w-10 h-10 bg-gradient-montecarlo text-white rounded-full flex items-center justify-center hover:shadow-montecarlo-lg transition-all duration-300 transform hover:scale-105"
+                aria-label="Aggiungi Giocatore"
+              >
+                <Plus size={20} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -63,7 +75,7 @@ export default function RosaGiocatori(): JSX.Element {
             {giocatori.map((g) => (
               <div
                 key={g.id}
-                onClick={() => navigate(`/rosa/${g.id}`)}
+                onClick={() => navigate(`/giocatore/${g.id}`)}
                 className="bg-white rounded-lg shadow-montecarlo hover:shadow-montecarlo-lg border-l-4 border-montecarlo-secondary cursor-pointer transition-all duration-300 transform hover:scale-[1.02] p-4"
               >
                 <div className="flex items-center space-x-4">
