@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabaseClient';
 import { Trophy, X, Plus, Calendar, MapPin, Users } from 'lucide-react';
+import { useAuth } from '../../../context/AuthContext';
+import { UserRole } from '../../../lib/roles';
 
 interface TorneoMeta {
   id: string;
@@ -18,6 +20,13 @@ export default function Tornei() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  const { user, loading: authLoading } = useAuth();
+  const role =
+    (user?.user_metadata?.role as UserRole) ||
+    (user?.app_metadata?.role as UserRole) ||
+    UserRole.Authenticated;
+  const canAdd = role === UserRole.Admin || role === UserRole.Creator;
+
   useEffect(() => {
     fetchListaTornei();
   }, []);
@@ -25,7 +34,6 @@ export default function Tornei() {
   async function fetchListaTornei() {
     setLoading(true);
     try {
-      // 1) prendi tornei base
       const { data: tornei, error: errT } = await supabase
         .from('tornei')
         .select('id, nome, luogo, stagione_id')
@@ -34,8 +42,6 @@ export default function Tornei() {
         console.error('Errore fetch tornei:', errT);
         return;
       }
-
-      // 2) prendi nomi stagioni
       const stagIds = Array.from(new Set(tornei.map(t => t.stagione_id)));
       const { data: st, error: errSt } = await supabase
         .from('stagioni')
@@ -44,8 +50,6 @@ export default function Tornei() {
       if (errSt) console.error('Errore fetch stagioni:', errSt);
       const mappaStag: Record<string,string> = {};
       st?.forEach(s => { mappaStag[s.id] = s.nome; });
-
-      // 3) prendi tutte le fasi esistenti
       const torneoIds = tornei.map(t => t.id);
       const { data: fasi, error: errF } = await supabase
         .from('fasi_torneo')
@@ -57,8 +61,6 @@ export default function Tornei() {
         faseMap[f.torneo_id] = faseMap[f.torneo_id] || [];
         faseMap[f.torneo_id].push(f.tipo_fase);
       });
-
-      // 4) costruisci TorneoMeta[]
       const arr: TorneoMeta[] = tornei.map(t => ({
         id: t.id,
         nome: t.nome,
@@ -66,7 +68,6 @@ export default function Tornei() {
         stagioneNome: mappaStag[t.stagione_id] ?? '–',
         fasi: faseMap[t.id] || []
       }));
-
       setListaTornei(arr);
     } catch (error) {
       console.error('Errore generale:', error);
@@ -75,29 +76,15 @@ export default function Tornei() {
     }
   }
 
-  // Helpers per navigare verso la pagina giusta
-  const apriGironi = (id: string) => {
-    navigate(`/tornei/nuovo/step6-fasegironi/${id}`);
-  };
-  const apriGironeUnico = (id: string) => {
-    navigate(
-      `/tornei/nuovo/step6-gironeunico/${id}`,
-      { state: { torneoId: id } }
-    );
-  };
-  const apriEliminazione = (id: string) => {
-    navigate(`/tornei/nuovo/step6-eliminazione/${id}`);
-  };
-  const creaFasi = (id: string) => {
-    navigate(`/tornei/nuovo/step1/${id}`);
-  };
-  const nuovoTorneo = () => {
-    navigate('/tornei/nuovo/step1');
-  };
+  const apriGironi = (id: string) => navigate(`/tornei/nuovo/step6-fasegironi/${id}`);
+  const apriGironeUnico = (id: string) =>
+    navigate(`/tornei/nuovo/step6-gironeunico/${id}`, { state: { torneoId: id } });
+  const apriEliminazione = (id: string) => navigate(`/tornei/nuovo/step6-eliminazione/${id}`);
+  const creaFasi = (id: string) => navigate(`/tornei/nuovo/step1/${id}`);
+  const nuovoTorneo = () => navigate('/tornei/nuovo/step1');
 
   const eliminaTorneo = async (id: string) => {
     if (!window.confirm('Sei sicuro di voler eliminare questo torneo?')) return;
-    
     try {
       await supabase.from('partite_torneo').delete().eq('torneo_id', id);
       await supabase.from('fasi_torneo').delete().eq('torneo_id', id);
@@ -110,18 +97,26 @@ export default function Tornei() {
   };
 
   const getFaseLabel = (fasi: string[]) => {
-    if (fasi.includes('girone_unico')) return 'Girone Unico';
-    if (fasi.includes('multi_gironi')) return 'Fase Gironi';
-    if (fasi.includes('eliminazione')) return 'Eliminazione';
+    if (fasi.includes('girone_unico'))    return 'Girone Unico';
+    if (fasi.includes('multi_gironi'))     return 'Fase Gironi';
+    if (fasi.includes('eliminazione'))     return 'Eliminazione';
     return 'Da Configurare';
   };
 
   const getFaseColor = (fasi: string[]) => {
-    if (fasi.includes('girone_unico')) return 'bg-montecarlo-red-100 text-montecarlo-secondary border-montecarlo-red-200';
-    if (fasi.includes('multi_gironi')) return 'bg-montecarlo-gold-100 text-montecarlo-secondary border-montecarlo-gold-200';
-    if (fasi.includes('eliminazione')) return 'bg-montecarlo-gray-100 text-montecarlo-neutral border-montecarlo-gray-200';
+    if (fasi.includes('girone_unico'))    return 'bg-montecarlo-red-100 text-montecarlo-secondary border-montecarlo-red-200';
+    if (fasi.includes('multi_gironi'))     return 'bg-montecarlo-gold-100 text-montecarlo-secondary border-montecarlo-gold-200';
+    if (fasi.includes('eliminazione'))     return 'bg-montecarlo-gray-100 text-montecarlo-neutral border-montecarlo-gray-200';
     return 'bg-montecarlo-neutral/20 text-montecarlo-neutral border-montecarlo-neutral/30';
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Caricamento…
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-montecarlo-light">
@@ -131,15 +126,19 @@ export default function Tornei() {
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <Trophy className="text-montecarlo-secondary mr-3" size={28} />
-              <h1 className="text-2xl font-bold text-montecarlo-secondary">Gestione Tornei</h1>
+              <h1 className="text-2xl font-bold text-montecarlo-secondary">
+                Gestione Tornei
+              </h1>
             </div>
-            <button
-              onClick={nuovoTorneo}
-              className="bg-gradient-montecarlo text-white px-6 py-3 rounded-lg font-medium hover:shadow-montecarlo-lg transition-all duration-300 transform hover:scale-105 flex items-center"
-            >
-              <Plus className="mr-2" size={20} />
-              Nuovo Torneo
-            </button>
+            {canAdd && (
+              <button
+                onClick={nuovoTorneo}
+                className="bg-gradient-montecarlo text-white px-6 py-3 rounded-lg font-medium hover:shadow-montecarlo-lg transition-all duration-300 transform hover:scale-105 flex items-center"
+              >
+                <Plus className="mr-2" size={20} />
+                Nuovo Torneo
+              </button>
+            )}
           </div>
         </div>
 
@@ -156,13 +155,15 @@ export default function Tornei() {
             <p className="text-montecarlo-neutral mb-6">
               Inizia creando il tuo primo torneo.
             </p>
-            <button
-              onClick={nuovoTorneo}
-              className="bg-gradient-montecarlo text-white px-6 py-3 rounded-lg font-medium hover:shadow-montecarlo-lg transition-all duration-300 transform hover:scale-105 flex items-center mx-auto"
-            >
-              <Plus className="mr-2" size={20} />
-              Crea Primo Torneo
-            </button>
+            {canAdd && (
+              <button
+                onClick={nuovoTorneo}
+                className="bg-gradient-montecarlo text-white px-6 py-3 rounded-lg font-medium hover:shadow-montecarlo-lg transition-all duration-300 transform hover:scale-105 flex items-center mx-auto"
+              >
+                <Plus className="mr-2" size={20} />
+                Crea Primo Torneo
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -205,7 +206,11 @@ export default function Tornei() {
                   {/* Tipo di torneo */}
                   <div className="flex items-center">
                     <Users className="mr-2 text-montecarlo-neutral" size={16} />
-                    <span className={`text-xs px-2 py-1 rounded-full border ${getFaseColor(t.fasi)}`}>
+                    <span
+                      className={`text-xs px-2 py-1 rounded-full border ${getFaseColor(
+                        t.fasi
+                      )}`}
+                    >
                       {getFaseLabel(t.fasi)}
                     </span>
                   </div>
