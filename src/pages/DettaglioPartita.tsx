@@ -4,7 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { Edit } from 'lucide-react';
+import { Edit, Trash2 } from 'lucide-react';
+import { UserRole } from '../lib/roles';
 
 interface MarcatoriEntry {
   id: string;
@@ -48,10 +49,10 @@ export default function DettaglioPartita() {
 
   // Ruolo da JWT
   const role =
-    (user?.user_metadata?.role as string) ||
-    (user?.app_metadata?.role as string) ||
-    null;
-  const canEdit = role === 'admin' || role === 'creator';
+    (user?.user_metadata?.role as UserRole) ||
+    (user?.app_metadata?.role as UserRole) ||
+    UserRole.Authenticated;
+  const canEdit = role === UserRole.Admin || role === UserRole.Creator;
 
   // Redirect se non loggato
   useEffect(() => {
@@ -134,6 +135,17 @@ export default function DettaglioPartita() {
     }
   }, [id, user, navigate]);
 
+  const handleDelete = async () => {
+    if (!id || !window.confirm('Sei sicuro di eliminare questa partita?')) return;
+    const { error } = await supabase.from('partite').delete().eq('id', id);
+    if (error) {
+      console.error(error);
+      alert('Eliminazione fallita');
+    } else {
+      navigate(-1);
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -170,10 +182,14 @@ export default function DettaglioPartita() {
     <div className="min-h-screen bg-white">
       {/* Top bar */}
       <div className="flex items-center p-4 border-b">
-        {/* Freccia spostata a destra con ml-12 */}
-        <Link to="/risultati" className="text-gray-700 text-2xl ml-12">
+        {/* Freccia torna indietro di un passo */}
+        <button
+          onClick={() => navigate(-1)}
+          className="text-gray-700 text-2xl ml-12"
+          aria-label="Indietro"
+        >
           ←
-        </Link>
+        </button>
         <div className="flex-1 text-center text-gray-800 text-lg font-semibold">
           {formatData(partita.data_ora)}
         </div>
@@ -221,7 +237,10 @@ export default function DettaglioPartita() {
                   .filter(m => m.periodo === i + 1)
                   .map(m => (
                     <div key={m.id} className="mt-1 ml-4 italic text-gray-700">
-                      <Link to={`/giocatore/${m.id}`} className="hover:text-blue-600">
+                      <Link
+                        to={`/giocatore/${m.id}`}
+                        className="hover:text-blue-600"
+                      >
                         {m.giocatore.cognome} {m.giocatore.nome}
                       </Link>
                     </div>
@@ -261,7 +280,10 @@ export default function DettaglioPartita() {
                   .filter(m => m.periodo === i + 1)
                   .map(m => (
                     <div key={m.id} className="mt-1 ml-4 italic text-gray-700">
-                      <Link to={`/giocatore/${m.id}`} className="hover:text-blue-600">
+                      <Link
+                        to={`/giocatore/${m.id}`}
+                        className="hover:text-blue-600"
+                      >
                         {m.giocatore.cognome} {m.giocatore.nome}
                       </Link>
                     </div>
