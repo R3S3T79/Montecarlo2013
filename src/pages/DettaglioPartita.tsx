@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../context/AuthContext';
 
 interface MarcatoriEntry {
   id: string;
@@ -39,17 +40,24 @@ const MONTECARLO_ID = '5bca3e07-974a-4d12-9208-d85975906fe4';
 export default function DettaglioPartita() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+
   const [partita, setPartita] = useState<PartitaDettaglio | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Se non sono autenticato, rimando al login
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/login', { replace: true });
+    }
+  }, [user, authLoading, navigate]);
+
   useEffect(() => {
     const fetchDetail = async () => {
-      if (!id) {
-        setLoading(false);
-        return;
-      }
+      if (!id) return setLoading(false);
 
       try {
+        // 1) Dati partita
         const { data: pd, error: pe } = await supabase
           .from('partite')
           .select(`
@@ -70,75 +78,100 @@ export default function DettaglioPartita() {
           `)
           .eq('id', id)
           .single();
+
         if (pe || !pd) {
           console.error(pe);
-          setLoading(false);
-          return;
+          return setLoading(false);
         }
 
+        // 2) Marcatori raw
         const { data: md, error: me } = await supabase
           .from('marcatori')
           .select('periodo, giocatore_id')
           .eq('partita_id', id);
+
         if (me) console.error(me);
 
+        // 3) Se ci sono marcatori, preleva i nomi
         let marcWithNames: MarcatoriEntry[] = [];
         if (md?.length) {
-          const ids = Array.from(new Set(md.map(m => m.giocatore_id)));
+          const ids = Array.from(new Set(md.map((m) => m.giocatore_id)));
           const { data: gd, error: ge } = await supabase
             .from('giocatori')
             .select('id, nome, cognome')
             .in('id', ids);
           if (ge) console.error(ge);
           if (gd) {
-            marcWithNames = md.map(m => {
-              const g = gd.find(x => x.id === m.giocatore_id);
+            marcWithNames = md.map((m) => {
+              const g = gd.find((x) => x.id === m.giocatore_id);
               return {
                 id: m.giocatore_id,
                 periodo: m.periodo,
-                giocatore: { nome: g?.nome||'', cognome: g?.cognome||'' }
+                giocatore: { nome: g?.nome ?? '', cognome: g?.cognome ?? '' },
               };
             });
           }
         }
 
-        setPartita({
-          ...pd,
-          marcatori: marcWithNames
-        });
+        setPartita({ ...pd, marcatori: marcWithNames });
       } catch (err) {
         console.error(err);
       } finally {
         setLoading(false);
       }
     };
-    fetchDetail();
-  }, [id]);
 
-  if (loading) return <div className="p-6 text-center text-gray-500">Caricamento…</div>;
-  if (!partita) return <div className="p-6 text-center text-gray-500">Partita non trovata</div>;
+    // Avvia fetch solo quando sono autenticato
+    if (user) fetchDetail();
+  }, [id, user]);
 
-  const formatData = (d: string) => new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <span>Caricamento…</span>
+      </div>
+    );
+  }
+
+  if (!partita) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-500">
+        Partita non trovata
+      </div>
+    );
+  }
+
+  const formatData = (d: string) =>
+    new Date(d).toLocaleDateString('it-IT', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
 
   const tempi = [
     { label: '1° Tempo', casa: partita.goal_a1, ospite: partita.goal_b1 },
     { label: '2° Tempo', casa: partita.goal_a2, ospite: partita.goal_b2 },
     { label: '3° Tempo', casa: partita.goal_a3, ospite: partita.goal_b3 },
-    { label: '4° Tempo', casa: partita.goal_a4, ospite: partita.goal_b4 }
+    { label: '4° Tempo', casa: partita.goal_a4, ospite: partita.goal_b4 },
   ];
 
   const isCasa = partita.casa.id === MONTECARLO_ID;
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Top bar */}
       <div className="flex items-center p-4 border-b">
-        <button onClick={() => navigate(-1)} className="text-gray-700 text-2xl">←</button>
-        <div className="flex-1 text-center text-gray-800 text-lg font-semibold">{formatData(partita.data_ora)}</div>
-        <div className="w-8"/>
+        <button onClick={() => navigate(-1)} className="text-gray-700 text-2xl">
+          ←
+        </button>
+        <div className="flex-1 text-center text-gray-800 text-lg font-semibold">
+          {formatData(partita.data_ora)}
+        </div>
+        <div className="w-8" />
       </div>
-      <div className="px-6 py-8 flex flex-col items-center">
 
-        {/* Casa con watermark */}
+      <div className="px-6 py-8 flex flex-col items-center">
+        {/* Casa */}
         <div className="relative w-full max-w-md mb-6">
           <div className="relative z-10 flex items-baseline justify-center space-x-2">
             <span className="text-xl font-bold text-gray-800">{partita.casa.nome}</span>
@@ -146,11 +179,12 @@ export default function DettaglioPartita() {
           </div>
           <img
             src={partita.casa.logo_url}
-            alt="Watermark casa"
-            className="absolute left-1/2 transform -translate-x-1/2 top-16 h-32 w-32 object-contain opacity-10"
+            alt=""
+            className="absolute left-1/2 top-16 transform -translate-x-1/2 h-32 w-32 object-contain opacity-10"
           />
         </div>
 
+        {/* Statistiche per tempo */}
         <div className="w-full max-w-md mb-4">
           {tempi.map((t, i) => (
             <div key={i} className="pb-1">
@@ -158,22 +192,21 @@ export default function DettaglioPartita() {
                 <span className="font-bold text-gray-600">{t.label}</span>
                 <span className="text-lg font-medium text-gray-900">{t.casa}</span>
               </div>
-              {isCasa && partita.marcatori.filter(m => m.periodo === i+1).length > 0 && (
-                <div className="mt-1 ml-4 text-gray-700 italic">
-                  {partita.marcatori.filter(m => m.periodo === i+1).map(m => (
-                    <div key={m.id}>
+              {isCasa &&
+                partita.marcatori
+                  .filter((m) => m.periodo === i + 1)
+                  .map((m) => (
+                    <div key={m.id} className="mt-1 ml-4 italic text-gray-700">
                       <Link to={`/giocatore/${m.id}`} className="hover:text-blue-600">
                         {m.giocatore.cognome} {m.giocatore.nome}
                       </Link>
                     </div>
                   ))}
-                </div>
-              )}
             </div>
           ))}
         </div>
 
-        {/* Ospite con watermark */}
+        {/* Ospite */}
         <div className="relative w-full max-w-md mb-6">
           <div className="relative z-10 flex items-baseline justify-center space-x-2">
             <span className="text-xl font-bold text-gray-800">{partita.ospite.nome}</span>
@@ -181,8 +214,8 @@ export default function DettaglioPartita() {
           </div>
           <img
             src={partita.ospite.logo_url}
-            alt="Watermark ospite"
-            className="absolute left-1/2 transform -translate-x-1/2 top-16 h-32 w-32 object-contain opacity-10"
+            alt=""
+            className="absolute left-1/2 top-16 transform -translate-x-1/2 h-32 w-32 object-contain opacity-10"
           />
         </div>
 
@@ -193,17 +226,16 @@ export default function DettaglioPartita() {
                 <span className="font-bold text-gray-600">{t.label}</span>
                 <span className="text-lg font-medium text-gray-900">{t.ospite}</span>
               </div>
-              {!isCasa && partita.marcatori.filter(m => m.periodo === i+1).length > 0 && (
-                <div className="mt-1 ml-4 text-gray-700 italic">
-                  {partita.marcatori.filter(m => m.periodo === i+1).map(m => (
-                    <div key={m.id}>
+              {!isCasa &&
+                partita.marcatori
+                  .filter((m) => m.periodo === i + 1)
+                  .map((m) => (
+                    <div key={m.id} className="mt-1 ml-4 italic text-gray-700">
                       <Link to={`/giocatore/${m.id}`} className="hover:text-blue-600">
                         {m.giocatore.cognome} {m.giocatore.nome}
                       </Link>
                     </div>
                   ))}
-                </div>
-              )}
             </div>
           ))}
         </div>
