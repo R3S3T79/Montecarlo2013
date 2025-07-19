@@ -33,13 +33,16 @@ export default function Calendario(): JSX.Element {
         .order('data_ora', { ascending: true });
 
       if (error) console.error('Errore fetch partite:', error);
-      else setPartite(data);
+      else setPartite(data || []);
       setLoading(false);
     };
     fetchPartite();
   }, []);
 
-  const handleClick = (id: string) => navigate(`/prepartita/${id}`);
+  // ❌ vecchio: navigate(`/prepartita/${id}`)
+  // ✅ corretto: usa il trattino per abbinare la route definita in App.tsx
+  const handleClick = (id: string) =>
+    navigate(`/pre-partita/${id}`);
 
   return (
     <div className="min-h-screen bg-gradient-montecarlo-light">
@@ -69,7 +72,9 @@ export default function Calendario(): JSX.Element {
           </div>
         ) : partite.length === 0 ? (
           <div className="bg-white rounded-lg shadow-montecarlo p-8 text-center">
-            <div className="text-montecarlo-neutral">Nessuna partita da giocare trovata.</div>
+            <div className="text-montecarlo-neutral">
+              Nessuna partita da giocare trovata.
+            </div>
           </div>
         ) : (
           <ul className="space-y-4 max-w-md mx-auto">
@@ -95,7 +100,7 @@ export default function Calendario(): JSX.Element {
                 {/* Contenuto partita */}
                 <div className="bg-white rounded-b-lg shadow-montecarlo hover:shadow-montecarlo-lg border-l-4 border-montecarlo-secondary p-4">
                   <div className="flex items-center justify-between">
-                    {/* Logo e nome casa */}
+                    {/* Casa */}
                     <div className="flex items-center space-x-3 flex-1">
                       {partita.casa.logo_url ? (
                         <img
@@ -118,7 +123,7 @@ export default function Calendario(): JSX.Element {
                       VS
                     </div>
 
-                    {/* Logo e nome ospite */}
+                    {/* Ospite */}
                     <div className="flex items-center space-x-3 flex-1 justify-end">
                       <span className="font-semibold text-montecarlo-secondary">
                         {partita.ospite.nome}
