@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, Outlet } from "react-router-dom";
 import { supabase } from "../../../lib/supabaseClient";
+import { useAuth } from "../../../context/AuthContext";
+import { UserRole } from "../../../lib/roles";
 
 interface Squadra {
   id: string;
@@ -22,18 +24,29 @@ interface Partita {
 }
 
 export default function Step7_FaseGironi() {
+  // --- AUTH & ROLE CHECK ---
+  const { user, loading: authLoading } = useAuth();
+  const role =
+    (user?.user_metadata?.role as UserRole) ||
+    (user?.app_metadata?.role as UserRole) ||
+    UserRole.Authenticated;
+  const canEdit = role === UserRole.Admin || role === UserRole.Creator;
+
   const { torneoId } = useParams<{ torneoId: string }>();
   const navigate = useNavigate();
 
+  // --- STATE ---
   const [torneoNome, setTorneoNome] = useState("");
   const [matches, setMatches] = useState<Partita[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // --- DATA LOAD ---
   useEffect(() => {
     (async () => {
       setLoading(true);
       if (!torneoId) return;
 
+      // Nome torneo
       const { data: tData } = await supabase
         .from("tornei")
         .select("nome")
@@ -41,6 +54,7 @@ export default function Step7_FaseGironi() {
         .single();
       if (tData?.nome) setTorneoNome(tData.nome);
 
+      // Finali
       const { data: pts, error } = await supabase
         .from<Partita>("partite_torneo")
         .select(`
@@ -56,20 +70,18 @@ export default function Step7_FaseGironi() {
         .eq("torneo_id", torneoId)
         .eq("is_finale", true)
         .order("ordine_fase", { ascending: true });
-
       if (!error && pts) setMatches(pts);
-      else {
-        console.error("Errore fetch finali:", error);
-        setMatches(pts || []);
-      }
+      else console.error("Errore fetch finali:", error);
+
       setLoading(false);
     })();
   }, [torneoId]);
 
-  if (loading) {
-    return <p className="text-center py-6">Caricamento…</p>;
-  }
+  // --- LOADING STATES ---
+  if (authLoading) return <p className="text-center py-6">Caricamento…</p>;
+  if (loading)    return <p className="text-center py-6">Caricamento…</p>;
 
+  // --- HELPERS ---
   const formatDate = (iso: string | null) => {
     if (!iso) return "—";
     const d = new Date(iso);
@@ -79,8 +91,7 @@ export default function Step7_FaseGironi() {
       d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })
     );
   };
-
-  // raggruppa per ordine_fase
+  // Raggruppa per ordine_fase
   const byOrdine: Record<number, Partita[]> = {};
   matches.forEach((m) => {
     const o = m.ordine_fase || 0;
@@ -91,35 +102,31 @@ export default function Step7_FaseGironi() {
     .map((k) => parseInt(k, 10))
     .sort((a, b) => a - b);
 
-  // costruisci classifica finale
+  // Costruisci classifica finale
   type ClassRow = { posizione: number; squadra: Squadra };
   const classifica: ClassRow[] = ordini
     .flatMap((ord) => {
       const m = byOrdine[ord][0];
-      let winner = m.squadra_casa,
-          loser = m.squadra_ospite;
+      let winner = m.squadra_casa, loser = m.squadra_ospite;
       if (m.goal_casa > m.goal_ospite) {
-        winner = m.squadra_casa;
-        loser = m.squadra_ospite;
+        winner = m.squadra_casa; loser = m.squadra_ospite;
       } else if (m.goal_ospite > m.goal_casa) {
-        winner = m.squadra_ospite;
-        loser = m.squadra_casa;
+        winner = m.squadra_ospite; loser = m.squadra_casa;
       } else if (m.rigori_vincitore) {
         if (m.rigori_vincitore === m.squadra_casa.id) {
-          winner = m.squadra_casa;
-          loser = m.squadra_ospite;
+          winner = m.squadra_casa; loser = m.squadra_ospite;
         } else {
-          winner = m.squadra_ospite;
-          loser = m.squadra_casa;
+          winner = m.squadra_ospite; loser = m.squadra_casa;
         }
       }
       return [
         { posizione: 2 * ord - 1, squadra: winner },
-        { posizione: 2 * ord, squadra: loser },
+        { posizione: 2 * ord,     squadra: loser  },
       ];
     })
     .sort((a, b) => a.posizione - b.posizione);
 
+  // Salva modifiche & torna alla lista tornei
   const handleSaveAndExit = async () => {
     setLoading(true);
     for (const m of matches) {
@@ -135,6 +142,7 @@ export default function Step7_FaseGironi() {
     navigate("/tornei");
   };
 
+  // --- RENDER ---
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
       <h2 className="text-2xl font-bold text-center">
@@ -153,19 +161,18 @@ export default function Step7_FaseGironi() {
             {byOrdine[ord].map((m) => (
               <div
                 key={m.id}
-                onClick={() =>
-                  navigate(
-                    `/tornei/nuovo/step7-fasegironi/${torneoId}/edit/${m.id}`
-                  )
-                }
-                className="
-                  bg-white rounded-lg
-                  shadow-2xl hover:shadow-3xl
-                  hover:bg-gray-50
-                  transition-colors duration-200
-                  p-4 cursor-pointer whitespace-nowrap
+                onClick={canEdit
+                  ? () => navigate(
+                      `/tornei/nuovo/step7-fasegironi/${torneoId}/edit/${m.id}`
+                    )
+                  : undefined}
+                className={`
+                  bg-white rounded-lg p-4 whitespace-nowrap
                   grid grid-cols-[max-content_auto_max-content] items-center
-                "
+                  ${canEdit
+                    ? 'shadow-2xl hover:shadow-3xl hover:bg-gray-50 transition-colors duration-200 cursor-pointer'
+                    : ''}
+                `}
               >
                 <div className="col-span-3 text-xs text-gray-500 mb-2 text-center">
                   {formatDate(m.data_ora)}
@@ -204,7 +211,7 @@ export default function Step7_FaseGironi() {
         );
       })}
 
-      {/* Classifica Finale centrata ma contenuto allineato a sinistra */}
+      {/* Classifica Finale */}
       <div className="mt-6">
         <h3 className="text-xl font-bold mb-2 text-center">Classifica Finale</h3>
         <div className="flex justify-center">
@@ -226,29 +233,42 @@ export default function Step7_FaseGironi() {
         </div>
       </div>
 
-      <div className="flex justify-between mt-6">
-        <button
-          onClick={() => navigate(-1)}
-          className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
-        >
-          Indietro
-        </button>
-        <button
-          onClick={() => window.print()}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          Stampa
-        </button>
-        <button
-          onClick={handleSaveAndExit}
-          disabled={loading}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
-        >
-          Salva ed Esci
-        </button>
-      </div>
+      {/* Azioni in fondo, differenziate per ruolo */}
+      {canEdit ? (
+        <div className="flex justify-between mt-6">
+          <button
+            onClick={() => navigate(-1)}
+            className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+          >
+            Indietro
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            Stampa
+          </button>
+          <button
+            onClick={handleSaveAndExit}
+            disabled={loading}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
+          >
+            Salva ed Esci
+          </button>
+        </div>
+      ) : (
+        <div className="flex justify-center mt-6">
+          <button
+            onClick={() => navigate('/tornei')}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            Esci
+          </button>
+        </div>
+      )}
 
-      <Outlet />
+      {/* Outlet per le rotte di editing (solo Admin/Creator) */}
+      {canEdit && <Outlet />}
     </div>
   );
 }
