@@ -12,7 +12,7 @@ import RegisterPage    from "./pages/RegisterPage";
 import ConfirmPage     from "./pages/ConfirmPage";
 import AuthCallback    from "./pages/AuthCallback";
 
-// pagine per ogni utente autenticato (ora NESTATE dentro SidebarLayout)
+// pagine per ogni utente autenticato (verso SidebarLayout)
 import RosaGiocatori      from "./pages/RosaGiocatori";
 import DettaglioGiocatore from "./pages/DettaglioGiocatore";
 import AggiungiGiocatore  from "./pages/AggiungiGiocatore";
@@ -26,7 +26,7 @@ import NuovaPartitaPage    from "./pages/NuovaPartitaPage";
 import EditPartitaPage     from "./pages/EditPartitaPage";
 import DettaglioPartita    from "./pages/DettaglioPartita";
 
-// ** import del componente di gestione risultato **
+// pagina di gestione risultato match-day
 import GestioneRisultatoPartita from "./components/GestioneRisultatoPartita";
 
 import ListaSquadre       from "./pages/ListaSquadre";
@@ -60,7 +60,7 @@ export default function App() {
         <Route path="/confirm"       element={<ConfirmPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
 
-        {/* TUTTE LE ROTTE PROTETTE CON SIDEBAR */}
+        {/* ROTTE PROTETTE SOTTO SIDEBARLAYOUT */}
         <Route
           path="/*"
           element={
@@ -72,7 +72,7 @@ export default function App() {
           {/* Home */}
           <Route index element={<Home />} />
 
-          {/* Rosa Giocatori e dettagli */}
+          {/* Rosa Giocatori */}
           <Route path="rosa"               element={<RosaGiocatori />} />
           <Route path="giocatore/:id"      element={<DettaglioGiocatore />} />
           <Route path="aggiungi-giocatore" element={<AggiungiGiocatore />} />
