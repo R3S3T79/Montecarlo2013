@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Calendar } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../lib/roles';
 
@@ -20,7 +20,6 @@ export default function Calendario(): JSX.Element {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
 
-  // Ricava il ruolo e stabilisci se mostrare il pulsante "+"
   const role =
     (user?.user_metadata?.role as UserRole) ||
     (user?.app_metadata?.role as UserRole) ||
@@ -62,25 +61,21 @@ export default function Calendario(): JSX.Element {
   return (
     <div className="min-h-screen bg-gradient-montecarlo-light">
       <div className="container mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="relative mb-6">
-          <div className="bg-white rounded-xl shadow-montecarlo p-6">
-            <div className="flex items-center justify-center mb-4">
-              <Calendar
-                className="text-montecarlo-secondary mr-3"
-                size={28}
-              />
-              <h2 className="text-2xl font-bold text-montecarlo-secondary">
+        {/* Header ridotto */}
+        <div className="relative mt-4 mb-4">
+          <div className="bg-white rounded-xl shadow-montecarlo p-2">
+            <div className="flex items-center justify-center">
+              <h2 className="text-lg font-bold text-montecarlo-secondary">
                 Calendario Partite
               </h2>
             </div>
             {canAdd && (
               <button
                 onClick={() => navigate('/nuova-partita')}
-                className="absolute right-2 top-2 w-10 h-10 bg-gradient-montecarlo text-white rounded-full flex items-center justify-center hover:shadow-montecarlo-lg transition-all duration-300 transform hover:scale-105"
+                className="absolute right-2 top-2 w-8 h-8 bg-gradient-montecarlo text-white rounded-full flex items-center justify-center hover:shadow-montecarlo-lg transition-all duration-300 transform hover:scale-105"
                 aria-label="Nuova Partita"
               >
-                <Plus size={20} />
+                <Plus size={16} />
               </button>
             )}
           </div>
@@ -117,49 +112,42 @@ export default function Calendario(): JSX.Element {
                   </div>
                 </div>
 
-                {/* Contenuto partita */}
-                <div className="bg-white rounded-b-lg shadow-montecarlo hover:shadow-montecarlo-lg border-l-4 border-montecarlo-secondary p-4">
-                  <div className="flex items-center justify-between">
-                    {/* Casa */}
-                    <div className="flex items-center space-x-3 flex-1">
-                      {partita.casa.logo_url ? (
-                        <img
-                          src={partita.casa.logo_url}
-                          alt={`${partita.casa.nome} logo`}
-                          className="w-10 h-10 object-contain rounded-full border-2 border-montecarlo-accent"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 bg-montecarlo-secondary rounded-full flex items-center justify-center text-white font-bold">
-                          {partita.casa.nome.charAt(0)}
-                        </div>
-                      )}
-                      <span className="font-semibold text-montecarlo-secondary">
-                        {partita.casa.nome}
-                      </span>
-                    </div>
+                {/* Contenuto partita su due righe */}
+                <div className="bg-white rounded-b-lg shadow-montecarlo hover:shadow-montecarlo-lg border-l-4 border-montecarlo-secondary p-4 space-y-2">
+                  {/* Squadra di casa */}
+                  <div className="flex items-center justify-start space-x-3">
+                    {partita.casa.logo_url ? (
+                      <img
+                        src={partita.casa.logo_url}
+                        alt={`${partita.casa.nome} logo`}
+                        className="w-10 h-10 object-contain rounded-full border-2 border-montecarlo-accent"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 bg-montecarlo-secondary rounded-full flex items-center justify-center text-white font-bold">
+                        {partita.casa.nome.charAt(0)}
+                      </div>
+                    )}
+                    <span className="font-semibold text-montecarlo-secondary">
+                      {partita.casa.nome}
+                    </span>
+                  </div>
 
-                    {/* VS */}
-                    <div className="bg-montecarlo-accent text-montecarlo-secondary px-3 py-1 rounded-lg font-bold shadow-gold">
-                      VS
-                    </div>
-
-                    {/* Ospite */}
-                    <div className="flex items-center space-x-3 flex-1 justify-end">
-                      <span className="font-semibold text-montecarlo-secondary">
-                        {partita.ospite.nome}
-                      </span>
-                      {partita.ospite.logo_url ? (
-                        <img
-                          src={partita.ospite.logo_url}
-                          alt={`${partita.ospite.nome} logo`}
-                          className="w-10 h-10 object-contain rounded-full border-2 border-montecarlo-accent"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 bg-montecarlo-secondary rounded-full flex items-center justify-center text-white font-bold">
-                          {partita.ospite.nome.charAt(0)}
-                        </div>
-                      )}
-                    </div>
+                  {/* Squadra ospite */}
+                  <div className="flex items-center justify-end space-x-3">
+                    <span className="font-semibold text-montecarlo-secondary">
+                      {partita.ospite.nome}
+                    </span>
+                    {partita.ospite.logo_url ? (
+                      <img
+                        src={partita.ospite.logo_url}
+                        alt={`${partita.ospite.nome} logo`}
+                        className="w-10 h-10 object-contain rounded-full border-2 border-montecarlo-accent"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 bg-montecarlo-secondary rounded-full flex items-center justify-center text-white font-bold">
+                        {partita.ospite.nome.charAt(0)}
+                      </div>
+                    )}
                   </div>
                 </div>
               </li>
