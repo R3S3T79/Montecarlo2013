@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import { Calendar, Clock, Play, History } from "lucide-react";
+import { Calendar, Clock, MapPin, Plus, History } from "lucide-react";
 
 interface SquadraInfo {
   id: string;
@@ -15,7 +15,6 @@ interface PartitaProssima {
   id: string;
   data_ora: string;
   stato: string;
-  stagione_id: string;
   squadra_casa_id: string;
   squadra_ospite_id: string;
   campionato_torneo: string;
@@ -37,132 +36,98 @@ export default function ProssimaPartita() {
   const [partita, setPartita] = useState<PartitaProssima | null>(null);
   const [precedenti, setPrecedenti] = useState<ScontroPrecedente[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hasPartitaOggi, setHasPartitaOggi] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchPartita = async () => {
       setLoading(true);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      const todayIso = today.toISOString();
+      const tomorrowIso = tomorrow.toISOString();
 
-      // Calcolo intervallo “oggi” in locale
-      const adesso = new Date();
-      const oggi = new Date(adesso.getFullYear(), adesso.getMonth(), adesso.getDate());
-      const domani = new Date(oggi);
-      domani.setDate(oggi.getDate() + 1);
-
-      const todayMidnightIso = oggi.toISOString();
-      const tomorrowMidnightIso = domani.toISOString();
-
-      // Log dei dati temporali
-      console.log("fetchPartita() • ora attuale:", adesso);
-      console.log("fetchPartita() • inizio oggi (ISO):", todayMidnightIso);
-      console.log("fetchPartita() • inizio domani (ISO):", tomorrowMidnightIso);
-
-      // Provo prima con le partite “oggi”
-      const { data: todayData, error: todayError } = await supabase
+      // Prova match di oggi
+      let { data, error } = await supabase
         .from("partite")
         .select(`
           id,
           data_ora,
           stato,
-          stagione_id,
           squadra_casa_id,
           squadra_ospite_id,
           campionato_torneo,
           luogo_torneo,
-          casa:squadra_casa_id(id, nome, logo_url),
-          ospite:squadra_ospite_id(id, nome, logo_url)
+          casa:squadra_casa_id (id, nome, logo_url),
+          ospite:squadra_ospite_id (id, nome, logo_url)
         `)
         .eq("stato", "DaGiocare")
-        .gte("data_ora", todayMidnightIso)
-        .lt("data_ora", tomorrowMidnightIso)
+        .gte("data_ora", todayIso)
+        .lt("data_ora", tomorrowIso)
         .order("data_ora", { ascending: true })
         .limit(1);
 
-      if (todayError) {
-        console.error("Errore recuperando le partite di oggi:", todayError);
+      if (data?.length) {
+        setPartita(data[0]);
         setLoading(false);
         return;
       }
 
-      // Log del risultato “oggi”
-      console.log("fetchPartita() • risultati query oggi:", todayData);
-
-      if (todayData && todayData.length > 0) {
-        setPartita(todayData[0] as PartitaProssima);
-        setHasPartitaOggi(true);
-        setLoading(false);
-        return;
-      }
-
-      // Se non c’è nulla “oggi”, cerco le future
-      const { data: futureData, error: futureError } = await supabase
+      // Se non, prossimo futuro
+      ({ data, error } = await supabase
         .from("partite")
         .select(`
           id,
           data_ora,
           stato,
-          stagione_id,
           squadra_casa_id,
           squadra_ospite_id,
           campionato_torneo,
           luogo_torneo,
-          casa:squadra_casa_id(id, nome, logo_url),
-          ospite:squadra_ospite_id(id, nome, logo_url)
+          casa:squadra_casa_id (id, nome, logo_url),
+          ospite:squadra_ospite_id (id, nome, logo_url)
         `)
         .eq("stato", "DaGiocare")
-        .gte("data_ora", tomorrowMidnightIso)
+        .gte("data_ora", tomorrowIso)
         .order("data_ora", { ascending: true })
-        .limit(1);
+        .limit(1));
 
-      if (futureError) {
-        console.error("Errore recuperando le partite future:", futureError);
-        setPartita(null);
-        setLoading(false);
-        return;
+      if (data?.length) {
+        const next = data[0];
+        setPartita(next);
+
+        // Precedenti
+        const { data: prevData, error: prevErr } = await supabase
+          .from("partite")
+          .select(`
+            id,
+            data_ora,
+            goal_a,
+            goal_b,
+            casa:squadra_casa_id (nome),
+            ospite:squadra_ospite_id (nome)
+          `)
+          .or(
+            `and(squadra_casa_id.eq.${next.squadra_casa_id},squadra_ospite_id.eq.${next.squadra_ospite_id}),` +
+            `and(squadra_casa_id.eq.${next.squadra_ospite_id},squadra_ospite_id.eq.${next.squadra_casa_id})`
+          )
+          .lt("data_ora", next.data_ora)
+          .order("data_ora", { ascending: false })
+          .limit(5);
+
+        setPrecedenti(prevErr ? [] : prevData);
       }
 
-      // Log del risultato “future”
-      console.log("fetchPartita() • risultati query future:", futureData);
-
-      if (!futureData || futureData.length === 0) {
-        setPartita(null);
-        setLoading(false);
-        return;
-      }
-
-      setPartita(futureData[0] as PartitaProssima);
-      setHasPartitaOggi(false);
       setLoading(false);
     };
 
     fetchPartita();
   }, []);
 
-  useEffect(() => {
-    if (!partita) return;
-    (async () => {
-      const { data: prevData, error: prevError } = await supabase
-        .from("partite")
-        .select(`
-          id,
-          data_ora,
-          goal_a,
-          goal_b,
-          casa:squadra_casa_id(nome),
-          ospite:squadra_ospite_id(nome)
-        `)
-        .or(
-          `and(squadra_casa_id.eq.${partita.casa.id},squadra_ospite_id.eq.${partita.ospite.id}),` +
-          `and(squadra_casa_id.eq.${partita.ospite.id},squadra_ospite_id.eq.${partita.casa.id})`
-        )
-        .lt("data_ora", partita.data_ora)
-        .order("data_ora", { ascending: false })
-        .limit(5);
-
-      setPrecedenti(prevError ? [] : (prevData as ScontroPrecedente[]));
-    })();
-  }, [partita]);
+  const handleCrea = () => navigate("/nuova-partita");
+  const handleVaiAlMatch = () =>
+    partita && navigate(`/match-handler/${partita.id}`);
 
   const formatData = (d: string) =>
     new Date(d).toLocaleDateString("it-IT", {
@@ -180,8 +145,31 @@ export default function ProssimaPartita() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-montecarlo-light flex items-center justify-center">
-        <div className="bg-white rounded-xl shadow-montecarlo p-4">
-          <span className="text-montecarlo-secondary">Caricamento…</span>
+        <div className="bg-white p-8 rounded-lg shadow-montecarlo">
+          <div className="text-montecarlo-secondary">Caricamento…</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!partita) {
+    return (
+      <div className="min-h-screen bg-gradient-montecarlo-light flex items-center justify-center">
+        <div className="bg-white p-8 rounded-xl shadow-montecarlo text-center">
+          <Calendar className="mx-auto text-montecarlo-neutral mb-4" size={48} />
+          <h2 className="text-xl font-bold text-montecarlo-secondary mb-4">
+            Nessuna partita programmata
+          </h2>
+          <p className="text-montecarlo-neutral mb-6">
+            Non ci sono partite in programma al momento.
+          </p>
+          <button
+            onClick={handleCrea}
+            className="bg-gradient-montecarlo text-white px-6 py-3 rounded-lg flex items-center mx-auto hover:scale-105 transition"
+          >
+            <Plus className="mr-2" size={20} />
+            Crea Nuova Partita
+          </button>
         </div>
       </div>
     );
@@ -189,112 +177,128 @@ export default function ProssimaPartita() {
 
   return (
     <div className="min-h-screen bg-gradient-montecarlo-light">
-      <div className="container mx-auto px-4 py-6">
-        {/* Header uniforme */}
-        <div className="relative mt-4 mb-4">
-          <div className="bg-white rounded-xl shadow-montecarlo p-2">
-            <h2 className="text-lg font-bold text-montecarlo-secondary text-center">
-              {hasPartitaOggi ? "Partita di Oggi" : "Prossima Partita"}
-            </h2>
-          </div>
+      <div className="container mx-auto px-4 py-8">
+        {/* Titolo centrato e allineato al card, con margine-top per non sovrapporsi */}
+        <div className="max-w-md mx-auto mt-16 bg-white rounded-xl shadow-montecarlo text-center py-6 mb-8">
+          <h1 className="text-2xl font-bold text-montecarlo-secondary">
+            Prossima partita
+          </h1>
         </div>
 
-        {!partita ? (
-          <div className="bg-white rounded-xl shadow-montecarlo p-8 text-center">
-            <span className="text-montecarlo-secondary">
-              Nessuna partita programmata
-            </span>
-          </div>
-        ) : (
-          <div className="bg-white rounded-xl shadow-montecarlo overflow-hidden space-y-6">
-            {/* Data, ora e tipo */}
-            <div className="p-4 text-center">
-              <div className="flex justify-center items-center space-x-4 mb-2 text-montecarlo-secondary">
+        {/* Card principale */}
+        <div className="max-w-md mx-auto space-y-6">
+          <div className="bg-white rounded-xl shadow-montecarlo overflow-hidden">
+            <div className="bg-montecarlo-red-50 p-4 border-l-4 border-montecarlo-secondary">
+              <div className="flex justify-center space-x-4 text-montecarlo-secondary">
                 <div className="flex items-center">
                   <Calendar className="mr-2" size={18} />
-                  <span className="font-semibold">{formatData(partita.data_ora)}</span>
+                  <span className="font-semibold">
+                    {formatData(partita.data_ora)}
+                  </span>
                 </div>
                 <div className="flex items-center">
                   <Clock className="mr-2" size={18} />
-                  <span className="font-semibold">{formatOra(partita.data_ora)}</span>
+                  <span className="font-semibold">
+                    {formatOra(partita.data_ora)}
+                  </span>
                 </div>
               </div>
-              <div>
-                <span className="text-montecarlo-secondary font-medium">
-                  {partita.campionato_torneo.charAt(0).toUpperCase() +
-                    partita.campionato_torneo.slice(1)}
+              <div className="text-center mt-2">
+                <span className="bg-montecarlo-accent text-montecarlo-secondary px-3 py-1 rounded-full text-sm font-medium shadow-gold">
+                  {partita.campionato_torneo}
                 </span>
               </div>
             </div>
 
-            {/* Squadre */}
-            <div className="grid grid-cols-1 gap-4 px-4 pb-6">
-              <div className="flex justify-start items-center bg-white rounded-lg p-4">
-                {partita.casa.logo_url && (
-                  <img
-                    src={partita.casa.logo_url}
-                    alt={partita.casa.nome}
-                    className="w-12 h-12 object-contain rounded-full mr-3"
-                  />
-                )}
-                <span className="font-bold text-montecarlo-secondary">
-                  {partita.casa.nome}
-                </span>
+            <div className="p-6 space-y-6">
+              <div className="flex justify-center p-4 bg-montecarlo-red-50 rounded-lg border border-montecarlo-red-200">
+                <div className="flex items-center space-x-4">
+                  {partita.casa.logo_url && (
+                    <img
+                      src={partita.casa.logo_url}
+                      alt={`${partita.casa.nome} logo`}
+                      className="w-12 h-12 rounded-full border-2 border-montecarlo-accent"
+                    />
+                  )}
+                  <span className="text-lg font-bold text-montecarlo-secondary">
+                    {partita.casa.nome}
+                  </span>
+                </div>
               </div>
+
               <div className="text-center">
                 <div className="bg-gradient-montecarlo text-white px-6 py-2 rounded-full font-bold text-lg shadow-montecarlo inline-block">
                   VS
                 </div>
               </div>
-              <div className="flex justify-end items-center bg-white rounded-lg p-4">
-                <span className="font-bold text-montecarlo-secondary mr-3">
-                  {partita.ospite.nome}
-                </span>
-                {partita.ospite.logo_url && (
-                  <img
-                    src={partita.ospite.logo_url}
-                    alt={partita.ospite.nome}
-                    className="w-12 h-12 object-contain rounded-full"
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* Scontri precedenti */}
-        {precedenti.length > 0 && (
-          <div className="bg-white rounded-xl shadow-montecarlo overflow-hidden mt-6">
-            <div className="bg-gradient-montecarlo text-white p-4">
-              <div className="flex items-center">
-                <History className="mr-2" size={20} />
-                <h3 className="font-semibold">Scontri precedenti</h3>
-              </div>
-            </div>
-            <div className="p-4 space-y-3">
-              {precedenti.map((sc) => (
-                <div
-                  key={sc.id}
-                  onClick={() => navigate(`/partita/${sc.id}`)}
-                  className="cursor-pointer hover:bg-montecarlo-gray-50 p-3 rounded-lg transition-colors"
-                >
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-montecarlo-neutral">
-                      {new Date(sc.data_ora).toLocaleDateString("it-IT", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "2-digit",
-                      })}
-                    </span>
-                    <span className="text-montecarlo-secondary font-medium">
-                      {sc.casa.nome} {sc.goal_a}-{sc.goal_b} {sc.ospite.nome}
-                    </span>
-                  </div>
+              <div className="flex justify-center p-4 bg-montecarlo-gray-50 rounded-lg border border-montecarlo-gray-200">
+                <div className="flex items-center space-x-4">
+                  {partita.ospite.logo_url && (
+                    <img
+                      src={partita.ospite.logo_url}
+                      alt={`${partita.ospite.nome} logo`}
+                      className="w-12 h-12 rounded-full border-2 border-montecarlo-accent"
+                    />
+                  )}
+                  <span className="text-lg font-bold text-montecarlo-secondary">
+                    {partita.ospite.nome}
+                  </span>
                 </div>
-              ))}
+              </div>
+
+              {partita.luogo_torneo && (
+                <div className="flex justify-center items-center text-montecarlo-neutral">
+                  <MapPin className="mr-2" size={16} />
+                  <span className="text-sm">{partita.luogo_torneo}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 pt-0">
+              <button
+                onClick={handleVaiAlMatch}
+                className="w-full bg-gradient-montecarlo text-white py-4 rounded-lg font-bold hover:scale-105 transition"
+              >
+                Gestisci Risultato
+              </button>
             </div>
           </div>
-        )}
+
+          {precedenti.length > 0 && (
+            <div className="bg-white rounded-xl shadow-montecarlo overflow-hidden">
+              <div className="bg-gradient-montecarlo text-white p-4">
+                <div className="flex items-center">
+                  <History className="mr-2" size={20} />
+                  <h2 className="font-semibold">Scontri Precedenti</h2>
+                </div>
+              </div>
+              <div className="p-4 space-y-3">
+                {precedenti.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => navigate(`/partita/${item.id}`)}
+                    className="cursor-pointer hover:bg-montecarlo-red-50 p-3 rounded-lg border border-montecarlo-red-100 transition"
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-montecarlo-neutral">
+                        {new Date(item.data_ora).toLocaleDateString("it-IT", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}
+                      </span>
+                      <span className="text-sm font-medium text-montecarlo-secondary">
+                        {item.casa.nome} {item.goal_a} - {item.goal_b}{" "}
+                        {item.ospite.nome}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
