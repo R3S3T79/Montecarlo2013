@@ -108,7 +108,8 @@ export default function Risultati() {
   return (
     <div className="min-h-screen bg-gradient-montecarlo-light">
       <div className="container mx-auto px-4 py-6">
-        <div className="relative mb-4">
+        {/* Header + filtri spostato maggiormente verso il basso */}
+        <div className="relative mt-6 mb-4">
           <div className="bg-white rounded-xl shadow-montecarlo p-2 space-y-2">
             <div className="flex items-center justify-center">
               <h2 className="text-lg font-bold text-montecarlo-secondary">
