@@ -38,6 +38,15 @@ import ProssimaPartita      from "./pages/ProssimaPartita";
 // pagina Tornei (senza dettaglio)
 import Tornei from "./pages/tornei/NuovoTorneo/Tornei";
 
+// dettaglio eliminazione diretta
+import Step5_Eliminazione  from "./pages/tornei/NuovoTorneo/Step5_Eliminazione";
+import Step6_Eliminazione  from "./pages/tornei/NuovoTorneo/Step6_Eliminazione";
+
+// ** DECOMMENTATE QUI LE DUE ROTTE **
+// dettaglio fase a gironi e girone unico
+import Step6_FaseGironi  from "./pages/tornei/NuovoTorneo/Step6_FaseGironi";
+import Step6_GironeUnico from "./pages/tornei/NuovoTorneo/Step6_GironeUnico";
+
 // admin only
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminPanel     from "./pages/AdminPanel";
@@ -68,24 +77,43 @@ export default function App() {
         >
           <Route index element={<Home />} />
 
-          <Route path="calendario"      element={<Calendario />} />
-          <Route path="pre-partita/:id" element={<DettaglioPrePartita />} />
+          <Route path="calendario"       element={<Calendario />} />
+          <Route path="pre-partita/:id"  element={<DettaglioPrePartita />} />
 
-          <Route path="risultati"       element={<Risultati />} />
-          <Route path="nuova-partita"   element={<NuovaPartitaPage />} />
-          <Route path="partita/:id"     element={<DettaglioPartita />} />
+          <Route path="risultati"        element={<Risultati />} />
+          <Route path="nuova-partita"    element={<NuovaPartitaPage />} />
+          <Route path="partita/:id"      element={<DettaglioPartita />} />
           <Route path="partita/:id/edit" element={<EditPartitaPage />} />
 
-          <Route path="squadre"          element={<ListaSquadre />} />
-          <Route path="squadre/nuova"    element={<NuovaSquadra />} />
-          <Route path="squadre/:id"      element={<DettaglioSquadra />} />
-          <Route path="squadre/:id/edit" element={<EditSquadra />} />
+          <Route path="squadre"           element={<ListaSquadre />} />
+          <Route path="squadre/nuova"     element={<NuovaSquadra />} />
+          <Route path="squadre/:id"       element={<DettaglioSquadra />} />
+          <Route path="squadre/:id/edit"  element={<EditSquadra />} />
 
           <Route path="statistiche/squadra"   element={<StatisticheSquadra />} />
           <Route path="statistiche/giocatori" element={<StatisticheGiocatori />} />
           <Route path="prossima-partita"       element={<ProssimaPartita />} />
 
+          {/* elenco tornei */}
           <Route path="tornei" element={<Tornei />} />
+
+          {/* passo 1: rotta di eliminazione diretta */}
+          <Route
+            path="tornei/nuovo/step6-eliminazione/:torneoId"
+            element={<Step6_Eliminazione />}
+          />
+
+          {/* passo 2: rotta di fase a gironi */}
+          <Route
+            path="tornei/nuovo/step6-fasegironi/:torneoId"
+            element={<Step6_FaseGironi />}
+          />
+
+          {/* passo 3: rotta di girone unico */}
+          <Route
+            path="tornei/nuovo/step6-gironeunico/:torneoId"
+            element={<Step6_GironeUnico />}
+          />
 
           {/* rotte riservate a creator/admin */}
           <Route path="admin"       element={<AdminDashboard />} />
