@@ -1,4 +1,4 @@
-// src/pages/tornei/Tornei.tsx
+// src/pages/tornei/NuovoTorneo/Tornei.tsx
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -12,7 +12,7 @@ interface TorneoMeta {
   nome: string;
   luogo: string;
   stagioneNome: string;
-  fasi: string[];  // es ['girone_unico'], ['multi_gironi','eliminazione'], ecc.
+  fasi: string[];
 }
 
 export default function Tornei() {
@@ -48,7 +48,7 @@ export default function Tornei() {
         .select('id, nome')
         .in('id', stagIds);
       if (errSt) console.error('Errore fetch stagioni:', errSt);
-      const mappaStag: Record<string,string> = {};
+      const mappaStag: Record<string, string> = {};
       st?.forEach(s => { mappaStag[s.id] = s.nome; });
       const torneoIds = tornei.map(t => t.id);
       const { data: fasi, error: errF } = await supabase
@@ -56,7 +56,7 @@ export default function Tornei() {
         .select('torneo_id, tipo_fase')
         .in('torneo_id', torneoIds);
       if (errF) console.error('Errore fetch fasi_torneo:', errF);
-      const faseMap: Record<string,string[]> = {};
+      const faseMap: Record<string, string[]> = {};
       fasi?.forEach(f => {
         faseMap[f.torneo_id] = faseMap[f.torneo_id] || [];
         faseMap[f.torneo_id].push(f.tipo_fase);
@@ -76,10 +76,15 @@ export default function Tornei() {
     }
   }
 
-  const apriGironi = (id: string) => navigate(`/tornei/nuovo/step6-fasegironi/${id}`);
+  const apriGironi = (id: string) =>
+    navigate(`/tornei/nuovo/step6-fasegironi/${id}`, { state: { torneoId: id } });
+
   const apriGironeUnico = (id: string) =>
     navigate(`/tornei/nuovo/step6-gironeunico/${id}`, { state: { torneoId: id } });
-  const apriEliminazione = (id: string) => navigate(`/tornei/nuovo/step6-eliminazione/${id}`);
+
+  const apriEliminazione = (id: string) =>
+    navigate(`/tornei/nuovo/step6-eliminazione/${id}`, { state: { torneoId: id } });
+
   const creaFasi = (id: string) => navigate(`/tornei/nuovo/step1/${id}`);
   const nuovoTorneo = () => navigate('/tornei/nuovo/step1');
 
@@ -97,16 +102,19 @@ export default function Tornei() {
   };
 
   const getFaseLabel = (fasi: string[]) => {
-    if (fasi.includes('girone_unico'))    return 'Girone Unico';
-    if (fasi.includes('multi_gironi'))     return 'Fase Gironi';
-    if (fasi.includes('eliminazione'))     return 'Eliminazione';
+    if (fasi.includes('girone_unico')) return 'Girone Unico';
+    if (fasi.includes('multi_gironi')) return 'Fase Gironi';
+    if (fasi.includes('eliminazione')) return 'Eliminazione';
     return 'Da Configurare';
   };
 
   const getFaseColor = (fasi: string[]) => {
-    if (fasi.includes('girone_unico'))    return 'bg-montecarlo-red-100 text-montecarlo-secondary border-montecarlo-red-200';
-    if (fasi.includes('multi_gironi'))     return 'bg-montecarlo-gold-100 text-montecarlo-secondary border-montecarlo-gold-200';
-    if (fasi.includes('eliminazione'))     return 'bg-montecarlo-gray-100 text-montecarlo-neutral border-montecarlo-gray-200';
+    if (fasi.includes('girone_unico'))
+      return 'bg-montecarlo-red-100 text-montecarlo-secondary border-montecarlo-red-200';
+    if (fasi.includes('multi_gironi'))
+      return 'bg-montecarlo-gold-100 text-montecarlo-secondary border-montecarlo-gold-200';
+    if (fasi.includes('eliminazione'))
+      return 'bg-montecarlo-gray-100 text-montecarlo-neutral border-montecarlo-gray-200';
     return 'bg-montecarlo-neutral/20 text-montecarlo-neutral border-montecarlo-neutral/30';
   };
 
@@ -172,7 +180,7 @@ export default function Tornei() {
                 key={t.id}
                 className="bg-white rounded-xl shadow-montecarlo hover:shadow-montecarlo-lg transition-all duration-300 transform hover:scale-[1.02] overflow-hidden border-l-4 border-montecarlo-secondary"
               >
-                {/* Header della card */}
+                {/* Header */}
                 <div className="bg-gradient-montecarlo text-white p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -195,15 +203,12 @@ export default function Tornei() {
                   </div>
                 </div>
 
-                {/* Contenuto della card */}
+                {/* Corpo card */}
                 <div className="p-4 space-y-3">
-                  {/* Luogo */}
                   <div className="flex items-center text-montecarlo-neutral">
                     <MapPin className="mr-2" size={16} />
                     <span className="text-sm">{t.luogo}</span>
                   </div>
-
-                  {/* Tipo di torneo */}
                   <div className="flex items-center">
                     <Users className="mr-2 text-montecarlo-neutral" size={16} />
                     <span
@@ -214,8 +219,6 @@ export default function Tornei() {
                       {getFaseLabel(t.fasi)}
                     </span>
                   </div>
-
-                  {/* Azioni */}
                   <div className="pt-3 border-t border-montecarlo-gray-100">
                     <div className="flex flex-wrap gap-2">
                       {t.fasi.includes('girone_unico') && (
@@ -253,6 +256,7 @@ export default function Tornei() {
                     </div>
                   </div>
                 </div>
+
               </div>
             ))}
           </div>
