@@ -1,8 +1,10 @@
-// src/pages/tornei/NuovoTorneo/Step5_GironeUnico.tsx
+// src/pages/tornei/NuovoTorneo/Step6_GironeUnico.tsx
 
-import React, { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { supabase } from '../../../lib/supabaseClient';
+import React, { useEffect, useState, useMemo } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { supabase } from "../../../lib/supabaseClient";
+import { useAuth } from "../../../context/AuthContext";
+import { UserRole } from "../../../lib/roles";
 
 interface Squadra {
   id: string;
@@ -10,266 +12,308 @@ interface Squadra {
   logo_url: string | null;
 }
 
-interface StateType {
-  torneoNome: string;
-  torneoLuogo: string;
-  stagioneSelezionata: string;
-  formatoTorneo: 'girone_unico';
-  numSquadre: number;
-  squadreSelezionate: string[];
+interface Partita {
+  id: string;
+  squadra_casa_id: string;
+  squadra_ospite_id: string;
+  goal_casa: number;
+  goal_ospite: number;
+  rigori_vincitore: string | null;
+  stato: string;
+  data_ora: string | null;
 }
 
-export default function Step5_GironeUnico() {
+export default function Step6_GironeUnico() {
+  const { user } = useAuth();
+  const role =
+    (user?.user_metadata?.role as UserRole) ||
+    (user?.app_metadata?.role as UserRole) ||
+    UserRole.Authenticated;
+  const canEdit = role === UserRole.Admin || role === UserRole.Creator;
+
+  const { torneoId: paramId } = useParams<{ torneoId?: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const state = location.state as StateType | null;
+  const torneoId =
+    (location.state as { torneoId?: string })?.torneoId || paramId;
 
-  const [squadre, setSquadre] = useState<Squadra[]>([]);
-  const [accoppiamenti, setAccoppiamenti] = useState<[string, string][]>([]);
-  const [dateIncontri, setDateIncontri] = useState<
-    Record<string, { andata: string; ritorno?: string }>
-  >({});
-  const [andataRitorno, setAndataRitorno] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [torneoNome, setTorneoNome] = useState<string>("Torneo");
+  const [matches, setMatches] = useState<Partita[]>([]);
+  const [squadreMap, setSquadreMap] = useState<Record<string, Squadra>>({});
+  const [loading, setLoading] = useState<boolean>(true);
 
-  // popolo squadre e accoppiamenti
   useEffect(() => {
-    if (!state) return;
-    supabase
-      .from<Squadra>('squadre')
-      .select('id, nome, logo_url')
-      .in('id', state.squadreSelezionate)
-      .then(({ data }) => {
-        if (!data) return;
-        setSquadre(data);
-        const acc: [string, string][] = [];
-        data.forEach((a, i) =>
-          data.slice(i + 1).forEach(b => acc.push([a.id, b.id]))
-        );
-        setAccoppiamenti(acc);
-      });
-  }, [state]);
+    if (!torneoId) {
+      navigate("/tornei");
+      return;
+    }
+    setLoading(true);
+    (async () => {
+      // 1) Nome torneo
+      const { data: tData } = await supabase
+        .from("tornei")
+        .select("nome")
+        .eq("id", torneoId)
+        .single();
+      if (tData?.nome) setTorneoNome(tData.nome);
 
-  if (!state) {
-    return (
-      <p className="text-center text-red-500 mt-6">
-        Dati torneo mancanti.
-      </p>
+      // 2) Partite girone unico
+      const { data: partiteData } = await supabase
+        .from<Partita>("partite_torneo")
+        .select(
+          [
+            "id",
+            "squadra_casa_id",
+            "squadra_ospite_id",
+            "goal_casa",
+            "goal_ospite",
+            "rigori_vincitore",
+            "stato",
+            "data_ora",
+          ].join(", ")
+        )
+        .eq("torneo_id", torneoId)
+        .order("data_ora", { ascending: true });
+      const ordered = [...(partiteData || [])].sort((a, b) => {
+        const t1 = new Date(a.data_ora || "").getTime();
+        const t2 = new Date(b.data_ora || "").getTime();
+        return t1 !== t2 ? t1 - t2 : a.id.localeCompare(b.id);
+      });
+      setMatches(ordered);
+
+      // 3) Squadre coinvolte
+      const squadreIds = Array.from(
+        new Set(ordered.flatMap((m) => [m.squadra_casa_id, m.squadra_ospite_id]))
+      );
+      const { data: sData } = await supabase
+        .from<Squadra>("squadre")
+        .select("id, nome, logo_url")
+        .in("id", squadreIds);
+      setSquadreMap(Object.fromEntries(sData.map((s) => [s.id, s])));
+
+      setLoading(false);
+    })();
+  }, [torneoId, navigate]);
+
+  const classifica = useMemo(() => {
+    type Row = {
+      id: string;
+      nome: string;
+      logo_url: string | null;
+      PG: number;
+      V: number;
+      N: number;
+      P: number;
+      GF: number;
+      GS: number;
+      DR: number;
+      Pt: number;
+    };
+    const tbl: Record<string, Row> = {};
+
+    matches.forEach((m) => {
+      [m.squadra_casa_id, m.squadra_ospite_id].forEach((id) => {
+        if (!tbl[id]) {
+          const s = squadreMap[id];
+          tbl[id] = {
+            id,
+            nome: s?.nome || id,
+            logo_url: s?.logo_url || null,
+            PG: 0,
+            V: 0,
+            N: 0,
+            P: 0,
+            GF: 0,
+            GS: 0,
+            DR: 0,
+            Pt: 0,
+          };
+        }
+      });
+    });
+
+    matches
+      .filter((m) => m.stato === "Giocata")
+      .forEach((m) => {
+        const home = tbl[m.squadra_casa_id];
+        const away = tbl[m.squadra_ospite_id];
+        home.PG++; away.PG++;
+        home.GF += m.goal_casa; home.GS += m.goal_ospite;
+        away.GF += m.goal_ospite; away.GS += m.goal_casa;
+
+        const draw = m.goal_casa === m.goal_ospite;
+        const rigori = draw && !!m.rigori_vincitore;
+
+        if (m.goal_casa > m.goal_ospite) {
+          home.V++; away.P++; home.Pt += 3;
+        } else if (m.goal_ospite > m.goal_casa) {
+          away.V++; home.P++; away.Pt += 3;
+        } else if (rigori) {
+          if (m.rigori_vincitore === m.squadra_casa_id) {
+            home.V++; away.P++; home.Pt += 3;
+          } else {
+            away.V++; home.P++; away.Pt += 3;
+          }
+        } else {
+          home.N++; away.N++; home.Pt++; away.Pt++;
+        }
+      });
+
+    Object.values(tbl).forEach((r) => {
+      r.DR = r.GF - r.GS;
+    });
+
+    return Object.values(tbl).sort(
+      (a, b) =>
+        b.Pt - a.Pt ||
+        b.DR - a.DR ||
+        b.GF - a.GF ||
+        a.nome.localeCompare(b.nome)
     );
+  }, [matches, squadreMap]);
+
+  const formatDate = (iso: string | null) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return (
+      d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }) +
+      " " +
+      d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })
+    );
+  };
+
+  const handleEdit = (matchId: string) => {
+    navigate(
+      `/tornei/nuovo/step6-gironeunico/${torneoId}/edit/${matchId}`,
+      { state: { torneoId } }
+    );
+  };
+  const handlePrint = () => window.print();
+  const handleSave = () => navigate("/tornei");
+  const handleExit = () => navigate("/tornei");
+
+  if (loading) {
+    return <p className="text-center py-6">Caricamento in corso…</p>;
   }
 
-  const aggiornaData = (
-    key: string,
-    tipo: 'andata' | 'ritorno',
-    val: string,
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setDateIncontri(prev => ({
-      ...prev,
-      [key]: { ...prev[key], [tipo]: val },
-    }));
-    e.target.blur();
-  };
-
-  const allDatesSet = () =>
-    accoppiamenti.every(([a, b]) => {
-      const key = `${a}-${b}`;
-      if (!dateIncontri[key]?.andata) return false;
-      if (andataRitorno && !dateIncontri[key]?.ritorno) return false;
-      return true;
-    });
-
-  // handler click “scambia”
-  const scambiaAccoppiamento = (idx: number) => {
-    setAccoppiamenti(prev => {
-      const copy = [...prev];
-      const [home, away] = copy[idx];
-      copy[idx] = [away, home];
-      return copy;
-    });
-  };
-
-  const handleNext = async () => {
-    if (!allDatesSet() || loading) return;
-    setLoading(true);
-    try {
-      // 1) crea torneo
-      const { data: torneo, error: torErr } = await supabase
-        .from('tornei')
-        .insert({
-          nome: state.torneoNome,
-          luogo: state.torneoLuogo,
-          stagione_id: state.stagioneSelezionata,
-          formato: 'girone_unico',
-          numero_squadre: state.numSquadre,
-        })
-        .select('id')
-        .single();
-      if (torErr || !torneo) throw torErr || new Error('No torneo');
-      const torneoId = torneo.id;
-
-      // 2) config_torneo
-      await supabase.from('config_torneo').insert({
-        torneo_id: torneoId,
-        girone_andata_ritorno: andataRitorno,
-      });
-
-      // 3) fasi_torneo
-      const { data: fase, error: faseErr } = await supabase
-        .from('fasi_torneo')
-        .insert({
-          torneo_id: torneoId,
-          tipo_fase: 'girone_unico',
-          fase_numerica: 1,
-          round: 1,
-        })
-        .select('id')
-        .single();
-      if (faseErr || !fase) throw faseErr || new Error('No fase');
-      const faseId = fase.id;
-
-      // 4) partite_torneo
-      const partiteDaInserire = accoppiamenti.map(([a, b]) => {
-        const key = `${a}-${b}`;
-        return {
-          torneo_id: torneoId,
-          fase_id: faseId,
-          squadra_casa_id: a,
-          squadra_ospite_id: b,
-          goal_casa: 0,
-          goal_ospite: 0,
-          stato: 'DaGiocare',
-          data_ora: dateIncontri[key].andata,
-          rigori_vincitore: null,
-        };
-      });
-      await supabase.from('partite_torneo').insert(partiteDaInserire);
-
-      // 5) avanti
-      navigate('/tornei/nuovo/step6-gironeunico', {
-        state: { torneoId },
-      });
-    } catch (e) {
-      console.error('Errore salvataggio girone unico:', e);
-      alert('Errore durante il salvataggio. Controlla console.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <div className="max-w-md mx-auto p-6 space-y-6">
-      <h2 className="text-2xl font-bold text-center">Date Incontri</h2>
+    <div className="max-w-3xl mx-auto p-4 print:p-0 space-y-6">
+      <h2 className="text-2xl font-bold text-center mb-4">{torneoNome}</h2>
 
-      <label className="flex items-center space-x-2">
-        <input
-          type="checkbox"
-          checked={andataRitorno}
-          onChange={e => setAndataRitorno(e.target.checked)}
-          className="form-checkbox h-4 w-4 text-blue-600"
-        />
-        <span className="text-sm">Andata e ritorno</span>
-      </label>
+      {/* Partite */}
+      <div className="space-y-3">
+        {matches.map((m) => {
+          const home = squadreMap[m.squadra_casa_id];
+          const away = squadreMap[m.squadra_ospite_id];
 
-      {accoppiamenti.map(([a, b], idx) => {
-        const key = `${a}-${b}`;
-        const casa = squadre.find(s => s.id === a);
-        const ospite = squadre.find(s => s.id === b);
+          let score: React.ReactNode = <span className="text-sm font-medium">VS</span>;
+          if (m.stato === "Giocata") {
+            let a = String(m.goal_casa), b = String(m.goal_ospite);
+            if (a === b && m.rigori_vincitore) {
+              if (m.rigori_vincitore === m.squadra_casa_id) a = `.${a}`;
+              else b = `${b}.`;
+            }
+            score = <span className="text-sm font-medium">{a}-{b}</span>;
+          }
 
-        return (
-          <div
-            key={key}
-            className={`relative bg-white shadow rounded-lg p-4 ${
-              idx < accoppiamenti.length - 1 ? 'mb-4' : ''
-            }`}
-          >
-            {/* pulsante “scambia” */}
-            <button
-              type="button"
-              onClick={() => scambiaAccoppiamento(idx)}
-              className="absolute top-2 right-2 text-gray-500 hover:text-gray-800"
-              title="Scambia casa/trasferta"
+          return (
+            <div
+              key={m.id}
+              onClick={canEdit ? () => handleEdit(m.id) : undefined}
+              className={
+                "bg-white shadow rounded-lg p-2 " +
+                (canEdit
+                  ? "cursor-pointer hover:bg-gray-50"
+                  : "cursor-default")
+              }
             >
-              ↔️
-            </button>
-
-            {/* casa */}
-            <div className="flex items-center space-x-2 mb-2">
-              {casa?.logo_url && (
-                <img
-                  src={casa.logo_url}
-                  alt={casa.nome}
-                  className="w-6 h-6 rounded-full"
-                />
-              )}
-              <span className="text-sm font-medium">{casa?.nome}</span>
-            </div>
-
-            {/* ospite */}
-            <div className="flex items-center space-x-2 mb-4">
-              {ospite?.logo_url && (
-                <img
-                  src={ospite.logo_url}
-                  alt={ospite.nome}
-                  className="w-6 h-6 rounded-full"
-                />
-              )}
-              <span className="text-sm font-medium">{ospite?.nome}</span>
-            </div>
-
-            {/* Data andata */}
-            <div className="mb-4">
-              <label className="block text-xs text-gray-600 mb-1">
-                Data andata
-              </label>
-              <input
-                type="datetime-local"
-                className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                value={dateIncontri[key]?.andata || ''}
-                onChange={e =>
-                  aggiornaData(key, 'andata', e.target.value, e)
-                }
-              />
-            </div>
-
-            {/* Data ritorno */}
-            {andataRitorno && (
-              <div className="mb-4">
-                <label className="block text-xs text-gray-600 mb-1">
-                  Data ritorno
-                </label>
-                <input
-                  type="datetime-local"
-                  className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                  value={dateIncontri[key]?.ritorno || ''}
-                  onChange={e =>
-                    aggiornaData(key, 'ritorno', e.target.value, e)
-                  }
-                />
+              <div className="text-xs text-gray-500 mb-1 text-center">
+                {formatDate(m.data_ora)}
               </div>
-            )}
-          </div>
-        );
-      })}
+              <div className="flex items-center">
+                <span className="w-1/3 text-left text-sm">
+                  {home?.nome || m.squadra_casa_id}
+                </span>
+                <span className="w-1/3 text-center">{score}</span>
+                <span className="w-1/3 text-right text-sm">
+                  {away?.nome || m.squadra_ospite_id}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
-      <div className="flex justify-between">
+      {/* Classifica */}
+      <table className="w-full table-auto border-collapse text-center text-sm mb-6">
+        <thead className="text-xs bg-gray-100">
+          <tr>
+            <th className="border px-1 py-1 text-left">Squadra</th>
+            <th className="border px-1 py-1">PG</th>
+            <th className="border px-1 py-1">V</th>
+            <th className="border px-1 py-1">N</th>
+            <th className="border px-1 py-1">P</th>
+            <th className="border px-1 py-1">GF</th>
+            <th className="border px-1 py-1">GS</th>
+            <th className="border px-1 py-1">DR</th>
+            <th className="border px-1 py-1">Pt</th>
+          </tr>
+        </thead>
+        <tbody>
+          {classifica.map((r, i) => (
+            <tr key={r.id} className={i % 2 === 1 ? "bg-gray-50" : ""}>
+              <td className="border px-1 py-1 flex items-center text-sm">
+                {r.logo_url && (
+                  <img
+                    src={r.logo_url}
+                    alt={r.nome}
+                    className="w-5 h-5 rounded-full mr-2"
+                  />
+                )}
+                {r.nome}
+              </td>
+              <td className="border px-1 py-1">{r.PG}</td>
+              <td className="border px-1 py-1">{r.V}</td>
+              <td className="border px-1 py-1">{r.N}</td>
+              <td className="border px-1 py-1">{r.P}</td>
+              <td className="border px-1 py-1">{r.GF}</td>
+              <td className="border px-1 py-1">{r.GS}</td>
+              <td className="border px-1 py-1">{r.DR}</td>
+              <td className="border px-1 py-1">{r.Pt}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Pulsanti */}
+      <div className="flex justify-between print:hidden">
         <button
           onClick={() => navigate(-1)}
-          className="px-6 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 text-sm"
+          className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
         >
           Indietro
         </button>
         <button
-          onClick={handleNext}
-          disabled={!allDatesSet() || loading}
-          className={`px-6 py-2 rounded text-white text-sm ${
-            allDatesSet() && !loading
-              ? 'bg-blue-600 hover:bg-blue-700'
-              : 'bg-gray-400 cursor-not-allowed'
-          }`}
+          onClick={handlePrint}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
         >
-          {loading ? 'Salvando...' : 'Avanti'}
+          Stampa
         </button>
+        {canEdit ? (
+          <button
+            onClick={handleSave}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+          >
+            Salva ed Esci
+          </button>
+        ) : (
+          <button
+            onClick={handleExit}
+            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+          >
+            Esci
+          </button>
+        )}
       </div>
     </div>
   );
