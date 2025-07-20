@@ -1,8 +1,10 @@
 // src/pages/tornei/NuovoTorneo/Step6_GironeUnico.tsx
 
-import React, { useEffect, useState, useMemo } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { supabase } from '../../../lib/supabaseClient';
+import React, { useEffect, useState, useMemo } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { supabase } from "../../../lib/supabaseClient";
+import { useAuth } from "../../../context/AuthContext";
+import { UserRole } from "../../../lib/roles";
 
 interface Squadra {
   id: string;
@@ -22,154 +24,190 @@ interface Partita {
 }
 
 export default function Step6_GironeUnico() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { torneoId: paramId } = useParams<{ torneoId?: string }>();
-  const torneoId = (location.state as { torneoId?: string })?.torneoId || paramId;
+  const { user } = useAuth();
+  const role =
+    (user?.user_metadata?.role as UserRole) ||
+    (user?.app_metadata?.role as UserRole) ||
+    UserRole.Authenticated;
+  const canEdit = role === UserRole.Admin || role === UserRole.Creator;
 
-  const [torneoNome, setTorneoNome] = useState('Torneo');
+  const { torneoId: paramId } = useParams<{ torneoId?: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const torneoId =
+    (location.state as { torneoId?: string })?.torneoId || paramId;
+
+  const [torneoNome, setTorneoNome] = useState<string>("Torneo");
   const [matches, setMatches] = useState<Partita[]>([]);
   const [squadreMap, setSquadreMap] = useState<Record<string, Squadra>>({});
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    if (!torneoId) return;
+    if (!torneoId) {
+      navigate("/tornei");
+      return;
+    }
+    setLoading(true);
     (async () => {
-      // 1) prendi nome del torneo
-      const { data: tData, error: tErr } = await supabase
-        .from('tornei')
-        .select('nome')
-        .eq('id', torneoId)
+      // 1) Nome torneo
+      const { data: tData } = await supabase
+        .from("tornei")
+        .select("nome")
+        .eq("id", torneoId)
         .single();
-      if (!tErr && tData) {
-        setTorneoNome(tData.nome);
-      }
+      if (tData?.nome) setTorneoNome(tData.nome);
 
-      // 2) prendi partite
-      const { data: raw, error: mErr } = await supabase
-        .from<Partita>('partite_torneo')
-        .select(`
-          id,
-          squadra_casa_id,
-          squadra_ospite_id,
-          goal_casa,
-          goal_ospite,
-          rigori_vincitore,
-          stato,
-          data_ora
-        `)
-        .eq('torneo_id', torneoId)
-        .order('data_ora', { ascending: true });
-
-      if (mErr || !raw) {
-        console.error('Errore fetch partite:', mErr);
-        return;
-      }
-
-      // ordina anche per id se stesse date
-      const ordered = [...raw].sort((a, b) => {
-        const t1 = new Date(a.data_ora || '').getTime() - new Date(b.data_ora || '').getTime();
-        return t1 !== 0 ? t1 : a.id.localeCompare(b.id);
+      // 2) Partite girone unico
+      const { data: partiteData } = await supabase
+        .from<Partita>("partite_torneo")
+        .select(
+          [
+            "id",
+            "squadra_casa_id",
+            "squadra_ospite_id",
+            "goal_casa",
+            "goal_ospite",
+            "rigori_vincitore",
+            "stato",
+            "data_ora",
+          ].join(", ")
+        )
+        .eq("torneo_id", torneoId)
+        .order("data_ora", { ascending: true });
+      const ordered = [...(partiteData || [])].sort((a, b) => {
+        const t1 = new Date(a.data_ora || "").getTime();
+        const t2 = new Date(b.data_ora || "").getTime();
+        return t1 !== t2 ? t1 - t2 : a.id.localeCompare(b.id);
       });
       setMatches(ordered);
 
-      // 3) prendi squadre
-      const ids = Array.from(new Set(raw.flatMap(m => [m.squadra_casa_id, m.squadra_ospite_id])));
-      const { data: sData, error: sErr } = await supabase
-        .from<Squadra>('squadre')
-        .select('id, nome, logo_url')
-        .in('id', ids);
+      // 3) Squadre coinvolte
+      const squadreIds = Array.from(
+        new Set(ordered.flatMap((m) => [m.squadra_casa_id, m.squadra_ospite_id]))
+      );
+      const { data: sData } = await supabase
+        .from<Squadra>("squadre")
+        .select("id, nome, logo_url")
+        .in("id", squadreIds);
+      setSquadreMap(Object.fromEntries(sData.map((s) => [s.id, s])));
 
-      if (sErr || !sData) {
-        console.error('Errore fetch squadre:', sErr);
-        return;
-      }
-      setSquadreMap(Object.fromEntries(sData.map(s => [s.id, s])));
+      setLoading(false);
     })();
-  }, [torneoId]);
+  }, [torneoId, navigate]);
 
   const classifica = useMemo(() => {
     type Row = {
-      id: string; nome: string; logo_url: string | null;
-      PG: number; V: number; N: number; P: number;
-      GF: number; GS: number; DR: number; Pt: number;
+      id: string;
+      nome: string;
+      logo_url: string | null;
+      PG: number;
+      V: number;
+      N: number;
+      P: number;
+      GF: number;
+      GS: number;
+      DR: number;
+      Pt: number;
     };
     const tbl: Record<string, Row> = {};
 
-    matches.forEach(m => {
-      [m.squadra_casa_id, m.squadra_ospite_id].forEach(id => {
+    matches.forEach((m) => {
+      [m.squadra_casa_id, m.squadra_ospite_id].forEach((id) => {
         if (!tbl[id]) {
           const s = squadreMap[id];
           tbl[id] = {
             id,
             nome: s?.nome || id,
             logo_url: s?.logo_url || null,
-            PG: 0, V: 0, N: 0, P: 0, GF: 0, GS: 0, DR: 0, Pt: 0,
+            PG: 0,
+            V: 0,
+            N: 0,
+            P: 0,
+            GF: 0,
+            GS: 0,
+            DR: 0,
+            Pt: 0,
           };
         }
       });
     });
 
-    matches.filter(m => m.stato === 'Giocata').forEach(m => {
-      const home = tbl[m.squadra_casa_id];
-      const away = tbl[m.squadra_ospite_id];
-      if (!home || !away) return;
+    matches
+      .filter((m) => m.stato === "Giocata")
+      .forEach((m) => {
+        const home = tbl[m.squadra_casa_id];
+        const away = tbl[m.squadra_ospite_id];
+        home.PG++; away.PG++;
+        home.GF += m.goal_casa; home.GS += m.goal_ospite;
+        away.GF += m.goal_ospite; away.GS += m.goal_casa;
 
-      home.PG++; away.PG++;
-      home.GF += m.goal_casa; home.GS += m.goal_ospite;
-      away.GF += m.goal_ospite; away.GS += m.goal_casa;
+        const draw = m.goal_casa === m.goal_ospite;
+        const rigori = draw && !!m.rigori_vincitore;
 
-      const draw = m.goal_casa === m.goal_ospite;
-      const rigori = draw && !!m.rigori_vincitore;
-
-      if (m.goal_casa > m.goal_ospite) {
-        home.V++; away.P++; home.Pt += 3;
-      } else if (m.goal_ospite > m.goal_casa) {
-        away.V++; home.P++; away.Pt += 3;
-      } else if (rigori) {
-        if (m.rigori_vincitore === m.squadra_casa_id) {
+        if (m.goal_casa > m.goal_ospite) {
           home.V++; away.P++; home.Pt += 3;
-        } else {
+        } else if (m.goal_ospite > m.goal_casa) {
           away.V++; home.P++; away.Pt += 3;
+        } else if (rigori) {
+          if (m.rigori_vincitore === m.squadra_casa_id) {
+            home.V++; away.P++; home.Pt += 3;
+          } else {
+            away.V++; home.P++; away.Pt += 3;
+          }
+        } else {
+          home.N++; away.N++; home.Pt++; away.Pt++;
         }
-      } else {
-        home.N++; away.N++; home.Pt++; away.Pt++;
-      }
+      });
+
+    Object.values(tbl).forEach((r) => {
+      r.DR = r.GF - r.GS;
     });
 
-    Object.values(tbl).forEach(r => r.DR = r.GF - r.GS);
-    return Object.values(tbl).sort((a, b) =>
-      b.Pt - a.Pt || b.DR - a.DR || b.GF - a.GF
+    return Object.values(tbl).sort(
+      (a, b) =>
+        b.Pt - a.Pt ||
+        b.DR - a.DR ||
+        b.GF - a.GF ||
+        a.nome.localeCompare(b.nome)
     );
   }, [matches, squadreMap]);
 
-  const handlePrint = () => window.print();
-  const handleSaveAndExit = () => navigate('/tornei');
-
   const formatDate = (iso: string | null) => {
-    if (!iso) return '—';
+    if (!iso) return "—";
     const d = new Date(iso);
     return (
-      d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' })
-      + ' ' +
-      d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+      d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }) +
+      " " +
+      d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })
     );
   };
 
-  return (
-    <div className="max-w-3xl mx-auto p-4 print:p-0">
-      {/* Header dinamico con nome torneo */}
-      <h2 className="text-2xl font-bold text-center mb-4">
-        {torneoNome}
-      </h2>
+  const handleEdit = (matchId: string) => {
+    navigate(
+      `/tornei/nuovo/step6-gironeunico/${torneoId}/edit/${matchId}`,
+      { state: { torneoId } }
+    );
+  };
+  const handlePrint = () => window.print();
+  const handleSave = () => navigate("/tornei");
+  const handleExit = () => navigate("/tornei");
 
-      {/* Tabellone */}
-      <div className="space-y-3 mb-6">
-        {matches.map(m => {
+  if (loading) {
+    return <p className="text-center py-6">Caricamento in corso…</p>;
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto p-4 print:p-0 space-y-6">
+      <h2 className="text-2xl font-bold text-center mb-4">{torneoNome}</h2>
+
+      {/* Partite */}
+      <div className="space-y-3">
+        {matches.map((m) => {
           const home = squadreMap[m.squadra_casa_id];
           const away = squadreMap[m.squadra_ospite_id];
 
           let score: React.ReactNode = <span className="text-sm font-medium">VS</span>;
-          if (m.stato === 'Giocata') {
+          if (m.stato === "Giocata") {
             let a = String(m.goal_casa), b = String(m.goal_ospite);
             if (a === b && m.rigori_vincitore) {
               if (m.rigori_vincitore === m.squadra_casa_id) a = `.${a}`;
@@ -181,21 +219,25 @@ export default function Step6_GironeUnico() {
           return (
             <div
               key={m.id}
-              onClick={() =>
-                navigate(
-                  `/tornei/nuovo/step6-gironeunico/${torneoId}/edit/${m.id}`,
-                  { state: { torneoId } }
-                )
+              onClick={canEdit ? () => handleEdit(m.id) : undefined}
+              className={
+                "bg-white shadow rounded-lg p-2 " +
+                (canEdit
+                  ? "cursor-pointer hover:bg-gray-50"
+                  : "cursor-default")
               }
-              className="bg-white shadow-lg hover:shadow-xl rounded-lg p-2 cursor-pointer hover:bg-gray-50"
             >
               <div className="text-xs text-gray-500 mb-1 text-center">
                 {formatDate(m.data_ora)}
               </div>
               <div className="flex items-center">
-                <span className="w-1/3 text-left text-sm">{home?.nome || m.squadra_casa_id}</span>
+                <span className="w-1/3 text-left text-sm">
+                  {home?.nome || m.squadra_casa_id}
+                </span>
                 <span className="w-1/3 text-center">{score}</span>
-                <span className="w-1/3 text-right text-sm">{away?.nome || m.squadra_ospite_id}</span>
+                <span className="w-1/3 text-right text-sm">
+                  {away?.nome || m.squadra_ospite_id}
+                </span>
               </div>
             </div>
           );
@@ -219,9 +261,15 @@ export default function Step6_GironeUnico() {
         </thead>
         <tbody>
           {classifica.map((r, i) => (
-            <tr key={r.id} className={i % 2 === 1 ? 'bg-gray-50' : ''}>
+            <tr key={r.id} className={i % 2 === 1 ? "bg-gray-50" : ""}>
               <td className="border px-1 py-1 flex items-center text-sm">
-                {r.logo_url && <img src={r.logo_url} alt={r.nome} className="w-5 h-5 rounded-full mr-2" />}
+                {r.logo_url && (
+                  <img
+                    src={r.logo_url}
+                    alt={r.nome}
+                    className="w-5 h-5 rounded-full mr-2"
+                  />
+                )}
                 {r.nome}
               </td>
               <td className="border px-1 py-1">{r.PG}</td>
@@ -237,14 +285,35 @@ export default function Step6_GironeUnico() {
         </tbody>
       </table>
 
-      {/* Stampa + Salva */}
+      {/* Pulsanti */}
       <div className="flex justify-between print:hidden">
-        <button onClick={handlePrint} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+        <button
+          onClick={() => navigate(-1)}
+          className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+        >
+          Indietro
+        </button>
+        <button
+          onClick={handlePrint}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
           Stampa
         </button>
-        <button onClick={handleSaveAndExit} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
-          Salva Torneo
-        </button>
+        {canEdit ? (
+          <button
+            onClick={handleSave}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+          >
+            Salva ed Esci
+          </button>
+        ) : (
+          <button
+            onClick={handleExit}
+            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+          >
+            Esci
+          </button>
+        )}
       </div>
     </div>
   );
