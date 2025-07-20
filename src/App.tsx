@@ -1,5 +1,4 @@
 // src/App.tsx
-
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
@@ -12,7 +11,7 @@ import RegisterPage    from "./pages/RegisterPage";
 import ConfirmPage     from "./pages/ConfirmPage";
 import AuthCallback    from "./pages/AuthCallback";
 
-// pagine fuori sidebar, per ogni utente autenticato
+// pagine per ogni utente autenticato
 import RosaGiocatori      from "./pages/RosaGiocatori";
 import DettaglioGiocatore from "./pages/DettaglioGiocatore";
 import AggiungiGiocatore  from "./pages/AggiungiGiocatore";
@@ -35,17 +34,14 @@ import StatisticheSquadra   from "./pages/StatisticheSquadra";
 import StatisticheGiocatori from "./pages/StatisticheGiocatori";
 import ProssimaPartita      from "./pages/ProssimaPartita";
 
-// pagina Tornei (senza dettaglio)
-import Tornei from "./pages/tornei/NuovoTorneo/Tornei";
-
-// dettaglio eliminazione diretta
+// tornei
+import Tornei             from "./pages/tornei/NuovoTorneo/Tornei";
 import Step5_Eliminazione  from "./pages/tornei/NuovoTorneo/Step5_Eliminazione";
 import Step6_Eliminazione  from "./pages/tornei/NuovoTorneo/Step6_Eliminazione";
-
-// ** DECOMMENTATE QUI LE DUE ROTTE **
-// dettaglio fase a gironi e girone unico
-import Step6_FaseGironi  from "./pages/tornei/NuovoTorneo/Step6_FaseGironi";
-import Step6_GironeUnico from "./pages/tornei/NuovoTorneo/Step6_GironeUnico";
+import Step6_FaseGironi    from "./pages/tornei/NuovoTorneo/Step6_FaseGironi";
+import Step6_GironeUnico   from "./pages/tornei/NuovoTorneo/Step6_GironeUnico";
+// ** qui ho cambiato **
+import Step7_FaseGironi    from "./pages/tornei/NuovoTorneo/Step7_FaseGironi";
 
 // admin only
 import AdminDashboard from "./pages/AdminDashboard";
@@ -55,18 +51,18 @@ export default function App() {
   return (
     <AuthProvider>
       <Routes>
-        {/* pagine pubbliche */}
+        {/* pubbliche */}
         <Route path="/login"         element={<LoginPage />} />
         <Route path="/register"      element={<RegisterPage />} />
         <Route path="/confirm"       element={<ConfirmPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
 
-        {/* pagine accessibili a ogni utente autenticato */}
+        {/* utenti autenticati */}
         <Route path="/rosa"               element={<RosaGiocatori />} />
         <Route path="/giocatore/:id"      element={<DettaglioGiocatore />} />
         <Route path="/aggiungi-giocatore" element={<AggiungiGiocatore />} />
 
-        {/* resto delle pagine protette dentro SidebarLayout */}
+        {/* protette nella sidebar */}
         <Route
           path="/*"
           element={
@@ -85,10 +81,10 @@ export default function App() {
           <Route path="partita/:id"      element={<DettaglioPartita />} />
           <Route path="partita/:id/edit" element={<EditPartitaPage />} />
 
-          <Route path="squadre"           element={<ListaSquadre />} />
-          <Route path="squadre/nuova"     element={<NuovaSquadra />} />
-          <Route path="squadre/:id"       element={<DettaglioSquadra />} />
-          <Route path="squadre/:id/edit"  element={<EditSquadra />} />
+          <Route path="squadre"          element={<ListaSquadre />} />
+          <Route path="squadre/nuova"    element={<NuovaSquadra />} />
+          <Route path="squadre/:id"      element={<DettaglioSquadra />} />
+          <Route path="squadre/:id/edit" element={<EditSquadra />} />
 
           <Route path="statistiche/squadra"   element={<StatisticheSquadra />} />
           <Route path="statistiche/giocatori" element={<StatisticheGiocatori />} />
@@ -97,30 +93,42 @@ export default function App() {
           {/* elenco tornei */}
           <Route path="tornei" element={<Tornei />} />
 
-          {/* passo 1: rotta di eliminazione diretta */}
+          {/* STEP 5: eliminazione diretta */}
+          <Route
+            path="tornei/nuovo/step5-eliminazione/:torneoId"
+            element={<Step5_Eliminazione />}
+          />
+
+          {/* STEP 6a: tabellone KO */}
           <Route
             path="tornei/nuovo/step6-eliminazione/:torneoId"
             element={<Step6_Eliminazione />}
           />
 
-          {/* passo 2: rotta di fase a gironi */}
+          {/* STEP 6b: fase a gironi */}
           <Route
             path="tornei/nuovo/step6-fasegironi/:torneoId"
             element={<Step6_FaseGironi />}
           />
 
-          {/* passo 3: rotta di girone unico */}
+          {/* STEP 6c: girone unico */}
           <Route
             path="tornei/nuovo/step6-gironeunico/:torneoId"
             element={<Step6_GironeUnico />}
           />
 
-          {/* rotte riservate a creator/admin */}
+          {/* STEP 7: gironi finali */}
+          <Route
+            path="tornei/nuovo/step7-fasegironi/:torneoId"
+            element={<Step7_FaseGironi />}
+          />
+
+          {/* creator/admin */}
           <Route path="admin"       element={<AdminDashboard />} />
-          <Route path="admin-panel" element={<AdminPanel />} />
+          <Route path="admin-panel" element={<AdminPanel     />} />
         </Route>
 
-        {/* catch-all → login */}
+        {/* fallback */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </AuthProvider>
