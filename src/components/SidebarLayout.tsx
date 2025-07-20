@@ -1,3 +1,5 @@
+// src/components/SidebarLayout.tsx
+
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Menu } from 'lucide-react';
@@ -44,10 +46,10 @@ export default function SidebarLayout() {
 
   return (
     <div className="relative h-screen flex overflow-hidden">
-      {/* hamburger */}
+      {/* hamburger nero */}
       <button
         onClick={() => setDrawerOpen(true)}
-        className="fixed top-4 left-4 z-50 text-white"
+        className="fixed top-4 left-4 z-50 text-black"
         aria-label="Apri menu"
       >
         <Menu size={24} />
