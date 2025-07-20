@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import { Users, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../lib/roles';
 
@@ -46,21 +46,21 @@ export default function RosaGiocatori(): JSX.Element {
   return (
     <div className="min-h-screen bg-gradient-montecarlo-light">
       <div className="container mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="relative mb-6">
-          <div className="bg-white rounded-xl shadow-montecarlo p-6">
-            <div className="flex items-center justify-center mb-4">
-              <Users className="text-montecarlo-secondary mr-3" size={28} />
-              <h1 className="text-2xl font-bold text-montecarlo-secondary">Rosa Giocatori</h1>
+        {/* Header ridotto */}
+        <div className="relative mb-4">
+          <div className="bg-white rounded-xl shadow-montecarlo p-2">
+            <div className="flex items-center justify-center">
+              <h2 className="text-lg font-bold text-montecarlo-secondary">
+                Rosa Giocatori
+              </h2>
             </div>
-
             {canEdit && (
               <button
                 onClick={() => navigate('/aggiungi-giocatore')}
-                className="absolute right-2 top-2 w-10 h-10 bg-gradient-montecarlo text-white rounded-full flex items-center justify-center hover:shadow-montecarlo-lg transition-all duration-300 transform hover:scale-105"
+                className="absolute right-2 top-2 w-8 h-8 bg-gradient-montecarlo text-white rounded-full flex items-center justify-center hover:shadow-montecarlo-lg transition-all duration-300 transform hover:scale-105"
                 aria-label="Aggiungi Giocatore"
               >
-                <Plus size={20} />
+                <Plus size={16} />
               </button>
             )}
           </div>
@@ -76,10 +76,10 @@ export default function RosaGiocatori(): JSX.Element {
               <div
                 key={g.id}
                 onClick={() => navigate(`/giocatore/${g.id}`)}
-                className="bg-white rounded-lg shadow-montecarlo hover:shadow-montecarlo-lg border-l-4 border-montecarlo-secondary cursor-pointer transition-all duration-300 transform hover:scale-[1.02] p-4"
+                className="bg-white rounded-lg shadow-montecarlo hover:shadow-montecarlo-lg border-l-4 border-montecarlo-secondary cursor-pointer transition-all duration-300 transform hover:scale-[1.02] p-2"
               >
-                <div className="flex items-center space-x-4">
-                  <div className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 border-2 border-montecarlo-accent">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border-2 border-montecarlo-accent">
                     {g.foto_url ? (
                       <img
                         src={g.foto_url}
@@ -87,20 +87,22 @@ export default function RosaGiocatori(): JSX.Element {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-montecarlo text-white flex items-center justify-center text-xl font-bold">
+                      <div className="w-full h-full bg-montecarlo-secondary flex items-center justify-center text-white text-base font-bold">
                         {g.cognome.charAt(0)}
                       </div>
                     )}
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-bold text-montecarlo-secondary text-lg">
+                    <h3 className="font-bold text-montecarlo-secondary text-base">
                       {g.cognome} {g.nome}
                     </h3>
                     {g.ruolo && (
-                      <p className="text-montecarlo-neutral font-medium">{g.ruolo}</p>
+                      <p className="text-montecarlo-neutral text-sm font-medium">
+                        {g.ruolo}
+                      </p>
                     )}
                   </div>
-                  <div className="w-3 h-3 bg-montecarlo-accent rounded-full"></div>
+                  {/* puntino giallo rimosso */}
                 </div>
               </div>
             ))}
