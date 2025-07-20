@@ -47,7 +47,7 @@ export default function RosaGiocatori(): JSX.Element {
     <div className="min-h-screen bg-gradient-montecarlo-light">
       <div className="container mx-auto px-4 py-6">
         {/* Header ridotto */}
-        <div className="relative mb-4">
+        <div className="relative mt-4 mb-4">
           <div className="bg-white rounded-xl shadow-montecarlo p-2">
             <div className="flex items-center justify-center">
               <h2 className="text-lg font-bold text-montecarlo-secondary">
@@ -71,7 +71,7 @@ export default function RosaGiocatori(): JSX.Element {
             <div className="text-montecarlo-secondary">Caricamento...</div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 max-w-md mx-auto">
+          <div className="grid grid-cols-1 gap-4">
             {giocatori.map((g) => (
               <div
                 key={g.id}
@@ -102,7 +102,6 @@ export default function RosaGiocatori(): JSX.Element {
                       </p>
                     )}
                   </div>
-                  {/* puntino giallo rimosso */}
                 </div>
               </div>
             ))}
