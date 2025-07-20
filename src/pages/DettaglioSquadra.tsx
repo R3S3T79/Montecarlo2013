@@ -24,14 +24,12 @@ export default function DettaglioSquadra(): JSX.Element {
   const [squadra, setSquadra] = useState<Squadra | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Ricava il ruolo e decide se mostrare Modifica/Elimina
   const role =
     (user?.user_metadata?.role as UserRole) ||
     (user?.app_metadata?.role as UserRole) ||
     UserRole.Authenticated;
   const canEdit = role === UserRole.Admin || role === UserRole.Creator;
 
-  // Fetch dati squadra
   useEffect(() => {
     if (!id) {
       setLoading(false);
@@ -43,16 +41,12 @@ export default function DettaglioSquadra(): JSX.Element {
         .select('*')
         .eq('id', id)
         .single();
-      if (error) {
-        console.error('Errore caricamento squadra:', error);
-      } else {
-        setSquadra(data);
-      }
+      if (error) console.error('Errore caricamento squadra:', error);
+      else setSquadra(data);
       setLoading(false);
     })();
   }, [id]);
 
-  // Handlers
   const handleDelete = async (): Promise<void> => {
     if (!id) return;
     if (!window.confirm('Sei sicuro di voler eliminare questa squadra?')) return;
@@ -85,38 +79,36 @@ export default function DettaglioSquadra(): JSX.Element {
     return <div className="p-4 text-center">Squadra non trovata</div>;
   }
 
-  // Valida embed mappa
   const validMap =
     typeof squadra.mappa_url === 'string' &&
     squadra.mappa_url.includes('/maps/embed?pb=');
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Top bar: back + edit + delete */}
-      <div className="flex items-center justify-between p-4 border-b">
+      {/* Top bar: back arrow aligned like other pages, no title */}
+      <div className="relative mt-6 mb-4">
         <Link
           to="/squadre"
-          className="flex items-center text-gray-600 hover:text-gray-900"
+          className="absolute left-16 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-900"
+          aria-label="Indietro"
         >
           <ArrowLeft size={20} />
-          <span className="ml-2">Lista Squadre</span>
         </Link>
-
         {canEdit && (
-          <div className="flex space-x-2">
+          <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex space-x-2">
             <button
               onClick={handleEdit}
               className="flex items-center text-blue-600 hover:text-blue-800"
+              aria-label="Modifica"
             >
               <Edit size={20} />
-              <span className="ml-2">Modifica</span>
             </button>
             <button
               onClick={handleDelete}
               className="flex items-center text-red-600 hover:text-red-800"
+              aria-label="Elimina"
             >
               <Trash2 size={20} />
-              <span className="ml-2">Elimina</span>
             </button>
           </div>
         )}
