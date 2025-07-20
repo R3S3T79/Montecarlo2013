@@ -1,4 +1,5 @@
 // src/App.tsx
+
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
@@ -24,6 +25,9 @@ import Risultati           from "./pages/Risultati";
 import NuovaPartitaPage    from "./pages/NuovaPartitaPage";
 import EditPartitaPage     from "./pages/EditPartitaPage";
 import DettaglioPartita    from "./pages/DettaglioPartita";
+
+// ** import del componente di gestione risultato **
+import GestioneRisultatoPartita from "./components/GestioneRisultatoPartita";
 
 import ListaSquadre       from "./pages/ListaSquadre";
 import NuovaSquadra       from "./pages/NuovaSquadra";
@@ -82,6 +86,9 @@ export default function App() {
           <Route path="nuova-partita"    element={<NuovaPartitaPage />} />
           <Route path="partita/:id"      element={<DettaglioPartita />} />
           <Route path="partita/:id/edit" element={<EditPartitaPage />} />
+
+          {/* Gestione risultato match-day */}
+          <Route path="gestione-risultato/:id" element={<GestioneRisultatoPartita />} />
 
           {/* Squadre */}
           <Route path="squadre"          element={<ListaSquadre />} />
