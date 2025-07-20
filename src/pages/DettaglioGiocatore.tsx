@@ -1,6 +1,9 @@
+// src/pages/DettaglioGiocatore.tsx
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import { ArrowLeft } from 'lucide-react';
 
 interface Giocatore {
   id: string;
@@ -106,12 +109,15 @@ export default function DettaglioGiocatore() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Barra superiore con freccia indietro */}
-      <div className="flex items-center p-4 border-b">
-        <button onClick={() => navigate(-1)} className="text-gray-700 text-2xl">
-          ←
+      {/* Header: freccia spostata come nelle altre pagine */}
+      <div className="relative mt-6 mb-6">
+        <button
+          onClick={() => navigate(-1)}
+          className="absolute left-16 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-900"
+          aria-label="Indietro"
+        >
+          <ArrowLeft size={20} />
         </button>
-        <div className="flex-1" />
       </div>
 
       {/* Contenuto principale */}
