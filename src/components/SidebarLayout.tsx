@@ -56,7 +56,7 @@ export default function SidebarLayout() {
       {/* sidebar */}
       <aside
         className={`fixed inset-y-0 left-0 w-64 bg-gradient-to-br from-[#bfb9b9] to-[#6B7280]
-          text-white z-40 transform transition-transform duration-200 ease-in-out
+          text-white z-40 transform transition-transform duration-200 ease-in-out pt-8
           ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="flex flex-col h-full">
