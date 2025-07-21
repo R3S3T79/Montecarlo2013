@@ -28,7 +28,6 @@ export default function Calendario(): JSX.Element {
 
   useEffect(() => {
     async function fetchPartite() {
-      const now = new Date().toISOString();
       const { data, error } = await supabase
         .from('partite')
         .select(`
@@ -38,7 +37,6 @@ export default function Calendario(): JSX.Element {
           ospite:squadra_ospite_id(nome, logo_url)
         `)
         .eq('stato', 'DaGiocare')
-        .gt('data_ora', now)
         .order('data_ora', { ascending: true });
 
       if (error) console.error('Errore fetch partite:', error);
