@@ -1,10 +1,8 @@
 // src/pages/tornei/NuovoTorneo/Step6_FaseGironi.tsx
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Outlet } from 'react-router-dom';
 import { supabase } from '../../../lib/supabaseClient';
-import { useAuth } from '../../../context/AuthContext';
-import { UserRole } from '../../../lib/roles';
 
 interface Squadra {
   id: string;
@@ -23,30 +21,20 @@ interface Partita {
 }
 
 export default function Step6_FaseGironi() {
-  // --- AUTH & ROLE CHECK ---
-  const { user, loading: authLoading } = useAuth();
-  const role =
-    (user?.user_metadata?.role as UserRole) ||
-    (user?.app_metadata?.role as UserRole) ||
-    UserRole.Authenticated;
-  const canEdit = role === UserRole.Admin || role === UserRole.Creator;
-
   const { torneoId } = useParams<{ torneoId: string }>();
   const navigate = useNavigate();
 
-  // --- STATE ---
   const [torneoNome, setTorneoNome] = useState('');
   const [groups, setGroups] = useState<Record<number, Squadra[]>>({});
   const [matches, setMatches] = useState<Partita[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // --- DATA LOAD ---
   useEffect(() => {
     (async () => {
       setLoading(true);
       if (!torneoId) return;
 
-      // 1) Nome torneo
+      // 1) nome del torneo
       const { data: t } = await supabase
         .from('tornei')
         .select('nome')
@@ -54,7 +42,7 @@ export default function Step6_FaseGironi() {
         .single();
       if (t) setTorneoNome(t.nome);
 
-      // 2) Fase "multi_gironi"
+      // 2) fase multi_gironi
       const { data: f } = await supabase
         .from('fasi_torneo')
         .select('id')
@@ -63,7 +51,7 @@ export default function Step6_FaseGironi() {
         .single();
       if (!f) { console.error('Fase multi_gironi non trovata'); setLoading(false); return; }
 
-      // 3) Squadre per gironi
+      // 3) squadre per gironi
       const { data: gs } = await supabase
         .from('gironi_squadre')
         .select('girone, squadra: squadra_id(id,nome,logo_url)')
@@ -76,7 +64,7 @@ export default function Step6_FaseGironi() {
       });
       setGroups(grp);
 
-      // 4) Partite
+      // 4) partite
       const { data: pts } = await supabase
         .from<Partita>('partite_torneo')
         .select(`
@@ -97,15 +85,15 @@ export default function Step6_FaseGironi() {
     })();
   }, [torneoId]);
 
-  // --- HELPERS ---
   const letterFor = (n: number) => String.fromCharCode(64 + n);
   const matchesOfGroup = (teams: Squadra[]) =>
     matches.filter(m =>
       teams.some(t => t.id === m.squadra_casa.id) &&
       teams.some(t => t.id === m.squadra_ospite.id)
     );
-  type Stat = { squadra: Squadra; pg: number; v: number; n: number; p: number; gf: number; gs: number; dr: number; pt: number };
+
   const calcClassifica = (teams: Squadra[]) => {
+    type Stat = { squadra: Squadra; pg: number; v: number; n: number; p: number; gf: number; gs: number; dr: number; pt: number };
     const stats: Record<string, Stat> = {};
     teams.forEach(t => stats[t.id] = { squadra: t, pg: 0, v: 0, n: 0, p: 0, gf: 0, gs: 0, dr: 0, pt: 0 });
     matchesOfGroup(teams).filter(m => m.stato === 'Giocata').forEach(m => {
@@ -121,6 +109,7 @@ export default function Step6_FaseGironi() {
       .map(s => ({ ...s, dr: s.gf - s.gs }))
       .sort((a,b) => b.pt - a.pt || b.dr - a.dr || b.gf - a.gf);
   };
+
   const formatDate = (iso: string | null) => {
     if (!iso) return '—';
     const d = new Date(iso);
@@ -128,11 +117,8 @@ export default function Step6_FaseGironi() {
       + ' ' + d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
   };
 
-  // --- LOADING STATES ---
-  if (authLoading) return <p className="text-center py-6">Caricamento…</p>;
-  if (loading)     return <p className="text-center py-6">Caricamento…</p>;
+  if (loading) return <p className="text-center py-6">Caricamento…</p>;
 
-  // --- RENDER ---
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-12">
       <h2 className="text-2xl font-bold text-center">{torneoNome}</h2>
@@ -146,54 +132,55 @@ export default function Step6_FaseGironi() {
           <div key={g} className="space-y-6">
             <h3 className="text-lg font-semibold">Girone {letter}</h3>
 
-            {/* Scontri */}
             <div className="space-y-3">
               {scontri.map(m => (
                 <div
                   key={m.id}
-                  onClick={canEdit
-                    ? () => navigate(`/tornei/nuovo/step6-fasegironi/${torneoId}/edit/${m.id}`)
-                    : undefined}
-                  className={`
-                    bg-white rounded-lg shadow-md p-4 max-w-lg mx-auto
-                    ${canEdit
-                      ? 'hover:shadow-lg hover:bg-gray-50 transition-all duration-200 cursor-pointer'
-                      : ''}
-                  `}
+                  onClick={() => navigate(`/tornei/nuovo/step6-fasegironi/${torneoId}/edit/${m.id}`)}
+                  className="
+                    bg-white rounded-lg shadow-md hover:shadow-lg
+                    hover:bg-gray-50 transition-all duration-200
+                    p-4 cursor-pointer max-w-lg mx-auto
+                  "
                 >
+                  {/* Data */}
                   <div className="text-xs text-gray-500 mb-3 text-center">
                     {formatDate(m.data_ora)}
                   </div>
+                  
+                  {/* Layout orizzontale con grid */}
                   <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
                     {/* Squadra Casa */}
                     <div className="flex items-center space-x-2 min-w-0">
                       {m.squadra_casa.logo_url && (
-                        <img
+                        <img 
                           src={m.squadra_casa.logo_url}
-                          alt=""
-                          className="w-6 h-6 rounded-full flex-shrink-0"
+                          className="w-6 h-6 rounded-full flex-shrink-0" 
+                          alt="" 
                         />
                       )}
                       <span className="text-sm font-medium truncate">
                         {m.squadra_casa.nome}
                       </span>
                     </div>
+
                     {/* Punteggio */}
                     <div className="flex items-center space-x-2 text-lg font-bold text-blue-600 flex-shrink-0">
                       <span>{m.goal_casa}</span>
                       <span>-</span>
                       <span>{m.goal_ospite}</span>
                     </div>
+
                     {/* Squadra Ospite */}
                     <div className="flex items-center space-x-2 justify-end min-w-0">
                       <span className="text-sm font-medium truncate">
                         {m.squadra_ospite.nome}
                       </span>
                       {m.squadra_ospite.logo_url && (
-                        <img
+                        <img 
                           src={m.squadra_ospite.logo_url}
-                          alt=""
-                          className="w-6 h-6 rounded-full flex-shrink-0"
+                          className="w-6 h-6 rounded-full flex-shrink-0" 
+                          alt="" 
                         />
                       )}
                     </div>
@@ -202,7 +189,7 @@ export default function Step6_FaseGironi() {
               ))}
             </div>
 
-            {/* Classifica */}
+            {/* CLASSIFICA */}
             <div>
               <h4 className="text-lg font-semibold mb-2">Classifica {letter}</h4>
               <div className="overflow-x-auto">
@@ -225,11 +212,8 @@ export default function Step6_FaseGironi() {
                       <tr key={r.squadra.id} className={i % 2 === 1 ? 'bg-gray-50' : ''}>
                         <td className="border px-3 py-2 flex items-center space-x-2 w-48">
                           {r.squadra.logo_url && (
-                            <img
-                              src={r.squadra.logo_url}
-                              alt=""
-                              className="w-6 h-6 rounded-full"
-                            />
+                            <img src={r.squadra.logo_url}
+                                 className="w-6 h-6 rounded-full" alt="" />
                           )}
                           <span>{r.squadra.nome}</span>
                         </td>
@@ -251,24 +235,17 @@ export default function Step6_FaseGironi() {
         );
       })}
 
-      {/* Azioni in fondo */}
       <div className="flex justify-between">
-        <button
-          onClick={() => window.print()}
-          className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
-        >
+        <button onClick={() => window.print()} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">
           Stampa
         </button>
-        <button
-          onClick={() => navigate(`/tornei/nuovo/step7-fasegironi/${torneoId}`)}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
+        <button onClick={() => navigate(`/tornei/nuovo/step7-fasegironi/${torneoId}`)}
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
           Gironi Finali
         </button>
       </div>
 
-      {/* Outlet per le rotte di editing (solo Admin/Creator) */}
-      {canEdit && <Outlet />}
+      <Outlet />
     </div>
   );
 }
