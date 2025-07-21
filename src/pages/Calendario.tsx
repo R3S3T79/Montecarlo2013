@@ -10,6 +10,7 @@ import { UserRole } from '../lib/roles';
 interface Partita {
   id: string;
   data_ora: string;
+  campionato_torneo: string;
   casa: { nome: string; logo_url: string | null };
   ospite: { nome: string; logo_url: string | null };
 }
@@ -33,6 +34,7 @@ export default function Calendario(): JSX.Element {
         .select(`
           id,
           data_ora,
+          campionato_torneo,
           casa:squadra_casa_id(nome, logo_url),
           ospite:squadra_ospite_id(nome, logo_url)
         `)
@@ -97,9 +99,12 @@ export default function Calendario(): JSX.Element {
                 onClick={() => handleClick(partita.id)}
                 className="cursor-pointer transform transition-all duration-300 hover:scale-[1.02]"
               >
-                {/* Data */}
-                <div className="bg-gradient-montecarlo text-white px-4 py-2 rounded-t-lg">
-                  <div className="text-sm font-medium text-center">
+                {/* Header tipo + data */}
+                <div className="bg-gradient-montecarlo text-white px-4 py-2 rounded-t-lg flex justify-between items-center">
+                  <span className="text-xs font-semibold uppercase">
+                    {partita.campionato_torneo}
+                  </span>
+                  <span className="text-sm font-medium">
                     {new Date(partita.data_ora).toLocaleString(undefined, {
                       day: '2-digit',
                       month: '2-digit',
@@ -107,7 +112,7 @@ export default function Calendario(): JSX.Element {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}
-                  </div>
+                  </span>
                 </div>
 
                 {/* Contenuto partita su due righe */}
