@@ -1,5 +1,4 @@
 // src/pages/ProssimaPartita.tsx
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
@@ -36,7 +35,44 @@ export default function ProssimaPartita() {
   const [partita, setPartita] = useState<PartitaProssima | null>(null);
   const [precedenti, setPrecedenti] = useState<ScontroPrecedente[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // NEW: track the current user's role fetched from pending_users
+  const [role, setRole] = useState<string | null>(null);
+  const [roleLoading, setRoleLoading] = useState(true);
+
   const navigate = useNavigate();
+
+  // fetch the user role from pending_users table by email
+  useEffect(() => {
+    async function fetchRole() {
+      const {
+        data: { user },
+        error: userErr,
+      } = await supabase.auth.getUser();
+
+      if (userErr || !user?.email) {
+        console.error("Errore fetching auth user:", userErr);
+        setRole(null);
+        setRoleLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("pending_users")
+        .select("role")
+        .eq("email", user.email)
+        .single();
+
+      if (error) {
+        console.error("Errore fetching role:", error);
+        setRole(null);
+      } else {
+        setRole(data.role);
+      }
+      setRoleLoading(false);
+    }
+    fetchRole();
+  }, []);
 
   useEffect(() => {
     const fetchPartita = async () => {
@@ -45,10 +81,11 @@ export default function ProssimaPartita() {
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const tomorrow = new Date(today);
       tomorrow.setDate(today.getDate() + 1);
+
       const todayIso = today.toISOString();
       const tomorrowIso = tomorrow.toISOString();
 
-      // Prova match di oggi
+      // try today's matches first
       let { data, error } = await supabase
         .from("partite")
         .select(`
@@ -68,13 +105,15 @@ export default function ProssimaPartita() {
         .order("data_ora", { ascending: true })
         .limit(1);
 
-      if (data?.length) {
-        setPartita(data[0]);
+      if (error) console.error("Errore fetching today:", error);
+
+      if (data && data.length) {
+        setPartita(data[0] as PartitaProssima);
         setLoading(false);
         return;
       }
 
-      // Se non, prossimo futuro
+      // otherwise get the next future match
       ({ data, error } = await supabase
         .from("partite")
         .select(`
@@ -93,11 +132,17 @@ export default function ProssimaPartita() {
         .order("data_ora", { ascending: true })
         .limit(1));
 
-      if (data?.length) {
-        const next = data[0];
+      if (error) {
+        console.error("Errore fetching future:", error);
+        setLoading(false);
+        return;
+      }
+
+      if (data && data.length) {
+        const next = data[0] as PartitaProssima;
         setPartita(next);
 
-        // Precedenti
+        // fetch last 5 head-to-heads
         const { data: prevData, error: prevErr } = await supabase
           .from("partite")
           .select(`
@@ -116,18 +161,22 @@ export default function ProssimaPartita() {
           .order("data_ora", { ascending: false })
           .limit(5);
 
-        setPrecedenti(prevErr ? [] : prevData);
+        setPrecedenti(prevErr ? [] : (prevData as ScontroPrecedente[]));
       }
-
       setLoading(false);
     };
 
     fetchPartita();
   }, []);
 
-  const handleCrea = () => navigate("/nuova-partita");
-  const handleVaiAlMatch = () =>
-    partita && navigate(`/match-handler/${partita.id}`);
+  const handleCrea = () => {
+    navigate("/nuova-partita");
+  };
+
+  const handleVaiAlMatch = () => {
+    if (!partita) return;
+    navigate(`/gestione-risultato/${partita.id}`);
+  };
 
   const formatData = (d: string) =>
     new Date(d).toLocaleDateString("it-IT", {
@@ -142,7 +191,8 @@ export default function ProssimaPartita() {
       minute: "2-digit",
     });
 
-  if (loading) {
+  // show loader until both data and role are loaded
+  if (loading || roleLoading) {
     return (
       <div className="min-h-screen bg-gradient-montecarlo-light flex items-center justify-center">
         <div className="bg-white p-8 rounded-lg shadow-montecarlo">
@@ -151,6 +201,9 @@ export default function ProssimaPartita() {
       </div>
     );
   }
+
+  // determine edit permission
+  const canEdit = role === "admin" || role === "creator";
 
   if (!partita) {
     return (
@@ -177,30 +230,25 @@ export default function ProssimaPartita() {
 
   return (
     <div className="min-h-screen bg-gradient-montecarlo-light">
-      <div className="container mx-auto px-4 py-8">
-        {/* Titolo centrato e allineato al card, con margine-top per non sovrapporsi */}
-        <div className="max-w-md mx-auto mt-16 bg-white rounded-xl shadow-montecarlo text-center py-6 mb-8">
+      <div className="container mx-auto px-4 pt-16">
+        <div className="bg-white rounded-xl shadow-montecarlo text-center py-6 mb-6">
           <h1 className="text-2xl font-bold text-montecarlo-secondary">
             Prossima partita
           </h1>
         </div>
 
-        {/* Card principale */}
         <div className="max-w-md mx-auto space-y-6">
+          {/* card prossima */}
           <div className="bg-white rounded-xl shadow-montecarlo overflow-hidden">
             <div className="bg-montecarlo-red-50 p-4 border-l-4 border-montecarlo-secondary">
               <div className="flex justify-center space-x-4 text-montecarlo-secondary">
                 <div className="flex items-center">
                   <Calendar className="mr-2" size={18} />
-                  <span className="font-semibold">
-                    {formatData(partita.data_ora)}
-                  </span>
+                  <span className="font-semibold">{formatData(partita.data_ora)}</span>
                 </div>
                 <div className="flex items-center">
                   <Clock className="mr-2" size={18} />
-                  <span className="font-semibold">
-                    {formatOra(partita.data_ora)}
-                  </span>
+                  <span className="font-semibold">{formatOra(partita.data_ora)}</span>
                 </div>
               </div>
               <div className="text-center mt-2">
@@ -256,15 +304,19 @@ export default function ProssimaPartita() {
             </div>
 
             <div className="p-6 pt-0">
-              <button
-                onClick={handleVaiAlMatch}
-                className="w-full bg-gradient-montecarlo text-white py-4 rounded-lg font-bold hover:scale-105 transition"
-              >
-                Gestisci Risultato
-              </button>
+              {/* only show to admin or creator */}
+              {canEdit && (
+                <button
+                  onClick={handleVaiAlMatch}
+                  className="w-full bg-gradient-montecarlo text-white py-4 rounded-lg font-bold hover:scale-105 transition"
+                >
+                  Gestisci Risultato
+                </button>
+              )}
             </div>
           </div>
 
+          {/* scontri precedenti */}
           {precedenti.length > 0 && (
             <div className="bg-white rounded-xl shadow-montecarlo overflow-hidden">
               <div className="bg-gradient-montecarlo text-white p-4">
