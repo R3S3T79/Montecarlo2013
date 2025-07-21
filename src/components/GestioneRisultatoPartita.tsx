@@ -1,7 +1,7 @@
 // src/components/GestioneRisultatoPartita.tsx
 
 import React, { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 
 interface SquadraInfo {
@@ -34,12 +34,15 @@ interface PresenzaRecord {
   giocatore_id: string;
 }
 
-export default function GestioneRisultatoPartita({
-  partita,
-}: {
-  partita: PartitaPropria;
-}) {
+export default function GestioneRisultatoPartita() {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  
+  // Stato per la partita e loading
+  const [partita, setPartita] = useState<PartitaPropria | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
   const [giocatori, setGiocatori] = useState<Giocatore[]>([]);
   const [showFormazione, setShowFormazione] = useState(false);
   const [formazioneCasa, setFormazioneCasa] = useState<string[]>([]);
@@ -54,6 +57,80 @@ export default function GestioneRisultatoPartita({
   const [countdownSec, setCountdownSec] = useState<number>(20 * 60);
   const [timerActive, setTimerActive] = useState<boolean>(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fetch della partita usando l'ID dalla route
+  useEffect(() => {
+    const fetchPartita = async () => {
+      if (!id) {
+        setError("ID partita non trovato nella route");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from("partite")
+          .select(`
+            id,
+            data_ora,
+            goal_a,
+            goal_b,
+            goal_a1,
+            goal_a2,
+            goal_a3,
+            goal_a4,
+            goal_b1,
+            goal_b2,
+            goal_b3,
+            goal_b4,
+            squadra_casa:squadra_casa_id(id, nome, logo_url),
+            squadra_ospite:squadra_ospite_id(id, nome, logo_url)
+          `)
+          .eq("id", id)
+          .single();
+
+        if (error) {
+          throw error;
+        }
+
+        if (!data) {
+          setError("Partita non trovata");
+          setLoading(false);
+          return;
+        }
+
+        // Trasforma i dati nel formato atteso dal componente
+        const partitaFormattata: PartitaPropria = {
+          id: data.id,
+          data_ora: data.data_ora,
+          casa: {
+            id: data.squadra_casa.id,
+            nome: data.squadra_casa.nome,
+            logo_url: data.squadra_casa.logo_url
+          },
+          ospite: {
+            id: data.squadra_ospite.id,
+            nome: data.squadra_ospite.nome,
+            logo_url: data.squadra_ospite.logo_url
+          }
+        };
+
+        setPartita(partitaFormattata);
+
+        // Carica i goal esistenti se presenti
+        setGoalCasa([data.goal_a1 || 0, data.goal_a2 || 0, data.goal_a3 || 0, data.goal_a4 || 0]);
+        setGoalOspite([data.goal_b1 || 0, data.goal_b2 || 0, data.goal_b3 || 0, data.goal_b4 || 0]);
+
+      } catch (err: any) {
+        console.error("Errore nel caricamento della partita:", err);
+        setError(err.message || "Errore nel caricamento della partita");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPartita();
+  }, [id]);
 
   // Carica tutti i giocatori
   useEffect(() => {
@@ -139,6 +216,8 @@ export default function GestioneRisultatoPartita({
   // Submit del form
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!partita) return;
+    
     setSubmitting(true);
     try {
       const totCasa = goalCasa.reduce((sum, v) => sum + v, 0);
@@ -205,6 +284,43 @@ export default function GestioneRisultatoPartita({
       setSubmitting(false);
     }
   };
+
+  // Gestione stati di loading ed errore
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-64">
+        <div className="text-lg">Caricamento partita...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col justify-center items-center min-h-64 space-y-4">
+        <div className="text-lg text-red-600">Errore: {error}</div>
+        <button
+          onClick={() => navigate("/prossima-partita")}
+          className="bg-blue-600 text-white px-4 py-2 rounded"
+        >
+          Torna alle partite
+        </button>
+      </div>
+    );
+  }
+
+  if (!partita) {
+    return (
+      <div className="flex flex-col justify-center items-center min-h-64 space-y-4">
+        <div className="text-lg">Partita non trovata</div>
+        <button
+          onClick={() => navigate("/prossima-partita")}
+          className="bg-blue-600 text-white px-4 py-2 rounded"
+        >
+          Torna alle partite
+        </button>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
