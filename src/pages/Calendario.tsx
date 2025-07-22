@@ -28,7 +28,6 @@ export default function Calendario(): JSX.Element {
 
   useEffect(() => {
     async function fetchPartite() {
-      const now = new Date().toISOString();
       const { data, error } = await supabase
         .from('partite')
         .select(
@@ -40,7 +39,6 @@ export default function Calendario(): JSX.Element {
         `
         )
         .eq('stato', 'DaGiocare')
-        .gt('data_ora', now)
         .order('data_ora', { ascending: true });
 
       if (error) console.error('Errore fetch partite:', error);
@@ -50,7 +48,6 @@ export default function Calendario(): JSX.Element {
     fetchPartite();
   }, []);
 
-  // Navigate to prepartita without hyphen
   const handleClick = (id: string) => navigate(`/prepartita/${id}`);
 
   if (authLoading) {
@@ -64,7 +61,6 @@ export default function Calendario(): JSX.Element {
   return (
     <div className="min-h-screen bg-gradient-montecarlo-light">
       <div className="container mx-auto px-4 py-6">
-        {/* Header ridotto */}
         <div className="relative mt-4 mb-4">
           <div className="bg-white rounded-xl shadow-montecarlo p-2">
             <div className="flex items-center justify-center">
@@ -102,7 +98,6 @@ export default function Calendario(): JSX.Element {
                 onClick={() => handleClick(partita.id)}
                 className="cursor-pointer transform transition-all duration-300 hover:scale-[1.02]"
               >
-                {/* Data */}
                 <div className="bg-gradient-montecarlo text-white px-4 py-2 rounded-t-lg">
                   <div className="text-sm font-medium text-center">
                     {new Date(partita.data_ora).toLocaleString(undefined, {
@@ -115,9 +110,7 @@ export default function Calendario(): JSX.Element {
                   </div>
                 </div>
 
-                {/* Contenuto partita su due righe */}
                 <div className="bg-white rounded-b-lg shadow-montecarlo hover:shadow-montecarlo-lg border-l-4 border-montecarlo-secondary p-4 space-y-2">
-                  {/* Squadra di casa */}
                   <div className="flex items-center justify-start space-x-3">
                     {partita.casa.logo_url ? (
                       <img
@@ -135,7 +128,6 @@ export default function Calendario(): JSX.Element {
                     </span>
                   </div>
 
-                  {/* Squadra ospite */}
                   <div className="flex items-center justify-end space-x-3">
                     <span className="font-semibold text-montecarlo-secondary">
                       {partita.ospite.nome}
