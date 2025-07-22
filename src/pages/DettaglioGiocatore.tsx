@@ -35,7 +35,6 @@ export default function DettaglioGiocatore() {
       if (!id) return;
 
       try {
-        // 1. Fetch dati giocatore
         const { data: giocatoreData, error: giocatoreError } = await supabase
           .from('giocatori')
           .select('*')
@@ -50,7 +49,6 @@ export default function DettaglioGiocatore() {
 
         setGiocatore(giocatoreData);
 
-        // 2. Fetch goal totali (dalla tabella marcatori)
         const { data: goalData, error: goalError } = await supabase
           .from('marcatori')
           .select('*', { count: 'exact', head: true })
@@ -58,7 +56,6 @@ export default function DettaglioGiocatore() {
 
         const goalTotali = goalError ? 0 : (goalData?.length || 0);
 
-        // 3. Fetch presenze totali (dalla tabella presenze)
         const { data: presenzeData, error: presenzeError } = await supabase
           .from('presenze')
           .select('*', { count: 'exact', head: true })
@@ -108,85 +105,90 @@ export default function DettaglioGiocatore() {
   const eta = calcolaEta(giocatore.data_nascita);
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header: freccia spostata come nelle altre pagine */}
-      <div className="relative mt-6 mb-6">
-        <button
-          onClick={() => navigate(-1)}
-          className="absolute left-16 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-900"
-          aria-label="Indietro"
-        >
-          <ArrowLeft size={20} />
-        </button>
-      </div>
-
-      {/* Contenuto principale */}
-      <div className="flex flex-col items-center px-6 py-8">
-        {/* Foto profilo */}
-        <div className="w-32 h-32 rounded-full bg-gray-200 overflow-hidden mb-6">
-          {giocatore.foto_url ? (
-            <img
-              src={giocatore.foto_url}
-              alt={`${giocatore.cognome} ${giocatore.nome}`}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full bg-blue-600 text-white flex items-center justify-center text-4xl">
-              {giocatore.cognome[0]}
-            </div>
-          )}
+    <div className="min-h-screen bg-gradient-montecarlo-light">
+      <div className="container mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="relative mt-6 mb-6">
+          <button
+            onClick={() => navigate(-1)}
+            className="absolute left-4 top-1/2 transform -translate-y-1/2 text-montecarlo-secondary hover:text-montecarlo-primary"
+            aria-label="Indietro"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div className="text-center">
+            <h2 className="text-lg font-bold text-montecarlo-secondary">Dettaglio Giocatore</h2>
+          </div>
         </div>
 
-        {/* Nome giocatore */}
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">
-          {giocatore.cognome} {giocatore.nome}
-        </h1>
+        {/* Contenuto */}
+        <div className="bg-white rounded-xl shadow-montecarlo p-6 flex flex-col items-center">
+          {/* Foto */}
+          <div className="w-32 h-32 rounded-full bg-gray-200 overflow-hidden mb-4 border-2 border-montecarlo-accent">
+            {giocatore.foto_url ? (
+              <img
+                src={giocatore.foto_url}
+                alt={`${giocatore.cognome} ${giocatore.nome}`}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-montecarlo-secondary text-white flex items-center justify-center text-4xl font-bold">
+                {giocatore.cognome[0]}
+              </div>
+            )}
+          </div>
 
-        {/* Statistiche principali */}
-        <div className="flex space-x-8 mb-6">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{statistiche.goalTotali}</div>
-            <div className="text-sm text-gray-600">Goal</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{statistiche.presenzeTotali}</div>
-            <div className="text-sm text-gray-600">Presenze</div>
-          </div>
-          {statistiche.presenzeTotali > 0 && (
+          {/* Nome */}
+          <h1 className="text-2xl font-bold text-montecarlo-secondary mb-4">
+            {giocatore.cognome} {giocatore.nome}
+          </h1>
+
+          {/* Statistiche */}
+          <div className="flex space-x-8 mb-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
-                {(statistiche.goalTotali / statistiche.presenzeTotali).toFixed(2)}
+              <div className="text-2xl font-bold text-montecarlo-accent">{statistiche.goalTotali}</div>
+              <div className="text-sm text-montecarlo-neutral">Goal</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">{statistiche.presenzeTotali}</div>
+              <div className="text-sm text-montecarlo-neutral">Presenze</div>
+            </div>
+            {statistiche.presenzeTotali > 0 && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-montecarlo-gold-600">
+                  {(statistiche.goalTotali / statistiche.presenzeTotali).toFixed(2)}
+                </div>
+                <div className="text-sm text-montecarlo-neutral">Media Goal</div>
               </div>
-              <div className="text-sm text-gray-600">Media Goal</div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        {/* Informazioni dettagliate */}
-        <div className="w-full max-w-md space-y-4">
-          {giocatore.data_nascita && (
-            <div className="flex justify-between items-center py-2 border-b">
-              <span className="text-gray-600">Data di nascita</span>
-              <div className="text-right">
-                <span className="font-medium">{formatDataNascita(giocatore.data_nascita)}</span>
-                {eta && <span className="text-sm text-gray-500 ml-2">({eta} anni)</span>}
+          {/* Dettagli */}
+          <div className="w-full max-w-md space-y-4">
+            {giocatore.data_nascita && (
+              <div className="flex justify-between items-center py-2 border-b">
+                <span className="text-montecarlo-neutral">Data di nascita</span>
+                <div className="text-right">
+                  <span className="font-medium">{formatDataNascita(giocatore.data_nascita)}</span>
+                  {eta && <span className="text-sm text-gray-500 ml-2">({eta} anni)</span>}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {giocatore.ruolo && (
-            <div className="flex justify-between items-center py-2 border-b">
-              <span className="text-gray-600">Ruolo</span>
-              <span className="font-medium">{giocatore.ruolo}</span>
-            </div>
-          )}
+            {giocatore.ruolo && (
+              <div className="flex justify-between items-center py-2 border-b">
+                <span className="text-montecarlo-neutral">Ruolo</span>
+                <span className="font-medium">{giocatore.ruolo}</span>
+              </div>
+            )}
 
-          {giocatore.numero_cartellino && (
-            <div className="flex justify-between items-center py-2 border-b">
-              <span className="text-gray-600">Numero Cartellino</span>
-              <span className="font-medium">{giocatore.numero_cartellino}</span>
-            </div>
-          )}
+            {giocatore.numero_cartellino && (
+              <div className="flex justify-between items-center py-2 border-b">
+                <span className="text-montecarlo-neutral">Numero Cartellino</span>
+                <span className="font-medium">{giocatore.numero_cartellino}</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
