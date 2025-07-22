@@ -126,6 +126,9 @@ export default function DettaglioPrePartita(): JSX.Element {
 
   return (
     <>
+      {/* top bar */}
+      <div className="flex items-center justify-between mb-6 px-4">
+        <Link to="/calendario" className="text-gray-600 hover:text-gray-900">
       {/* header: freccia spostata con left-16 per non sovrapporsi all'hamburger */}
       <div className="relative mt-6 mb-6">
         <Link
@@ -136,9 +139,10 @@ export default function DettaglioPrePartita(): JSX.Element {
         </Link>
 
         {canEdit && (
+          <div className="flex space-x-2">
           <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex space-x-2">
             <button
-              navigate(`/partita/${id}/edit`)
+              onClick={() => navigate(`/edit-partita/${id}`)}
               className="flex items-center px-2 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
             >
               <Edit2 size={14} />
@@ -151,7 +155,11 @@ export default function DettaglioPrePartita(): JSX.Element {
             </button>
           </div>
         )}
+      </div>
 
+      {/* data */}
+      <div className="text-center text-gray-700 text-sm font-medium mb-8">
+        {formattedDate}
         <div className="text-center text-gray-700 text-sm font-medium">
           {formattedDate}
         </div>
@@ -188,12 +196,15 @@ export default function DettaglioPrePartita(): JSX.Element {
         )}
       </div>
 
+      {/* scontri precedenti */}
       {/* scontri precedenti: lista centrata */}
       {precedenti.length > 0 && (
+        <div className="mb-6 text-justify px-4">
         <div className="mb-6 px-4">
           <h3 className="text-base font-semibold mb-3 text-center">
             Scontri precedenti
           </h3>
+          <ul className="space-y-2">
           <ul className="space-y-2 mx-auto text-center">
             {precedenti.map((p) => {
               const d = new Date(p.data_ora).toLocaleDateString(undefined, {
@@ -219,4 +230,5 @@ export default function DettaglioPrePartita(): JSX.Element {
       )}
     </>
   );
+}
 }
