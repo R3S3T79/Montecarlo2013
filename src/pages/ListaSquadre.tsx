@@ -23,7 +23,6 @@ export default function ListaSquadre() {
   const { id } = useParams<{ id?: string }>();
   const { user, loading: authLoading } = useAuth();
 
-  // Ricava il ruolo e decide se mostrare il pulsante “+”
   const role =
     (user?.user_metadata?.role as UserRole) ||
     (user?.app_metadata?.role as UserRole) ||
@@ -52,73 +51,72 @@ export default function ListaSquadre() {
   }, [id]);
 
   if (loading || authLoading) {
-    return <div className="p-4 text-center">Caricamento...</div>;
+    return (
+      <div className="min-h-screen bg-gradient-montecarlo-light flex items-center justify-center">
+        <div className="text-montecarlo-secondary text-lg">Caricamento...</div>
+      </div>
+    );
   }
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      {/* Header: titolo centrato + pulsante “+” a destra (solo per admin/creator) */}
-      <div className="flex justify-center items-center mb-6 space-x-4">
-        <h1 className="text-xl font-bold">Lista Squadre</h1>
-        {canAdd && (
-          <button
-            onClick={() => navigate('/squadre/nuova')}
-            title="Nuova Squadra"
-            className="
-              flex items-center justify-center
-              w-10 h-10
-              bg-blue-600 text-white
-              rounded-full
-              hover:bg-blue-700
-              transition-colors
-            "
-          >
-            <PlusCircle size={20} />
-          </button>
-        )}
-      </div>
+    <div className="min-h-screen bg-gradient-montecarlo-light">
+      <div className="container mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="relative mt-6 mb-6">
+          <div className="bg-white rounded-xl shadow-montecarlo p-2">
+            <div className="flex items-center justify-center">
+              <h2 className="text-lg font-bold text-montecarlo-secondary">Lista Squadre</h2>
+            </div>
+            {canAdd && (
+              <button
+                onClick={() => navigate('/squadre/nuova')}
+                title="Nuova Squadra"
+                className="absolute right-4 top-1/2 transform -translate-y-1/2 w-9 h-9 bg-gradient-montecarlo text-white rounded-full flex items-center justify-center hover:shadow-montecarlo-lg transition-all"
+              >
+                <PlusCircle size={18} />
+              </button>
+            )}
+          </div>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {squadre.map((squadra) => (
-          <div
-            key={squadra.id}
-            onClick={() => navigate(`/squadre/${squadra.id}`)}
-            className="
-              bg-white rounded-lg
-              shadow-lg border border-gray-200
-              p-4 cursor-pointer
-              hover:shadow-2xl transition-shadow duration-200
-            "
-          >
-            <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 flex-shrink-0">
-                {squadra.logo_url ? (
-                  <img
-                    src={squadra.logo_url}
-                    alt={`Logo ${squadra.nome}`}
-                    className="w-full h-full object-contain"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gray-200 rounded-full flex items-center justify-center">
-                    <span className="text-2xl text-gray-400">
+        {/* Lista squadre */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+          {squadre.map((squadra) => (
+            <div
+              key={squadra.id}
+              onClick={() => navigate(`/squadre/${squadra.id}`)}
+              className="bg-white rounded-xl shadow-montecarlo p-4 cursor-pointer hover:shadow-montecarlo-lg transition-all duration-200 transform hover:scale-[1.02]"
+            >
+              <div className="flex items-center space-x-4">
+                <div className="w-14 h-14 flex-shrink-0">
+                  {squadra.logo_url ? (
+                    <img
+                      src={squadra.logo_url}
+                      alt={`Logo ${squadra.nome}`}
+                      className="w-full h-full object-contain rounded-full border-2 border-montecarlo-accent"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-montecarlo-secondary text-white rounded-full flex items-center justify-center text-xl font-bold">
                       {squadra.nome.charAt(0)}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">
-                  {squadra.nome}
-                </h2>
-                {squadra.nome_stadio && (
-                  <p className="text-sm text-gray-600">
-                    {squadra.nome_stadio}
-                  </p>
-                )}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-md font-semibold text-montecarlo-secondary">{squadra.nome}</h3>
+                  {squadra.nome_stadio && (
+                    <p className="text-sm text-montecarlo-neutral">{squadra.nome_stadio}</p>
+                  )}
+                </div>
               </div>
             </div>
+          ))}
+        </div>
+
+        {squadre.length === 0 && (
+          <div className="mt-10 text-center text-montecarlo-neutral text-sm">
+            Nessuna squadra trovata.
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
