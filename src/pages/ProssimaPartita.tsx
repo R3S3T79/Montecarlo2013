@@ -36,39 +36,28 @@ export default function ProssimaPartita() {
   const [precedenti, setPrecedenti] = useState<ScontroPrecedente[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // NEW: track the current user's role fetched from pending_users
   const [role, setRole] = useState<string | null>(null);
   const [roleLoading, setRoleLoading] = useState(true);
 
   const navigate = useNavigate();
 
-  // fetch the user role from pending_users table by email
   useEffect(() => {
     async function fetchRole() {
       const {
         data: { user },
         error: userErr,
       } = await supabase.auth.getUser();
-
       if (userErr || !user?.email) {
-        console.error("Errore fetching auth user:", userErr);
         setRole(null);
         setRoleLoading(false);
         return;
       }
-
       const { data, error } = await supabase
         .from("pending_users")
         .select("role")
         .eq("email", user.email)
         .single();
-
-      if (error) {
-        console.error("Errore fetching role:", error);
-        setRole(null);
-      } else {
-        setRole(data.role);
-      }
+      setRole(error ? null : data.role);
       setRoleLoading(false);
     }
     fetchRole();
@@ -85,7 +74,6 @@ export default function ProssimaPartita() {
       const todayIso = today.toISOString();
       const tomorrowIso = tomorrow.toISOString();
 
-      // try today's matches first
       let { data, error } = await supabase
         .from("partite")
         .select(`
@@ -105,15 +93,12 @@ export default function ProssimaPartita() {
         .order("data_ora", { ascending: true })
         .limit(1);
 
-      if (error) console.error("Errore fetching today:", error);
-
       if (data && data.length) {
         setPartita(data[0] as PartitaProssima);
         setLoading(false);
         return;
       }
 
-      // otherwise get the next future match
       ({ data, error } = await supabase
         .from("partite")
         .select(`
@@ -132,17 +117,9 @@ export default function ProssimaPartita() {
         .order("data_ora", { ascending: true })
         .limit(1));
 
-      if (error) {
-        console.error("Errore fetching future:", error);
-        setLoading(false);
-        return;
-      }
-
       if (data && data.length) {
         const next = data[0] as PartitaProssima;
         setPartita(next);
-
-        // fetch last 5 head-to-heads
         const { data: prevData, error: prevErr } = await supabase
           .from("partite")
           .select(`
@@ -160,22 +137,16 @@ export default function ProssimaPartita() {
           .lt("data_ora", next.data_ora)
           .order("data_ora", { ascending: false })
           .limit(5);
-
         setPrecedenti(prevErr ? [] : (prevData as ScontroPrecedente[]));
       }
       setLoading(false);
     };
-
     fetchPartita();
   }, []);
 
-  const handleCrea = () => {
-    navigate("/nuova-partita");
-  };
-
+  const handleCrea = () => navigate("/nuova-partita");
   const handleVaiAlMatch = () => {
-    if (!partita) return;
-    navigate(`/gestione-risultato/${partita.id}`);
+    if (partita) navigate(`/gestione-risultato/${partita.id}`);
   };
 
   const formatData = (d: string) =>
@@ -191,7 +162,6 @@ export default function ProssimaPartita() {
       minute: "2-digit",
     });
 
-  // show loader until both data and role are loaded
   if (loading || roleLoading) {
     return (
       <div className="min-h-screen bg-gradient-montecarlo-light flex items-center justify-center">
@@ -202,7 +172,6 @@ export default function ProssimaPartita() {
     );
   }
 
-  // determine edit permission
   const canEdit = role === "admin" || role === "creator";
 
   if (!partita) {
@@ -230,15 +199,19 @@ export default function ProssimaPartita() {
 
   return (
     <div className="min-h-screen bg-gradient-montecarlo-light">
-      <div className="container mx-auto px-4 pt-16">
-        <div className="bg-white rounded-xl shadow-montecarlo text-center py-6 mb-6">
-          <h1 className="text-2xl font-bold text-montecarlo-secondary">
-            Prossima partita
-          </h1>
+      <div className="container mx-auto px-4 pt-10">
+        {/* Header ridotto come in RosaGiocatori.tsx */}
+        <div className="relative mt-4 mb-4">
+          <div className="bg-white rounded-xl shadow-montecarlo p-2">
+            <div className="flex items-center justify-center">
+              <h2 className="text-lg font-bold text-montecarlo-secondary">
+                Prossima partita
+              </h2>
+            </div>
+          </div>
         </div>
 
         <div className="max-w-md mx-auto space-y-6">
-          {/* card prossima */}
           <div className="bg-white rounded-xl shadow-montecarlo overflow-hidden">
             <div className="bg-montecarlo-red-50 p-4 border-l-4 border-montecarlo-secondary">
               <div className="flex justify-center space-x-4 text-montecarlo-secondary">
@@ -252,7 +225,7 @@ export default function ProssimaPartita() {
                 </div>
               </div>
               <div className="text-center mt-2">
-                <span className="bg-montecarlo-accent text-montecarlo-secondary px-3 py-1 rounded-full text-sm font-medium shadow-gold">
+                <span className="bg-montecarlo-accent text-montecarlo-secondary px-3 py-1 rounded-full text-sm font-medium">
                   {partita.campionato_torneo}
                 </span>
               </div>
@@ -304,7 +277,6 @@ export default function ProssimaPartita() {
             </div>
 
             <div className="p-6 pt-0">
-              {/* only show to admin or creator */}
               {canEdit && (
                 <button
                   onClick={handleVaiAlMatch}
@@ -316,7 +288,6 @@ export default function ProssimaPartita() {
             </div>
           </div>
 
-          {/* scontri precedenti */}
           {precedenti.length > 0 && (
             <div className="bg-white rounded-xl shadow-montecarlo overflow-hidden">
               <div className="bg-gradient-montecarlo text-white p-4">
@@ -341,8 +312,7 @@ export default function ProssimaPartita() {
                         })}
                       </span>
                       <span className="text-sm font-medium text-montecarlo-secondary">
-                        {item.casa.nome} {item.goal_a} - {item.goal_b}{" "}
-                        {item.ospite.nome}
+                        {item.casa.nome} {item.goal_a} - {item.goal_b} {item.ospite.nome}
                       </span>
                     </div>
                   </div>
