@@ -1,5 +1,4 @@
 // src/App.tsx
-
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
@@ -12,12 +11,12 @@ import RegisterPage    from "./pages/RegisterPage";
 import ConfirmPage     from "./pages/ConfirmPage";
 import AuthCallback    from "./pages/AuthCallback";
 
-// pagine per ogni utente autenticato (verso SidebarLayout)
+// pagine utente
 import RosaGiocatori      from "./pages/RosaGiocatori";
 import DettaglioGiocatore from "./pages/DettaglioGiocatore";
 import AggiungiGiocatore  from "./pages/AggiungiGiocatore";
 
-// pagine interne sotto SidebarLayout
+// pagine interne
 import Home                from "./pages/Home";
 import Calendario          from "./pages/Calendario";
 import DettaglioPrePartita from "./pages/DettaglioPrePartita";
@@ -25,18 +24,20 @@ import Risultati           from "./pages/Risultati";
 import NuovaPartitaPage    from "./pages/NuovaPartitaPage";
 import EditPartitaPage     from "./pages/EditPartitaPage";
 import DettaglioPartita    from "./pages/DettaglioPartita";
+import ProssimaPartita     from "./pages/ProssimaPartita";
 
-// pagina di gestione risultato match-day
+// gestione risultato match-day
 import GestioneRisultatoPartita from "./components/GestioneRisultatoPartita";
 
+// squadre
 import ListaSquadre       from "./pages/ListaSquadre";
 import NuovaSquadra       from "./pages/NuovaSquadra";
 import EditSquadra        from "./pages/EditSquadra";
 import DettaglioSquadra   from "./pages/DettaglioSquadra";
 
+// statistiche
 import StatisticheSquadra   from "./pages/StatisticheSquadra";
 import StatisticheGiocatori from "./pages/StatisticheGiocatori";
-import ProssimaPartita      from "./pages/ProssimaPartita";
 
 // tornei
 import Tornei             from "./pages/tornei/NuovoTorneo/Tornei";
@@ -72,6 +73,12 @@ export default function App() {
           {/* Home */}
           <Route index element={<Home />} />
 
+          {/* Prossima Partita */}
+          <Route path="prossima-partita" element={<ProssimaPartita />} />
+
+          {/* Gestione risultato match-day */}
+          <Route path="gestione-risultato/:id" element={<GestioneRisultatoPartita />} />
+
           {/* Rosa Giocatori */}
           <Route path="rosa"               element={<RosaGiocatori />} />
           <Route path="giocatore/:id"      element={<DettaglioGiocatore />} />
@@ -79,16 +86,13 @@ export default function App() {
 
           {/* Calendario */}
           <Route path="calendario"      element={<Calendario />} />
-          <Route path="pre-partita/:id" element={<DettaglioPrePartita />} />
+          <Route path="prepartita/:id"  element={<DettaglioPrePartita />} />
 
           {/* Risultati */}
           <Route path="risultati"        element={<Risultati />} />
           <Route path="nuova-partita"    element={<NuovaPartitaPage />} />
           <Route path="partita/:id"      element={<DettaglioPartita />} />
           <Route path="partita/:id/edit" element={<EditPartitaPage />} />
-
-          {/* Gestione risultato match-day */}
-          <Route path="gestione-risultato/:id" element={<GestioneRisultatoPartita />} />
 
           {/* Squadre */}
           <Route path="squadre"          element={<ListaSquadre />} />
@@ -99,34 +103,18 @@ export default function App() {
           {/* Statistiche */}
           <Route path="statistiche/squadra"   element={<StatisticheSquadra />} />
           <Route path="statistiche/giocatori" element={<StatisticheGiocatori />} />
-          <Route path="prossima-partita"       element={<ProssimaPartita />} />
 
           {/* Tornei */}
           <Route path="tornei" element={<Tornei />} />
-          <Route
-            path="tornei/nuovo/step5-eliminazione/:torneoId"
-            element={<Step5_Eliminazione />}
-          />
-          <Route
-            path="tornei/nuovo/step6-eliminazione/:torneoId"
-            element={<Step6_Eliminazione />}
-          />
-          <Route
-            path="tornei/nuovo/step6-fasegironi/:torneoId"
-            element={<Step6_FaseGironi />}
-          />
-          <Route
-            path="tornei/nuovo/step6-gironeunico/:torneoId"
-            element={<Step6_GironeUnico />}
-          />
-          <Route
-            path="tornei/nuovo/step7-fasegironi/:torneoId"
-            element={<Step7_FaseGironi />}
-          />
+          <Route path="tornei/nuovo/step5-eliminazione/:torneoId" element={<Step5_Eliminazione />} />
+          <Route path="tornei/nuovo/step6-eliminazione/:torneoId" element={<Step6_Eliminazione />} />
+          <Route path="tornei/nuovo/step6-fasegironi/:torneoId"   element={<Step6_FaseGironi />} />
+          <Route path="tornei/nuovo/step6-gironeunico/:torneoId"  element={<Step6_GironeUnico />} />
+          <Route path="tornei/nuovo/step7-fasegironi/:torneoId"   element={<Step7_FaseGironi />} />
 
           {/* Admin only */}
           <Route path="admin"       element={<AdminDashboard />} />
-          <Route path="admin-panel" element={<AdminPanel     />} />
+          <Route path="admin-panel" element={<AdminPanel />} />
         </Route>
 
         {/* fallback */}
