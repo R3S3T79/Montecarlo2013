@@ -10,7 +10,6 @@ import { UserRole } from '../lib/roles';
 interface Partita {
   id: string;
   data_ora: string;
-  campionato_torneo: string;
   casa: { nome: string; logo_url: string | null };
   ospite: { nome: string; logo_url: string | null };
 }
@@ -29,16 +28,19 @@ export default function Calendario(): JSX.Element {
 
   useEffect(() => {
     async function fetchPartite() {
+      const now = new Date().toISOString();
       const { data, error } = await supabase
         .from('partite')
-        .select(`
+        .select(
+          `
           id,
           data_ora,
-          campionato_torneo,
           casa:squadra_casa_id(nome, logo_url),
           ospite:squadra_ospite_id(nome, logo_url)
-        `)
+        `
+        )
         .eq('stato', 'DaGiocare')
+        .gt('data_ora', now)
         .order('data_ora', { ascending: true });
 
       if (error) console.error('Errore fetch partite:', error);
@@ -48,7 +50,8 @@ export default function Calendario(): JSX.Element {
     fetchPartite();
   }, []);
 
-  const handleClick = (id: string) => navigate(`/pre-partita/${id}`);
+  // Navigate to prepartita without hyphen
+  const handleClick = (id: string) => navigate(`/prepartita/${id}`);
 
   if (authLoading) {
     return (
@@ -99,12 +102,9 @@ export default function Calendario(): JSX.Element {
                 onClick={() => handleClick(partita.id)}
                 className="cursor-pointer transform transition-all duration-300 hover:scale-[1.02]"
               >
-                {/* Header tipo + data */}
-                <div className="bg-gradient-montecarlo text-white px-4 py-2 rounded-t-lg flex justify-between items-center">
-                  <span className="text-xs font-semibold uppercase">
-                    {partita.campionato_torneo}
-                  </span>
-                  <span className="text-sm font-medium">
+                {/* Data */}
+                <div className="bg-gradient-montecarlo text-white px-4 py-2 rounded-t-lg">
+                  <div className="text-sm font-medium text-center">
                     {new Date(partita.data_ora).toLocaleString(undefined, {
                       day: '2-digit',
                       month: '2-digit',
@@ -112,7 +112,7 @@ export default function Calendario(): JSX.Element {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}
-                  </span>
+                  </div>
                 </div>
 
                 {/* Contenuto partita su due righe */}
