@@ -1,3 +1,5 @@
+// src/pages/NuovaPartitaPage.tsx
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
@@ -29,13 +31,10 @@ export default function NuovaPartitaPage() {
     luogo_torneo: ''
   });
 
-  // L’ID di Montecarlo (viene preso direttamente dal codice)
   const montecarloId = '5bca3e07-974a-4d12-9208-d85975906fe4';
   const navigate = useNavigate();
-
   const isMontecarloCasa = formData.squadra_casa_id === montecarloId;
 
-  // Nome della squadra avversaria (da mostrare al posto di “Avversari”)
   const otherTeamName =
     formData.squadra_casa_id &&
     formData.squadra_ospite_id
@@ -47,34 +46,20 @@ export default function NuovaPartitaPage() {
       : '';
 
   useEffect(() => {
-    supabase
-      .from('squadre')
-      .select('id, nome')
-      .order('nome')
-      .then(({ data }) => {
-        if (data) setSquadre(data);
-      });
+    supabase.from('squadre').select('id, nome').order('nome').then(({ data }) => {
+      if (data) setSquadre(data);
+    });
 
-    supabase
-      .from('stagioni')
-      .select('id, nome')
-      .order('data_inizio', { ascending: false })
-      .then(({ data }) => {
-        if (data) setStagioni(data);
-      });
+    supabase.from('stagioni').select('id, nome').order('data_inizio', { ascending: false }).then(({ data }) => {
+      if (data) setStagioni(data);
+    });
 
-    supabase
-      .from('giocatori')
-      .select('*')
-      .then(({ data }) => {
-        if (data) setGiocatori(data);
-      });
+    supabase.from('giocatori').select('*').then(({ data }) => {
+      if (data) setGiocatori(data);
+    });
   }, []);
 
-  // ======= LOGICA PER SPOSTARE “Montecarlo” IN TESTA =======
-  const squadreOrdinate: Squadra[] = React.useMemo(() => {
-    if (!squadre || squadre.length === 0) return [];
-
+  const squadreOrdinate = React.useMemo(() => {
     const copia = [...squadre];
     const idx = copia.findIndex(s => s.id === montecarloId);
     if (idx !== -1) {
@@ -83,17 +68,10 @@ export default function NuovaPartitaPage() {
     }
     return copia;
   }, [squadre]);
-  // ========================================================
 
-  const handleGoal = (
-    tempo: number,
-    squadra: 'MC' | 'AVV',
-    increment: boolean
-  ) => {
+  const handleGoal = (tempo: number, squadra: 'MC' | 'AVV', increment: boolean) => {
     const update = (arr: number[]) =>
-      arr.map((v, i) =>
-        i === tempo ? Math.max(0, v + (increment ? 1 : -1)) : v
-      );
+      arr.map((v, i) => i === tempo ? Math.max(0, v + (increment ? 1 : -1)) : v);
 
     if (squadra === 'MC') {
       setGoalMC(prev => update(prev));
@@ -108,11 +86,7 @@ export default function NuovaPartitaPage() {
     }
   };
 
-  const handleMarcatoreChange = (
-    tempo: number,
-    idx: number,
-    pid: string
-  ) => {
+  const handleMarcatoreChange = (tempo: number, idx: number, pid: string) => {
     setMarcatori(prev => {
       const list = [...(prev[tempo] || [])];
       list[idx] = pid;
@@ -136,12 +110,8 @@ export default function NuovaPartitaPage() {
           squadra_ospite_id: formData.squadra_ospite_id,
           campionato_torneo: formData.campionato_torneo,
           luogo_torneo: formData.luogo_torneo || null,
-          goal_a: isMontecarloCasa
-            ? goalMC.reduce((s, v) => s + v, 0)
-            : goalAvv.reduce((s, v) => s + v, 0),
-          goal_b: isMontecarloCasa
-            ? goalAvv.reduce((s, v) => s + v, 0)
-            : goalMC.reduce((s, v) => s + v, 0),
+          goal_a: isMontecarloCasa ? goalMC.reduce((s, v) => s + v, 0) : goalAvv.reduce((s, v) => s + v, 0),
+          goal_b: isMontecarloCasa ? goalAvv.reduce((s, v) => s + v, 0) : goalMC.reduce((s, v) => s + v, 0),
           goal_a1: isMontecarloCasa ? goalMC[0] : goalAvv[0],
           goal_a2: isMontecarloCasa ? goalMC[1] : goalAvv[1],
           goal_a3: isMontecarloCasa ? goalMC[2] : goalAvv[2],
@@ -150,7 +120,7 @@ export default function NuovaPartitaPage() {
           goal_b2: isMontecarloCasa ? goalAvv[1] : goalMC[1],
           goal_b3: isMontecarloCasa ? goalAvv[2] : goalMC[2],
           goal_b4: isMontecarloCasa ? goalAvv[3] : goalMC[3],
-        },
+        }
       ])
       .select()
       .single();
@@ -166,19 +136,14 @@ export default function NuovaPartitaPage() {
         giocatore_id: pid,
       }));
       if (presArr.length)
-        await supabase
-          .from('presenze')
-          .upsert(presArr, { onConflict: ['partita_id', 'giocatore_id'] });
+        await supabase.from('presenze').upsert(presArr, { onConflict: ['partita_id', 'giocatore_id'] });
 
-      const marcArr = Object.entries(marcatori).flatMap(
-        ([tempo, lista]) =>
-          lista
-            .filter(pid => pid)
-            .map(pid => ({
-              partita_id: partitaInserita.id,
-              giocatore_id: pid!,
-              periodo: parseInt(tempo),
-            }))
+      const marcArr = Object.entries(marcatori).flatMap(([tempo, lista]) =>
+        lista.filter(pid => pid).map(pid => ({
+          partita_id: partitaInserita.id,
+          giocatore_id: pid!,
+          periodo: parseInt(tempo),
+        }))
       );
       if (marcArr.length)
         await supabase.from('marcatori').insert(marcArr);
@@ -189,269 +154,130 @@ export default function NuovaPartitaPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded shadow-md mt-6">
-      <h2 className="text-2xl font-bold mb-4">Nuova Partita</h2>
-      <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Data e Ora */}
-        <div className="grid grid-cols-2 gap-4">
-          <input
-            type="date"
-            required
-            className="border rounded px-3 py-2 text-lg"
-            value={formData.data}
-            onChange={e =>
-              setFormData({ ...formData, data: e.target.value })
-            }
-          />
-          <input
-            type="time"
-            required
-            className="border rounded px-3 py-2 text-lg"
-            value={formData.ora}
-            onChange={e =>
-              setFormData({ ...formData, ora: e.target.value })
-            }
-          />
-        </div>
+    <div className="min-h-screen bg-gradient-montecarlo-light py-6">
+      <div className="max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-montecarlo">
+        <h2 className="text-2xl font-bold mb-6 text-center text-montecarlo-secondary">Nuova Partita</h2>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Data e Ora */}
+          <div className="grid grid-cols-2 gap-4">
+            <input type="date" required className="input-mc" value={formData.data} onChange={e => setFormData({ ...formData, data: e.target.value })} />
+            <input type="time" required className="input-mc" value={formData.ora} onChange={e => setFormData({ ...formData, ora: e.target.value })} />
+          </div>
 
-        {/* Stagione */}
-        <select
-          required
-          className="border rounded px-3 py-2 text-lg"
-          value={formData.stagione_id}
-          onChange={e =>
-            setFormData({ ...formData, stagione_id: e.target.value })
-          }
-        >
-          <option value="">Seleziona stagione</option>
-          {stagioni.map(s => (
-            <option key={s.id} value={s.id}>
-              {s.nome}
-            </option>
-          ))}
-        </select>
-
-        {/* Squadra Casa (Montecarlo in testa) */}
-        <select
-          required
-          className="border rounded px-3 py-2 text-lg"
-          value={formData.squadra_casa_id}
-          onChange={e =>
-            setFormData({ ...formData, squadra_casa_id: e.target.value })
-          }
-        >
-          <option value="">Squadra Casa</option>
-          {squadreOrdinate.map(s => (
-            <option key={s.id} value={s.id}>
-              {s.nome}
-            </option>
-          ))}
-        </select>
-
-        {/* Squadra Ospite (Montecarlo in testa) */}
-        <select
-          required
-          className="border rounded px-3 py-2 text-lg"
-          value={formData.squadra_ospite_id}
-          onChange={e =>
-            setFormData({ ...formData, squadra_ospite_id: e.target.value })
-          }
-        >
-          <option value="">Squadra Ospite</option>
-          {squadreOrdinate.map(s => (
-            <option key={s.id} value={s.id}>
-              {s.nome}
-            </option>
-          ))}
-        </select>
-
-        {/* Stato (visibile solo se entrambe le squadre sono selezionate) */}
-        {formData.squadra_casa_id && formData.squadra_ospite_id && (
-          <select
-            className="border rounded px-3 py-2 text-lg"
-            value={formData.stato}
-            onChange={e =>
-              setFormData({ ...formData, stato: e.target.value })
-            }
-          >
-            <option value="DaGiocare">DaGiocare</option>
-            <option value="Giocata">Giocata</option>
+          {/* Stagione */}
+          <select required className="input-mc" value={formData.stagione_id} onChange={e => setFormData({ ...formData, stagione_id: e.target.value })}>
+            <option value="">Seleziona stagione</option>
+            {stagioni.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
           </select>
-        )}
 
-        {/* Campionato/Torneo */}
-        <select
-          required
-          className="border rounded px-3 py-2 text-lg"
-          value={formData.campionato_torneo}
-          onChange={e =>
-            setFormData({ ...formData, campionato_torneo: e.target.value })
-          }
-        >
-          <option value="campionato">Campionato</option>
-          <option value="torneo">Torneo</option>
-          <option value="amichevole">Amichevole</option>
-        </select>
+          {/* Squadre */}
+          <select required className="input-mc" value={formData.squadra_casa_id} onChange={e => setFormData({ ...formData, squadra_casa_id: e.target.value })}>
+            <option value="">Squadra Casa</option>
+            {squadreOrdinate.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+          </select>
 
-        {/* Luogo (visibile solo per 'torneo') */}
-        {formData.campionato_torneo === 'torneo' && (
-          <input
-            type="text"
-            placeholder="Luogo (opzionale)"
-            className="border rounded px-3 py-2 text-lg"
-            value={formData.luogo_torneo}
-            onChange={e =>
-              setFormData({ ...formData, luogo_torneo: e.target.value })
-            }
-          />
-        )}
+          <select required className="input-mc" value={formData.squadra_ospite_id} onChange={e => setFormData({ ...formData, squadra_ospite_id: e.target.value })}>
+            <option value="">Squadra Ospite</option>
+            {squadreOrdinate.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+          </select>
 
-        {formData.stato === 'Giocata' && (
-          <div className="mt-6 space-y-5">
-            {/* Pulsante Mostra/Nascondi Formazione */}
-            <button
-              type="button"
-              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 text-lg"
-              onClick={() => setMostraFormazione(prev => !prev)}
-            >
-              {mostraFormazione ? 'Nascondi Formazione' : 'Mostra Formazione'}
-            </button>
+          {/* Stato */}
+          {formData.squadra_casa_id && formData.squadra_ospite_id && (
+            <select className="input-mc" value={formData.stato} onChange={e => setFormData({ ...formData, stato: e.target.value })}>
+              <option value="DaGiocare">DaGiocare</option>
+              <option value="Giocata">Giocata</option>
+            </select>
+          )}
 
-            {/* Formazione Montecarlo */}
-            {mostraFormazione && (
-              <div>
-                <h4 className="text-xl font-bold mb-2">Formazione Montecarlo</h4>
-                {giocatori.map(g => (
-                  <label key={g.id} className="block text-lg mb-1">
-                    <input
-                      type="checkbox"
-                      className="mr-2"
-                      checked={formazione.includes(g.id)}
-                      onChange={e =>
-                        setFormazione(prev =>
-                          e.target.checked
-                            ? [...prev, g.id]
-                            : prev.filter(pid => pid !== g.id)
-                        )
-                      }
-                    />
-                    {g.cognome} {g.nome}
-                  </label>
-                ))}
-              </div>
-            )}
+          {/* Tipo partita */}
+          <select required className="input-mc" value={formData.campionato_torneo} onChange={e => setFormData({ ...formData, campionato_torneo: e.target.value })}>
+            <option value="campionato">Campionato</option>
+            <option value="torneo">Torneo</option>
+            <option value="amichevole">Amichevole</option>
+          </select>
 
-            {/* Checkbox per visualizzare i singoli tempi */}
-            <div className="mt-4 flex space-x-4">
-              {[0, 1, 2, 3].map(t => (
-                <label key={t} className="flex items-center text-lg">
-                  <input
-                    type="checkbox"
-                    className="mr-2 w-5 h-5"
-                    checked={tempiVisible[t]}
-                    onChange={e => {
+          {/* Luogo torneo */}
+          {formData.campionato_torneo === 'torneo' && (
+            <input type="text" className="input-mc" placeholder="Luogo (opzionale)" value={formData.luogo_torneo} onChange={e => setFormData({ ...formData, luogo_torneo: e.target.value })} />
+          )}
+
+          {/* Se Giocata: mostra sezione avanzata */}
+          {formData.stato === 'Giocata' && (
+            <>
+              <button type="button" className="btn-mc-gray" onClick={() => setMostraFormazione(prev => !prev)}>
+                {mostraFormazione ? 'Nascondi Formazione' : 'Mostra Formazione'}
+              </button>
+
+              {mostraFormazione && (
+                <div className="space-y-1">
+                  <h4 className="text-xl font-semibold">Formazione Montecarlo</h4>
+                  {giocatori.map(g => (
+                    <label key={g.id} className="block">
+                      <input type="checkbox" className="mr-2" checked={formazione.includes(g.id)} onChange={e => setFormazione(prev => e.target.checked ? [...prev, g.id] : prev.filter(pid => pid !== g.id))} />
+                      {g.cognome} {g.nome}
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-4 flex flex-wrap gap-4">
+                {[0, 1, 2, 3].map(t => (
+                  <label key={t} className="flex items-center text-lg">
+                    <input type="checkbox" className="mr-2 w-5 h-5" checked={tempiVisible[t]} onChange={e => {
                       const newVis = [...tempiVisible];
                       newVis[t] = e.target.checked;
                       setTempiVisible(newVis);
-                    }}
-                  />
-                  <span>{t + 1}° Tempo</span>
-                </label>
-              ))}
-            </div>
+                    }} />
+                    <span>{t + 1}° Tempo</span>
+                  </label>
+                ))}
+              </div>
 
-            {/* Sezioni per ogni tempo, rese visibili solo se checkbox corrispondente è selezionata */}
-            {([0, 1, 2, 3] as const).map(t =>
-              tempiVisible[t] ? (
+              {([0, 1, 2, 3] as const).map(t => tempiVisible[t] && (
                 <div key={t} className="mt-6">
-                  <h5 className="font-semibold text-2xl mb-3">{t + 1}° Tempo</h5>
+                  <h5 className="text-xl font-bold mb-2">{t + 1}° Tempo</h5>
 
-                  {/* Riga Montecarlo: nome + controlli goal */}
-                  <div className="grid grid-cols-[1fr_auto] items-center mb-2">
-                    <span className="text-xl">Montecarlo</span>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        type="button"
-                        className="px-4 py-2 border rounded text-xl"
-                        onClick={() => handleGoal(t, 'MC', false)}
-                      >
-                        −
-                      </button>
-                      <span className="text-xl">{goalMC[t]}</span>
-                      <button
-                        type="button"
-                        className="px-4 py-2 border rounded text-xl"
-                        onClick={() => handleGoal(t, 'MC', true)}
-                      >
-                        ＋
-                      </button>
+                  {/* Goal Montecarlo */}
+                  <div className="mb-2">
+                    <span className="font-medium text-montecarlo-secondary">Montecarlo</span>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => handleGoal(t, 'MC', false)} className="btn-goal">−</button>
+                      <span className="text-lg">{goalMC[t]}</span>
+                      <button type="button" onClick={() => handleGoal(t, 'MC', true)} className="btn-goal">＋</button>
                     </div>
                   </div>
 
-                  {/* Riga Avversaria: nome + controlli goal */}
-                  <div className="grid grid-cols-[1fr_auto] items-center mb-2">
-                    <span className="text-xl">{otherTeamName || 'Avversari'}</span>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        type="button"
-                        className="px-4 py-2 border rounded text-xl"
-                        onClick={() => handleGoal(t, 'AVV', false)}
-                      >
-                        −
-                      </button>
-                      <span className="text-xl">{goalAvv[t]}</span>
-                      <button
-                        type="button"
-                        className="px-4 py-2 border rounded text-xl"
-                        onClick={() => handleGoal(t, 'AVV', true)}
-                      >
-                        ＋
-                      </button>
+                  {/* Goal Avversario */}
+                  <div className="mb-4">
+                    <span className="font-medium text-montecarlo-secondary">{otherTeamName || 'Avversari'}</span>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => handleGoal(t, 'AVV', false)} className="btn-goal">−</button>
+                      <span className="text-lg">{goalAvv[t]}</span>
+                      <button type="button" onClick={() => handleGoal(t, 'AVV', true)} className="btn-goal">＋</button>
                     </div>
                   </div>
 
-                  {/* Selezione marcatori (ad altezze uniformi) */}
+                  {/* Marcatori */}
                   {(marcatori[t + 1] || []).map((pid, i) => (
-                    <select
-                      key={i}
-                      className="border rounded px-4 py-2 text-xl w-full max-w-lg mb-2"
-                      value={pid || ''}
-                      onChange={e => handleMarcatoreChange(t + 1, i, e.target.value)}
-                    >
+                    <select key={i} className="input-mc mb-2" value={pid || ''} onChange={e => handleMarcatoreChange(t + 1, i, e.target.value)}>
                       <option value="">-- Seleziona marcatore --</option>
-                      {giocatori
-                        .filter(g => formazione.includes(g.id))
-                        .map(g => (
-                          <option key={g.id} value={g.id}>
-                            {g.cognome} {g.nome}
-                          </option>
-                        ))}
+                      {giocatori.filter(g => formazione.includes(g.id)).map(g => (
+                        <option key={g.id} value={g.id}>{g.cognome} {g.nome}</option>
+                      ))}
                     </select>
                   ))}
                 </div>
-              ) : null
-            )}
-          </div>
-        )}
+              ))}
+            </>
+          )}
 
-        {/* Pulsanti Annulla/Salva */}
-        <div className="flex justify-end space-x-3 mt-6">
-          <button
-            type="button"
-            className="px-4 py-2 text-lg"
-            onClick={() => navigate('/calendario')}
-          >
-            Annulla
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded text-lg disabled:opacity-50"
-          >
-            {loading ? 'Salvataggio...' : 'Salva'}
-          </button>
-        </div>
-      </form>
+          {/* Pulsanti */}
+          <div className="flex justify-end gap-4 pt-4">
+            <button type="button" onClick={() => navigate('/calendario')} className="btn-mc-gray">Annulla</button>
+            <button type="submit" disabled={loading} className="btn-mc-primary">{loading ? 'Salvataggio...' : 'Salva'}</button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
