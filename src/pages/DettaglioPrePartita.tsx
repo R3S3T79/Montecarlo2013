@@ -138,7 +138,7 @@ export default function DettaglioPrePartita(): JSX.Element {
         {canEdit && (
           <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex space-x-2">
             <button
-              onClick={() => navigate(`/edit-partita/${id}`)}
+              navigate(`/partita/${id}/edit`)
               className="flex items-center px-2 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
             >
               <Edit2 size={14} />
