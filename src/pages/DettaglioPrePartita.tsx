@@ -1,3 +1,5 @@
+// src/pages/DettaglioPrePartita.tsx
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
@@ -29,21 +31,18 @@ export default function DettaglioPrePartita(): JSX.Element {
   const [precedenti, setPrecedenti] = useState<Partita[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Ruolo e permessi
   const role =
     (user?.user_metadata?.role as UserRole) ||
     (user?.app_metadata?.role as UserRole) ||
     UserRole.Authenticated;
   const canEdit = role === UserRole.Admin || role === UserRole.Creator;
 
-  // Redirect se non autenticato
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/login', { replace: true });
     }
   }, [user, authLoading, navigate]);
 
-  // Carica i dati della partita
   useEffect(() => {
     if (!id) {
       setLoading(false);
@@ -51,49 +50,61 @@ export default function DettaglioPrePartita(): JSX.Element {
     }
     (async () => {
       const { data, error } = await supabase
-        .from<Partita>('partite')
-        .select(
+        .from('partite')
+        .select(`
           id,
           data_ora,
           goal_a,
           goal_b,
-          casa:squadra_casa_id(id, nome, logo_url),
-          ospite:squadra_ospite_id(id, nome, logo_url)
-        )
+          squadra_casa_id(id, nome, logo_url),
+          squadra_ospite_id(id, nome, logo_url)
+        `)
         .eq('id', id)
         .single();
+
       if (error) {
         console.error('Errore fetch partita:', error);
       } else {
-        setPartita(data);
+        setPartita({
+          ...data,
+          casa: data.squadra_casa_id,
+          ospite: data.squadra_ospite_id,
+        });
       }
       setLoading(false);
     })();
   }, [id]);
 
-  // Carica gli scontri precedenti
   useEffect(() => {
     if (!partita) return;
     (async () => {
       const { data, error } = await supabase
-        .from<Partita>('partite')
-        .select(
+        .from('partite')
+        .select(`
           id,
           data_ora,
           goal_a,
           goal_b,
-          casa:squadra_casa_id(id, nome, logo_url),
-          ospite:squadra_ospite_id(id, nome, logo_url)
-        )
+          squadra_casa_id(id, nome, logo_url),
+          squadra_ospite_id(id, nome, logo_url)
+        `)
         .or(
-          and(squadra_casa_id.eq.${partita.casa.id},squadra_ospite_id.eq.${partita.ospite.id}),and(squadra_casa_id.eq.${partita.ospite.id},squadra_ospite_id.eq.${partita.casa.id})
+          `and(squadra_casa_id.eq.${partita.casa.id},squadra_ospite_id.eq.${partita.ospite.id}),and(squadra_casa_id.eq.${partita.ospite.id},squadra_ospite_id.eq.${partita.casa.id})`
         )
         .order('data_ora', { ascending: false })
         .limit(5);
+
       if (error) {
         console.error('Errore fetch precedenti:', error);
       } else {
-        setPrecedenti(data.filter(p => p.id !== partita.id));
+        const precedentiPuliti = data
+          .filter((p) => p.id !== partita.id)
+          .map((p) => ({
+            ...p,
+            casa: p.squadra_casa_id,
+            ospite: p.squadra_ospite_id,
+          }));
+        setPrecedenti(precedentiPuliti);
       }
     })();
   }, [partita]);
@@ -124,7 +135,6 @@ export default function DettaglioPrePartita(): JSX.Element {
 
   return (
     <>
-      {/* header: freccia spostata con left-16 per non sovrapporsi all'hamburger */}
       <div className="relative mt-6 mb-6">
         <Link
           to="/calendario"
@@ -136,7 +146,7 @@ export default function DettaglioPrePartita(): JSX.Element {
         {canEdit && (
           <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex space-x-2">
             <button
-              onClick={() => navigate(/edit-partita/${id})}
+              onClick={() => navigate(`/partita/${id}/edit`)}
               className="flex items-center px-2 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
             >
               <Edit2 size={14} />
@@ -155,7 +165,6 @@ export default function DettaglioPrePartita(): JSX.Element {
         </div>
       </div>
 
-      {/* loghi e nomi */}
       <div className="flex flex-col items-center mb-10 space-y-4">
         {partita.casa.logo_url ? (
           <img
@@ -186,7 +195,6 @@ export default function DettaglioPrePartita(): JSX.Element {
         )}
       </div>
 
-      {/* scontri precedenti: lista centrata */}
       {precedenti.length > 0 && (
         <div className="mb-6 px-4">
           <h3 className="text-base font-semibold mb-3 text-center">
@@ -202,7 +210,7 @@ export default function DettaglioPrePartita(): JSX.Element {
               return (
                 <li
                   key={p.id}
-                  onClick={() => navigate(/partita/${p.id})}
+                  onClick={() => navigate(`/partita/${p.id}`)}
                   className="py-2 cursor-pointer"
                 >
                   <span className="text-sm">
