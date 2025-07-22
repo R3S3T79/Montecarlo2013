@@ -1,10 +1,8 @@
-// src/pages/DettaglioPartita.tsx
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { Edit, Trash2, ArrowLeft } from 'lucide-react';
+import { Edit2, Trash2, ArrowLeft } from 'lucide-react';
 import { UserRole } from '../lib/roles';
 
 interface MarcatoriEntry {
@@ -89,7 +87,6 @@ export default function DettaglioPartita() {
           .single();
 
         if (!pd || pe) {
-          console.error("Errore fetch partita:", pe);
           setLoading(false);
           return;
         }
@@ -102,12 +99,12 @@ export default function DettaglioPartita() {
         let marcWithNames: MarcatoriEntry[] = [];
         if (md?.length) {
           const ids = Array.from(new Set(md.map(m => m.giocatore_id)));
-          const { data: gd, error: ge } = await supabase
+          const { data: gd } = await supabase
             .from('giocatori')
             .select('id, nome, cognome')
             .in('id', ids);
 
-          if (gd && !ge) {
+          if (gd) {
             marcWithNames = md.map(m => {
               const g = gd.find(x => x.id === m.giocatore_id)!;
               return {
@@ -121,7 +118,7 @@ export default function DettaglioPartita() {
 
         setPartita({ ...pd, marcatori: marcWithNames });
       } catch (err) {
-        console.error("Errore generale:", err);
+        console.error("Errore:", err);
       } finally {
         setLoading(false);
       }
@@ -131,14 +128,10 @@ export default function DettaglioPartita() {
   }, [id, user]);
 
   const handleDelete = async () => {
-    if (!id || !window.confirm('Sei sicuro di eliminare questa partita?')) return;
+    if (!id || !window.confirm('Eliminare questa partita?')) return;
     const { error } = await supabase.from('partite').delete().eq('id', id);
-    if (error) {
-      console.error(error);
-      alert('Eliminazione fallita');
-    } else {
-      navigate('/risultati');
-    }
+    if (error) alert('Errore eliminazione');
+    else navigate('/risultati');
   };
 
   if (authLoading || loading) {
@@ -158,23 +151,33 @@ export default function DettaglioPartita() {
   }
 
   const isCasa = partita.casa.id === MONTECARLO_ID;
-  const formattedDate = new Date(partita.data_ora).toLocaleDateString('it-IT', {
+  const montecarlo = isCasa ? partita.casa : partita.ospite;
+  const avversario = isCasa ? partita.ospite : partita.casa;
+  const goalMC = isCasa ? partita.goal_a : partita.goal_b;
+  const goalAVV = isCasa ? partita.goal_b : partita.goal_a;
+
+  const goalMCxTempo = [
+    isCasa ? partita.goal_a1 : partita.goal_b1,
+    isCasa ? partita.goal_a2 : partita.goal_b2,
+    isCasa ? partita.goal_a3 : partita.goal_b3,
+    isCasa ? partita.goal_a4 : partita.goal_b4,
+  ];
+  const goalAVVxTempo = [
+    isCasa ? partita.goal_b1 : partita.goal_a1,
+    isCasa ? partita.goal_b2 : partita.goal_a2,
+    isCasa ? partita.goal_b3 : partita.goal_a3,
+    isCasa ? partita.goal_b4 : partita.goal_a4,
+  ];
+
+  const dataFormatted = new Date(partita.data_ora).toLocaleDateString('it-IT', {
     weekday: 'short',
     day: '2-digit',
     month: '2-digit',
   });
 
-  const tempi = [
-    { label: '1° Tempo', casa: partita.goal_a1, ospite: partita.goal_b1 },
-    { label: '2° Tempo', casa: partita.goal_a2, ospite: partita.goal_b2 },
-    { label: '3° Tempo', casa: partita.goal_a3, ospite: partita.goal_b3 },
-    { label: '4° Tempo', casa: partita.goal_a4, ospite: partita.goal_b4 },
-  ];
-
   return (
     <div className="min-h-screen bg-gradient-montecarlo-light">
       <div className="container mx-auto px-4 py-6">
-        {/* Header */}
         <div className="relative mb-6">
           <Link
             to="/risultati"
@@ -183,63 +186,62 @@ export default function DettaglioPartita() {
             <ArrowLeft size={20} />
           </Link>
 
+          <div className="text-center text-sm font-medium text-montecarlo-secondary">
+            {dataFormatted}
+          </div>
+
           {canEdit && (
             <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex space-x-2">
               <button
                 onClick={() => navigate(`/partita/${id}/edit`)}
-                className="px-2 py-1 bg-montecarlo-accent text-white rounded-lg hover:bg-montecarlo-gold-600"
+                className="px-2 py-1 text-xs bg-yellow-400 text-white rounded hover:bg-yellow-500"
               >
-                <Edit size={16} />
+                <Edit2 size={14} />
               </button>
               <button
                 onClick={handleDelete}
-                className="px-2 py-1 bg-montecarlo-red-600 text-white rounded-lg hover:bg-montecarlo-red-700"
+                className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
               >
-                <Trash2 size={16} />
+                <Trash2 size={14} />
               </button>
             </div>
           )}
-
-          <div className="text-center text-montecarlo-secondary text-sm font-medium bg-white rounded shadow py-2">
-            {formattedDate}
-          </div>
         </div>
 
-        {/* Squadre + Risultato */}
-        <div className="bg-white rounded-xl shadow p-6 text-center mb-6">
-          <div className="flex flex-col items-center space-y-4">
-            <div className="text-lg font-semibold text-montecarlo-secondary">{partita.casa.nome}</div>
-            <div className="text-4xl font-bold text-montecarlo-primary">
-              {partita.goal_a} - {partita.goal_b}
-            </div>
-            <div className="text-lg font-semibold text-montecarlo-secondary">{partita.ospite.nome}</div>
-          </div>
+        <div className="bg-white rounded-xl shadow p-4 mb-6 text-center">
+          <div className="text-montecarlo-secondary font-bold text-lg">{montecarlo.nome}</div>
+          <div className="text-4xl font-extrabold text-montecarlo-purple">{goalMC} - {goalAVV}</div>
+          <div className="text-montecarlo-secondary font-bold text-lg">{avversario.nome}</div>
         </div>
 
-        {/* Goal per tempo */}
-        <div className="bg-white rounded-xl shadow p-6 mb-6">
-          <h3 className="text-center text-montecarlo-secondary font-semibold mb-4">Risultato per tempo</h3>
-          <ul className="space-y-2">
-            {tempi.map((t, i) => (
-              <li key={i} className="flex justify-between text-sm text-montecarlo-neutral px-2">
-                <span>{t.label}</span>
-                <span>{t.casa} - {t.ospite}</span>
-              </li>
+        <div className="bg-white rounded-xl shadow p-4 mb-6">
+          <h3 className="text-center text-montecarlo-secondary font-semibold mb-3">Risultato per tempo</h3>
+          <div className="grid grid-cols-2 gap-2 text-sm text-center text-montecarlo-neutral">
+            {[0, 1, 2, 3].map(i => (
+              <React.Fragment key={i}>
+                <div>{i + 1}° Tempo</div>
+                <div>{goalMCxTempo[i]} - {goalAVVxTempo[i]}</div>
+              </React.Fragment>
             ))}
-          </ul>
+          </div>
         </div>
 
-        {/* Marcatori */}
         {partita.marcatori.length > 0 && (
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="text-center text-montecarlo-secondary font-semibold mb-4">Marcatori Montecarlo</h3>
-            <ul className="space-y-1 text-sm text-montecarlo-neutral">
-              {partita.marcatori.map((m, i) => (
-                <li key={`${m.id}-${i}`}>
-                  <span className="font-semibold">{m.giocatore.cognome} {m.giocatore.nome}</span>
-                  {` - ${m.periodo}° Tempo`}
-                </li>
-              ))}
+          <div className="bg-white rounded-xl shadow p-4">
+            <h3 className="text-center text-montecarlo-secondary font-semibold mb-3">
+              Marcatori Montecarlo
+            </h3>
+            <ul className="text-sm text-gray-700 space-y-1">
+              {partita.marcatori
+                .sort((a, b) => a.periodo - b.periodo)
+                .map((m, i) => (
+                  <li key={i} className="text-montecarlo-neutral">
+                    <span className="font-medium">
+                      {m.giocatore.cognome} {m.giocatore.nome}
+                    </span>{' '}
+                    - {m.periodo}° Tempo
+                  </li>
+                ))}
             </ul>
           </div>
         )}
