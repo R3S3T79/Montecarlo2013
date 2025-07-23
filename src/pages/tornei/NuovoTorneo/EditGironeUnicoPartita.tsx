@@ -1,7 +1,6 @@
 // src/pages/tornei/NuovoTorneo/EditGironeUnicoPartita.tsx
-
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { supabase } from '../../../lib/supabaseClient';
 
@@ -13,6 +12,7 @@ interface Partita {
   goal_ospite: number | null;
   rigori_vincitore: string | null;
   stato: string;
+  data_ora: string | null;
 }
 
 interface Squadra {
@@ -22,24 +22,29 @@ interface Squadra {
 }
 
 export default function EditGironeUnicoPartita() {
-  const { matchId } = useParams<{ matchId: string }>();
+  const { id: matchId } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingResult, setSavingResult] = useState(false);
+  const [savingDate, setSavingDate] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [partita, setPartita] = useState<Partita | null>(null);
   const [teams, setTeams] = useState<Record<string, Squadra>>({});
   const [scoreCasa, setScoreCasa] = useState(0);
   const [scoreOspite, setScoreOspite] = useState(0);
-  const [rigoriUsed, setRigoriUsed] = useState(false);
   const [rigoriVincitore, setRigoriVincitore] = useState<string | null>(null);
   const [dataOra, setDataOra] = useState('');
 
-  // fetch dati
+  // Carica la partita e le squadre
   useEffect(() => {
-    if (!matchId) return;
+    if (!matchId) {
+      setError('ID partita mancante');
+      setLoading(false);
+      return;
+    }
     (async () => {
       setLoading(true);
       const { data: p, error: pe } = await supabase
@@ -55,15 +60,13 @@ export default function EditGironeUnicoPartita() {
       setPartita(p);
       setScoreCasa(p.goal_casa ?? 0);
       setScoreOspite(p.goal_ospite ?? 0);
-      setRigoriUsed(!!p.rigori_vincitore);
       setRigoriVincitore(p.rigori_vincitore);
       setDataOra(p.data_ora ? p.data_ora.slice(0, 16) : '');
 
-      // carica nomi e logo delle squadre
       const ids = [p.squadra_casa_id, p.squadra_ospite_id];
       const { data: sqs } = await supabase
         .from<Squadra>('squadre')
-        .select('id,nome,logo_url')
+        .select('id, nome, logo_url')
         .in('id', ids);
       if (sqs) {
         const map: Record<string, Squadra> = {};
@@ -74,20 +77,22 @@ export default function EditGironeUnicoPartita() {
     })();
   }, [matchId]);
 
-  const handleSave = async () => {
+  // Salva risultato + data
+  const handleSaveResult = async () => {
     if (!partita) return;
-    setSaving(true);
+    setSavingResult(true);
+
     let winner_id: string | null = null;
     if (scoreCasa > scoreOspite) winner_id = partita.squadra_casa_id;
     else if (scoreOspite > scoreCasa) winner_id = partita.squadra_ospite_id;
     else winner_id = rigoriVincitore;
 
-    const updates: any = {
+    const updates = {
       goal_casa: scoreCasa,
       goal_ospite: scoreOspite,
       winner_id,
       rigori_vincitore: scoreCasa === scoreOspite ? rigoriVincitore : null,
-      data_ora: dataOra ? new Date(dataOra).toISOString() : null,
+      data_ora: dataOra ? `${dataOra}:00` : null,
       stato: 'Giocata',
     };
 
@@ -96,32 +101,42 @@ export default function EditGironeUnicoPartita() {
       .update(updates)
       .eq('id', partita.id);
 
-    setSaving(false);
+    setSavingResult(false);
     if (upErr) {
-      setError('Errore in salvataggio.');
+      setError('Errore in salvataggio risultato.');
+    } else {
+      navigate(-1);
+    }
+  };
+
+  // Salva solo la data
+  const handleSaveDate = async () => {
+    if (!partita) return;
+    setSavingDate(true);
+
+    const { error: upErr } = await supabase
+      .from('partite_torneo')
+      .update({ data_ora: dataOra ? `${dataOra}:00` : null })
+      .eq('id', partita.id);
+
+    setSavingDate(false);
+    if (upErr) {
+      setError('Errore in salvataggio data.');
     } else {
       navigate(-1);
     }
   };
 
   if (loading) return <p className="text-center py-6">Caricamento…</p>;
-  if (error) return <p className="text-center py-6 text-red-600">{error}</p>;
+  if (error)   return <p className="text-center py-6 text-red-600">{error}</p>;
   if (!partita) return <p className="text-center py-6">Partita non trovata.</p>;
 
-  const casa = teams[partita.squadra_casa_id];
+  const casa   = teams[partita.squadra_casa_id];
   const ospite = teams[partita.squadra_ospite_id];
-  const casaName = casa?.nome || '';
-  const ospiteName = ospite?.nome || '';
-  const casaLogo = casa?.logo_url;
-  const ospiteLogo = ospite?.logo_url;
 
   return (
     <div className="max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow space-y-6">
-      {/* Torna indietro */}
-      <button
-        onClick={() => navigate(-1)}
-        className="flex items-center text-blue-600 hover:underline"
-      >
+      <button onClick={() => navigate(-1)} className="flex items-center text-blue-600 hover:underline">
         <ArrowLeft size={20} /> <span className="ml-1">Indietro</span>
       </button>
 
@@ -130,14 +145,8 @@ export default function EditGironeUnicoPartita() {
       {/* Squadra Casa */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          {casaLogo && (
-            <img
-              src={casaLogo}
-              alt={casaName}
-              className="w-8 h-8 rounded-full"
-            />
-          )}
-          <span className="font-medium">{casaName}</span>
+          {casa?.logo_url && <img src={casa.logo_url} alt={casa.nome} className="w-8 h-8 rounded-full" />}
+          <span className="font-medium">{casa?.nome}</span>
         </div>
         <input
           type="number"
@@ -152,14 +161,8 @@ export default function EditGironeUnicoPartita() {
       {/* Squadra Ospite */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          {ospiteLogo && (
-            <img
-              src={ospiteLogo}
-              alt={ospiteName}
-              className="w-8 h-8 rounded-full"
-            />
-          )}
-          <span className="font-medium">{ospiteName}</span>
+          {ospite?.logo_url && <img src={ospite.logo_url} alt={ospite.nome} className="w-8 h-8 rounded-full" />}
+          <span className="font-medium">{ospite?.nome}</span>
         </div>
         <input
           type="number"
@@ -171,7 +174,7 @@ export default function EditGironeUnicoPartita() {
         />
       </div>
 
-      {/* Rigori */}
+      {/* Rigori se pareggio */}
       {scoreCasa === scoreOspite && (
         <div className="space-y-1">
           <span className="font-medium">Vincitore ai rigori:</span>
@@ -183,7 +186,7 @@ export default function EditGironeUnicoPartita() {
                 checked={rigoriVincitore === partita.squadra_casa_id}
                 onChange={() => setRigoriVincitore(partita.squadra_casa_id)}
               />
-              <span>{casaName}</span>
+              <span>{casa?.nome}</span>
             </label>
             <label className="flex items-center space-x-1">
               <input
@@ -192,7 +195,7 @@ export default function EditGironeUnicoPartita() {
                 checked={rigoriVincitore === partita.squadra_ospite_id}
                 onChange={() => setRigoriVincitore(partita.squadra_ospite_id)}
               />
-              <span>{ospiteName}</span>
+              <span>{ospite?.nome}</span>
             </label>
           </div>
         </div>
@@ -209,14 +212,23 @@ export default function EditGironeUnicoPartita() {
         />
       </div>
 
-      {/* Salva */}
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-      >
-        {saving ? 'Salvando…' : 'Salva Risultato e Esci'}
-      </button>
+      {/* Pulsanti */}
+      <div className="flex flex-col gap-3">
+        <button
+          onClick={handleSaveResult}
+          disabled={savingResult}
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+        >
+          {savingResult ? 'Salvando risultato…' : 'Salva Risultato e Data'}
+        </button>
+        <button
+          onClick={handleSaveDate}
+          disabled={savingDate}
+          className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 disabled:opacity-50"
+        >
+          {savingDate ? 'Salvando data…' : 'Salva Solo Data'}
+        </button>
+      </div>
     </div>
   );
 }
