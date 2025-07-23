@@ -1,25 +1,28 @@
+// src/pages/tornei/NuovoTorneo/Step3_ENumeroSquadre.tsx
 import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+
+interface StateType {
+  torneoNome: string;
+  torneoLuogo: string;
+  stagioneSelezionata: string;
+  formatoTorneo: string;
+}
 
 export default function Step3_ENumeroSquadre() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const state = location.state as {
-    torneoNome: string;
-    torneoLuogo: string;
-    stagioneSelezionata: string;
-    formatoTorneo: string;
-  } | null;
+  const state = location.state as StateType | null;
 
   useEffect(() => {
     console.log('STATE RICEVUTO IN Step3_ENumeroSquadre:', state);
-  }, [state]);
+    if (!state) {
+      navigate('/tornei/nuovo/step1');
+    }
+  }, [state, navigate]);
 
-  if (!state) {
-    navigate('/tornei/nuovo/step1');
-    return null;
-  }
+  if (!state) return null;
 
   const handleClick = (num: number) => {
     navigate('/tornei/nuovo/step4-eliminazione', {
@@ -32,7 +35,7 @@ export default function Step3_ENumeroSquadre() {
   };
 
   const handleBack = () => {
-    navigate('/tornei/nuovo/step1_5', {
+    navigate('/tornei/nuovo/step1-5', {
       state: {
         torneoNome: state.torneoNome,
         torneoLuogo: state.torneoLuogo,
@@ -61,7 +64,7 @@ export default function Step3_ENumeroSquadre() {
         onClick={handleBack}
         className="w-full bg-gray-300 text-black py-2 rounded-lg hover:bg-gray-400"
       >
-        Indietro
+        ← Indietro
       </button>
     </div>
   );
