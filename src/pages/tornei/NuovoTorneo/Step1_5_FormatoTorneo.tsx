@@ -1,3 +1,4 @@
+// src/pages/tornei/NuovoTorneo/Step1_5_FormatoTorneo.tsx
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -17,50 +18,58 @@ export default function Step1_5_FormatoTorneo() {
     return null;
   }
 
-  const handleFormato = (formatoTorneo: 'eliminazione' | 'girone_unico' | 'fase_gironi') => {
-    let nextPath = '/tornei/nuovo/step3-eliminazione';
-    if (formatoTorneo === 'girone_unico') {
-      nextPath = '/tornei/nuovo/step3-gironeunico';
-    } else if (formatoTorneo === 'fase_gironi') {
-      nextPath = '/tornei/nuovo/step3-fasegironi';
+  const handleSelectFormat = (format: string) => {
+    let nextStepPath = '';
+    switch (format) {
+      case 'eliminazione':
+        nextStepPath = '/tornei/nuovo/step3-eliminazione';
+        break;
+      case 'girone_unico':
+        nextStepPath = '/tornei/nuovo/step3-gironeunico';
+        break;
+      case 'fase_gironi':
+        nextStepPath = '/tornei/nuovo/step3-fasegironi';
+        break;
+      default:
+        return;
     }
 
-    navigate(nextPath, {
+    navigate(nextStepPath, {
       state: {
         ...state,
-        formatoTorneo,
+        formatoTorneo: format,
       },
     });
   };
 
   return (
     <div className="max-w-md mx-auto px-4 py-6 space-y-6">
-      <h2 className="text-2xl font-bold text-center">Seleziona il Formato del Torneo</h2>
+      <h2 className="text-2xl font-bold text-center">Seleziona Formato Torneo</h2>
 
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4">
         <button
-          onClick={() => handleFormato('eliminazione')}
-          className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors"
+          onClick={() => handleSelectFormat('eliminazione')}
+          className="bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors"
         >
           Eliminazione Diretta
         </button>
         <button
-          onClick={() => handleFormato('girone_unico')}
-          className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors"
+          onClick={() => handleSelectFormat('girone_unico')}
+          className="bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors"
         >
           Girone Unico
         </button>
         <button
-          onClick={() => handleFormato('fase_gironi')}
-          className="w-full bg-yellow-500 text-white py-3 rounded-lg hover:bg-yellow-600 transition-colors"
+          onClick={() => handleSelectFormat('fase_gironi')}
+          className="bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors"
         >
           Fase a Gironi
         </button>
       </div>
 
       <button
-        onClick={() => navigate('/tornei/nuovo/step1', { state })}
-        className="w-full bg-gray-300 text-black py-2 rounded-lg hover:bg-gray-400"
+        onClick={() => navigate(-1)}
+        className="w-full bg-gray-300 text-black py-2 rounded-lg hover:bg-gray-400 transition-colors"
       >
         Indietro
       </button>
