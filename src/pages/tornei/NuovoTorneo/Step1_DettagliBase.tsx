@@ -40,7 +40,8 @@ export default function Step1_DettagliBase() {
       return;
     }
     setErrorMsg(null);
-    navigate('/tornei/nuovo/step1_5', {
+    // CORREZIONE: trattino anziché underscore
+    navigate('/tornei/nuovo/step1-5', {
       state: {
         torneoNome,
         torneoLuogo,
@@ -51,7 +52,6 @@ export default function Step1_DettagliBase() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-6">
-      {/* Indietro */}
       <button
         onClick={() => navigate(-1)}
         className="inline-flex items-center text-gray-600 hover:text-gray-800 mb-4"
