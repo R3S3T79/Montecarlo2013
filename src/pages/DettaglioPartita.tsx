@@ -193,7 +193,7 @@ export default function DettaglioPartita() {
           {canEdit && (
             <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex space-x-2">
               <button
-                onClick={() => navigate(`/partita/${id}/edit`)}
+                onClick={() => navigate(`/gestione-risultato/${id}`)}
                 className="px-2 py-1 text-xs bg-yellow-400 text-white rounded hover:bg-yellow-500"
               >
                 <Edit2 size={14} />
