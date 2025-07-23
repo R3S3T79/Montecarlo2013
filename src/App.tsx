@@ -57,10 +57,10 @@ import Step6_GironeUnico        from "./pages/tornei/NuovoTorneo/Step6_GironeUni
 import Step6_FaseGironi         from "./pages/tornei/NuovoTorneo/Step6_FaseGironi";
 import Step7_FaseGironi         from "./pages/tornei/NuovoTorneo/Step7_FaseGironi";
 
-// componenti edit per ogni formato
-import EditRTorneo              from "./pages/tornei/NuovoTorneo/EditRTorneo";
-import EditGironeUnicoPartita   from "./pages/tornei/NuovoTorneo/EditGironeUnicoPartita";
-import EditFaseGironiPartita    from "./pages/tornei/NuovoTorneo/EditFaseGironiPartita";
+// componenti edit
+import EditRTorneo            from "./pages/tornei/NuovoTorneo/EditRTorneo";
+import EditGironeUnicoPartita from "./pages/tornei/NuovoTorneo/EditGironeUnicoPartita";
+import EditFaseGironiPartita  from "./pages/tornei/NuovoTorneo/EditFaseGironiPartita";
 
 // admin only
 import AdminDashboard from "./pages/AdminDashboard";
@@ -70,18 +70,18 @@ export default function App() {
   return (
     <AuthProvider>
       <Routes>
-        {/* === pagine pubbliche === */}
+        {/* pagine pubbliche */}
         <Route path="/login"         element={<LoginPage />} />
         <Route path="/register"      element={<RegisterPage />} />
         <Route path="/confirm"       element={<ConfirmPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
 
-        {/* === pagine fuori sidebar (autenticati) === */}
+        {/* pagine fuori sidebar */}
         <Route path="/rosa"               element={<RosaGiocatori />} />
         <Route path="/giocatore/:id"      element={<DettaglioGiocatore />} />
         <Route path="/aggiungi-giocatore" element={<AggiungiGiocatore />} />
 
-        {/* === rotte protette sotto SidebarLayout === */}
+        {/* rotte protette */}
         <Route
           path="/*"
           element={
@@ -131,7 +131,7 @@ export default function App() {
           <Route path="tornei/nuovo/step6-gironeunico/:torneoId"  element={<Step6_GironeUnico />} />
           <Route path="tornei/nuovo/step6-fasegironi/:torneoId"   element={<Step6_FaseGironi />} />
 
-          {/* rotte EDIT per ogni formato torneo */}
+          {/* rotte EDIT */}
           <Route
             path="tornei/nuovo/step6-eliminazione/:torneoId/edit/:id"
             element={<EditRTorneo />}
@@ -159,5 +159,3 @@ export default function App() {
   );
 }
 
-
-}
