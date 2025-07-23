@@ -119,5 +119,3 @@ export default function Step4_GironeUnico() {
     </div>
   );
 }
-
-}
