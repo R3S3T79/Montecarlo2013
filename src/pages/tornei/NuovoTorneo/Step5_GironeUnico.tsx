@@ -21,10 +21,7 @@ interface StateType {
 export default function Step5_GironeUnico() {
   const location = useLocation();
   const navigate = useNavigate();
-  const state = location.state as StateType | null;
-
-  // Log in apertura per capire se lo state arriva correttamente
-  console.log('[Step5_GironeUnico] render, state =', state);
+  const state = (location.state as StateType) || null;
 
   const [squadre, setSquadre] = useState<Squadra[]>([]);
   const [accoppiamenti, setAccoppiamenti] = useState<[string, string][]>([]);
@@ -34,36 +31,32 @@ export default function Step5_GironeUnico() {
   const [andataRitorno, setAndataRitorno] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Se manca lo state, torno subito a /tornei
+  // se manca state, torno allo step4
   useEffect(() => {
     if (!state) {
-      console.warn('[Step5_GironeUnico] dati mancanti, torno a /tornei');
-      navigate('/tornei', { replace: true });
+      navigate('/tornei/nuovo/step4-gironeunico', { replace: true });
     }
   }, [state, navigate]);
 
-  // Popolo squadre e accoppiamenti quando lo state è presente
+  // carico squadre e creo accoppiamenti
   useEffect(() => {
     if (!state) return;
     supabase
       .from<Squadra>('squadre')
       .select('id, nome, logo_url')
       .in('id', state.squadreSelezionate)
-      .then(({ data }) => {
-        if (!data) return;
+      .then(({ data, error }) => {
+        if (error || !data) return;
         setSquadre(data);
-        const acc: [string, string][] = [];
+        const pairs: [string, string][] = [];
         data.forEach((a, i) =>
-          data.slice(i + 1).forEach((b) => acc.push([a.id, b.id]))
+          data.slice(i + 1).forEach((b) => pairs.push([a.id, b.id]))
         );
-        setAccoppiamenti(acc);
-        console.log('[Step5_GironeUnico] accoppiamenti =', acc);
+        setAccoppiamenti(pairs);
       });
   }, [state]);
 
-  if (!state) {
-    return null;
-  }
+  if (!state) return null;
 
   const aggiornaData = (
     key: string,
@@ -80,28 +73,27 @@ export default function Step5_GironeUnico() {
 
   const allDatesSet = () =>
     accoppiamenti.every(([a, b]) => {
-      const key = `${a}-${b}`;
-      if (!dateIncontri[key]?.andata) return false;
-      if (andataRitorno && !dateIncontri[key]?.ritorno) return false;
+      const k = `${a}-${b}`;
+      if (!dateIncontri[k]?.andata) return false;
+      if (andataRitorno && !dateIncontri[k]?.ritorno) return false;
       return true;
     });
 
-  const scambiaAccoppiamento = (idx: number) => {
+  const scambia = (idx: number) => {
     setAccoppiamenti((prev) => {
-      const copia = [...prev];
-      const [home, away] = copia[idx];
-      copia[idx] = [away, home];
-      return copia;
+      const copy = [...prev];
+      const [h, o] = copy[idx];
+      copy[idx] = [o, h];
+      return copy;
     });
   };
 
   const handleNext = async () => {
     if (!allDatesSet() || loading) return;
-    console.log('[Step5_GironeUnico] salvataggio in corso, date =', dateIncontri);
     setLoading(true);
     try {
-      // 1) crea torneo
-      const { data: torneo, error: torErr } = await supabase
+      // creo torneo
+      const { data: t, error: eT } = await supabase
         .from('tornei')
         .insert({
           nome: state.torneoNome,
@@ -112,17 +104,17 @@ export default function Step5_GironeUnico() {
         })
         .select('id')
         .single();
-      if (torErr || !torneo) throw torErr || new Error('Nessun torneo creato');
-      const torneoId = torneo.id;
+      if (eT || !t) throw eT || new Error('No torneo');
+      const torneoId = t.id;
 
-      // 2) config_torneo
+      // config_torneo
       await supabase.from('config_torneo').insert({
         torneo_id: torneoId,
         girone_andata_ritorno: andataRitorno,
       });
 
-      // 3) fasi_torneo
-      const { data: fase, error: faseErr } = await supabase
+      // fasi_torneo
+      const { data: f, error: eF } = await supabase
         .from('fasi_torneo')
         .insert({
           torneo_id: torneoId,
@@ -132,11 +124,11 @@ export default function Step5_GironeUnico() {
         })
         .select('id')
         .single();
-      if (faseErr || !fase) throw faseErr || new Error('Nessuna fase creata');
-      const faseId = fase.id;
+      if (eF || !f) throw eF || new Error('No fase');
+      const faseId = f.id;
 
-      // 4) partite_torneo
-      const partiteDaInserire = accoppiamenti.map(([a, b]) => {
+      // partite_torneo
+      const partite = accoppiamenti.map(([a, b]) => {
         const key = `${a}-${b}`;
         return {
           torneo_id: torneoId,
@@ -150,15 +142,15 @@ export default function Step5_GironeUnico() {
           rigori_vincitore: null,
         };
       });
-      await supabase.from('partite_torneo').insert(partiteDaInserire);
+      await supabase.from('partite_torneo').insert(partite);
 
-      // 5) avanti
-      navigate('/tornei/nuovo/step6-gironeunico', {
+      // navigo allo step6 con il parametro torneoId
+      navigate(`/tornei/nuovo/step6-gironeunico/${torneoId}`, {
         state: { torneoId },
       });
-    } catch (e) {
-      console.error('[Step5_GironeUnico] errore salvataggio:', e);
-      alert('Errore durante il salvataggio. Controlla console.');
+    } catch (err) {
+      console.error('Errore salvataggio Girone Unico:', err);
+      alert('Errore durante il salvataggio, controlla console.');
     } finally {
       setLoading(false);
     }
@@ -191,7 +183,7 @@ export default function Step5_GironeUnico() {
           >
             <button
               type="button"
-              onClick={() => scambiaAccoppiamento(idx)}
+              onClick={() => scambia(idx)}
               className="absolute top-2 right-2 text-gray-500 hover:text-gray-800"
               title="Scambia casa/trasferta"
             >
@@ -239,10 +231,11 @@ export default function Step5_GironeUnico() {
                 </label>
                 <input
                   type="datetime-local"
-                  className="w-full border
- border-gray-300 rounded px-2 py-1 text-sm"
+                  className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
                   value={dateIncontri[key]?.ritorno || ''}
-                  onChange={(e) => aggiornaData(key, 'ritorno', e.target.value, e)}
+                  onChange={(e) =>
+                    aggiornaData(key, 'ritorno', e.target.value, e)
+                  }
                 />
               </div>
             )}
@@ -270,5 +263,5 @@ export default function Step5_GironeUnico() {
         </button>
       </div>
     </div>
-  );
+);
 }
