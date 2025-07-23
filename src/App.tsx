@@ -61,6 +61,7 @@ import Step7_FaseGironi         from "./pages/tornei/NuovoTorneo/Step7_FaseGiron
 import EditRTorneo            from "./pages/tornei/NuovoTorneo/EditRTorneo";
 import EditGironeUnicoPartita from "./pages/tornei/NuovoTorneo/EditGironeUnicoPartita";
 import EditFaseGironiPartita  from "./pages/tornei/NuovoTorneo/EditFaseGironiPartita";
+import ModificaRisultatoEliminazione from "./pages/tornei/NuovoTorneo/ModificaRisultatoEliminazione";
 
 // admin only
 import AdminDashboard from "./pages/AdminDashboard";
@@ -93,13 +94,13 @@ export default function App() {
           <Route index element={<Home />} />
 
           {/* Partite singolo */}
-          <Route path="calendario"            element={<Calendario />} />
-          <Route path="prepartita/:id"        element={<DettaglioPrePartita />} />
-          <Route path="risultati"             element={<Risultati />} />
-          <Route path="nuova-partita"         element={<NuovaPartitaPage />} />
-          <Route path="partita/:id"           element={<DettaglioPartita />} />
-          <Route path="partita/:id/edit"      element={<EditPartitaPage />} />
-          <Route path="prossima-partita"      element={<ProssimaPartita />} />
+          <Route path="calendario"             element={<Calendario />} />
+          <Route path="prepartita/:id"         element={<DettaglioPrePartita />} />
+          <Route path="risultati"              element={<Risultati />} />
+          <Route path="nuova-partita"          element={<NuovaPartitaPage />} />
+          <Route path="partita/:id"            element={<DettaglioPartita />} />
+          <Route path="partita/:id/edit"       element={<EditPartitaPage />} />
+          <Route path="prossima-partita"       element={<ProssimaPartita />} />
           <Route path="gestione-risultato/:id" element={<GestioneRisultatoPartita />} />
 
           {/* Squadre */}
@@ -113,19 +114,19 @@ export default function App() {
           <Route path="statistiche/giocatori" element={<StatisticheGiocatori />} />
 
           {/* Workflow Tornei */}
-          <Route path="tornei"                         element={<Tornei />} />
-          <Route path="tornei/nuovo/step1"             element={<Step1_DettagliBase />} />
-          <Route path="tornei/nuovo/step1-5"           element={<Step1_5_FormatoTorneo />} />
-          <Route path="tornei/nuovo/step3-eliminazione" element={<Step3_ENumeroSquadre />} />
-          <Route path="tornei/nuovo/step3-gironeunico"  element={<Step3_GuNumeroSquadre />} />
-          <Route path="tornei/nuovo/step3-fasegironi"   element={<Step3_FgNumeroSquadre />} />
-          <Route path="tornei/nuovo/step4-eliminazione" element={<Step4_Eliminazione />} />
-          <Route path="tornei/nuovo/step4-gironeunico"  element={<Step4_GironeUnico />} />
-          <Route path="tornei/nuovo/step4-fasegironi"   element={<Step4_FaseGironi />} />
+          <Route path="tornei"                           element={<Tornei />} />
+          <Route path="tornei/nuovo/step1"               element={<Step1_DettagliBase />} />
+          <Route path="tornei/nuovo/step1-5"             element={<Step1_5_FormatoTorneo />} />
+          <Route path="tornei/nuovo/step3-eliminazione"  element={<Step3_ENumeroSquadre />} />
+          <Route path="tornei/nuovo/step3-gironeunico"   element={<Step3_GuNumeroSquadre />} />
+          <Route path="tornei/nuovo/step3-fasegironi"    element={<Step3_FgNumeroSquadre />} />
+          <Route path="tornei/nuovo/step4-eliminazione"  element={<Step4_Eliminazione />} />
+          <Route path="tornei/nuovo/step4-gironeunico"   element={<Step4_GironeUnico />} />
+          <Route path="tornei/nuovo/step4-fasegironi"    element={<Step4_FaseGironi />} />
 
-          <Route path="tornei/nuovo/step5-eliminazione" element={<Step5_Eliminazione />} />
-          <Route path="tornei/nuovo/step5-gironeunico"  element={<Step5_GironeUnico />} />
-          <Route path="tornei/nuovo/step5-fasegironi"   element={<Step5_FaseGironi />} />
+          <Route path="tornei/nuovo/step5-eliminazione"  element={<Step5_Eliminazione />} />
+          <Route path="tornei/nuovo/step5-gironeunico"   element={<Step5_GironeUnico />} />
+          <Route path="tornei/nuovo/step5-fasegironi"    element={<Step5_FaseGironi />} />
 
           <Route path="tornei/nuovo/step6-eliminazione/:torneoId" element={<Step6_Eliminazione />} />
           <Route path="tornei/nuovo/step6-gironeunico/:torneoId"  element={<Step6_GironeUnico />} />
@@ -133,8 +134,8 @@ export default function App() {
 
           {/* rotte EDIT */}
           <Route
-            path="tornei/nuovo/step6-eliminazione/:torneoId/edit/:id"
-            element={<EditRTorneo />}
+            path="tornei/nuovo/step6-eliminazione/:torneoId/partita/:id/edit"
+            element={<ModificaRisultatoEliminazione />}
           />
           <Route
             path="tornei/nuovo/step6-gironeunico/:torneoId/edit/:id"
@@ -158,4 +159,3 @@ export default function App() {
     </AuthProvider>
   );
 }
-
