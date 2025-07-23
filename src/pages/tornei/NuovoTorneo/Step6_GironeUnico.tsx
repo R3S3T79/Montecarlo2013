@@ -36,7 +36,6 @@ export default function Step6_GironeUnico() {
   const torneoId =
     (location.state as { torneoId?: string })?.torneoId || paramId;
 
-  // LOG per debug
   console.log("[Step6_GironeUnico] mount", { torneoId, state: location.state });
 
   const [torneoNome, setTorneoNome] = useState<string>("Torneo");
@@ -71,7 +70,7 @@ export default function Step6_GironeUnico() {
             "rigori_vincitore",
             "stato",
             "data_ora",
-          ].join(", ")
+          ].join(",")
         )
         .eq("torneo_id", torneoId)
         .order("data_ora", { ascending: true });
@@ -81,7 +80,6 @@ export default function Step6_GironeUnico() {
         const t2 = new Date(b.data_ora || "").getTime();
         return t1 !== t2 ? t1 - t2 : a.id.localeCompare(b.id);
       });
-      console.log("[Step6_GironeUnico] partite", ordered);
       setMatches(ordered);
 
       const squadreIds = Array.from(
@@ -91,14 +89,12 @@ export default function Step6_GironeUnico() {
         .from<Squadra>("squadre")
         .select("id, nome, logo_url")
         .in("id", squadreIds);
-      console.log("[Step6_GironeUnico] squadre", sData);
       setSquadreMap(Object.fromEntries((sData || []).map((s) => [s.id, s])));
 
       setLoading(false);
     })();
   }, [torneoId, navigate]);
 
-  // calcolo classifica
   const classifica = useMemo(() => {
     type Row = {
       id: string;
@@ -194,7 +190,6 @@ export default function Step6_GironeUnico() {
   };
 
   const handleEdit = (matchId: string) => {
-    console.log("[Step6_GironeUnico] handleEdit", matchId);
     navigate(
       `/tornei/nuovo/step6-gironeunico/${torneoId}/edit/${matchId}`,
       { state: { torneoId } }
@@ -219,7 +214,8 @@ export default function Step6_GironeUnico() {
           const away = squadreMap[m.squadra_ospite_id];
           let score: React.ReactNode = <span>VS</span>;
           if (m.stato === "Giocata") {
-            let a = String(m.goal_casa), b = String(m.goal_ospite);
+            let a = String(m.goal_casa),
+              b = String(m.goal_ospite);
             if (a === b && m.rigori_vincitore) {
               if (m.rigori_vincitore === m.squadra_casa_id) a = `.${a}`;
               else b = `${b}.`;
@@ -267,7 +263,9 @@ export default function Step6_GironeUnico() {
           {classifica.map((r) => (
             <tr key={r.id}>
               <td className="px-2 py-1 border flex items-center space-x-2">
-                {r.logo_url && <img src={r.logo_url} alt="" className="w-4 h-4 rounded-full" />}
+                {r.logo_url && (
+                  <img src={r.logo_url} alt="" className="w-4 h-4 rounded-full" />
+                )}
                 <span>{r.nome}</span>
               </td>
               <td className="px-2 py-1 border">{r.PG}</td>
@@ -315,6 +313,4 @@ export default function Step6_GironeUnico() {
       </div>
     </div>
   );
-}
-
 }
