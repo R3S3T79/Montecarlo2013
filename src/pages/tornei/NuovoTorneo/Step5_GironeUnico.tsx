@@ -1,5 +1,4 @@
 // src/pages/tornei/NuovoTorneo/Step5_GironeUnico.tsx
-
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabaseClient';
@@ -24,6 +23,9 @@ export default function Step5_GironeUnico() {
   const navigate = useNavigate();
   const state = location.state as StateType | null;
 
+  // Log in apertura per capire se lo state arriva correttamente
+  console.log('[Step5_GironeUnico] render, state =', state);
+
   const [squadre, setSquadre] = useState<Squadra[]>([]);
   const [accoppiamenti, setAccoppiamenti] = useState<[string, string][]>([]);
   const [dateIncontri, setDateIncontri] = useState<
@@ -32,7 +34,15 @@ export default function Step5_GironeUnico() {
   const [andataRitorno, setAndataRitorno] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // popolo squadre e accoppiamenti
+  // Se manca lo state, torno subito a /tornei
+  useEffect(() => {
+    if (!state) {
+      console.warn('[Step5_GironeUnico] dati mancanti, torno a /tornei');
+      navigate('/tornei', { replace: true });
+    }
+  }, [state, navigate]);
+
+  // Popolo squadre e accoppiamenti quando lo state è presente
   useEffect(() => {
     if (!state) return;
     supabase
@@ -44,18 +54,15 @@ export default function Step5_GironeUnico() {
         setSquadre(data);
         const acc: [string, string][] = [];
         data.forEach((a, i) =>
-          data.slice(i + 1).forEach(b => acc.push([a.id, b.id]))
+          data.slice(i + 1).forEach((b) => acc.push([a.id, b.id]))
         );
         setAccoppiamenti(acc);
+        console.log('[Step5_GironeUnico] accoppiamenti =', acc);
       });
   }, [state]);
 
   if (!state) {
-    return (
-      <p className="text-center text-red-500 mt-6">
-        Dati torneo mancanti.
-      </p>
-    );
+    return null;
   }
 
   const aggiornaData = (
@@ -64,7 +71,7 @@ export default function Step5_GironeUnico() {
     val: string,
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
-    setDateIncontri(prev => ({
+    setDateIncontri((prev) => ({
       ...prev,
       [key]: { ...prev[key], [tipo]: val },
     }));
@@ -79,18 +86,18 @@ export default function Step5_GironeUnico() {
       return true;
     });
 
-  // handler click “scambia”
   const scambiaAccoppiamento = (idx: number) => {
-    setAccoppiamenti(prev => {
-      const copy = [...prev];
-      const [home, away] = copy[idx];
-      copy[idx] = [away, home];
-      return copy;
+    setAccoppiamenti((prev) => {
+      const copia = [...prev];
+      const [home, away] = copia[idx];
+      copia[idx] = [away, home];
+      return copia;
     });
   };
 
   const handleNext = async () => {
     if (!allDatesSet() || loading) return;
+    console.log('[Step5_GironeUnico] salvataggio in corso, date =', dateIncontri);
     setLoading(true);
     try {
       // 1) crea torneo
@@ -105,7 +112,7 @@ export default function Step5_GironeUnico() {
         })
         .select('id')
         .single();
-      if (torErr || !torneo) throw torErr || new Error('No torneo');
+      if (torErr || !torneo) throw torErr || new Error('Nessun torneo creato');
       const torneoId = torneo.id;
 
       // 2) config_torneo
@@ -125,7 +132,7 @@ export default function Step5_GironeUnico() {
         })
         .select('id')
         .single();
-      if (faseErr || !fase) throw faseErr || new Error('No fase');
+      if (faseErr || !fase) throw faseErr || new Error('Nessuna fase creata');
       const faseId = fase.id;
 
       // 4) partite_torneo
@@ -150,7 +157,7 @@ export default function Step5_GironeUnico() {
         state: { torneoId },
       });
     } catch (e) {
-      console.error('Errore salvataggio girone unico:', e);
+      console.error('[Step5_GironeUnico] errore salvataggio:', e);
       alert('Errore durante il salvataggio. Controlla console.');
     } finally {
       setLoading(false);
@@ -165,7 +172,7 @@ export default function Step5_GironeUnico() {
         <input
           type="checkbox"
           checked={andataRitorno}
-          onChange={e => setAndataRitorno(e.target.checked)}
+          onChange={(e) => setAndataRitorno(e.target.checked)}
           className="form-checkbox h-4 w-4 text-blue-600"
         />
         <span className="text-sm">Andata e ritorno</span>
@@ -173,9 +180,8 @@ export default function Step5_GironeUnico() {
 
       {accoppiamenti.map(([a, b], idx) => {
         const key = `${a}-${b}`;
-        const casa = squadre.find(s => s.id === a);
-        const ospite = squadre.find(s => s.id === b);
-
+        const casa = squadre.find((s) => s.id === a);
+        const ospite = squadre.find((s) => s.id === b);
         return (
           <div
             key={key}
@@ -183,7 +189,6 @@ export default function Step5_GironeUnico() {
               idx < accoppiamenti.length - 1 ? 'mb-4' : ''
             }`}
           >
-            {/* pulsante “scambia” */}
             <button
               type="button"
               onClick={() => scambiaAccoppiamento(idx)}
@@ -193,7 +198,6 @@ export default function Step5_GironeUnico() {
               ↔️
             </button>
 
-            {/* casa */}
             <div className="flex items-center space-x-2 mb-2">
               {casa?.logo_url && (
                 <img
@@ -205,7 +209,6 @@ export default function Step5_GironeUnico() {
               <span className="text-sm font-medium">{casa?.nome}</span>
             </div>
 
-            {/* ospite */}
             <div className="flex items-center space-x-2 mb-4">
               {ospite?.logo_url && (
                 <img
@@ -217,7 +220,6 @@ export default function Step5_GironeUnico() {
               <span className="text-sm font-medium">{ospite?.nome}</span>
             </div>
 
-            {/* Data andata */}
             <div className="mb-4">
               <label className="block text-xs text-gray-600 mb-1">
                 Data andata
@@ -226,13 +228,10 @@ export default function Step5_GironeUnico() {
                 type="datetime-local"
                 className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
                 value={dateIncontri[key]?.andata || ''}
-                onChange={e =>
-                  aggiornaData(key, 'andata', e.target.value, e)
-                }
+                onChange={(e) => aggiornaData(key, 'andata', e.target.value, e)}
               />
             </div>
 
-            {/* Data ritorno */}
             {andataRitorno && (
               <div className="mb-4">
                 <label className="block text-xs text-gray-600 mb-1">
@@ -240,11 +239,10 @@ export default function Step5_GironeUnico() {
                 </label>
                 <input
                   type="datetime-local"
-                  className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                  className="w-full border
+ border-gray-300 rounded px-2 py-1 text-sm"
                   value={dateIncontri[key]?.ritorno || ''}
-                  onChange={e =>
-                    aggiornaData(key, 'ritorno', e.target.value, e)
-                  }
+                  onChange={(e) => aggiornaData(key, 'ritorno', e.target.value, e)}
                 />
               </div>
             )}
