@@ -1,5 +1,4 @@
 // src/pages/tornei/NuovoTorneo/Step6_GironeUnico.tsx
-
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../../../lib/supabaseClient";
@@ -37,19 +36,22 @@ export default function Step6_GironeUnico() {
   const torneoId =
     (location.state as { torneoId?: string })?.torneoId || paramId;
 
+  // LOG per debug
+  console.log("[Step6_GironeUnico] mount", { torneoId, state: location.state });
+
   const [torneoNome, setTorneoNome] = useState<string>("Torneo");
   const [matches, setMatches] = useState<Partita[]>([]);
   const [squadreMap, setSquadreMap] = useState<Record<string, Squadra>>({});
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    console.log("[Step6_GironeUnico] useEffect load", { torneoId });
     if (!torneoId) {
       navigate("/tornei");
       return;
     }
     setLoading(true);
     (async () => {
-      // 1) Nome torneo
       const { data: tData } = await supabase
         .from("tornei")
         .select("nome")
@@ -57,7 +59,6 @@ export default function Step6_GironeUnico() {
         .single();
       if (tData?.nome) setTorneoNome(tData.nome);
 
-      // 2) Partite girone unico
       const { data: partiteData } = await supabase
         .from<Partita>("partite_torneo")
         .select(
@@ -74,14 +75,15 @@ export default function Step6_GironeUnico() {
         )
         .eq("torneo_id", torneoId)
         .order("data_ora", { ascending: true });
+
       const ordered = [...(partiteData || [])].sort((a, b) => {
         const t1 = new Date(a.data_ora || "").getTime();
         const t2 = new Date(b.data_ora || "").getTime();
         return t1 !== t2 ? t1 - t2 : a.id.localeCompare(b.id);
       });
+      console.log("[Step6_GironeUnico] partite", ordered);
       setMatches(ordered);
 
-      // 3) Squadre coinvolte
       const squadreIds = Array.from(
         new Set(ordered.flatMap((m) => [m.squadra_casa_id, m.squadra_ospite_id]))
       );
@@ -89,12 +91,14 @@ export default function Step6_GironeUnico() {
         .from<Squadra>("squadre")
         .select("id, nome, logo_url")
         .in("id", squadreIds);
-      setSquadreMap(Object.fromEntries(sData.map((s) => [s.id, s])));
+      console.log("[Step6_GironeUnico] squadre", sData);
+      setSquadreMap(Object.fromEntries((sData || []).map((s) => [s.id, s])));
 
       setLoading(false);
     })();
   }, [torneoId, navigate]);
 
+  // calcolo classifica
   const classifica = useMemo(() => {
     type Row = {
       id: string;
@@ -176,13 +180,21 @@ export default function Step6_GironeUnico() {
     if (!iso) return "—";
     const d = new Date(iso);
     return (
-      d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }) +
+      d.toLocaleDateString("it-IT", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }) +
       " " +
-      d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })
+      d.toLocaleTimeString("it-IT", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
     );
   };
 
   const handleEdit = (matchId: string) => {
+    console.log("[Step6_GironeUnico] handleEdit", matchId);
     navigate(
       `/tornei/nuovo/step6-gironeunico/${torneoId}/edit/${matchId}`,
       { state: { torneoId } }
@@ -205,39 +217,31 @@ export default function Step6_GironeUnico() {
         {matches.map((m) => {
           const home = squadreMap[m.squadra_casa_id];
           const away = squadreMap[m.squadra_ospite_id];
-
-          let score: React.ReactNode = <span className="text-sm font-medium">VS</span>;
+          let score: React.ReactNode = <span>VS</span>;
           if (m.stato === "Giocata") {
             let a = String(m.goal_casa), b = String(m.goal_ospite);
             if (a === b && m.rigori_vincitore) {
               if (m.rigori_vincitore === m.squadra_casa_id) a = `.${a}`;
               else b = `${b}.`;
             }
-            score = <span className="text-sm font-medium">{a}-{b}</span>;
+            score = <span>{a}-{b}</span>;
           }
-
           return (
             <div
               key={m.id}
               onClick={canEdit ? () => handleEdit(m.id) : undefined}
               className={
                 "bg-white shadow rounded-lg p-2 " +
-                (canEdit
-                  ? "cursor-pointer hover:bg-gray-50"
-                  : "cursor-default")
+                (canEdit ? "cursor-pointer hover:bg-gray-50" : "")
               }
             >
               <div className="text-xs text-gray-500 mb-1 text-center">
                 {formatDate(m.data_ora)}
               </div>
               <div className="flex items-center">
-                <span className="w-1/3 text-left text-sm">
-                  {home?.nome || m.squadra_casa_id}
-                </span>
+                <span className="w-1/3 text-left text-sm">{home?.nome}</span>
                 <span className="w-1/3 text-center">{score}</span>
-                <span className="w-1/3 text-right text-sm">
-                  {away?.nome || m.squadra_ospite_id}
-                </span>
+                <span className="w-1/3 text-right text-sm">{away?.nome}</span>
               </div>
             </div>
           );
@@ -246,40 +250,34 @@ export default function Step6_GironeUnico() {
 
       {/* Classifica */}
       <table className="w-full table-auto border-collapse text-center text-sm mb-6">
-        <thead className="text-xs bg-gray-100">
+        <thead>
           <tr>
-            <th className="border px-1 py-1 text-left">Squadra</th>
-            <th className="border px-1 py-1">PG</th>
-            <th className="border px-1 py-1">V</th>
-            <th className="border px-1 py-1">N</th>
-            <th className="border px-1 py-1">P</th>
-            <th className="border px-1 py-1">GF</th>
-            <th className="border px-1 py-1">GS</th>
-            <th className="border px-1 py-1">DR</th>
-            <th className="border px-1 py-1">Pt</th>
+            <th className="px-2 py-1 border">Squadra</th>
+            <th className="px-2 py-1 border">PG</th>
+            <th className="px-2 py-1 border">V</th>
+            <th className="px-2 py-1 border">N</th>
+            <th className="px-2 py-1 border">P</th>
+            <th className="px-2 py-1 border">GF</th>
+            <th className="px-2 py-1 border">GS</th>
+            <th className="px-2 py-1 border">DR</th>
+            <th className="px-2 py-1 border">Pt</th>
           </tr>
         </thead>
         <tbody>
-          {classifica.map((r, i) => (
-            <tr key={r.id} className={i % 2 === 1 ? "bg-gray-50" : ""}>
-              <td className="border px-1 py-1 flex items-center text-sm">
-                {r.logo_url && (
-                  <img
-                    src={r.logo_url}
-                    alt={r.nome}
-                    className="w-5 h-5 rounded-full mr-2"
-                  />
-                )}
-                {r.nome}
+          {classifica.map((r) => (
+            <tr key={r.id}>
+              <td className="px-2 py-1 border flex items-center space-x-2">
+                {r.logo_url && <img src={r.logo_url} alt="" className="w-4 h-4 rounded-full" />}
+                <span>{r.nome}</span>
               </td>
-              <td className="border px-1 py-1">{r.PG}</td>
-              <td className="border px-1 py-1">{r.V}</td>
-              <td className="border px-1 py-1">{r.N}</td>
-              <td className="border px-1 py-1">{r.P}</td>
-              <td className="border px-1 py-1">{r.GF}</td>
-              <td className="border px-1 py-1">{r.GS}</td>
-              <td className="border px-1 py-1">{r.DR}</td>
-              <td className="border px-1 py-1">{r.Pt}</td>
+              <td className="px-2 py-1 border">{r.PG}</td>
+              <td className="px-2 py-1 border">{r.V}</td>
+              <td className="px-2 py-1 border">{r.N}</td>
+              <td className="px-2 py-1 border">{r.P}</td>
+              <td className="px-2 py-1 border">{r.GF}</td>
+              <td className="px-2 py-1 border">{r.GS}</td>
+              <td className="px-2 py-1 border">{r.DR}</td>
+              <td className="px-2 py-1 border">{r.Pt}</td>
             </tr>
           ))}
         </tbody>
@@ -317,4 +315,6 @@ export default function Step6_GironeUnico() {
       </div>
     </div>
   );
+}
+
 }
