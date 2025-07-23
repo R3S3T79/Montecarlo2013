@@ -39,7 +39,7 @@ import DettaglioSquadra from "./pages/DettaglioSquadra";
 import StatisticheSquadra   from "./pages/StatisticheSquadra";
 import StatisticheGiocatori from "./pages/StatisticheGiocatori";
 
-// tornei
+// tornei workflow
 import Tornei                   from "./pages/tornei/NuovoTorneo/Tornei";
 import Step1_DettagliBase       from "./pages/tornei/NuovoTorneo/Step1_DettagliBase";
 import Step1_5_FormatoTorneo    from "./pages/tornei/NuovoTorneo/Step1_5_FormatoTorneo";
@@ -57,8 +57,10 @@ import Step6_GironeUnico        from "./pages/tornei/NuovoTorneo/Step6_GironeUni
 import Step6_FaseGironi         from "./pages/tornei/NuovoTorneo/Step6_FaseGironi";
 import Step7_FaseGironi         from "./pages/tornei/NuovoTorneo/Step7_FaseGironi";
 
-// componente per edit eliminazione
-import EditRTorneo from "./pages/tornei/NuovoTorneo/EditRTorneo";
+// componenti edit per ogni formato
+import EditRTorneo              from "./pages/tornei/NuovoTorneo/EditRTorneo";
+import EditGironeUnicoPartita   from "./pages/tornei/NuovoTorneo/EditGironeUnicoPartita";
+import EditFaseGironiPartita    from "./pages/tornei/NuovoTorneo/EditFaseGironiPartita";
 
 // admin only
 import AdminDashboard from "./pages/AdminDashboard";
@@ -68,18 +70,18 @@ export default function App() {
   return (
     <AuthProvider>
       <Routes>
-        {/* pagine pubbliche */}
+        {/* === pagine pubbliche === */}
         <Route path="/login"         element={<LoginPage />} />
         <Route path="/register"      element={<RegisterPage />} />
         <Route path="/confirm"       element={<ConfirmPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
 
-        {/* pagine fuori sidebar */}
+        {/* === pagine fuori sidebar (autenticati) === */}
         <Route path="/rosa"               element={<RosaGiocatori />} />
         <Route path="/giocatore/:id"      element={<DettaglioGiocatore />} />
         <Route path="/aggiungi-giocatore" element={<AggiungiGiocatore />} />
 
-        {/* pagine protette sotto SidebarLayout */}
+        {/* === rotte protette sotto SidebarLayout === */}
         <Route
           path="/*"
           element={
@@ -110,28 +112,40 @@ export default function App() {
           <Route path="statistiche/squadra"   element={<StatisticheSquadra />} />
           <Route path="statistiche/giocatori" element={<StatisticheGiocatori />} />
 
-          {/* Tornei */}
-          <Route path="tornei"                          element={<Tornei />} />
-          <Route path="tornei/nuovo/step1"              element={<Step1_DettagliBase />} />
-          <Route path="tornei/nuovo/step1-5"            element={<Step1_5_FormatoTorneo />} />
+          {/* Workflow Tornei */}
+          <Route path="tornei"                         element={<Tornei />} />
+          <Route path="tornei/nuovo/step1"             element={<Step1_DettagliBase />} />
+          <Route path="tornei/nuovo/step1-5"           element={<Step1_5_FormatoTorneo />} />
           <Route path="tornei/nuovo/step3-eliminazione" element={<Step3_ENumeroSquadre />} />
           <Route path="tornei/nuovo/step3-gironeunico"  element={<Step3_GuNumeroSquadre />} />
           <Route path="tornei/nuovo/step3-fasegironi"   element={<Step3_FgNumeroSquadre />} />
           <Route path="tornei/nuovo/step4-eliminazione" element={<Step4_Eliminazione />} />
           <Route path="tornei/nuovo/step4-gironeunico"  element={<Step4_GironeUnico />} />
           <Route path="tornei/nuovo/step4-fasegironi"   element={<Step4_FaseGironi />} />
+
           <Route path="tornei/nuovo/step5-eliminazione" element={<Step5_Eliminazione />} />
-          {/* rotta per edit eliminazione */}
-          <Route
-            path="tornei/nuovo/step5-eliminazione/partita/:id/edit"
-            element={<EditRTorneo />}
-          />
-          <Route path="tornei/nuovo/step5-gironeunico"   element={<Step5_GironeUnico />} />
-          <Route path="tornei/nuovo/step5-fasegironi"    element={<Step5_FaseGironi />} />
+          <Route path="tornei/nuovo/step5-gironeunico"  element={<Step5_GironeUnico />} />
+          <Route path="tornei/nuovo/step5-fasegironi"   element={<Step5_FaseGironi />} />
+
           <Route path="tornei/nuovo/step6-eliminazione/:torneoId" element={<Step6_Eliminazione />} />
           <Route path="tornei/nuovo/step6-gironeunico/:torneoId"  element={<Step6_GironeUnico />} />
           <Route path="tornei/nuovo/step6-fasegironi/:torneoId"   element={<Step6_FaseGironi />} />
-          <Route path="tornei/nuovo/step7-fasegironi/:torneoId"   element={<Step7_FaseGironi />} />
+
+          {/* rotte EDIT per ogni formato torneo */}
+          <Route
+            path="tornei/nuovo/step6-eliminazione/:torneoId/edit/:id"
+            element={<EditRTorneo />}
+          />
+          <Route
+            path="tornei/nuovo/step6-gironeunico/:torneoId/edit/:id"
+            element={<EditGironeUnicoPartita />}
+          />
+          <Route
+            path="tornei/nuovo/step6-fasegironi/:torneoId/edit/:id"
+            element={<EditFaseGironiPartita />}
+          />
+
+          <Route path="tornei/nuovo/step7-fasegironi/:torneoId" element={<Step7_FaseGironi />} />
 
           {/* Admin only */}
           <Route path="admin"       element={<AdminDashboard />} />
@@ -143,4 +157,7 @@ export default function App() {
       </Routes>
     </AuthProvider>
   );
+}
+
+
 }
