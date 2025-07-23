@@ -57,6 +57,9 @@ import Step6_GironeUnico        from "./pages/tornei/NuovoTorneo/Step6_GironeUni
 import Step6_FaseGironi         from "./pages/tornei/NuovoTorneo/Step6_FaseGironi";
 import Step7_FaseGironi         from "./pages/tornei/NuovoTorneo/Step7_FaseGironi";
 
+// componente per edit eliminazione
+import EditRTorneo from "./pages/tornei/NuovoTorneo/EditRTorneo";
+
 // admin only
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminPanel     from "./pages/AdminPanel";
@@ -65,19 +68,18 @@ export default function App() {
   return (
     <AuthProvider>
       <Routes>
-
-        {/* PUBBLICHE */}
+        {/* pagine pubbliche */}
         <Route path="/login"         element={<LoginPage />} />
         <Route path="/register"      element={<RegisterPage />} />
         <Route path="/confirm"       element={<ConfirmPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
 
-        {/* FUORI SIDEBAR (autenticati) */}
+        {/* pagine fuori sidebar */}
         <Route path="/rosa"               element={<RosaGiocatori />} />
         <Route path="/giocatore/:id"      element={<DettaglioGiocatore />} />
         <Route path="/aggiungi-giocatore" element={<AggiungiGiocatore />} />
 
-        {/* PROTETTE SOTTO SIDEBARLAYOUT */}
+        {/* pagine protette sotto SidebarLayout */}
         <Route
           path="/*"
           element={
@@ -86,17 +88,16 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-
           <Route index element={<Home />} />
 
-          {/* Partite */}
-          <Route path="calendario"             element={<Calendario />} />
-          <Route path="prepartita/:id"         element={<DettaglioPrePartita />} />
-          <Route path="risultati"              element={<Risultati />} />
-          <Route path="nuova-partita"          element={<NuovaPartitaPage />} />
-          <Route path="partita/:id"            element={<DettaglioPartita />} />
-          <Route path="partita/:id/edit"       element={<EditPartitaPage />} />
-          <Route path="prossima-partita"       element={<ProssimaPartita />} />
+          {/* Partite singolo */}
+          <Route path="calendario"            element={<Calendario />} />
+          <Route path="prepartita/:id"        element={<DettaglioPrePartita />} />
+          <Route path="risultati"             element={<Risultati />} />
+          <Route path="nuova-partita"         element={<NuovaPartitaPage />} />
+          <Route path="partita/:id"           element={<DettaglioPartita />} />
+          <Route path="partita/:id/edit"      element={<EditPartitaPage />} />
+          <Route path="prossima-partita"      element={<ProssimaPartita />} />
           <Route path="gestione-risultato/:id" element={<GestioneRisultatoPartita />} />
 
           {/* Squadre */}
@@ -120,8 +121,13 @@ export default function App() {
           <Route path="tornei/nuovo/step4-gironeunico"  element={<Step4_GironeUnico />} />
           <Route path="tornei/nuovo/step4-fasegironi"   element={<Step4_FaseGironi />} />
           <Route path="tornei/nuovo/step5-eliminazione" element={<Step5_Eliminazione />} />
-          <Route path="tornei/nuovo/step5-gironeunico"  element={<Step5_GironeUnico />} />
-          <Route path="tornei/nuovo/step5-fasegironi"   element={<Step5_FaseGironi />} />
+          {/* rotta per edit eliminazione */}
+          <Route
+            path="tornei/nuovo/step5-eliminazione/partita/:id/edit"
+            element={<EditRTorneo />}
+          />
+          <Route path="tornei/nuovo/step5-gironeunico"   element={<Step5_GironeUnico />} />
+          <Route path="tornei/nuovo/step5-fasegironi"    element={<Step5_FaseGironi />} />
           <Route path="tornei/nuovo/step6-eliminazione/:torneoId" element={<Step6_Eliminazione />} />
           <Route path="tornei/nuovo/step6-gironeunico/:torneoId"  element={<Step6_GironeUnico />} />
           <Route path="tornei/nuovo/step6-fasegironi/:torneoId"   element={<Step6_FaseGironi />} />
@@ -130,12 +136,10 @@ export default function App() {
           {/* Admin only */}
           <Route path="admin"       element={<AdminDashboard />} />
           <Route path="admin-panel" element={<AdminPanel />} />
-
         </Route>
 
-        {/* FALLBACK */}
+        {/* fallback */}
         <Route path="*" element={<Navigate to="/login" replace />} />
-
       </Routes>
     </AuthProvider>
   );
