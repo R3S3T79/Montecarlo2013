@@ -188,7 +188,7 @@ export default function StatisticheSquadra() {
 
   return (
     <div className="min-h-screen bg-gradient-montecarlo-light">
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-10">
         <div className="mb-6">
           <div className="bg-white rounded-xl shadow-montecarlo p-2 text-center">
             <h2 className="text-lg font-bold text-montecarlo-secondary">Statistiche Squadra</h2>
