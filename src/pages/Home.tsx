@@ -4,6 +4,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
+import stemma from "../assets/montecarlo.png";
 
 // ========================
 // Tipi
@@ -521,18 +522,18 @@ const fbPluginSrc = useMemo(() => {
   // RENDER
   // --------------------------------
   return (
-    <div style={styles.page}>
-      {/* HERO HEADER: logo + titolo centrati */}
-      <header style={styles.header}>
-        <div style={styles.heroInner}>
-          <img
-            src={"src/assets/montecarlo.png"}
-            alt="Stemma Montecarlo"
-            style={styles.heroLogo}
-          />
-          <h1 style={styles.heroTitle}>Montecarlo 2013</h1>
-        </div>
-      </header>
+  <div style={styles.page}>
+    {/* HERO HEADER: logo + titolo centrati */}
+    <header style={styles.header}>
+  <div style={styles.heroInner}>
+    <img
+      src={stemma}
+      alt="Stemma Montecarlo"
+      style={styles.heroLogo}
+    />
+    <h1 style={styles.heroTitle}>Montecarlo 2013</h1>
+  </div>
+</header>
 
       {/* NOTIZIE */}
       <section style={{ ...styles.card, ...styles.cardLarge }}>
