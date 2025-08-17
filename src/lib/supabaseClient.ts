@@ -8,6 +8,11 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    storage: localStorage, // 🔥 forza uso esplicito
+    storage: localStorage,
   },
+  realtime: {
+    params: {
+      // nessun filtro esplicito: usa i default di Supabase Cloud
+    }
+  }
 })

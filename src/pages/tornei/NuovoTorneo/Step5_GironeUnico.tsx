@@ -10,10 +10,11 @@ interface Squadra {
 }
 
 interface StateType {
+  torneoId: string;
   torneoNome: string;
   torneoLuogo: string;
   stagioneSelezionata: string;
-  formatoTorneo: 'girone_unico';
+  formatoTorneo: 'Girone_Unico';
   numSquadre: number;
   squadreSelezionate: string[];
 }
@@ -31,14 +32,12 @@ export default function Step5_GironeUnico() {
   const [andataRitorno, setAndataRitorno] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // se manca state, torno allo step4
   useEffect(() => {
     if (!state) {
-      navigate('/tornei/nuovo/step4-gironeunico', { replace: true });
+      navigate('/tornei/nuovo/step4-gironeunico');
     }
   }, [state, navigate]);
 
-  // carico squadre e creo accoppiamenti
   useEffect(() => {
     if (!state) return;
     supabase
@@ -92,65 +91,66 @@ export default function Step5_GironeUnico() {
     if (!allDatesSet() || loading) return;
     setLoading(true);
     try {
-      // creo torneo
+      // salva torneo nella tabella principale (se non esiste già)
       const { data: t, error: eT } = await supabase
         .from('tornei')
         .insert({
-          nome: state.torneoNome,
+          id: state.torneoId,
+          nome_torneo: state.torneoNome,
           luogo: state.torneoLuogo,
-          stagione_id: state.stagioneSelezionata,
-          formato: 'girone_unico',
+          stagioni: state.stagioneSelezionata,
+          formato_torneo: 'Girone_Unico',
           numero_squadre: state.numSquadre,
         })
         .select('id')
         .single();
-      if (eT || !t) throw eT || new Error('No torneo');
+
+      if (eT || !t) throw eT || new Error('Errore creazione torneo');
       const torneoId = t.id;
 
-      // config_torneo
-      await supabase.from('config_torneo').insert({
-        torneo_id: torneoId,
-        girone_andata_ritorno: andataRitorno,
-      });
+      // crea partite del girone unico
+      let matchNumber = 1;
+      const partite: any[] = [];
 
-      // fasi_torneo
-      const { data: f, error: eF } = await supabase
-        .from('fasi_torneo')
-        .insert({
-          torneo_id: torneoId,
-          tipo_fase: 'girone_unico',
-          fase_numerica: 1,
-          round: 1,
-        })
-        .select('id')
-        .single();
-      if (eF || !f) throw eF || new Error('No fase');
-      const faseId = f.id;
-
-      // partite_torneo
-      const partite = accoppiamenti.map(([a, b]) => {
+      for (const [a, b] of accoppiamenti) {
         const key = `${a}-${b}`;
-        return {
+        partite.push({
           torneo_id: torneoId,
-          fase_id: faseId,
-          squadra_casa_id: a,
-          squadra_ospite_id: b,
-          goal_casa: 0,
-          goal_ospite: 0,
-          stato: 'DaGiocare',
-          data_ora: dateIncontri[key].andata,
-          rigori_vincitore: null,
-        };
-      });
-      await supabase.from('partite_torneo').insert(partite);
+          match_number: matchNumber++,
+          squadra_casa: a,
+          squadra_ospite: b,
+          gol_casa: 0,
+          gol_ospite: 0,
+          data_match: dateIncontri[key].andata,
+          giocata: false,
+        });
 
-      // navigo allo step6 con il parametro torneoId
+        if (andataRitorno && dateIncontri[key].ritorno) {
+          partite.push({
+            torneo_id: torneoId,
+            match_number: matchNumber++,
+            squadra_casa: b,
+            squadra_ospite: a,
+            gol_casa: 0,
+            gol_ospite: 0,
+            data_match: dateIncontri[key].ritorno,
+            giocata: false,
+          });
+        }
+      }
+
+      const { error: errInsert } = await supabase
+        .from('tornei_gironeunico')
+        .insert(partite);
+
+      if (errInsert) throw errInsert;
+
       navigate(`/tornei/nuovo/step6-gironeunico/${torneoId}`, {
         state: { torneoId },
       });
     } catch (err) {
       console.error('Errore salvataggio Girone Unico:', err);
-      alert('Errore durante il salvataggio, controlla console.');
+      alert('Errore durante il salvataggio. Vedi console.');
     } finally {
       setLoading(false);
     }
@@ -158,7 +158,7 @@ export default function Step5_GironeUnico() {
 
   return (
     <div className="max-w-md mx-auto p-6 space-y-6">
-      <h2 className="text-2xl font-bold text-center">Date Incontri</h2>
+      
 
       <label className="flex items-center space-x-2">
         <input
@@ -263,5 +263,5 @@ export default function Step5_GironeUnico() {
         </button>
       </div>
     </div>
-);
+  );
 }

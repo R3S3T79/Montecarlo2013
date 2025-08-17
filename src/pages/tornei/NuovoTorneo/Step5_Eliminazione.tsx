@@ -1,7 +1,8 @@
 // src/pages/tornei/NuovoTorneo/Step5_Eliminazione.tsx
 import React, { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../../lib/supabaseClient';
+import { v4 as uuidv4 } from 'uuid';
 
 interface Squadra {
   id: string;
@@ -19,274 +20,311 @@ interface MatchInput {
   data: string;
 }
 
+type DateTurniMap = { [round: number]: string[] };
+
 export default function Step5_Eliminazione() {
-  const location = useLocation();
+  const { state } = useLocation() as { state: StateType | null };
+  const { torneoId: paramId } = useParams();
   const navigate = useNavigate();
-  const state = location.state as StateType | null;
-  const torneoId = state?.torneoId;
+  const torneoId = state?.torneoId || paramId;
 
   const [squadre, setSquadre] = useState<Squadra[]>([]);
   const [accoppiamenti, setAccoppiamenti] = useState<MatchInput[]>([]);
-  const [semifinaliData, setSemifinaliData] = useState<string[]>([]);
-  const [finaleData, setFinaleData] = useState<string>('');
+  const [dateTurni, setDateTurni] = useState<DateTurniMap>({});
 
-  // 1) Carica le squadre e imposta gli slot data
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const getNumeroTurni = (n: number): number => Math.ceil(Math.log2(n));
+  const getEtichettaFase = (ri: number, total: number): string => {
+    const nomi = [
+      'Finale',
+      'Semifinale',
+      'Quarti di Finale',
+      'Ottavi di Finale',
+      'Sedicesimi di Finale',
+      'Trentaduesimi di Finale',
+    ];
+    return nomi[total - ri - 1] || `Turno ${ri + 1}`;
+  };
+
+  const formatDateForInput = (val: string | null): string => {
+    if (!val) return '';
+    const d = new Date(val);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+  };
+
   useEffect(() => {
-    if (!state) return;
-    (async () => {
-      const { data: sqs, error: err } = await supabase
-        .from('squadre')
-        .select('id,nome')
-        .in('id', state.squadreSelezionate);
-      if (err) {
-        console.error(err);
-        return;
-      }
-      // Ordino come nello state
-      const ordered = state.squadreSelezionate
-        .map((id) => sqs?.find((s) => s.id === id))
-        .filter((s): s is Squadra => !!s);
-      setSquadre(ordered);
-
-      // Primo turno: accoppiamenti iniziali
-      const init: MatchInput[] = [];
-      for (let i = 0; i < ordered.length; i += 2) {
-        init.push({ casa: ordered[i].id, ospite: ordered[i + 1].id, data: '' });
-      }
-      setAccoppiamenti(init);
-      setSemifinaliData(new Array(init.length / 2).fill(''));
-      setFinaleData('');
-    })();
-  }, [state]);
-
-  const aggiornaData = (i: number, val: string, tgt: HTMLInputElement) => {
-    setAccoppiamenti((p) =>
-      p.map((m, idx) => (idx === i ? { ...m, data: val } : m))
-    );
-    tgt.blur();
-  };
-  const aggiornaDataSemi = (i: number, val: string, tgt: HTMLInputElement) => {
-    setSemifinaliData((p) => p.map((d, idx) => (idx === i ? val : d)));
-    tgt.blur();
-  };
-  const aggiornaDataFinale = (val: string, tgt: HTMLInputElement) => {
-    setFinaleData(val);
-    tgt.blur();
-  };
-  const inverti = (i: number) => {
-    setAccoppiamenti((p) =>
-      p.map((m, idx) =>
-        idx === i
-          ? { casa: m.ospite, ospite: m.casa, data: m.data }
-          : m
-      )
-    );
-  };
-
-  const getPhaseName = (c: number) => {
-    if (c === 1) return 'Finale';
-    if (c === 2) return 'Semifinale';
-    if (c === 4) return 'Quarti di Finale';
-    if (c === 8) return 'Ottavi di Finale';
-    return 'Fase Sconosciuta';
-  };
-
-  // 2) Alla pressione di "Salva e continua"...
-  const generaPartiteEliminazione = async () => {
     if (!torneoId) return;
 
-    // **Controllo se esiste già una fase di eliminazione**
-    const { data: fasi, error: errFasi } = await supabase
-      .from('fasi_torneo')
-      .select('id')
-      .eq('torneo_id', torneoId)
-      .eq('tipo_fase', 'eliminazione')
-      .limit(1);
-    if (!errFasi && fasi && fasi.length > 0) {
-      // Esiste già: salto generazione e vado a step6
-      navigate(`/tornei/nuovo/step6-eliminazione/${torneoId}`, {
-        state: { torneoId },
-      });
-      return;
-    }
+    const fetchFromState = async () => {
+      const ids = state!.squadreSelezionate;
+      const { data: sqs, error } = await supabase
+        .from('squadre')
+        .select('id,nome')
+        .in('id', ids);
+      if (error || !sqs) return;
+      const ordered = ids.map(id => sqs.find(s => s.id === id)).filter((s): s is Squadra => !!s);
+      setSquadre(ordered);
 
-    // **1. Upsert torneo_squadre** (no duplicati)
-    await supabase
-      .from('torneo_squadre')
-      .upsert(
-        state!.squadreSelezionate.map((id) => ({
-          torneo_id: torneoId,
-          squadra_id: id,
-        })),
-        { onConflict: ['torneo_id', 'squadra_id'] }
-      );
-
-    // **2. Creo fase eliminazione**
-    const { data: fase, error: errF } = await supabase
-      .from('fasi_torneo')
-      .insert({
-        torneo_id: torneoId,
-        tipo_fase: 'eliminazione',
-        fase_numerica: 1,
-        round: 1,
-      })
-      .select('id')
-      .single();
-    if (errF || !fase) {
-      console.error(errF);
-      return;
-    }
-    const faseId = fase.id;
-
-    // **3. Inserisco primo turno**
-    const { data: prime, error: errP } = await supabase
-      .from('partite_torneo')
-      .insert(
-        accoppiamenti.map((m, idx) => ({
-          squadra_casa_id: m.casa,
-          squadra_ospite_id: m.ospite,
-          data_ora: m.data || null,
-          torneo_id: torneoId,
-          fase: getPhaseName(accoppiamenti.length),
-          fase_id: faseId,
-          ordine_fase: idx,
-          next_match_id: null,
-        }))
-      )
-      .select('id');
-    if (errP || !prime) {
-      console.error(errP);
-      return;
-    }
-
-    // **4. Genero semifinali e finale**
-    let current = prime.map((r) => r.id);
-    while (current.length > 1) {
-      const phase = getPhaseName(current.length / 2);
-      const nextIds: string[] = [];
-      for (let i = 0; i < current.length; i += 2) {
-        const dVal =
-          phase === 'Semifinale'
-            ? semifinaliData[i / 2] || null
-            : finaleData || null;
-        const { data: nm, error: errN } = await supabase
-          .from('partite_torneo')
-          .insert({
-            squadra_casa_id: null,
-            squadra_ospite_id: null,
-            data_ora: dVal,
-            torneo_id: torneoId,
-            fase: phase,
-            fase_id: faseId,
-            ordine_fase: i / 2,
-            next_match_id: null,
-          })
-          .select('id')
-          .single();
-        if (errN || !nm) {
-          console.error(errN);
-          return;
-        }
-        nextIds.push(nm.id);
-        // link delle due partite precedenti
-        await supabase
-          .from('partite_torneo')
-          .update({ next_match_id: nm.id })
-          .in('id', [current[i], current[i + 1]]);
+      const iniziali: MatchInput[] = [];
+      for (let i = 0; i < ordered.length; i += 2) {
+        iniziali.push({ casa: ordered[i].id, ospite: ordered[i + 1].id, data: '' });
       }
-      current = nextIds;
-    }
+      setAccoppiamenti(iniziali);
 
-    // **5. Vai in Step6**
-    navigate(`/tornei/nuovo/step6-eliminazione/${torneoId}`, {
-      state: { torneoId },
-    });
+      const totTurni = getNumeroTurni(ordered.length);
+      const dt: DateTurniMap = {};
+      for (let r = 1; r < totTurni; r++) {
+        dt[r] = new Array(ordered.length / Math.pow(2, r + 1)).fill('');
+      }
+      setDateTurni(dt);
+    };
+
+    const fetchFromDB = async () => {
+      const { data: partite } = await supabase
+        .from('tornei_eliminazione')
+        .select('squadra_casa, squadra_ospite, data_match, round_number')
+        .eq('torneo_id', torneoId)
+        .order('round_number', { ascending: true })
+        .order('match_number', { ascending: true });
+
+      if (!partite) return;
+
+      const iniziali = partite.filter(p => p.round_number === 1);
+      const successive = partite.filter(p => p.round_number > 1);
+
+      const ids = Array.from(new Set([
+        ...iniziali.map(p => p.squadra_casa),
+        ...iniziali.map(p => p.squadra_ospite),
+      ])).filter((x): x is string => !!x);
+
+      const { data: sqs } = await supabase
+        .from('squadre')
+        .select('id,nome')
+        .in('id', ids);
+      if (!sqs) return;
+
+      setSquadre(sqs);
+
+      const acc: MatchInput[] = iniziali.map(p => ({
+        casa: p.squadra_casa,
+        ospite: p.squadra_ospite,
+        data: p.data_match || '',
+      }));
+      setAccoppiamenti(acc);
+
+      const dateMap: DateTurniMap = {};
+      successive.forEach(p => {
+        if (!dateMap[p.round_number]) dateMap[p.round_number] = [];
+        dateMap[p.round_number].push(p.data_match || '');
+      });
+      setDateTurni(dateMap);
+    };
+
+    if (state?.squadreSelezionate?.length) {
+      fetchFromState();
+    } else {
+      fetchFromDB();
+    }
+  }, [state, torneoId]);
+
+  const aggiornaData = (i: number, val: string) => {
+    setAccoppiamenti(prev =>
+      prev.map((m, idx) => (idx === i ? { ...m, data: val } : m))
+    );
   };
 
-  if (!state) {
-    return (
-      <p className="text-center text-red-500 mt-6">
-        Dati torneo mancanti — torna indietro.
-      </p>
+  const aggiornaDataTurno = (r: number, i: number, val: string) => {
+    setDateTurni(prev => ({
+      ...prev,
+      [r]: prev[r].map((d, idx) => (idx === i ? val : d)),
+    }));
+  };
+
+  const inverti = (i: number) => {
+    setAccoppiamenti(prev =>
+      prev.map((m, idx) =>
+        idx === i ? { casa: m.ospite, ospite: m.casa, data: m.data } : m
+      )
     );
+  };
+
+  const salvaEliminazione = async () => {
+    if (!torneoId || accoppiamenti.length === 0) return;
+
+    type Partita = {
+      id: string;
+      torneo_id: string;
+      round_number: number;
+      match_number: number;
+      fase_torneo: string;
+      squadra_casa: string | null;
+      squadra_ospite: string | null;
+      data_match: string | null;
+      lettera: string;
+      next_match_id: string | null;
+    };
+
+    const totTurni = getNumeroTurni(squadre.length);
+    const partite: Partita[] = [];
+    const idMap: { [key: string]: string } = {};
+
+    accoppiamenti.forEach((m, i) => {
+      const matchId = uuidv4();
+      idMap[`R0M${i}`] = matchId;
+      partite.push({
+        id: matchId,
+        torneo_id: torneoId as string,
+        round_number: 1,
+        match_number: i + 1,
+        fase_torneo: getEtichettaFase(0, totTurni),
+        squadra_casa: m.casa,
+        squadra_ospite: m.ospite,
+        data_match: m.data || null,
+        lettera: letters[i],
+        next_match_id: null,
+      });
+    });
+
+    let prevCount = accoppiamenti.length;
+    for (let r = 1; r < totTurni; r++) {
+      const count = prevCount / 2;
+      for (let i = 0; i < count; i++) {
+        const matchId = uuidv4();
+        const label = letters[accoppiamenti.length + (prevCount / 2 - count) + i];
+        const dataValue = dateTurni[r]?.[i] || null;
+        partite.push({
+          id: matchId,
+          torneo_id: torneoId as string,
+          round_number: r + 1,
+          match_number: i + 1,
+          fase_torneo: getEtichettaFase(r, totTurni),
+          squadra_casa: null,
+          squadra_ospite: null,
+          data_match: dataValue,
+          lettera: label,
+          next_match_id: null,
+        });
+        const p1 = idMap[`R${r - 1}M${2 * i}`];
+        const p2 = idMap[`R${r - 1}M${2 * i + 1}`];
+        idMap[`R${r}M${i}`] = matchId;
+
+        const idx1 = partite.findIndex(p => p.id === p1);
+        const idx2 = partite.findIndex(p => p.id === p2);
+        if (idx1 >= 0) partite[idx1].next_match_id = matchId;
+        if (idx2 >= 0) partite[idx2].next_match_id = matchId;
+      }
+      prevCount = count;
+    }
+
+    await supabase.from('tornei_eliminazione').delete().eq('torneo_id', torneoId);
+
+    const insertData = partite.map(({ next_match_id, ...rest }) => rest);
+    await supabase
+      .from('tornei_eliminazione')
+      .insert(insertData)
+      .select('id');
+
+    for (const match of partite) {
+      if (!match.next_match_id) continue;
+      await supabase
+        .from('tornei_eliminazione')
+        .update({ next_match_id: match.next_match_id })
+        .eq('id', match.id);
+    }
+
+    navigate(`/tornei/nuovo/step6-eliminazione/${torneoId}`);
+  };
+
+  if (!torneoId) {
+    return <p className="text-center mt-10 text-red-500">Errore: torneoId mancante.</p>;
   }
 
-  return (
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-      <button
-        onClick={() => navigate(-1)}
-        className="text-gray-600 hover:text-gray-800 font-medium"
-      >
-        ← Indietro
-      </button>
+  const totTurni = getNumeroTurni(squadre.length);
 
-      <h2 className="text-2xl font-bold text-center">
-        Imposta {getPhaseName(accoppiamenti.length)}
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+      <h2 className="text-2xl font-bold text-center border-b pb-2">
+        {getEtichettaFase(0, totTurni)}
       </h2>
 
-      {accoppiamenti.map((m, idx) => {
-        const casa = squadre.find((s) => s.id === m.casa)?.nome ?? '???';
-        const ospite = squadre.find((s) => s.id === m.ospite)?.nome ?? '???';
+      {accoppiamenti.map((m, i) => (
+        <div key={i} className="bg-white rounded-lg shadow p-4">
+          <div className="relative mb-3 h-6 text-sm font-medium text-gray-700">
+            <span className="absolute left-0">{squadre.find(s => s.id === m.casa)?.nome}</span>
+            <span className="absolute right-0">{squadre.find(s => s.id === m.ospite)?.nome}</span>
+            <button
+              onClick={() => inverti(i)}
+              className="absolute inset-y-0 left-1/2 transform -translate-x-1/2"
+            >
+              {letters[i]}
+            </button>
+          </div>
+          <input
+            type="datetime-local"
+            value={formatDateForInput(m.data)}
+            onChange={e => {
+              aggiornaData(i, e.target.value);
+              e.target.blur();
+            }}
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-400 outline-none transition"
+          />
+        </div>
+      ))}
+
+      {Object.entries(dateTurni).map(([roundStr, arr]) => {
+        const round = parseInt(roundStr, 10);
+        const startIdx = accoppiamenti.length + (accoppiamenti.length / 2) * (round - 1);
         return (
-          <div key={idx} className="bg-white rounded-lg shadow p-4">
-            <div className="flex justify-between items-center mb-2">
-              <span>{casa}</span>
-              <button
-                onClick={() => inverti(idx)}
-                title="Inverti casa/ospite"
-                className="text-blue-600 hover:text-blue-800"
-              >
-                ↔
-              </button>
-              <span>{ospite}</span>
-            </div>
-            <input
-              type="datetime-local"
-              value={m.data}
-              onChange={(e) =>
-                aggiornaData(idx, e.target.value, e.target)
-              }
-              className="w-full border rounded-lg px-3 py-2"
-            />
+          <div key={round}>
+            <h3 className="text-xl font-semibold text-center mt-6">
+              {getEtichettaFase(round, totTurni)}
+            </h3>
+            {arr.map((d, i) => {
+              const letter = letters[startIdx + i];
+              const prev1 = letters[startIdx - (accoppiamenti.length / Math.pow(2, round)) * 2 + 2 * i];
+              const prev2 = letters[startIdx - (accoppiamenti.length / Math.pow(2, round)) * 2 + 2 * i + 1];
+              return (
+                <div key={i} className="bg-white rounded-lg shadow p-4 mt-2">
+                  <div className="relative mb-3 h-6 text-sm font-medium text-gray-700">
+                    <span className="absolute left-0">Vincitrice {prev1}</span>
+                    <span className="absolute right-0">Vincitrice {prev2}</span>
+                    <div className="absolute inset-y-0 left-1/2 transform -translate-x-1/2">
+                      {letter}
+                    </div>
+                  </div>
+                  <input
+                    type="datetime-local"
+                    value={formatDateForInput(d)}
+                    onChange={e => {
+                      aggiornaDataTurno(round, i, e.target.value);
+                      e.target.blur();
+                    }}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-400 outline-none transition"
+                  />
+                </div>
+              );
+            })}
           </div>
         );
       })}
 
-      {accoppiamenti.length > 2 && (
-        <>
-          <h2 className="text-2xl font-bold text-center mt-8">
-            Imposta Semifinali
-          </h2>
-          {semifinaliData.map((d, i) => (
-            <div key={i} className="bg-white rounded-lg shadow p-4">
-              <input
-                type="datetime-local"
-                value={d}
-                onChange={(e) =>
-                  aggiornaDataSemi(i, e.target.value, e.target)
-                }
-                className="w-full border rounded-lg px-3 py-2"
-              />
-            </div>
-          ))}
-        </>
-      )}
-
-      <h2 className="text-2xl font-bold text-center mt-8">Imposta Finale</h2>
-      <div className="bg-white rounded-lg shadow p-4">
-        <input
-          type="datetime-local"
-          value={finaleData}
-          onChange={(e) => aggiornaDataFinale(e.target.value, e.target)}
-          className="w-full border rounded-lg px-3 py-2"
-        />
-      </div>
+      <button
+        onClick={salvaEliminazione}
+        className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-semibold shadow"
+      >
+        Continua
+      </button>
 
       <button
-        onClick={generaPartiteEliminazione}
-        className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700"
+        onClick={() => navigate(-1)}
+        className="w-full bg-gray-300 text-black py-2 rounded-lg hover:bg-gray-400 transition"
       >
-        Salva e continua
+        Indietro
       </button>
     </div>
   );

@@ -16,7 +16,7 @@ interface Utente {
 export default function AdminDashboard(): JSX.Element {
   const navigate = useNavigate();
   const [utenti, setUtenti] = useState<Utente[]>([]);
-  const [roles, setRoles] = useState<Record<string, string>>({});
+  const [roles, setRoles] = useState<Record<string, string>({});
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {

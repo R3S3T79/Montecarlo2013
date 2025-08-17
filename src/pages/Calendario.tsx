@@ -1,4 +1,6 @@
+// Data creazione chat: 2025-07-30
 // src/pages/Calendario.tsx
+// Basato sul file originale con aggiunta di campionato_torneo e modifica header cellule 
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
@@ -10,6 +12,7 @@ import { UserRole } from '../lib/roles';
 interface Partita {
   id: string;
   data_ora: string;
+  campionato_torneo: string;
   casa: { nome: string; logo_url: string | null };
   ospite: { nome: string; logo_url: string | null };
 }
@@ -30,14 +33,13 @@ export default function Calendario(): JSX.Element {
     async function fetchPartite() {
       const { data, error } = await supabase
         .from('partite')
-        .select(
-          `
+        .select(`
           id,
           data_ora,
+          campionato_torneo,
           casa:squadra_casa_id(nome, logo_url),
           ospite:squadra_ospite_id(nome, logo_url)
-        `
-        )
+        `)
         .eq('stato', 'DaGiocare')
         .order('data_ora', { ascending: true });
 
@@ -48,40 +50,23 @@ export default function Calendario(): JSX.Element {
     fetchPartite();
   }, []);
 
-  const handleClick = (id: string) => navigate(`/prepartita/${id}`);
+  const handleClick = (id: string) => navigate(`/pre-partita/${id}`);
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen">
         Caricamento…
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-montecarlo-light">
+    <div className="min-h-screen">
       <div className="container mx-auto px-4 py-6">
-        <div className="relative mt-4 mb-4">
-          <div className="bg-white rounded-xl shadow-montecarlo p-2">
-            <div className="flex items-center justify-center">
-              <h2 className="text-lg font-bold text-montecarlo-secondary">
-                Calendario Partite
-              </h2>
-            </div>
-            {canAdd && (
-              <button
-                onClick={() => navigate('/nuova-partita')}
-                className="absolute right-2 top-2 w-8 h-8 bg-gradient-montecarlo text-white rounded-full flex items-center justify-center hover:shadow-montecarlo-lg transition-all duration-300 transform hover:scale-105"
-                aria-label="Nuova Partita"
-              >
-                <Plus size={16} />
-              </button>
-            )}
-          </div>
-        </div>
 
+        {/* Contenuto Partite */}
         {loading ? (
-          <div className="bg-white rounded-lg shadow-montecarlo p-8 text-center">
+          <div className="min-h-screen">
             <div className="text-montecarlo-secondary">Caricamento...</div>
           </div>
         ) : partite.length === 0 ? (
@@ -98,8 +83,12 @@ export default function Calendario(): JSX.Element {
                 onClick={() => handleClick(partita.id)}
                 className="cursor-pointer transform transition-all duration-300 hover:scale-[1.02]"
               >
-                <div className="bg-gradient-montecarlo text-white px-4 py-2 rounded-t-lg">
-                  <div className="text-sm font-medium text-center">
+                {/* Header cella: tipo competizione a sinistra, data al centro */}
+                <div className="bg-gradient-montecarlo text-white px-4 py-2 rounded-t-lg flex items-center">
+                  <div className="text-xs font-medium">
+                    {partita.campionato_torneo}
+                  </div>
+                  <div className="flex-1 text-sm font-medium text-center">
                     {new Date(partita.data_ora).toLocaleString(undefined, {
                       day: '2-digit',
                       month: '2-digit',
@@ -110,6 +99,7 @@ export default function Calendario(): JSX.Element {
                   </div>
                 </div>
 
+                {/* Corpo cella con squadre */}
                 <div className="bg-white rounded-b-lg shadow-montecarlo hover:shadow-montecarlo-lg border-l-4 border-montecarlo-secondary p-4 space-y-2">
                   <div className="flex items-center justify-start space-x-3">
                     {partita.casa.logo_url ? (
@@ -127,7 +117,6 @@ export default function Calendario(): JSX.Element {
                       {partita.casa.nome}
                     </span>
                   </div>
-
                   <div className="flex items-center justify-end space-x-3">
                     <span className="font-semibold text-montecarlo-secondary">
                       {partita.ospite.nome}

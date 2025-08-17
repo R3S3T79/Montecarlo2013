@@ -1,9 +1,9 @@
 // src/pages/Risultati.tsx
+// Data creazione chat: 2025-08-01
 
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
-import { Plus } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import type { Partita } from "../types/database";
 
@@ -23,8 +23,8 @@ export default function Risultati() {
 
   const [partite, setPartite] = useState<PartitaWithTeams[]>([]);
   const [stagioni, setStagioni] = useState<Stagione[]>([]);
-  const [stagioneSelezionata, setStagioneSelezionata] = useState<string>("");
-  const [tipoCompetizione, setTipoCompetizione] = useState<string>("");
+  const [stagioneSelezionata, setStagioneSelezionata] = useState<string>(""); // 🔹 default vuoto
+  const [tipoCompetizione, setTipoCompetizione] = useState<string>(""); // 🔹 default vuoto = Tutti
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,15 +46,20 @@ export default function Risultati() {
           .from("stagioni")
           .select("*")
           .order("data_inizio", { ascending: false });
-        if (stagErr) setError(stagErr.message);
-        else setStagioni(stagData || []);
-        await fetchPartite();
+        if (stagErr) {
+          setError(stagErr.message);
+        } else {
+          setStagioni(stagData || []);
+          // 🔹 rimosso auto-set della stagione più recente
+        }
       })();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loading]);
 
   useEffect(() => {
     if (user) fetchPartite();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stagioneSelezionata, tipoCompetizione]);
 
   const fetchPartite = async () => {
@@ -72,14 +77,20 @@ export default function Risultati() {
         .eq("stato", "Giocata")
         .order("data_ora", { ascending: false });
 
-      if (stagioneSelezionata) q = q.eq("stagione_id", stagioneSelezionata);
-      if (tipoCompetizione) q = q.eq("campionato_torneo", tipoCompetizione);
+      if (stagioneSelezionata) {
+        q = q.eq("stagione_id", stagioneSelezionata);
+      }
+      if (tipoCompetizione) {
+        q = q.eq("campionato_torneo", tipoCompetizione);
+      }
 
       const { data, error } = await q;
       if (error) throw error;
       setPartite(data || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Errore caricamento partite");
+      setError(
+        err instanceof Error ? err.message : "Errore caricamento partite"
+      );
     } finally {
       setLoadingData(false);
     }
@@ -87,51 +98,43 @@ export default function Risultati() {
 
   const formatData = (d: string) =>
     new Date(d).toLocaleDateString("it-IT", {
-      weekday: "short",
+      weekday: "long",
       day: "2-digit",
       month: "2-digit",
+      year: "2-digit"
     });
 
   const filteredPartite = partite.filter(({ casa, ospite }) => {
     const s = searchTerm.toLowerCase();
-    return casa.nome.toLowerCase().includes(s) || ospite.nome.toLowerCase().includes(s);
+    return (
+      casa.nome.toLowerCase().includes(s) ||
+      ospite.nome.toLowerCase().includes(s)
+    );
   });
 
   if (loading || loadingData) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <span>Caricamento...</span>
+      <div className="min-h-screen">
+        <span>Caricamento…</span>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-montecarlo-light">
-      <div className="container mx-auto px-4 py-6">
-        {/* Header + filtri spostato maggiormente verso il basso */}
-        <div className="relative mt-6 mb-4">
+    <div className="min-h-screen">
+      <div className="container mx-auto px-4">
+        <div className="relative mb-4">
           <div className="bg-white rounded-xl shadow-montecarlo p-2 space-y-2">
-            <div className="flex items-center justify-center">
-              <h2 className="text-lg font-bold text-montecarlo-secondary">
-                Risultati
-              </h2>
-            </div>
-            {canAddPartita && (
-              <button
-                onClick={() => navigate("/nuova-partita")}
-                className="absolute right-2 top-2 w-8 h-8 bg-gradient-montecarlo text-white rounded-full flex items-center justify-center hover:shadow-montecarlo-lg transition-all duration-300 transform hover:scale-105"
-                title="Aggiungi Partita"
-              >
-                <Plus size={16} />
-              </button>
-            )}
+            {/* Input di ricerca */}
             <input
               type="text"
-              placeholder="Cerca squadra…"
+              placeholder="Cerca Nome Squadra"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full border-2 border-montecarlo-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
             />
+
+            {/* Dropdown Stagione e Competizioni */}
             <div className="flex gap-2">
               <select
                 value={stagioneSelezionata}
@@ -145,15 +148,16 @@ export default function Risultati() {
                   </option>
                 ))}
               </select>
+
               <select
                 value={tipoCompetizione}
                 onChange={(e) => setTipoCompetizione(e.target.value)}
                 className="flex-1 border-2 border-montecarlo-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
               >
-                <option value="">Competizioni</option>
-                <option value="campionato">Campionato</option>
-                <option value="torneo">Torneo</option>
-                <option value="amichevole">Amichevole</option>
+                <option value="">Tutti</option>
+                <option value="Campionato">Campionato</option>
+                <option value="Torneo">Torneo</option>
+                <option value="Amichevole">Amichevole</option>
               </select>
             </div>
           </div>
@@ -164,11 +168,13 @@ export default function Risultati() {
             {error}
           </div>
         )}
+
         {!error && filteredPartite.length === 0 && (
           <div className="bg-white rounded-lg shadow-montecarlo p-8 text-center">
             {searchTerm ? "Nessuna partita trovata" : "Nessuna partita giocata"}
           </div>
         )}
+
         {!error && filteredPartite.length > 0 && (
           <div className="space-y-3">
             {filteredPartite.map((p) => (
