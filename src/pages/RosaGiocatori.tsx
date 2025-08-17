@@ -1,22 +1,31 @@
 // src/pages/RosaGiocatori.tsx
+// Data creazione chat: 2025-08-14
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import { Plus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../lib/roles';
 
 interface Giocatore {
-  id: string;
-  nome: string;
-  cognome: string;
+  giocatore_uid: string;
+  nome: string | null;
+  cognome: string | null;
   ruolo: string | null;
   foto_url: string | null;
 }
 
+interface Stagione {
+  id: string;
+  nome: string;
+  data_inizio: string;
+  data_fine: string;
+}
+
 export default function RosaGiocatori(): JSX.Element {
   const [giocatori, setGiocatori] = useState<Giocatore[]>([]);
+  const [stagioni, setStagioni] = useState<Stagione[]>([]);
+  const [stagioneSelezionata, setStagioneSelezionata] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -27,91 +36,112 @@ export default function RosaGiocatori(): JSX.Element {
     user?.user_metadata?.role === UserRole.Admin ||
     user?.user_metadata?.role === UserRole.Creator;
 
+  // Carica stagioni e imposta quella corrente di default
   useEffect(() => {
-    const fetchGiocatori = async () => {
+    async function fetchStagioni() {
       const { data, error } = await supabase
-        .from<Giocatore>('giocatori')
-        .select('*')
-        .order('cognome', { ascending: true });
-      if (error) {
-        console.error('Errore fetch giocatori:', error);
-      } else if (data) {
-        setGiocatori(data);
+        .from('stagioni')
+        .select('id, nome, data_inizio, data_fine')
+        .order('data_inizio', { ascending: false });
+
+      if (!error && data) {
+        setStagioni(data);
+
+        const oggi = new Date().toISOString().split('T')[0];
+        const stagioneCorrente = data.find(
+          s => s.data_inizio <= oggi && s.data_fine >= oggi
+        );
+        setStagioneSelezionata(stagioneCorrente?.id || data[0]?.id || null);
       }
-      setLoading(false);
-    };
-    fetchGiocatori();
+    }
+    fetchStagioni();
   }, []);
 
+  // Carica giocatori della stagione selezionata dalla nuova view
+  useEffect(() => {
+    async function fetchGiocatori() {
+      if (!stagioneSelezionata) return;
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('giocatori_stagioni_view')
+          .select('giocatore_uid, nome, cognome, ruolo, foto_url')
+          .eq('stagione_id', stagioneSelezionata)
+          .order('cognome', { ascending: true });
+
+        if (!error && data) {
+          setGiocatori(data as Giocatore[]);
+        } else {
+          setGiocatori([]);
+        }
+      } catch {
+        setGiocatori([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchGiocatori();
+  }, [stagioneSelezionata]);
+
+  const getInitial = (g: Giocatore): string => {
+    const testo = g.cognome?.trim() || g.nome?.trim() || '';
+    return testo.charAt(0).toUpperCase() || '?';
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-montecarlo-light">
+    <div className="min-h-screen">
       <div className="container mx-auto px-4 py-6">
-        {/* Header ridotto */}
-        <div className="relative mt-4 mb-4">
-          <div className="bg-white rounded-xl shadow-montecarlo p-2">
-            <div className="flex items-center justify-center">
-              <h2 className="text-lg font-bold text-montecarlo-secondary">
-                Rosa Giocatori
-              </h2>
-            </div>
-            {canEdit && (
-              <button
-                onClick={() => navigate('/aggiungi-giocatore')}
-                className="absolute right-2 top-2 w-8 h-8 bg-gradient-montecarlo text-white rounded-full flex items-center justify-center hover:shadow-montecarlo-lg transition-all duration-300 transform hover:scale-105"
-                aria-label="Aggiungi Giocatore"
-              >
-                <Plus size={16} />
-              </button>
-            )}
-          </div>
+        {/* Selettore stagione */}
+        <div className="mb-4">
+          <select
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
+            value={stagioneSelezionata || ''}
+            onChange={(e) => setStagioneSelezionata(e.target.value)}
+          >
+            {stagioni.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.nome}
+              </option>
+            ))}
+          </select>
         </div>
 
         {loading ? (
-          <div className="bg-white rounded-lg shadow-montecarlo p-8 text-center">
-            <div className="text-montecarlo-secondary">Caricamento...</div>
-          </div>
+          <div className="text-center text-montecarlo-secondary">Caricamento...</div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
             {giocatori.map((g) => (
               <div
-                key={g.id}
-                onClick={() => navigate(`/giocatore/${g.id}`)}
-                className="bg-white rounded-lg shadow-montecarlo hover:shadow-montecarlo-lg border-l-4 border-montecarlo-secondary cursor-pointer transition-all duration-300 transform hover:scale-[1.02] p-2"
+                key={g.giocatore_uid}
+                onClick={() => navigate(`/giocatore/${g.giocatore_uid}`)}
+                className="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-lg transition"
               >
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border-2 border-montecarlo-accent">
+                  <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-montecarlo-accent">
                     {g.foto_url ? (
                       <img
                         src={g.foto_url}
-                        alt={`${g.cognome} ${g.nome}`}
+                        alt={`${g.cognome || ''} ${g.nome || ''}`}
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full bg-montecarlo-secondary flex items-center justify-center text-white text-base font-bold">
-                        {g.cognome.charAt(0)}
+                      <div className="w-full h-full bg-montecarlo-secondary flex items-center justify-center text-white font-bold">
+                        {getInitial(g)}
                       </div>
                     )}
                   </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-montecarlo-secondary text-base">
-                      {g.cognome} {g.nome}
+                  <div>
+                    <h3 className="text-base font-semibold text-montecarlo-secondary">
+                      {g.cognome || ''} {g.nome || ''}
                     </h3>
                     {g.ruolo && (
-                      <p className="text-montecarlo-neutral text-sm font-medium">
-                        {g.ruolo}
-                      </p>
+                      <p className="text-sm text-gray-800">{g.ruolo}</p>
+
                     )}
                   </div>
                 </div>
               </div>
             ))}
-            {giocatori.length === 0 && (
-              <div className="bg-white rounded-lg shadow-montecarlo p-8 text-center">
-                <div className="text-montecarlo-neutral">
-                  Nessun giocatore trovato.
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>

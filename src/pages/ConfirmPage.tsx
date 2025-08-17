@@ -86,7 +86,7 @@ export default function ConfirmPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
+    <div className="min-h-screen">
       <div className="max-w-md w-full">
         <div className={`bg-white rounded-lg shadow-lg p-8 border-2 ${getBgColor()}`}>
           <div className="text-center">

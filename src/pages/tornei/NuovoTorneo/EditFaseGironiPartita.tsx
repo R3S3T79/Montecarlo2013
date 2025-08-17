@@ -1,9 +1,9 @@
 // src/pages/tornei/NuovoTorneo/EditFaseGironiPartita.tsx
+// Data creazione chat: 29/07/2025
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../../lib/supabaseClient';
-import { ArrowLeft } from 'lucide-react';
 
 interface Squadra {
   id: string;
@@ -13,10 +13,10 @@ interface Squadra {
 
 interface Partita {
   id: string;
-  goal_casa: number;
-  goal_ospite: number;
+  gol_casa: number | null;
+  gol_ospite: number | null;
   rigori_vincitore: string | null;
-  data_ora: string | null;
+  data_match: string | null;
   squadra_casa: Squadra;
   squadra_ospite: Squadra;
 }
@@ -26,185 +26,201 @@ export default function EditFaseGironiPartita() {
   const navigate = useNavigate();
 
   const [partita, setPartita] = useState<Partita | null>(null);
-  const [casaGol, setCasaGol] = useState(0);
-  const [ospiteGol, setOspiteGol] = useState(0);
-  const [rigoriWinner, setRigoriWinner] = useState<string | null>(null);
+  const [scoreCasa, setScoreCasa] = useState(0);
+  const [scoreOspite, setScoreOspite] = useState(0);
+  const [rigoriVincitore, setRigoriVincitore] = useState<string | null>(null);
   const [dataOra, setDataOra] = useState('');
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (!matchId) return;
     (async () => {
-      if (!matchId) return;
       setLoading(true);
-
       const { data, error } = await supabase
-        .from<Partita>('partite_torneo')
+        .from('tornei_fasegironi')
         .select(`
           id,
-          goal_casa,
-          goal_ospite,
+          gol_casa,
+          gol_ospite,
           rigori_vincitore,
-          data_ora,
-          squadra_casa: squadra_casa_id(id,nome,logo_url),
-          squadra_ospite: squadra_ospite_id(id,nome,logo_url)
+          data_match,
+          squadra_casa:squadra_casa(id,nome,logo_url),
+          squadra_ospite:squadra_ospite(id,nome,logo_url)
         `)
         .eq('id', matchId)
         .single();
-
       if (error || !data) {
         console.error('Errore fetch partita:', error);
         setLoading(false);
         return;
       }
       setPartita(data);
-      setCasaGol(data.goal_casa);
-      setOspiteGol(data.goal_ospite);
-      setRigoriWinner(data.rigori_vincitore);
-      setDataOra(data.data_ora ? data.data_ora.slice(0, 16) : '');
+      setScoreCasa(data.gol_casa ?? 0);
+      setScoreOspite(data.gol_ospite ?? 0);
+      setRigoriVincitore(data.rigori_vincitore);
+      setDataOra(data.data_match ? data.data_match.slice(0, 16) : '');
       setLoading(false);
     })();
   }, [matchId]);
 
-  const handleSave = async () => {
+  const isDraw = scoreCasa === scoreOspite;
+
+  const handleSaveAll = async () => {
     if (!partita || !matchId) return;
-    setLoading(true);
-
-    const isDraw = casaGol === ospiteGol;
-    const rigori = isDraw ? rigoriWinner : null;
-
-    const updates: Partial<Partita> = {
-      goal_casa: casaGol,
-      goal_ospite: ospiteGol,
-      rigori_vincitore: rigori,
-      data_ora: dataOra ? new Date(dataOra).toISOString() : null,
-      stato: 'Giocata',
+    setSaving(true);
+    const updates = {
+      gol_casa: scoreCasa,
+      gol_ospite: scoreOspite,
+      rigori_vincitore: isDraw ? rigoriVincitore : null,
+      data_match: dataOra ? new Date(dataOra).toISOString() : null,
+      giocata: true,              // ← sempre true
+      updated_at: new Date().toISOString(),
     };
-
     const { error } = await supabase
-      .from('partite_torneo')
+      .from('tornei_fasegironi')
       .update(updates)
       .eq('id', matchId);
-
-    setLoading(false);
-    if (error) {
-      alert('Errore durante il salvataggio: ' + error.message);
-    } else {
-      navigate(-1);
-    }
+    setSaving(false);
+    if (error) alert('Errore salvataggio: ' + error.message);
+    else navigate(-1);
   };
 
-  if (loading || !partita) {
-    return <p className="text-center py-6">Caricamento…</p>;
+  const handleSaveDateOnly = async () => {
+    if (!partita || !matchId) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from('tornei_fasegironi')
+      .update({
+        data_match: dataOra ? new Date(dataOra).toISOString() : null,
+        giocata: true,            // ← sempre true
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', matchId);
+    setSaving(false);
+    if (error) alert('Errore salvataggio data: ' + error.message);
+    else navigate(-1);
+  };
+
+  if (loading) return <p className="text-center py-6">Caricamento…</p>;
+  if (!partita) {
+    return (
+      <div className="max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow">
+        <p className="text-center">Partita non trovata.</p>
+      </div>
+    );
   }
 
-  const isDraw = casaGol === ospiteGol;
+  const casa = partita.squadra_casa;
+  const ospite = partita.squadra_ospite;
 
   return (
-    <div className="max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow">
-      <button
-        onClick={() => navigate(-1)}
-        className="flex items-center text-blue-600 hover:underline mb-4"
-      >
-        <ArrowLeft size={20} /><span className="ml-1">Torna indietro</span>
-      </button>
-
-      <h2 className="text-xl font-semibold text-center mb-6">
+    <div className="max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow space-y-6">
+      <h2 className="text-xl font-semibold text-center border-b pb-2 mb-4">
         Modifica Risultato
       </h2>
 
-      {/* Casa */}
-      <div className="flex items-center justify-between mb-4">
+      {/* CASA */}
+      <div className="text-xs text-gray-500 uppercase mb-1">Casa</div>
+      <div className="flex items-center justify-between p-3 bg-gray-50 rounded border">
         <div className="flex items-center space-x-2">
-          {partita.squadra_casa.logo_url && (
+          {casa.logo_url && (
             <img
-              src={partita.squadra_casa.logo_url}
-              alt={partita.squadra_casa.nome}
+              src={casa.logo_url}
+              alt={casa.nome}
               className="w-8 h-8 rounded-full"
             />
           )}
-          <span className="font-medium">{partita.squadra_casa.nome}</span>
+          <span className="font-medium">{casa.nome}</span>
         </div>
         <input
           type="number"
           min={0}
-          value={casaGol}
-          onChange={e => setCasaGol(+e.target.value)}
-          onFocus={e => e.currentTarget.select()}
-          className="w-16 text-center border rounded"
+          value={scoreCasa}
+          onChange={(e) => setScoreCasa(+e.currentTarget.value)}
+          onFocus={(e) => e.currentTarget.select()}
+          className="w-16 text-center border rounded text-xl font-bold hover:ring-2 hover:ring-blue-300"
         />
       </div>
 
-      {/* Ospite */}
-      <div className="flex items-center justify-between mb-6">
+      {/* OSPITE */}
+      <div className="text-xs text-gray-500 uppercase mb-1">Ospite</div>
+      <div className="flex items-center justify-between p-3 bg-gray-50 rounded border">
         <div className="flex items-center space-x-2">
-          {partita.squadra_ospite.logo_url && (
+          {ospite.logo_url && (
             <img
-              src={partita.squadra_ospite.logo_url}
-              alt={partita.squadra_ospite.nome}
+              src={ospite.logo_url}
+              alt={ospite.nome}
               className="w-8 h-8 rounded-full"
             />
           )}
-          <span className="font-medium">{partita.squadra_ospite.nome}</span>
+          <span className="font-medium">{ospite.nome}</span>
         </div>
         <input
           type="number"
           min={0}
-          value={ospiteGol}
-          onChange={e => setOspiteGol(+e.target.value)}
-          onFocus={e => e.currentTarget.select()}
-          className="w-16 text-center border rounded"
+          value={scoreOspite}
+          onChange={(e) => setScoreOspite(+e.currentTarget.value)}
+          onFocus={(e) => e.currentTarget.select()}
+          className="w-16 text-center border rounded text-xl font-bold hover:ring-2 hover:ring-blue-300"
         />
       </div>
 
-      {/* Rigori */}
+      {/* RIGORI (solo se pareggio) */}
       {isDraw && (
-        <div className="mb-6">
-          <p className="mb-2 font-medium text-center">Vincitore ai rigori:</p>
-          <div className="flex justify-center space-x-4">
-            <label className="flex items-center space-x-1">
-              <input
-                type="radio"
-                name="rigori"
-                checked={rigoriWinner === partita.squadra_casa.id}
-                onChange={() => setRigoriWinner(partita.squadra_casa.id)}
-              />
-              <span>{partita.squadra_casa.nome}</span>
-            </label>
-            <label className="flex items-center space-x-1">
-              <input
-                type="radio"
-                name="rigori"
-                checked={rigoriWinner === partita.squadra_ospite.id}
-                onChange={() => setRigoriWinner(partita.squadra_ospite.id)}
-              />
-              <span>{partita.squadra_ospite.nome}</span>
-            </label>
+        <div className="space-y-2">
+          <div className="text-sm font-semibold text-gray-700">
+            Vincitore ai rigori
           </div>
+          <label className="flex items-center space-x-2">
+            <input
+              type="radio"
+              checked={rigoriVincitore === casa.id}
+              onChange={() => setRigoriVincitore(casa.id)}
+            />
+            <span>{casa.nome}</span>
+          </label>
+          <label className="flex items-center space-x-2">
+            <input
+              type="radio"
+              checked={rigoriVincitore === ospite.id}
+              onChange={() => setRigoriVincitore(ospite.id)}
+            />
+            <span>{ospite.nome}</span>
+          </label>
         </div>
       )}
 
-      {/* Data & Ora */}
-      <div className="mb-6">
-        <label className="block mb-1 font-medium">Data &amp; Ora Incontro</label>
+      {/* DATA & ORA */}
+      <div>
+        <label className="block mb-1 font-medium">
+          Data &amp; Ora Incontro
+        </label>
         <input
           type="datetime-local"
           value={dataOra}
-          onChange={e => {
-            setDataOra(e.target.value);
-            e.currentTarget.blur();      // ← chiude il calendario subito
-          }}
+          onChange={(e) => setDataOra(e.currentTarget.value)}
           className="w-full border rounded px-3 py-2"
         />
       </div>
 
-      {/* Salva */}
-      <button
-        onClick={handleSave}
-        disabled={loading || (isDraw && !rigoriWinner)}
-        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-      >
-        Salva risultato
-      </button>
+      {/* PULSANTI */}
+      <div className="space-y-3">
+        <button
+          onClick={handleSaveAll}
+          disabled={saving}
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+        >
+          {saving ? "Salvataggio…" : "Salva Risultato e Data"}
+        </button>
+        <button
+          onClick={handleSaveDateOnly}
+          disabled={saving}
+          className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 disabled:opacity-50"
+        >
+          {saving ? "Salvataggio…" : "Salva Solo Data"}
+        </button>
+      </div>
     </div>
   );
 }

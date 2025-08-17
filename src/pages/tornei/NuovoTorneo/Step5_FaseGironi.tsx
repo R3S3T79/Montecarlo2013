@@ -1,8 +1,9 @@
 // src/pages/tornei/NuovoTorneo/Step5_FaseGironi.tsx
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface StateType {
+  torneoId: string;
   torneoNome: string;
   torneoLuogo: string;
   stagioneSelezionata: string;
@@ -16,21 +17,26 @@ export default function Step5_FaseGironi() {
   const location = useLocation();
   const state = location.state as StateType | null;
 
+  // 🔍 Debug in console
+  useEffect(() => {
+    console.log('🛡️ Sono in Step5_FaseGironi, path:', location.pathname, 'state:', state);
+  }, [location, state]);
+
   if (!state) {
     return (
       <p className="text-center mt-10 text-red-500">
-        Dati torneo mancanti.
+        Dati torneo mancanti — torna indietro.
       </p>
     );
   }
 
-  const { numSquadre } = state;
+  const { numSquadre, torneoId, squadreSelezionate } = state;
 
-  // tutti i divisori di numSquadre che danno più di 1 squadra per girone
+  // Calcola i divisori validi di numSquadre (>=2 gironi, almeno 2 squadre per girone)
   const possibiliDivisioni = useMemo(() => {
     const divs: number[] = [];
-    for (let i = 2; i <= numSquadre; i++) {
-      if (numSquadre % i === 0 && numSquadre / i > 1) {
+    for (let i = 2; i <= numSquadre / 2; i++) {
+      if (numSquadre % i === 0) {
         divs.push(i);
       }
     }
@@ -48,26 +54,28 @@ export default function Step5_FaseGironi() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+  
+
       <h2 className="text-2xl font-bold text-center">
-        Dividi le {numSquadre} squadre in gironi
+        Dividi le <strong>{numSquadre}</strong> squadre in gironi
       </h2>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {possibiliDivisioni.map((n) => (
           <button
             key={n}
             onClick={() => handleSelectDivision(n)}
-            className="py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+            className="py-3 px-4 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
           >
-            {n} Gironi da {numSquadre / n} Squadre
+            {n} gironi da {numSquadre / n} squadre
           </button>
         ))}
       </div>
 
-      <div className="flex justify-center pt-4">
+      <div className="flex justify-center pt-6">
         <button
           onClick={() => navigate(-1)}
-          className="bg-gray-300 text-black px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors"
+          className="bg-gray-300 text-black px-6 py-2 rounded-lg hover:bg-gray-400 transition-colors"
         >
           Indietro
         </button>

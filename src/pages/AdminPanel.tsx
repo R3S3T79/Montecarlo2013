@@ -1,4 +1,6 @@
 // src/pages/AdminPanel.tsx
+// Data creazione chat: 2025-08-02 (rev: aggiunto pulsante Gestione Notizie)
+
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { UserRole } from "@/lib/roles";
@@ -9,7 +11,9 @@ import {
   User,
   Crown,
   Mail,
+  Newspaper, // icona per il pulsante
 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 interface PendingUser {
   id: string;
@@ -50,7 +54,7 @@ export default function AdminPanel() {
   // Reinvia link di conferma
   const resendEmail = async (email: string) => {
     if (processing.has(email)) return;
-    setProcessing((s) => new Set(s).add(email));
+    setProcessing((prev) => new Set(prev).add(email));
     try {
       const res = await fetch("/api/resend-confirm", {
         method: "POST",
@@ -68,8 +72,10 @@ export default function AdminPanel() {
       console.error(err);
       alert("Errore di connessione: " + err.message);
     } finally {
-      setProcessing((s) => {
-        const n = new Set(s); n.delete(email); return n;
+      setProcessing((prev) => {
+        const next = new Set(prev);
+        next.delete(email);
+        return next;
       });
     }
   };
@@ -77,7 +83,7 @@ export default function AdminPanel() {
   // Imposta ruolo via set-role
   const setRole = async (email: string, role: UserRole) => {
     if (processing.has(email)) return;
-    setProcessing((s) => new Set(s).add(email));
+    setProcessing((prev) => new Set(prev).add(email));
     try {
       const {
         data: { session },
@@ -106,8 +112,10 @@ export default function AdminPanel() {
       console.error(err);
       alert("Errore di connessione: " + err.message);
     } finally {
-      setProcessing((s) => {
-        const n = new Set(s); n.delete(email); return n;
+      setProcessing((prev) => {
+        const next = new Set(prev);
+        next.delete(email);
+        return next;
       });
     }
   };
@@ -117,8 +125,21 @@ export default function AdminPanel() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h2 className="text-2xl font-bold mb-4">Utenti in Attesa</h2>
+    <div className="pt-20 px-6 max-w-4xl mx-auto">
+      <h2 className="text-2xl font-bold mb-4">Pannello Amministratore</h2>
+
+      {/* Pulsante gestione notizie */}
+      <div className="mb-6">
+        <Link
+          to="/admin-notizie"
+          className="px-4 py-2 bg-blue-600 text-white rounded inline-flex items-center hover:bg-blue-700"
+        >
+          <Newspaper className="mr-2" size={18} />
+          Gestione Notizie
+        </Link>
+      </div>
+
+      <h3 className="text-xl font-semibold mb-2">Utenti in Attesa</h3>
       <table className="w-full border">
         <thead>
           <tr className="bg-gray-100">
@@ -131,7 +152,6 @@ export default function AdminPanel() {
         <tbody>
           {pendingUsers.map((u) => {
             const roles: UserRole[] = ["user", "creator", "admin"];
-            // Rimuovi il ruolo già assegnato
             const toShow = u.confirmed
               ? roles.filter((r) => r !== u.role)
               : [];
@@ -157,30 +177,35 @@ export default function AdminPanel() {
                   {formatDate(u.created_at)}
                 </td>
                 <td className="p-2 flex space-x-2">
-                  {u.confirmed
-                    ? toShow.map((r) => {
-                        const Icon = r === "user" ? User : r === "creator" ? Shield : Crown;
-                        return (
-                          <button
-                            key={r}
-                            onClick={() => setRole(u.email, r)}
-                            disabled={processing.has(u.email)}
-                            className="px-3 py-1 border rounded inline-flex items-center text-sm"
-                          >
-                            <Icon className="mr-1" size={14} />
-                            {r.charAt(0).toUpperCase() + r.slice(1)}
-                          </button>
-                        );
-                      })
-                    : (
-                      <button
-                        onClick={() => resendEmail(u.email)}
-                        disabled={processing.has(u.email)}
-                        className="px-3 py-1 border rounded inline-flex items-center text-sm"
-                      >
-                        <Mail className="mr-1" size={14} /> Reinvia Link
-                      </button>
-                    )}
+                  {u.confirmed ? (
+                    toShow.map((r) => {
+                      const Icon =
+                        r === "user"
+                          ? User
+                          : r === "creator"
+                          ? Shield
+                          : Crown;
+                      return (
+                        <button
+                          key={r}
+                          onClick={() => setRole(u.email, r)}
+                          disabled={processing.has(u.email)}
+                          className="px-3 py-1 border rounded inline-flex items-center text-sm"
+                        >
+                          <Icon className="mr-1" size={14} />
+                          {r.charAt(0).toUpperCase() + r.slice(1)}
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <button
+                      onClick={() => resendEmail(u.email)}
+                      disabled={processing.has(u.email)}
+                      className="px-3 py-1 border rounded inline-flex items-center text-sm"
+                    >
+                      <Mail className="mr-1" size={14} /> Reinvia Link
+                    </button>
+                  )}
                   {u.confirmed && (
                     <button
                       onClick={() => resendEmail(u.email)}

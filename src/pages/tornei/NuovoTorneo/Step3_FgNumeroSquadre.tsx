@@ -1,3 +1,4 @@
+// src/pages/tornei/NuovoTorneo/Step3_FgNumeroSquadre.tsx
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -6,6 +7,7 @@ export default function Step3_FgNumeroSquadre() {
   const location = useLocation();
 
   const state = location.state as {
+    torneoId: string;
     torneoNome: string;
     torneoLuogo: string;
     stagioneSelezionata: string;
@@ -18,7 +20,7 @@ export default function Step3_FgNumeroSquadre() {
   }
 
   const handleClick = (num: number) => {
-    navigate('/tornei/nuovo/step4-fasegironi', {
+    navigate(`/tornei/nuovo/step4-fasegironi/${state.torneoId}`, {
       state: {
         ...state,
         numSquadre: num,
@@ -29,7 +31,6 @@ export default function Step3_FgNumeroSquadre() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-6 space-y-6">
-      <h2 className="text-2xl font-bold text-center">Quante squadre partecipano?</h2>
 
       <div className="grid grid-cols-2 gap-4">
         {[4, 6, 8, 10, 12, 14, 16].map((n) => (
@@ -44,7 +45,7 @@ export default function Step3_FgNumeroSquadre() {
       </div>
 
       <button
-         onClick={() => navigate(-1)}
+        onClick={() => navigate(-1)}
         className="w-full bg-gray-300 text-black py-2 rounded-lg hover:bg-gray-400 transition-colors"
       >
         Indietro

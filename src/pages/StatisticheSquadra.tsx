@@ -1,4 +1,5 @@
 // src/pages/StatisticheSquadra.tsx
+// Data creazione chat: 2025-08-10
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
@@ -45,8 +46,6 @@ interface StatistichePartite {
   };
 }
 
-const MONTECARLO_ID = '5bca3e07-974a-4d12-9208-d85975906fe4';
-
 export default function StatisticheSquadra() {
   const [stagioni, setStagioni] = useState<Stagione[]>([]);
   const [stagioneSelezionata, setStagioneSelezionata] = useState<string>('');
@@ -56,19 +55,37 @@ export default function StatisticheSquadra() {
   const [matchMaxDifferenza, setMatchMaxDifferenza] = useState<PartitaEstesa | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [montecarloId, setMontecarloId] = useState<string>('');
+
   useEffect(() => {
-    const fetchStagioni = async () => {
-      const { data } = await supabase
+    async function fetchInitialData() {
+      const { data: stagioniData } = await supabase
         .from('stagioni')
         .select('id, nome')
         .order('data_inizio', { ascending: false });
-      if (data) setStagioni(data);
-    };
-    fetchStagioni();
+
+      if (stagioniData && stagioniData.length > 0) {
+        setStagioni(stagioniData);
+        setStagioneSelezionata(stagioniData[0].id);
+      }
+
+      const { data: squadra } = await supabase
+        .from('squadre')
+        .select('id')
+        .eq('nome', 'Montecarlo')
+        .single();
+
+      if (squadra) {
+        setMontecarloId(squadra.id);
+      }
+    }
+    fetchInitialData();
   }, []);
 
   useEffect(() => {
-    const fetchStatistiche = async () => {
+    async function fetchStatistiche() {
+      if (!stagioneSelezionata || !montecarloId) return;
+
       setLoading(true);
       try {
         let query = supabase
@@ -82,151 +99,183 @@ export default function StatisticheSquadra() {
             casa:squadra_casa_id(nome),
             ospite:squadra_ospite_id(nome)
           `)
-          .eq('stato', 'Giocata');
-
-        if (stagioneSelezionata) {
-          query = query.eq('stagione_id', stagioneSelezionata);
-        }
+          .eq('stato', 'Giocata')
+          .eq('stagione_id', stagioneSelezionata);
 
         const { data: partite, error } = await query;
-        if (error || !partite) {
+
+        if (!partite || error) {
           setStatistiche(null);
           setMatchMaxFatti(null);
           setMatchMaxSubiti(null);
           setMatchMaxDifferenza(null);
-          setLoading(false);
           return;
         }
 
-        const stats: StatistichePartite = {
-          totali: { giocate: 0, vittorie: 0, pareggi: 0, sconfitte: 0, gol_fatti: 0, gol_subiti: 0 },
-          casa: { giocate: 0, vittorie: 0, pareggi: 0, sconfitte: 0, gol_fatti: 0, gol_subiti: 0 },
-          trasferta: { giocate: 0, vittorie: 0, pareggi: 0, sconfitte: 0, gol_fatti: 0, gol_subiti: 0 }
-        };
+        const tot = { giocate: 0, vittorie: 0, pareggi: 0, sconfitte: 0, gol_fatti: 0, gol_subiti: 0 };
+        const casa = { ...tot };
+        const trasf = { ...tot };
 
-        let maxFatti = -1, maxSubiti = -1, maxDiff = -1;
-        let partitaMaxFatti = null, partitaMaxSubiti = null, partitaMaxDiff = null;
+        let maxF: PartitaEstesa | null = null;
+        let maxS: PartitaEstesa | null = null;
+        let maxD: PartitaEstesa | null = null;
 
-        partite.forEach((p: PartitaEstesa) => {
-          const isCasa = p.squadra_casa_id === MONTECARLO_ID;
-          const isTrasferta = p.squadra_ospite_id === MONTECARLO_ID;
-          if (!isCasa && !isTrasferta) return;
+        partite.forEach(p => {
+          const èCasa = p.squadra_casa_id === montecarloId;
+          const goalFatti = èCasa ? p.goal_a : p.goal_b;
+          const goalSubiti = èCasa ? p.goal_b : p.goal_a;
 
-          const fatti = isCasa ? p.goal_a : p.goal_b;
-          const subiti = isCasa ? p.goal_b : p.goal_a;
-          const tipo = isCasa ? 'casa' : 'trasferta';
+          // Totali
+          tot.giocate++;
+          tot.gol_fatti += goalFatti;
+          tot.gol_subiti += goalSubiti;
+          if (goalFatti > goalSubiti) tot.vittorie++;
+          else if (goalFatti === goalSubiti) tot.pareggi++;
+          else tot.sconfitte++;
 
-          stats[tipo].giocate++;
-          stats[tipo].gol_fatti += fatti;
-          stats[tipo].gol_subiti += subiti;
-          if (fatti > subiti) stats[tipo].vittorie++;
-          else if (fatti < subiti) stats[tipo].sconfitte++;
-          else stats[tipo].pareggi++;
+          // Casa/Trasferta
+          if (èCasa) {
+            casa.giocate++;
+            casa.gol_fatti += goalFatti;
+            casa.gol_subiti += goalSubiti;
+            if (goalFatti > goalSubiti) casa.vittorie++;
+            else if (goalFatti === goalSubiti) casa.pareggi++;
+            else casa.sconfitte++;
+          } else {
+            trasf.giocate++;
+            trasf.gol_fatti += goalFatti;
+            trasf.gol_subiti += goalSubiti;
+            if (goalFatti > goalSubiti) trasf.vittorie++;
+            else if (goalFatti === goalSubiti) trasf.pareggi++;
+            else trasf.sconfitte++;
+          }
 
-          stats.totali.giocate++;
-          stats.totali.gol_fatti += fatti;
-          stats.totali.gol_subiti += subiti;
-          if (fatti > subiti) stats.totali.vittorie++;
-          else if (fatti < subiti) stats.totali.sconfitte++;
-          else stats.totali.pareggi++;
-
-          if (fatti > maxFatti) { maxFatti = fatti; partitaMaxFatti = p; }
-          if (subiti > maxSubiti) { maxSubiti = subiti; partitaMaxSubiti = p; }
-          const diff = Math.abs(fatti - subiti);
-          if (diff > maxDiff) { maxDiff = diff; partitaMaxDiff = p; }
+          // Massimi
+          if (!maxF || goalFatti > (maxF.squadra_casa_id === montecarloId ? maxF.goal_a : maxF.goal_b)) {
+            maxF = p;
+          }
+          if (!maxS || goalSubiti > (maxS.squadra_casa_id === montecarloId ? maxS.goal_b : maxS.goal_a)) {
+            maxS = p;
+          }
+          if (!maxD || Math.abs(goalFatti - goalSubiti) > Math.abs((maxD.squadra_casa_id === montecarloId ? maxD.goal_a : maxD.goal_b) - (maxD.squadra_casa_id === montecarloId ? maxD.goal_b : maxD.goal_a))) {
+            maxD = p;
+          }
         });
 
-        setStatistiche(stats);
-        setMatchMaxFatti(partitaMaxFatti);
-        setMatchMaxSubiti(partitaMaxSubiti);
-        setMatchMaxDifferenza(partitaMaxDiff);
-      } catch (err) {
-        console.error('Errore:', err);
+        setStatistiche({ totali: tot, casa, trasferta: trasf });
+        setMatchMaxFatti(maxF);
+        setMatchMaxSubiti(maxS);
+        setMatchMaxDifferenza(maxD);
+      } catch (e) {
+        console.error(e);
       } finally {
         setLoading(false);
       }
-    };
+    }
     fetchStatistiche();
-  }, [stagioneSelezionata]);
-
-  const StatisticheBox = ({ title, stats }: { title: string; stats: any }) => {
-    const mediaFatti = stats.giocate ? (stats.gol_fatti / stats.giocate).toFixed(2) : '0.00';
-    const mediaSubiti = stats.giocate ? (stats.gol_subiti / stats.giocate).toFixed(2) : '0.00';
-
-    return (
-      <div className="bg-white rounded-xl shadow-montecarlo p-6">
-        <h3 className="text-lg font-semibold mb-4 text-montecarlo-secondary">{title}</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div><p className="text-sm text-montecarlo-neutral">Giocate</p><p className="text-xl font-bold">{stats.giocate}</p></div>
-          <div><p className="text-sm text-montecarlo-neutral">Vittorie</p><p className="text-xl font-bold text-green-600">{stats.vittorie}</p></div>
-          <div><p className="text-sm text-montecarlo-neutral">Pareggi</p><p className="text-xl font-bold text-yellow-600">{stats.pareggi}</p></div>
-          <div><p className="text-sm text-montecarlo-neutral">Sconfitte</p><p className="text-xl font-bold text-red-600">{stats.sconfitte}</p></div>
-          <div><p className="text-sm text-montecarlo-neutral">Gol fatti</p><p className="text-xl font-bold">{stats.gol_fatti}</p><p className="text-sm text-gray-400">Media: {mediaFatti}</p></div>
-          <div><p className="text-sm text-montecarlo-neutral">Gol subiti</p><p className="text-xl font-bold">{stats.gol_subiti}</p><p className="text-sm text-gray-400">Media: {mediaSubiti}</p></div>
-        </div>
-      </div>
-    );
-  };
-
-  const MatchCard = ({ partita, label }: { partita: PartitaEstesa; label: string }) => {
-    const isCasa = partita.squadra_casa_id === MONTECARLO_ID;
-    const fatti = isCasa ? partita.goal_a : partita.goal_b;
-    const subiti = isCasa ? partita.goal_b : partita.goal_a;
-    const avversario = isCasa ? partita.ospite.nome : partita.casa.nome;
-    return (
-      <div className="bg-white rounded-xl shadow-montecarlo p-4">
-        <h4 className="text-base font-semibold text-montecarlo-secondary mb-2">{label}</h4>
-        <p className="text-sm text-montecarlo-neutral">
-          <span className="font-medium">Avversario:</span> {avversario} ({isCasa ? 'Casa' : 'Trasferta'})
-        </p>
-        <p className="text-sm text-montecarlo-neutral">
-          <span className="font-medium">Risultato:</span> {isCasa ? `Montecarlo ${fatti} - ${subiti} ${avversario}` : `${avversario} ${subiti} - ${fatti} Montecarlo`}
-        </p>
-      </div>
-    );
-  };
+  }, [stagioneSelezionata, montecarloId]);
 
   return (
-    <div className="min-h-screen bg-gradient-montecarlo-light">
-      <div className="container mx-auto px-4 py-10">
-        <div className="mb-6">
-          <div className="bg-white rounded-xl shadow-montecarlo p-2 text-center">
-            <h2 className="text-lg font-bold text-montecarlo-secondary">Statistiche Squadra</h2>
-          </div>
-        </div>
-
-        <div className="mb-6">
+    <div className="min-h-screen px-4 md:px-8">
+      <div className="container mx-auto flex flex-col md:flex-row gap-6">
+        {/* Left: tabella statistiche */}
+        <div className="bg-white rounded-xl shadow-montecarlo flex-1 p-6 md:p-8">
           <select
             value={stagioneSelezionata}
-            onChange={(e) => setStagioneSelezionata(e.target.value)}
-            className="w-full border-2 border-montecarlo-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-montecarlo-secondary/40"
+            onChange={e => setStagioneSelezionata(e.target.value)}
+            className="w-full mb-6 border-2 border-montecarlo-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-montecarlo-secondary/40"
           >
-            <option value="">Tutte le stagioni</option>
-            {stagioni.map((s) => (
+            {stagioni.map(s => (
               <option key={s.id} value={s.id}>{s.nome}</option>
             ))}
           </select>
+
+          {loading ? (
+            <div className="text-center text-montecarlo-secondary">Caricamento statistiche…</div>
+          ) : !statistiche ? (
+            <div className="text-center text-montecarlo-neutral">Nessuna statistica disponibile</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full border border-gray-200 rounded-lg">
+  <thead className="bg-montecarlo-red-600 text-white">
+    <tr>
+      <th className="px-4 py-2 text-left">Statistiche</th>
+      <th className="px-4 py-2 text-center">Totale</th>
+      <th className="px-4 py-2 text-center">Casa</th>
+      <th className="px-4 py-2 text-center">Trasf.</th>
+    </tr>
+  </thead>
+  <tbody className="text-gray-900">
+    <tr className="border-t border-montecarlo-red-600">
+      <td className="px-4 py-2">Giocate</td>
+      <td className="text-center">{statistiche.totali.giocate}</td>
+      <td className="text-center">{statistiche.casa.giocate}</td>
+      <td className="text-center">{statistiche.trasferta.giocate}</td>
+    </tr>
+    <tr className="border-t border-montecarlo-red-600">
+      <td className="px-4 py-2">Vittorie</td>
+      <td className="text-center">{statistiche.totali.vittorie}</td>
+      <td className="text-center">{statistiche.casa.vittorie}</td>
+      <td className="text-center">{statistiche.trasferta.vittorie}</td>
+    </tr>
+    <tr className="border-t border-montecarlo-red-600">
+      <td className="px-4 py-2">Pareggi</td>
+      <td className="text-center">{statistiche.totali.pareggi}</td>
+      <td className="text-center">{statistiche.casa.pareggi}</td>
+      <td className="text-center">{statistiche.trasferta.pareggi}</td>
+    </tr>
+    <tr className="border-t border-montecarlo-red-600">
+      <td className="px-4 py-2">Sconfitte</td>
+      <td className="text-center">{statistiche.totali.sconfitte}</td>
+      <td className="text-center">{statistiche.casa.sconfitte}</td>
+      <td className="text-center">{statistiche.trasferta.sconfitte}</td>
+    </tr>
+    <tr className="border-t border-montecarlo-red-600">
+      <td className="px-4 py-2">Gol fatti</td>
+      <td className="text-center">{statistiche.totali.gol_fatti}</td>
+      <td className="text-center">{statistiche.casa.gol_fatti}</td>
+      <td className="text-center">{statistiche.trasferta.gol_fatti}</td>
+    </tr>
+    <tr className="border-t border-montecarlo-red-600">
+      <td className="px-4 py-2">Gol subiti</td>
+      <td className="text-center">{statistiche.totali.gol_subiti}</td>
+      <td className="text-center">{statistiche.casa.gol_subiti}</td>
+      <td className="text-center">{statistiche.trasferta.gol_subiti}</td>
+    </tr>
+  </tbody>
+</table>
+
+            </div>
+          )}
         </div>
 
-        {loading ? (
-          <div className="text-center text-montecarlo-secondary">Caricamento statistiche…</div>
-        ) : !statistiche ? (
-          <div className="text-center text-montecarlo-neutral">Nessuna statistica disponibile</div>
-        ) : (
-          <>
-            <div className="space-y-6 mb-6">
-              <StatisticheBox title="Totali" stats={statistiche.totali} />
-              <StatisticheBox title="In Casa" stats={statistiche.casa} />
-              <StatisticheBox title="In Trasferta" stats={statistiche.trasferta} />
+        {/* Right: record match */}
+        <div className="flex-1 md:w-1/3 space-y-4">
+          {matchMaxFatti && (
+            <div className="bg-white p-4 md:p-6 rounded-xl shadow-montecarlo">
+              <h3 className="font-semibold text-montecarlo-secondary mb-1">Massimo Gol Fatti</h3>
+              <p className="text-gray-900">
+                {matchMaxFatti.casa.nome} {matchMaxFatti.goal_a} - {matchMaxFatti.goal_b} {matchMaxFatti.ospite.nome}
+              </p>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {matchMaxFatti && <MatchCard partita={matchMaxFatti} label="Più gol fatti" />}
-              {matchMaxSubiti && <MatchCard partita={matchMaxSubiti} label="Più gol subiti" />}
-              {matchMaxDifferenza && <MatchCard partita={matchMaxDifferenza} label="Maggior differenza" />}
+          )}
+          {matchMaxSubiti && (
+            <div className="bg-white p-4 md:p-6 rounded-xl shadow-montecarlo">
+              <h3 className="font-semibold text-montecarlo-secondary mb-1">Massimo Gol Subiti</h3>
+              <p className="text-gray-900">
+                {matchMaxSubiti.casa.nome} {matchMaxSubiti.goal_a} - {matchMaxSubiti.goal_b} {matchMaxSubiti.ospite.nome}
+              </p>
             </div>
-          </>
-        )}
+          )}
+          {matchMaxDifferenza && (
+            <div className="bg-white p-4 md:p-6 rounded-xl shadow-montecarlo">
+              <h3 className="font-semibold text-montecarlo-secondary mb-1">Maggior Differenza Reti</h3>
+              <p className="text-gray-900">
+                {matchMaxDifferenza.casa.nome} {matchMaxDifferenza.goal_a} - {matchMaxDifferenza.goal_b} {matchMaxDifferenza.ospite.nome}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

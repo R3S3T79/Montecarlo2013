@@ -1,9 +1,9 @@
 // src/pages/DettaglioPrePartita.tsx
+// Data creazione chat: 2025-08-01
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
-import { ArrowLeft, Edit2, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../lib/roles';
 
@@ -18,8 +18,8 @@ interface Partita {
   data_ora: string;
   goal_a: number;
   goal_b: number;
-  casa: Squadra;
-  ospite: Squadra;
+  squadra_casa_id: Squadra;
+  squadra_ospite_id: Squadra;
 }
 
 export default function DettaglioPrePartita(): JSX.Element {
@@ -29,19 +29,13 @@ export default function DettaglioPrePartita(): JSX.Element {
 
   const [partita, setPartita] = useState<Partita | null>(null);
   const [precedenti, setPrecedenti] = useState<Partita[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
 
   const role =
     (user?.user_metadata?.role as UserRole) ||
     (user?.app_metadata?.role as UserRole) ||
     UserRole.Authenticated;
-  const canEdit = role === UserRole.Admin || role === UserRole.Creator;
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/login', { replace: true });
-    }
-  }, [user, authLoading, navigate]);
+  const canView = true;
 
   useEffect(() => {
     if (!id) {
@@ -49,8 +43,9 @@ export default function DettaglioPrePartita(): JSX.Element {
       return;
     }
     (async () => {
-      const { data, error } = await supabase
-        .from('partite')
+      setLoading(true);
+      const { data: d, error: err } = await supabase
+        .from<Partita>('partite')
         .select(`
           id,
           data_ora,
@@ -62,24 +57,15 @@ export default function DettaglioPrePartita(): JSX.Element {
         .eq('id', id)
         .single();
 
-      if (error) {
-        console.error('Errore fetch partita:', error);
-      } else {
-        setPartita({
-          ...data,
-          casa: data.squadra_casa_id,
-          ospite: data.squadra_ospite_id,
-        });
+      if (err || !d) {
+        alert('Partita non trovata');
+        setLoading(false);
+        return;
       }
-      setLoading(false);
-    })();
-  }, [id]);
+      setPartita(d);
 
-  useEffect(() => {
-    if (!partita) return;
-    (async () => {
-      const { data, error } = await supabase
-        .from('partite')
+      const { data: prev, error: errPrev } = await supabase
+        .from<Partita>('partite')
         .select(`
           id,
           data_ora,
@@ -89,140 +75,129 @@ export default function DettaglioPrePartita(): JSX.Element {
           squadra_ospite_id(id, nome, logo_url)
         `)
         .or(
-          `and(squadra_casa_id.eq.${partita.casa.id},squadra_ospite_id.eq.${partita.ospite.id}),and(squadra_casa_id.eq.${partita.ospite.id},squadra_ospite_id.eq.${partita.casa.id})`
+          `and(squadra_casa_id.eq.${d.squadra_casa_id.id},squadra_ospite_id.eq.${d.squadra_ospite_id.id}),and(squadra_casa_id.eq.${d.squadra_ospite_id.id},squadra_ospite_id.eq.${d.squadra_casa_id.id})`
         )
         .order('data_ora', { ascending: false })
         .limit(5);
 
-      if (error) {
-        console.error('Errore fetch precedenti:', error);
-      } else {
-        const precedentiPuliti = data
-          .filter((p) => p.id !== partita.id)
-          .map((p) => ({
-            ...p,
-            casa: p.squadra_casa_id,
-            ospite: p.squadra_ospite_id,
-          }));
-        setPrecedenti(precedentiPuliti);
+      if (!errPrev && prev) {
+        setPrecedenti(prev);
       }
+      setLoading(false);
     })();
-  }, [partita]);
-
-  const handleDelete = async () => {
-    if (!id || !window.confirm('Eliminare questa partita?')) return;
-    const { error } = await supabase.from('partite').delete().eq('id', id);
-    if (error) {
-      console.error('Errore eliminazione:', error);
-      alert('Eliminazione fallita');
-    } else {
-      navigate('/calendario', { replace: true });
-    }
-  };
+  }, [id]);
 
   if (authLoading || loading) {
-    return <div className="text-center p-4">Caricamento…</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#6B7280] to-[#bfb9b9]">
+        <div className="text-white text-lg">Caricamento…</div>
+      </div>
+    );
   }
   if (!partita) {
-    return <div className="text-center p-4">Partita non trovata</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#6B7280] to-[#bfb9b9]">
+        <div className="text-white text-lg">Partita non trovata</div>
+      </div>
+    );
   }
 
-  const formattedDate = new Date(partita.data_ora).toLocaleDateString(undefined, {
-    day: '2-digit',
+  const formattedDate = new Date(partita.data_ora).toLocaleDateString('it-IT', {
+    day:   '2-digit',
     month: '2-digit',
-    year: '2-digit',
+    year:  '2-digit',
   });
 
   return (
-    <>
-      <div className="relative mt-6 mb-6">
-        <Link
-          to="/calendario"
-          className="absolute left-16 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-900"
-        >
-          <ArrowLeft size={20} />
-        </Link>
+    <div className="min-h-screen pt-12 px-4 pb-6">
+      <div className="w-full">
+        <div className="bg-white rounded-xl shadow-montecarlo p-6">
+          {/* Dettaglio squadre */}
+          <div className="flex flex-col items-center space-y-6 mb-6">
+            <div className="flex items-center space-x-4">
+              {partita.squadra_casa_id.logo_url ? (
+                <img
+                  src={partita.squadra_casa_id.logo_url}
+                  alt={partita.squadra_casa_id.nome}
+                  className="w-20 h-20 rounded-full border-2 border-montecarlo-accent"
+                />
+              ) : (
+                <div className="w-20 h-20 bg-montecarlo-neutral rounded-full flex items-center justify-center text-white font-bold text-2xl">
+                  {partita.squadra_casa_id.nome.charAt(0)}
+                </div>
+              )}
+              <span className="text-xl font-semibold text-gray-800">
+                {partita.squadra_casa_id.nome}
+              </span>
+            </div>
 
-        {canEdit && (
-          <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex space-x-2">
-            <button
-              onClick={() => navigate(`/partita/${id}/edit`)}
-              className="flex items-center px-2 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
-            >
-              <Edit2 size={14} />
-            </button>
-            <button
-              onClick={handleDelete}
-              className="flex items-center px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
-            >
-              <Trash2 size={14} />
-            </button>
+            <div className="text-base font-semibold text-gray-800">vs</div>
+
+            <div className="flex items-center space-x-4">
+              <span className="text-xl font-semibold text-gray-800">
+                {partita.squadra_ospite_id.nome}
+              </span>
+              {partita.squadra_ospite_id.logo_url ? (
+                <img
+                  src={partita.squadra_ospite_id.logo_url}
+                  alt={partita.squadra_ospite_id.nome}
+                  className="w-20 h-20 rounded-full border-2 border-montecarlo-accent"
+                />
+              ) : (
+                <div className="w-20 h-20 bg-montecarlo-neutral rounded-full flex items-center justify-center text-white font-bold text-2xl">
+                  {partita.squadra_ospite_id.nome.charAt(0)}
+                </div>
+              )}
+            </div>
           </div>
-        )}
 
-        <div className="text-center text-gray-700 text-sm font-medium">
-          {formattedDate}
+          {/* Data */}
+          <div className="text-center text-gray-800 mb-6">
+            <span className="px-3 py-1 bg-montecarlo-accent text-montecarlo-secondary rounded-full text-sm font-medium">
+              {formattedDate}
+            </span>
+          </div>
+
+          {/* Scontri precedenti */}
+          {precedenti.length > 0 && (
+            <section>
+              <h3 className="text-base font-medium text-red-600 mb-3 text-center">
+                Scontri precedenti
+              </h3>
+              <hr className="border-t border-gray-300 mb-3" />
+              <ul>
+                {precedenti.map((p, idx) => {
+                  const d = new Date(p.data_ora).toLocaleDateString('it-IT', {
+                    day:   '2-digit',
+                    month: '2-digit',
+                    year:  '2-digit',
+                  });
+                  return (
+                    <React.Fragment key={p.id}>
+                      {idx > 0 && <hr className="border-t border-gray-200 my-4" />}
+                      <li
+                        onClick={() => navigate(`/partita/${p.id}`)}
+                        className="cursor-pointer hover:bg-gray-100 transition-colors rounded p-2"
+                      >
+                        <div className="text-sm text-gray-800 text-center mb-1">
+                          {d}
+                        </div>
+                        <div className="flex justify-center items-center gap-2 text-base text-gray-800 font-medium">
+                          <span>{p.squadra_casa_id.nome}</span>
+                          <span>
+                            {p.goal_a}-{p.goal_b}
+                          </span>
+                          <span>{p.squadra_ospite_id.nome}</span>
+                        </div>
+                      </li>
+                    </React.Fragment>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
         </div>
       </div>
-
-      <div className="flex flex-col items-center mb-10 space-y-4">
-        {partita.casa.logo_url ? (
-          <img
-            src={partita.casa.logo_url}
-            alt={partita.casa.nome}
-            className="w-16 h-16 object-contain"
-          />
-        ) : (
-          <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-xl">
-            {partita.casa.nome.charAt(0)}
-          </div>
-        )}
-        <div className="text-lg font-semibold">{partita.casa.nome}</div>
-
-        <div className="text-base font-medium text-gray-600">vs</div>
-
-        <div className="text-lg font-semibold">{partita.ospite.nome}</div>
-        {partita.ospite.logo_url ? (
-          <img
-            src={partita.ospite.logo_url}
-            alt={partita.ospite.nome}
-            className="w-16 h-16 object-contain"
-          />
-        ) : (
-          <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-xl">
-            {partita.ospite.nome.charAt(0)}
-          </div>
-        )}
-      </div>
-
-      {precedenti.length > 0 && (
-        <div className="mb-6 px-4">
-          <h3 className="text-base font-semibold mb-3 text-center">
-            Scontri precedenti
-          </h3>
-          <ul className="space-y-2 mx-auto text-center">
-            {precedenti.map((p) => {
-              const d = new Date(p.data_ora).toLocaleDateString(undefined, {
-                day: '2-digit',
-                month: '2-digit',
-                year: '2-digit',
-              });
-              return (
-                <li
-                  key={p.id}
-                  onClick={() => navigate(`/partita/${p.id}`)}
-                  className="py-2 cursor-pointer"
-                >
-                  <span className="text-sm">
-                    {d}&nbsp;&nbsp;{p.casa.nome} {p.goal_a}-{p.goal_b}{' '}
-                    {p.ospite.nome}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-    </>
+    </div>
   );
 }

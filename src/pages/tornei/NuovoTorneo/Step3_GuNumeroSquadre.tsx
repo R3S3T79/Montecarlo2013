@@ -1,3 +1,4 @@
+// src/pages/tornei/NuovoTorneo/Step3_GuNumeroSquadre.tsx
 
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -7,6 +8,7 @@ export default function Step3_GuNumeroSquadre() {
   const location = useLocation();
 
   const state = location.state as {
+    torneoId: string;
     torneoNome: string;
     torneoLuogo: string;
     stagioneSelezionata: string;
@@ -19,20 +21,19 @@ export default function Step3_GuNumeroSquadre() {
   }
 
   const handleClick = (num: number) => {
-    navigate('/tornei/nuovo/step4-gironeunico', {
+    navigate(`/tornei/nuovo/step4-gironeunico/${state.torneoId}`, {
       state: {
         ...state,
         numSquadre: num,
-        formatoTorneo: 'girone_unico',
+        formatoTorneo: 'Girone_Unico',
       },
     });
   };
 
-  const teamNumbers = Array.from({ length: 13 }, (_, i) => i + 3); // [3...15]
+  const teamNumbers = Array.from({ length: 13 }, (_, i) => i + 3); // da 3 a 15
 
   return (
     <div className="max-w-md mx-auto px-4 py-6">
-      <h2 className="text-2xl font-bold mb-6 text-center">Quante squadre partecipano?</h2>
       <div className="grid grid-cols-2 gap-4 mb-4">
         {teamNumbers.map((n) => (
           <button

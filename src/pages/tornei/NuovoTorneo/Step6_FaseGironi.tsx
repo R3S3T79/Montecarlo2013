@@ -1,251 +1,378 @@
 // src/pages/tornei/NuovoTorneo/Step6_FaseGironi.tsx
+// Data creazione chat: 29/07/2025
 
-import React, { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate, Outlet } from 'react-router-dom';
-import { supabase } from '../../../lib/supabaseClient';
+import React, { useEffect, useMemo, useState } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { supabase } from "../../../lib/supabaseClient";
+import { useAuth } from "../../../context/AuthContext";
+import { UserRole } from "../../../lib/roles";
 
 interface Squadra {
   id: string;
   nome: string;
-  logo_url: string | null;
+  logo_url?: string;
 }
 
 interface Partita {
   id: string;
-  goal_casa: number;
-  goal_ospite: number;
-  data_ora: string | null;
-  stato: string;
-  squadra_casa: Squadra;
-  squadra_ospite: Squadra;
+  girone: string;
+  match_number: number;
+  gol_casa: number | null;
+  gol_ospite: number | null;
+  rigori_vincitore: string | null;
+  squadra_casa: Squadra | null;
+  squadra_ospite: Squadra | null;
+  data_match: string | null;
+  giocata: boolean;
+}
+
+interface Fase {
+  id: string;
+  tipo_fase: string;
+  fase_numerica?: number;
+  formula_tipo?: string;
 }
 
 export default function Step6_FaseGironi() {
-  const { torneoId } = useParams<{ torneoId: string }>();
+  const { torneoId: paramId } = useParams<{ torneoId?: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
+  const { user: authUser, loading: authLoading } = useAuth();
 
-  const [torneoNome, setTorneoNome] = useState('');
-  const [groups, setGroups] = useState<Record<number, Squadra[]>>({});
-  const [matches, setMatches] = useState<Partita[]>([]);
-  const [loading, setLoading] = useState(true);
+  const role =
+    (authUser?.user_metadata?.role ?? authUser?.app_metadata?.role) as UserRole ||
+    UserRole.Authenticated;
+  const canEdit = role === UserRole.Admin || role === UserRole.Creator;
 
+  const torneoId =
+    (location.state as { torneoId?: string })?.torneoId || paramId;
+
+  const [groupPhaseId, setGroupPhaseId] = useState<string | null>(null);
+  const [partite, setPartite] = useState<Partita[]>([]);
+  const [torneoNome, setTorneoNome] = useState<string>("Fase a Gironi");
+  const [loading, setLoading] = useState<boolean>(true);
+  const [savingFormula, setSavingFormula] = useState(false);
+  const [formulaType, setFormulaType] = useState<"eliminazione" | "gironi">(
+    "eliminazione"
+  );
+
+  // 1) fase gironi
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      if (!torneoId) return;
-
-      // 1) nome del torneo
-      const { data: t } = await supabase
-        .from('tornei')
-        .select('nome')
-        .eq('id', torneoId)
-        .single();
-      if (t) setTorneoNome(t.nome);
-
-      // 2) fase multi_gironi
-      const { data: f } = await supabase
-        .from('fasi_torneo')
-        .select('id')
-        .eq('torneo_id', torneoId)
-        .eq('tipo_fase', 'multi_gironi')
-        .single();
-      if (!f) { console.error('Fase multi_gironi non trovata'); setLoading(false); return; }
-
-      // 3) squadre per gironi
-      const { data: gs } = await supabase
-        .from('gironi_squadre')
-        .select('girone, squadra: squadra_id(id,nome,logo_url)')
-        .eq('fase_id', f.id)
-        .order('girone', { ascending: true });
-      const grp: Record<number, Squadra[]> = {};
-      gs?.forEach(r => {
-        grp[r.girone] = grp[r.girone] || [];
-        grp[r.girone].push(r.squadra);
+    if (!torneoId) return;
+    supabase
+      .from<Fase>("fasi_torneo")
+      .select("id,tipo_fase")
+      .eq("torneo_id", torneoId)
+      .in("tipo_fase", ["multi_gironi", "gironi"])
+      .limit(1)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) console.error("Errore fetch fase gironi:", error);
+        else setGroupPhaseId(data?.id ?? null);
       });
-      setGroups(grp);
-
-      // 4) partite
-      const { data: pts } = await supabase
-        .from<Partita>('partite_torneo')
-        .select(`
-          id,
-          goal_casa,
-          goal_ospite,
-          data_ora,
-          stato,
-          squadra_casa: squadra_casa_id(id,nome,logo_url),
-          squadra_ospite: squadra_ospite_id(id,nome,logo_url)
-        `)
-        .eq('torneo_id', torneoId)
-        .eq('fase_id', f.id)
-        .order('data_ora', { ascending: true });
-      setMatches(pts || []);
-
-      setLoading(false);
-    })();
   }, [torneoId]);
 
-  const letterFor = (n: number) => String.fromCharCode(64 + n);
-  const matchesOfGroup = (teams: Squadra[]) =>
-    matches.filter(m =>
-      teams.some(t => t.id === m.squadra_casa.id) &&
-      teams.some(t => t.id === m.squadra_ospite.id)
-    );
+  // 2) nome torneo
+  useEffect(() => {
+    if (!torneoId) return;
+    supabase
+      .from("tornei")
+      .select("nome_torneo")
+      .eq("id", torneoId)
+      .single()
+      .then(({ data, error }) => {
+        if (data) setTorneoNome(data.nome_torneo);
+        if (error) console.error("Errore fetch nome torneo:", error);
+      });
+  }, [torneoId]);
 
-  const calcClassifica = (teams: Squadra[]) => {
-    type Stat = { squadra: Squadra; pg: number; v: number; n: number; p: number; gf: number; gs: number; dr: number; pt: number };
-    const stats: Record<string, Stat> = {};
-    teams.forEach(t => stats[t.id] = { squadra: t, pg: 0, v: 0, n: 0, p: 0, gf: 0, gs: 0, dr: 0, pt: 0 });
-    matchesOfGroup(teams).filter(m => m.stato === 'Giocata').forEach(m => {
-      const home = stats[m.squadra_casa.id], away = stats[m.squadra_ospite.id];
-      home.pg++; away.pg++;
-      home.gf += m.goal_casa; home.gs += m.goal_ospite;
-      away.gf += m.goal_ospite; away.gs += m.goal_casa;
-      if (m.goal_casa > m.goal_ospite)      { home.v++; home.pt += 3; away.p++; }
-      else if (m.goal_ospite > m.goal_casa) { away.v++; away.pt += 3; home.p++; }
-      else { home.n++; away.n++; home.pt++; away.pt++; }
+  // 3) partite
+  useEffect(() => {
+    if (!torneoId || !groupPhaseId) return;
+    setLoading(true);
+    supabase
+      .from<Partita>("tornei_fasegironi")
+      .select(`
+        id,girone,match_number,
+        gol_casa,gol_ospite,rigori_vincitore,
+        data_match,giocata,
+        squadra_casa(id,nome,logo_url),
+        squadra_ospite(id,nome,logo_url)
+      `)
+      .eq("torneo_id", torneoId)
+      .eq("fase_id", groupPhaseId)
+      .order("girone", { ascending: true })
+      .order("match_number", { ascending: true })
+      .then(({ data, error }) => {
+        if (error) console.error("Errore fetch partite:", error);
+        else setPartite(data || []);
+        setLoading(false);
+      });
+  }, [torneoId, groupPhaseId]);
+
+  // raggruppo per girone
+  const partitePerGirone = useMemo(() => {
+    const map: Record<string, Partita[]> = {};
+    partite.forEach((p) => {
+      if (!map[p.girone]) map[p.girone] = [];
+      map[p.girone].push(p);
     });
-    return Object.values(stats)
-      .map(s => ({ ...s, dr: s.gf - s.gs }))
-      .sort((a,b) => b.pt - a.pt || b.dr - a.dr || b.gf - a.gf);
+    return map;
+  }, [partite]);
+
+  // classifica per girone
+  const classificaPerGirone = useMemo(() => {
+    const out: Record<string, any[]> = {};
+    Object.entries(partitePerGirone).forEach(([girone, matches]) => {
+      const stats: Record<string, any> = {};
+      matches.forEach((m) => {
+        const h = m.squadra_casa!, a = m.squadra_ospite!;
+        [h, a].forEach((s) => {
+          if (!stats[s.id]) {
+            stats[s.id] = {
+              id: s.id,
+              nome: s.nome,
+              logo_url: s.logo_url,
+              PG: 0, V: 0, N: 0, P: 0, GF: 0, GS: 0, DR: 0, Pt: 0,
+            };
+          }
+        });
+        if (!m.giocata) return;
+        const rh = stats[h.id], ra = stats[a.id];
+        rh.PG++; ra.PG++;
+        rh.GF += m.gol_casa!; rh.GS += m.gol_ospite!;
+        ra.GF += m.gol_ospite!; ra.GS += m.gol_casa!;
+        if (m.gol_casa! > m.gol_ospite!) {
+          rh.V++; ra.P++; rh.Pt += 3;
+        } else if (m.gol_ospite! > m.gol_casa!) {
+          ra.V++; rh.P++; ra.Pt += 3;
+        } else if (m.rigori_vincitore) {
+          (m.rigori_vincitore === h.id ? rh : ra).Pt += 3;
+          (m.rigori_vincitore === h.id ? rh : ra).V++;
+          (m.rigori_vincitore === h.id ? ra : rh).P++;
+        } else {
+          rh.N++; ra.N++; rh.Pt++; ra.Pt++;
+        }
+      });
+      Object.values(stats).forEach((r: any) => (r.DR = r.GF - r.GS));
+      out[girone] = Object.values(stats).sort(
+        (a: any, b: any) =>
+          b.Pt - a.Pt || b.DR - a.DR || b.GF - a.GF || a.nome.localeCompare(b.nome)
+      );
+    });
+    return out;
+  }, [partitePerGirone]);
+
+  const handleEditPartita = (matchId: string) => {
+    if (!torneoId) return;
+    navigate(`/tornei/nuovo/step6-fasegironi/${torneoId}/partita/${matchId}/edit`, {
+      state: { torneoId },
+    });
   };
 
-  const formatDate = (iso: string | null) => {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    return d.toLocaleDateString('it-IT', { day:'2-digit',month:'2-digit',year:'numeric' })
-      + ' ' + d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+  const handleNextPhase = async () => {
+    if (!canEdit || !torneoId) return;
+    setSavingFormula(true);
+
+    const { data: existing } = await supabase
+      .from("fasi_torneo")
+      .select("id")
+      .eq("torneo_id", torneoId)
+      .eq("tipo_fase", "eliminazione")
+      .maybeSingle();
+
+    let elimPhaseId: string;
+    const payload = {
+      torneo_id: torneoId,
+      tipo_fase: "eliminazione",
+      formula_tipo: formulaType,
+    };
+
+    if (existing?.id) {
+      await supabase.from("fasi_torneo").update(payload).eq("id", existing.id);
+      elimPhaseId = existing.id;
+    } else {
+      const { data: ins } = await supabase
+        .from("fasi_torneo")
+        .insert(payload)
+        .select("id")
+        .single();
+      elimPhaseId = ins!.id;
+    }
+
+    if (formulaType === "eliminazione") {
+      const byGroup: Record<string, { id: string; pts: number }[]> = {};
+      partite.forEach((m) => {
+        const gir = m.girone;
+        byGroup[gir] = byGroup[gir] || [];
+        const cid = m.squadra_casa?.id;
+        const oid = m.squadra_ospite?.id;
+        [cid, oid].forEach((id) => {
+          if (!id) return;
+          if (!byGroup[gir].some((x) => x.id === id)) byGroup[gir].push({ id, pts: 0 });
+        });
+        if (!m.giocata || !cid || !oid) return;
+        if (m.gol_casa! > m.gol_ospite!) byGroup[gir].find(x => x.id === cid)!.pts += 3;
+        else if (m.gol_ospite! > m.gol_casa!) byGroup[gir].find(x => x.id === oid)!.pts += 3;
+        else if (m.rigori_vincitore) byGroup[gir].find(x => x.id === m.rigori_vincitore)!.pts += 3;
+        else {
+          byGroup[gir].find(x => x.id === cid)!.pts += 1;
+          byGroup[gir].find(x => x.id === oid)!.pts += 1;
+        }
+      });
+
+      const groups = Object.values(byGroup);
+      if (groups.length < 2 || !groups[0]?.length || !groups[1]?.length) {
+        alert("Gironi incompleti per generare gli scontri diretti.");
+        setSavingFormula(false);
+        return;
+      }
+
+      const topA = [...groups[0]].sort((a, b) => b.pts - a.pts).slice(0, 3);
+      const topB = [...groups[1]].sort((a, b) => b.pts - a.pts).slice(0, 3);
+      const pairCount = Math.min(topA.length, topB.length);
+      if (pairCount === 0) {
+        alert("Nessuna squadra qualificata.");
+        setSavingFormula(false);
+        return;
+      }
+
+      const toInsert = Array.from({ length: pairCount }, (_, i) => ({
+        torneo_id: torneoId,
+        fase_id: elimPhaseId,
+        girone: "eliminazione",
+        match_number: i + 1,
+        squadra_casa: topA[i].id,
+        squadra_ospite: topB[i].id,
+      }));
+      await supabase.from("tornei_fasegironi").upsert(toInsert, {
+        onConflict: "torneo_id,fase_id,girone,match_number",
+        ignoreDuplicates: true,
+      });
+
+      setSavingFormula(false);
+      navigate(`/tornei/nuovo/step8-fasegironi/${torneoId}`);
+      return;
+    }
+
+    setSavingFormula(false);
+    navigate(`/tornei/nuovo/step7-fasegironi/${torneoId}`, {
+      state: { formulaType },
+    });
   };
 
-  if (loading) return <p className="text-center py-6">Caricamento…</p>;
+  if (authLoading || loading) {
+    return <p className="text-center py-6">Caricamento in corso…</p>;
+  }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6 space-y-12">
-      <h2 className="text-2xl font-bold text-center">{torneoNome}</h2>
+    <div className="max-w-3xl mx-auto p-4 space-y-6 print:p-0">
+      {/* ⛔️ Nascosto in stampa */}
+      {canEdit && (
+        <div className="flex justify-center items-center gap-2 print:hidden no-print">
+          <label className="font-medium">Formula fase successiva:</label>
+          <select
+            className="border rounded px-2 py-1"
+            value={formulaType}
+            onChange={(e) =>
+              setFormulaType(e.currentTarget.value as "eliminazione" | "gironi")
+            }
+          >
+            <option value="eliminazione">Scontri Diretti</option>
+            <option value="gironi">Seconda Fase a Gironi</option>
+          </select>
+        </div>
+      )}
 
-      {Object.entries(groups).map(([g, teamsArr]) => {
-        const num = Number(g), letter = letterFor(num);
-        const scontri = matchesOfGroup(teamsArr);
-        const classifica = calcClassifica(teamsArr);
+      {Object.entries(partitePerGirone).map(([girone, matches]) => (
+        <div key={girone} className="space-y-4 avoid-break">
+          <h3 className="text-lg font-semibold text-center">{girone}</h3>
 
-        return (
-          <div key={g} className="space-y-6">
-            <h3 className="text-lg font-semibold">Girone {letter}</h3>
+          {matches.map((m) => (
+            <div
+              key={m.id}
+              onClick={canEdit ? () => handleEditPartita(m.id) : undefined}
+              className="grid grid-cols-3 items-center bg-gray-100 shadow rounded-lg p-2 mb-1 hover:bg-gray-200 cursor-pointer"
+            >
+              <span className="text-sm truncate">{m.squadra_casa?.nome}</span>
+              <span className="text-sm font-medium text-center">
+                {m.giocata ? `${m.gol_casa} – ${m.gol_ospite}` : "VS"}
+              </span>
+              <span className="text-sm text-right truncate">
+                {m.squadra_ospite?.nome}
+              </span>
+            </div>
+          ))}
 
-            <div className="space-y-3">
-              {scontri.map(m => (
-                <div
-                  key={m.id}
-                  onClick={() => navigate(`/tornei/nuovo/step6-fasegironi/${torneoId}/edit/${m.id}`)}
-                  className="
-                    bg-white rounded-lg shadow-md hover:shadow-lg
-                    hover:bg-gray-50 transition-all duration-200
-                    p-4 cursor-pointer max-w-lg mx-auto
-                  "
-                >
-                  {/* Data */}
-                  <div className="text-xs text-gray-500 mb-3 text-center">
-                    {formatDate(m.data_ora)}
-                  </div>
-                  
-                  {/* Layout orizzontale con grid */}
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-                    {/* Squadra Casa */}
-                    <div className="flex items-center space-x-2 min-w-0">
-                      {m.squadra_casa.logo_url && (
-                        <img 
-                          src={m.squadra_casa.logo_url}
-                          className="w-6 h-6 rounded-full flex-shrink-0" 
-                          alt="" 
+          {/* CLASSIFICA: tabella fissa con nome troncato */}
+          <table className="w-full table-fixed border-collapse text-center text-sm mb-6">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border px-3 py-1 text-left" style={{ width: "52%" }}>
+                  Squadra
+                </th>
+                <th className="border px-2 py-1">PG</th>
+                <th className="border px-2 py-1">V</th>
+                <th className="border px-2 py-1">N</th>
+                <th className="border px-2 py-1">P</th>
+                <th className="border px-2 py-1">GF</th>
+                <th className="border px-2 py-1">GS</th>
+                <th className="border px-2 py-1">DR</th>
+                <th className="border px-2 py-1">Pt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {classificaPerGirone[girone].map((r) => (
+                <tr key={r.id} className="align-middle">
+                  <td className="border px-3 py-1 text-left" style={{ width: "52%" }}>
+                    <div className="td-team">
+                      {r.logo_url && (
+                        <img
+                          src={r.logo_url}
+                          alt={r.nome}
+                          className="w-4 h-4 rounded-full flex-none"
                         />
                       )}
-                      <span className="text-sm font-medium truncate">
-                        {m.squadra_casa.nome}
-                      </span>
+                      <span className="name">{r.nome}</span>
                     </div>
-
-                    {/* Punteggio */}
-                    <div className="flex items-center space-x-2 text-lg font-bold text-blue-600 flex-shrink-0">
-                      <span>{m.goal_casa}</span>
-                      <span>-</span>
-                      <span>{m.goal_ospite}</span>
-                    </div>
-
-                    {/* Squadra Ospite */}
-                    <div className="flex items-center space-x-2 justify-end min-w-0">
-                      <span className="text-sm font-medium truncate">
-                        {m.squadra_ospite.nome}
-                      </span>
-                      {m.squadra_ospite.logo_url && (
-                        <img 
-                          src={m.squadra_ospite.logo_url}
-                          className="w-6 h-6 rounded-full flex-shrink-0" 
-                          alt="" 
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
+                  </td>
+                  <td className="border px-2 py-1">{r.PG}</td>
+                  <td className="border px-2 py-1">{r.V}</td>
+                  <td className="border px-2 py-1">{r.N}</td>
+                  <td className="border px-2 py-1">{r.P}</td>
+                  <td className="border px-2 py-1">{r.GF}</td>
+                  <td className="border px-2 py-1">{r.GS}</td>
+                  <td className="border px-2 py-1">{r.DR}</td>
+                  <td className="border px-2 py-1">{r.Pt}</td>
+                </tr>
               ))}
-            </div>
+            </tbody>
+          </table>
+        </div>
+      ))}
 
-            {/* CLASSIFICA */}
-            <div>
-              <h4 className="text-lg font-semibold mb-2">Classifica {letter}</h4>
-              <div className="overflow-x-auto">
-                <table className="min-w-full bg-white rounded shadow">
-                  <thead className="bg-gray-100 text-xs text-gray-600 uppercase">
-                    <tr>
-                      <th className="border px-3 py-2 text-left w-48">Squadra</th>
-                      <th className="border px-3 py-2">PG</th>
-                      <th className="border px-3 py-2">V</th>
-                      <th className="border px-3 py-2">N</th>
-                      <th className="border px-3 py-2">P</th>
-                      <th className="border px-3 py-2">GF</th>
-                      <th className="border px-3 py-2">GS</th>
-                      <th className="border px-3 py-2">DR</th>
-                      <th className="border px-3 py-2">Pt</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {classifica.map((r, i) => (
-                      <tr key={r.squadra.id} className={i % 2 === 1 ? 'bg-gray-50' : ''}>
-                        <td className="border px-3 py-2 flex items-center space-x-2 w-48">
-                          {r.squadra.logo_url && (
-                            <img src={r.squadra.logo_url}
-                                 className="w-6 h-6 rounded-full" alt="" />
-                          )}
-                          <span>{r.squadra.nome}</span>
-                        </td>
-                        <td className="border px-3 py-2 text-center">{r.pg}</td>
-                        <td className="border px-3 py-2 text-center">{r.v}</td>
-                        <td className="border px-3 py-2 text-center">{r.n}</td>
-                        <td className="border px-3 py-2 text-center">{r.p}</td>
-                        <td className="border px-3 py-2 text-center">{r.gf}</td>
-                        <td className="border px-3 py-2 text-center">{r.gs}</td>
-                        <td className="border px-3 py-2 text-center">{r.dr}</td>
-                        <td className="border px-3 py-2 text-center">{r.pt}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        );
-      })}
-
-      <div className="flex justify-between">
-        <button onClick={() => window.print()} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">
+      {/* Pulsanti: già nascosti con print:hidden */}
+      <div className="flex justify-between print:hidden space-x-2">
+        <button
+          onClick={() => navigate(-1)}
+          className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+        >
+          Indietro
+        </button>
+        <button
+          onClick={() => window.print()}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
           Stampa
         </button>
-        <button onClick={() => navigate(`/tornei/nuovo/step7-fasegironi/${torneoId}`)}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-          Gironi Finali
+        <button
+          onClick={handleNextPhase}
+          disabled={savingFormula}
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
+        >
+          {savingFormula ? "Salvataggio…" : "Prossima Fase"}
         </button>
       </div>
-
-      <Outlet />
     </div>
   );
 }

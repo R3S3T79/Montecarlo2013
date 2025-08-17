@@ -1,8 +1,9 @@
 // src/pages/tornei/NuovoTorneo/Step1_5_FormatoTorneo.tsx
-import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 
 interface StateType {
+  torneoId: string;
   torneoNome: string;
   torneoLuogo: string;
   stagioneSelezionata: string;
@@ -14,21 +15,22 @@ export default function Step1_5_FormatoTorneo() {
   const state = location.state as StateType | null;
 
   if (!state) {
-    navigate('/tornei/nuovo/step1');
+    navigate("/tornei/nuovo/step1");
     return null;
   }
 
   const handleSelectFormat = (format: string) => {
-    let nextStepPath = '';
+    let nextStepPath = "";
+
     switch (format) {
-      case 'eliminazione':
-        nextStepPath = '/tornei/nuovo/step3-eliminazione';
+      case "Eliminazione":
+        nextStepPath = `/tornei/nuovo/step3-enumerosquadre/${state.torneoId}`;
         break;
-      case 'girone_unico':
-        nextStepPath = '/tornei/nuovo/step3-gironeunico';
+      case "Girone_Unico":
+        nextStepPath = `/tornei/nuovo/step3-gunumerosquadre/${state.torneoId}`;
         break;
-      case 'fase_gironi':
-        nextStepPath = '/tornei/nuovo/step3-fasegironi';
+      case "Fase_Gironi":
+        nextStepPath = `/tornei/nuovo/step3-fgnumerosquadre/${state.torneoId}`;
         break;
       default:
         return;
@@ -43,33 +45,42 @@ export default function Step1_5_FormatoTorneo() {
   };
 
   return (
-    <div className="max-w-md mx-auto px-4 py-6 space-y-6">
-      <h2 className="text-2xl font-bold text-center">Seleziona Formato Torneo</h2>
+    <div className="max-w-md mx-auto mt-10 px-4 py-6 bg-white rounded-lg shadow space-y-6">
+      
 
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 gap-4 pt-2">
         <button
-          onClick={() => handleSelectFormat('eliminazione')}
-          className="bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors"
+          onClick={() => handleSelectFormat("Eliminazione")}
+          className="bg-blue-600 text-white text-lg py-3 rounded-lg hover:bg-blue-700 shadow hover:shadow-md transition"
         >
           Eliminazione Diretta
         </button>
         <button
-          onClick={() => handleSelectFormat('girone_unico')}
-          className="bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors"
+          onClick={() => handleSelectFormat("Girone_Unico")}
+          className="bg-emerald-600 text-white text-lg py-3 rounded-lg hover:bg-emerald-700 shadow hover:shadow-md transition"
         >
           Girone Unico
         </button>
         <button
-          onClick={() => handleSelectFormat('fase_gironi')}
-          className="bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors"
+          onClick={() => handleSelectFormat("Fase_Gironi")}
+          className="bg-purple-600 text-white text-lg py-3 rounded-lg hover:bg-purple-700 shadow hover:shadow-md transition"
         >
           Fase a Gironi
         </button>
       </div>
 
       <button
-        onClick={() => navigate(-1)}
-        className="w-full bg-gray-300 text-black py-2 rounded-lg hover:bg-gray-400 transition-colors"
+        onClick={() =>
+          navigate("/tornei/nuovo/step1", {
+            state: {
+              torneoId: state.torneoId,
+              torneoNome: state.torneoNome,
+              torneoLuogo: state.torneoLuogo,
+              stagioneSelezionata: state.stagioneSelezionata,
+            },
+          })
+        }
+        className="w-full bg-gray-200 text-black py-2 rounded-lg hover:bg-gray-300 transition"
       >
         Indietro
       </button>

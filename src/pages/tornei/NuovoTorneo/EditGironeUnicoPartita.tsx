@@ -1,18 +1,17 @@
 // src/pages/tornei/NuovoTorneo/EditGironeUnicoPartita.tsx
-import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../../lib/supabaseClient';
 
 interface Partita {
   id: string;
-  squadra_casa_id: string;
-  squadra_ospite_id: string;
-  goal_casa: number | null;
-  goal_ospite: number | null;
+  squadra_casa: string;
+  squadra_ospite: string;
+  gol_casa: number;
+  gol_ospite: number;
+  data_match: string | null;
+  giocata: boolean;
   rigori_vincitore: string | null;
-  stato: string;
-  data_ora: string | null;
 }
 
 interface Squadra {
@@ -22,211 +21,203 @@ interface Squadra {
 }
 
 export default function EditGironeUnicoPartita() {
-  const { id: matchId } = useParams<{ id: string }>();
+  const { matchId } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const [loading, setLoading] = useState(true);
-  const [savingResult, setSavingResult] = useState(false);
-  const [savingDate, setSavingDate] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [partita, setPartita] = useState<Partita | null>(null);
-  const [teams, setTeams] = useState<Record<string, Squadra>>({});
+  const [teams, setTeams] = useState<{ [key: string]: Squadra }>({}); // <-- sostituito Record
   const [scoreCasa, setScoreCasa] = useState(0);
   const [scoreOspite, setScoreOspite] = useState(0);
-  const [rigoriVincitore, setRigoriVincitore] = useState<string | null>(null);
   const [dataOra, setDataOra] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [rigoriVincitore, setRigoriVincitore] = useState<string | null>(null);
 
-  // Carica la partita e le squadre
   useEffect(() => {
-    if (!matchId) {
-      setError('ID partita mancante');
-      setLoading(false);
-      return;
-    }
+    if (!matchId) return;
+
     (async () => {
-      setLoading(true);
-      const { data: p, error: pe } = await supabase
-        .from<Partita>('partite_torneo')
+      const { data: p } = await supabase
+        .from('tornei_gironeunico')
         .select('*')
         .eq('id', matchId)
         .single();
-      if (pe || !p) {
-        setError('Impossibile caricare la partita.');
-        setLoading(false);
+
+      if (!p) {
+        navigate(-1);
         return;
       }
-      setPartita(p);
-      setScoreCasa(p.goal_casa ?? 0);
-      setScoreOspite(p.goal_ospite ?? 0);
-      setRigoriVincitore(p.rigori_vincitore);
-      setDataOra(p.data_ora ? p.data_ora.slice(0, 16) : '');
 
-      const ids = [p.squadra_casa_id, p.squadra_ospite_id];
-      const { data: sqs } = await supabase
-        .from<Squadra>('squadre')
+      setPartita(p);
+      setScoreCasa(p.gol_casa ?? 0);
+      setScoreOspite(p.gol_ospite ?? 0);
+      setDataOra(p.data_match ? p.data_match.slice(0, 16) : '');
+      setRigoriVincitore(p.rigori_vincitore || null);
+
+      const { data: teamData } = await supabase
+        .from('squadre')
         .select('id, nome, logo_url')
-        .in('id', ids);
-      if (sqs) {
-        const map: Record<string, Squadra> = {};
-        sqs.forEach(s => (map[s.id] = s));
+        .in('id', [p.squadra_casa, p.squadra_ospite]);
+
+      if (teamData) {
+        const map: { [key: string]: Squadra } = {}; // <-- sostituito Record
+        teamData.forEach(t => (map[t.id] = t));
         setTeams(map);
       }
+
       setLoading(false);
     })();
   }, [matchId]);
 
-  // Salva risultato + data
-  const handleSaveResult = async () => {
+  const handleSaveResults = async () => {
     if (!partita) return;
-    setSavingResult(true);
+    setSaving(true);
 
-    let winner_id: string | null = null;
-    if (scoreCasa > scoreOspite) winner_id = partita.squadra_casa_id;
-    else if (scoreOspite > scoreCasa) winner_id = partita.squadra_ospite_id;
-    else winner_id = rigoriVincitore;
-
-    const updates = {
-      goal_casa: scoreCasa,
-      goal_ospite: scoreOspite,
-      winner_id,
-      rigori_vincitore: scoreCasa === scoreOspite ? rigoriVincitore : null,
-      data_ora: dataOra ? `${dataOra}:00` : null,
-      stato: 'Giocata',
-    };
-
-    const { error: upErr } = await supabase
-      .from('partite_torneo')
-      .update(updates)
+    const { error } = await supabase
+      .from('tornei_gironeunico')
+      .update({
+        gol_casa: scoreCasa,
+        gol_ospite: scoreOspite,
+        giocata: true,
+        data_match: dataOra ? `${dataOra}:00` : null,
+        rigori_vincitore: rigoriVincitore,
+      })
       .eq('id', partita.id);
 
-    setSavingResult(false);
-    if (upErr) {
-      setError('Errore in salvataggio risultato.');
+    setSaving(false);
+    if (error) {
+      alert('Errore salvataggio: ' + error.message);
     } else {
       navigate(-1);
     }
   };
 
-  // Salva solo la data
-  const handleSaveDate = async () => {
+  const handleSaveDateOnly = async () => {
     if (!partita) return;
-    setSavingDate(true);
+    setSaving(true);
 
-    const { error: upErr } = await supabase
-      .from('partite_torneo')
-      .update({ data_ora: dataOra ? `${dataOra}:00` : null })
+    const { error } = await supabase
+      .from('tornei_gironeunico')
+      .update({
+        data_match: dataOra ? `${dataOra}:00` : null,
+      })
       .eq('id', partita.id);
 
-    setSavingDate(false);
-    if (upErr) {
-      setError('Errore in salvataggio data.');
+    setSaving(false);
+    if (error) {
+      alert('Errore salvataggio data: ' + error.message);
     } else {
       navigate(-1);
+    }
+  };
+
+  const handleRigoriChange = (squadraId: string) => {
+    if (rigoriVincitore === squadraId) {
+      setRigoriVincitore(null);
+    } else {
+      setRigoriVincitore(squadraId);
     }
   };
 
   if (loading) return <p className="text-center py-6">Caricamento…</p>;
-  if (error)   return <p className="text-center py-6 text-red-600">{error}</p>;
-  if (!partita) return <p className="text-center py-6">Partita non trovata.</p>;
+  if (!partita || !teams[partita.squadra_casa] || !teams[partita.squadra_ospite]) {
+    return (
+      <div className="max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow">
+        <p className="text-center">Le squadre non sono ancora definite per questa partita.</p>
+      </div>
+    );
+  }
 
-  const casa   = teams[partita.squadra_casa_id];
-  const ospite = teams[partita.squadra_ospite_id];
+  const casa = teams[partita.squadra_casa];
+  const ospite = teams[partita.squadra_ospite];
 
   return (
     <div className="max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow space-y-6">
-      <button onClick={() => navigate(-1)} className="flex items-center text-blue-600 hover:underline">
-        <ArrowLeft size={20} /> <span className="ml-1">Indietro</span>
-      </button>
+      <h2 className="text-xl font-semibold text-center border-b pb-2 mb-4">Modifica Risultato</h2>
 
-      <h2 className="text-xl font-semibold text-center">Modifica Risultato</h2>
-
-      {/* Squadra Casa */}
-      <div className="flex items-center justify-between">
+      {/* CASA */}
+      <div className="text-xs text-gray-500 uppercase mb-1">Casa</div>
+      <div className="flex items-center justify-between p-3 bg-gray-50 rounded border">
         <div className="flex items-center space-x-2">
-          {casa?.logo_url && <img src={casa.logo_url} alt={casa.nome} className="w-8 h-8 rounded-full" />}
-          <span className="font-medium">{casa?.nome}</span>
+          {casa.logo_url && <img src={casa.logo_url} alt={casa.nome} className="w-8 h-8 rounded-full" />}
+          <span className="font-medium">{casa.nome}</span>
         </div>
         <input
           type="number"
           min={0}
           value={scoreCasa}
-          onChange={e => setScoreCasa(+e.target.value)}
+          onChange={e => setScoreCasa(+e.currentTarget.value)}
           onFocus={e => e.currentTarget.select()}
-          className="w-16 text-center border rounded"
+          className="w-16 text-center border rounded text-xl font-bold hover:ring-2 hover:ring-blue-300"
         />
       </div>
 
-      {/* Squadra Ospite */}
-      <div className="flex items-center justify-between">
+      {/* OSPITE */}
+      <div className="text-xs text-gray-500 uppercase mb-1">Ospite</div>
+      <div className="flex items-center justify-between p-3 bg-gray-50 rounded border">
         <div className="flex items-center space-x-2">
-          {ospite?.logo_url && <img src={ospite.logo_url} alt={ospite.nome} className="w-8 h-8 rounded-full" />}
-          <span className="font-medium">{ospite?.nome}</span>
+          {ospite.logo_url && <img src={ospite.logo_url} alt={ospite.nome} className="w-8 h-8 rounded-full" />}
+          <span className="font-medium">{ospite.nome}</span>
         </div>
         <input
           type="number"
           min={0}
           value={scoreOspite}
-          onChange={e => setScoreOspite(+e.target.value)}
+          onChange={e => setScoreOspite(+e.currentTarget.value)}
           onFocus={e => e.currentTarget.select()}
-          className="w-16 text-center border rounded"
+          className="w-16 text-center border rounded text-xl font-bold hover:ring-2 hover:ring-blue-300"
         />
       </div>
 
-      {/* Rigori se pareggio */}
+      {/* RIGORI */}
       {scoreCasa === scoreOspite && (
-        <div className="space-y-1">
-          <span className="font-medium">Vincitore ai rigori:</span>
-          <div className="flex items-center space-x-4">
-            <label className="flex items-center space-x-1">
-              <input
-                type="radio"
-                name="rigori"
-                checked={rigoriVincitore === partita.squadra_casa_id}
-                onChange={() => setRigoriVincitore(partita.squadra_casa_id)}
-              />
-              <span>{casa?.nome}</span>
-            </label>
-            <label className="flex items-center space-x-1">
-              <input
-                type="radio"
-                name="rigori"
-                checked={rigoriVincitore === partita.squadra_ospite_id}
-                onChange={() => setRigoriVincitore(partita.squadra_ospite_id)}
-              />
-              <span>{ospite?.nome}</span>
-            </label>
-          </div>
+        <div className="space-y-2">
+          <div className="text-sm font-semibold text-gray-700">Vincitore ai rigori</div>
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={rigoriVincitore === casa.id}
+              onChange={() => handleRigoriChange(casa.id)}
+            />
+            <span>{casa.nome}</span>
+          </label>
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={rigoriVincitore === ospite.id}
+              onChange={() => handleRigoriChange(ospite.id)}
+            />
+            <span>{ospite.nome}</span>
+          </label>
         </div>
       )}
 
-      {/* Data & Ora */}
+      {/* DATA & ORA */}
       <div>
-        <label className="block mb-1 font-medium">Data &amp; Ora Incontro</label>
+        <label className="block mb-1 font-medium">Data & Ora Incontro</label>
         <input
           type="datetime-local"
           value={dataOra}
-          onChange={e => setDataOra(e.target.value)}
+          onChange={e => setDataOra(e.currentTarget.value)}
           className="w-full border rounded px-3 py-2"
         />
       </div>
 
-      {/* Pulsanti */}
-      <div className="flex flex-col gap-3">
+      {/* PULSANTI */}
+      <div className="space-y-3">
         <button
-          onClick={handleSaveResult}
-          disabled={savingResult}
+          onClick={handleSaveResults}
+          disabled={saving}
           className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
         >
-          {savingResult ? 'Salvando risultato…' : 'Salva Risultato e Data'}
+          {saving ? 'Salvataggio…' : 'Salva Risultato e Data'}
         </button>
         <button
-          onClick={handleSaveDate}
-          disabled={savingDate}
+          onClick={handleSaveDateOnly}
+          disabled={saving}
           className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 disabled:opacity-50"
         >
-          {savingDate ? 'Salvando data…' : 'Salva Solo Data'}
+          {saving ? 'Salvataggio…' : 'Salva Solo Data'}
         </button>
       </div>
     </div>

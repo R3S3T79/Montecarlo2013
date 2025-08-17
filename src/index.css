@@ -1,3 +1,82 @@
+/* Data creazione chat: 2025-07-30 */
+/* src/index.css */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Layout base */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+/* Sfondo solo a schermo (non in stampa) */
+@media screen {
+  body {
+    background: linear-gradient(180deg, #6b7280 0%, #e5e7eb 100%);
+    background-attachment: fixed;
+  }
+}
+
+/* ---- Stampa ---- */
+/* Non impostiamo size:A4 per NON bloccare lo scaling del browser */
+@page {
+  size: auto;
+  margin: 12mm;
+}
+
+@media print {
+  /* Forza rimozione di QUALSIASI sfondo/ombra in stampa */
+  *, *::before, *::after {
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+  }
+
+  html, body, #root {
+    height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important; /* pagina bianca */
+  }
+
+  /* Area contenuto stampabile (evita max-width e overflow) */
+  .print-area {
+    height: auto !important;
+    max-width: none !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  /* Nascondi hamburger e qualsiasi elemento marcato no-print */
+  button[aria-label="Apri menu"],
+  .no-print,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Evita spezzature dei blocchi */
+  .avoid-break,
+  .no-break-inside {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Forza inizio nuova pagina */
+  .break-before-page,
+  .page-break {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  /* Tabelle: header ripetuto e righe non spezzate */
+  table { width: 100%; border-collapse: collapse; }
+  thead { display: table-header-group; }
+  tr, td, th { break-inside: avoid; page-break-inside: avoid; }
+}
+
+/* Celle “nome squadra” con logo + testo troncato */
+.td-team { display:flex; align-items:center; gap:.5rem; min-width:0; }
+.td-team .name { display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

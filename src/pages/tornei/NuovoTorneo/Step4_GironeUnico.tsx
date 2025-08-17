@@ -1,6 +1,6 @@
 // src/pages/tornei/NuovoTorneo/Step4_GironeUnico.tsx
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { supabase } from '../../../lib/supabaseClient';
 
 interface Squadra {
@@ -12,24 +12,24 @@ interface StateType {
   torneoNome: string;
   torneoLuogo: string;
   stagioneSelezionata: string;
-  formatoTorneo: 'girone_unico';
+  formatoTorneo: 'Girone_Unico';
   numSquadre: number;
 }
 
 export default function Step4_GironeUnico() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { torneoId } = useParams();
   const state = location.state as StateType | null;
 
-  // Log in apertura per vedere sempre lo state
-  console.log('[Step4_GironeUnico] render, location.state =', state);
+  console.log('[Step4_GironeUnico] render, location.state =', state, 'torneoId =', torneoId);
 
   const [squadre, setSquadre] = useState<Squadra[]>([]);
   const [scelte, setScelte] = useState<(string | null)[]>([]);
 
   useEffect(() => {
-    if (!state) {
-      console.warn('[Step4_GironeUnico] stato mancante, torno a step1');
+    if (!state || !torneoId) {
+      console.warn('[Step4_GironeUnico] stato o torneoId mancante, torno a step1');
       navigate('/tornei/nuovo/step1');
       return;
     }
@@ -41,17 +41,42 @@ export default function Step4_GironeUnico() {
         console.error('[Step4_GironeUnico] errore fetch:', error);
         return;
       }
-      const montecarlo = data.find(s => s.nome.toLowerCase().includes('montecarlo'));
-      const altre = data.filter(s => !s.nome.toLowerCase().includes('montecarlo'));
-      altre.sort((a, b) => a.nome.localeCompare(b.nome));
+
+      // --- ORDINAMENTO RICHIESTO ---
+      // Montecarlo deve essere la prima voce, il resto in ordine alfabetico.
+      // Usiamo l'ID noto per evitare collisioni con "Montecarlo Sq. B", ecc.
+      const MONTECARLO_ID = 'a16a8645-9f86-41d9-a81f-a92931f1cc67';
+
+      let elenco: Squadra[] = data ?? [];
+
+      // Se Montecarlo non è nella lista, la recuperiamo e aggiungiamo
+      if (!elenco.some(s => s.id === MONTECARLO_ID)) {
+        const { data: mc } = await supabase
+          .from('squadre')
+          .select('id, nome')
+          .eq('id', MONTECARLO_ID)
+          .maybeSingle();
+        if (mc) elenco = [...elenco, mc];
+      }
+
+      const montecarlo =
+        elenco.find(s => s.id === MONTECARLO_ID) ||
+        elenco.find(s => s.nome.trim().toLowerCase() === 'montecarlo');
+
+      const altre = elenco
+        .filter(s => s.id !== montecarlo?.id)
+        .sort((a, b) => a.nome.localeCompare(b.nome, 'it', { sensitivity: 'base' }));
+
       const ordered = montecarlo ? [montecarlo, ...altre] : altre;
+      // --- FINE ORDINAMENTO ---
+
       setSquadre(ordered);
       setScelte(Array(state.numSquadre).fill(null));
       console.log('[Step4_GironeUnico] squadre caricate:', ordered);
     })();
-  }, [state, navigate]);
+  }, [state, torneoId, navigate]);
 
-  if (!state) return null;
+  if (!state || !torneoId) return null;
 
   const handleSelect = (idx: number, val: string) => {
     const nuove = [...scelte];
@@ -66,14 +91,14 @@ export default function Step4_GironeUnico() {
   const handleContinue = () => {
     console.log('[Step4_GironeUnico] click Avanti, tutte valide?', tutteValide());
     if (!tutteValide()) return;
-    navigate('/tornei/nuovo/step5-gironeunico', { state: { ...state, squadreSelezionate: scelte } });
+    navigate(`/tornei/nuovo/step5-gironeunico/${torneoId}`, {
+      state: { ...state, squadreSelezionate: scelte },
+    });
   };
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-      <h2 className="text-2xl font-bold text-center mb-4">
-        Seleziona {state.numSquadre} squadre
-      </h2>
+      
 
       {scelte.map((val, idx) => (
         <select
@@ -84,6 +109,7 @@ export default function Step4_GironeUnico() {
         >
           <option value="">– Seleziona squadra –</option>
           {squadre
+            // Manteniamo l'ordine già calcolato: Montecarlo prima, poi alfabetico.
             .filter(s => !scelte.includes(s.id) || scelte[idx] === s.id)
             .map((s) => (
               <option key={s.id} value={s.id}>

@@ -1,251 +1,252 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../lib/supabaseClient';
-import { useAuth } from '../context/AuthContext';
-import { Edit2, Trash2, ArrowLeft } from 'lucide-react';
-import { UserRole } from '../lib/roles';
+// src/pages/DettaglioPartita.tsx
+// Data creazione chat: 2025-08-03
+
+import React, { useEffect, useState, useRef } from 'react'
+import html2canvas from 'html2canvas'
+import { useParams, useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../context/AuthContext'
 
 interface MarcatoriEntry {
-  id: string;
-  giocatore: { nome: string; cognome: string };
-  periodo: number;
+  periodo: number
+  giocatore: { nome: string; cognome: string }
 }
 
 interface SquadraInfo {
-  id: string;
-  nome: string;
-  logo_url: string;
+  id: string
+  nome: string
 }
 
 interface PartitaDettaglio {
-  id: string;
-  data_ora: string;
-  casa: SquadraInfo;
-  ospite: SquadraInfo;
-  goal_a: number;
-  goal_b: number;
-  goal_a1: number;
-  goal_a2: number;
-  goal_a3: number;
-  goal_a4: number;
-  goal_b1: number;
-  goal_b2: number;
-  goal_b3: number;
-  goal_b4: number;
-  marcatori: MarcatoriEntry[];
+  id: string
+  stagione_id: string
+  data_ora: string
+  casa: SquadraInfo
+  ospite: SquadraInfo
+  goal_a1: number
+  goal_a2: number
+  goal_a3: number
+  goal_a4: number
+  goal_b1: number
+  goal_b2: number
+  goal_b3: number
+  goal_b4: number
+  marcatori: MarcatoriEntry[]
 }
 
-const MONTECARLO_ID = '5bca3e07-974a-4d12-9208-d85975906fe4';
-
 export default function DettaglioPartita() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const { user, loading: authLoading } = useAuth()
 
-  const [partita, setPartita] = useState<PartitaDettaglio | null>(null);
-  const [loading, setLoading] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null)
 
-  const role =
-    (user?.user_metadata?.role as UserRole) ||
-    (user?.app_metadata?.role as UserRole) ||
-    UserRole.Authenticated;
-  const canEdit = role === UserRole.Admin || role === UserRole.Creator;
+  const handleScreenshot = async () => {
+    if (!containerRef.current) return
+    const canvas = await html2canvas(containerRef.current)
+    const dataUrl = canvas.toDataURL('image/png')
+    const link = document.createElement('a')
+    link.href = dataUrl
+    link.download = 'partita.png'
+    link.click()
+  }
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/login', { replace: true });
+    const listener = () => {
+      handleScreenshot()
     }
-  }, [user, authLoading, navigate]);
+    window.addEventListener('capture-container', listener)
+    return () => {
+      window.removeEventListener('capture-container', listener)
+    }
+  }, [])
+
+  const [partita, setPartita] = useState<PartitaDettaglio | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!authLoading && !user) navigate('/login', { replace: true })
+  }, [user, authLoading, navigate])
 
   useEffect(() => {
     async function fetchDetail() {
-      if (!id) {
-        setLoading(false);
-        return;
+      if (!id) { setLoading(false); return }
+
+      // 1️⃣ Recupero dati partita con stagione_id
+      const { data: pd, error: errPd } = await supabase
+        .from('partite')
+        .select(`
+          id,
+          stagione_id,
+          data_ora,
+          goal_a1, goal_a2, goal_a3, goal_a4,
+          goal_b1, goal_b2, goal_b3, goal_b4,
+          casa: squadra_casa_id ( id, nome ),
+          ospite: squadra_ospite_id ( id, nome )
+        `)
+        .eq('id', id)
+        .single()
+
+      if (errPd || !pd) { 
+        console.error(errPd)
+        setLoading(false)
+        return
       }
 
-      try {
-        const { data: pd, error: pe } = await supabase
-          .from('partite')
-          .select(`
-            id,
-            data_ora,
-            goal_a,
-            goal_b,
-            goal_a1,
-            goal_a2,
-            goal_a3,
-            goal_a4,
-            goal_b1,
-            goal_b2,
-            goal_b3,
-            goal_b4,
-            casa: squadra_casa_id ( id, nome, logo_url ),
-            ospite: squadra_ospite_id ( id, nome, logo_url )
-          `)
-          .eq('id', id)
-          .single();
+      // 2️⃣ Recupero marcatori grezzi
+      const { data: marcatoriData, error: errMd } = await supabase
+        .from('marcatori')
+        .select('periodo, giocatore_uid')
+        .eq('partita_id', id)
 
-        if (!pd || pe) {
-          setLoading(false);
-          return;
+      if (errMd) console.error(errMd)
+
+      // 3️⃣ Recupero giocatori della stagione
+      const { data: giocatoriStagione, error: errGs } = await supabase
+        .from('giocatori_stagioni')
+        .select('giocatore_uid, nome, cognome')
+        .eq('stagione_id', pd.stagione_id)
+
+      if (errGs) console.error(errGs)
+
+      // 4️⃣ Merge lato client
+      const marcatori: MarcatoriEntry[] = (marcatoriData || []).map(m => {
+        const g = giocatoriStagione?.find(gs => gs.giocatore_uid === m.giocatore_uid)
+        return {
+          periodo: m.periodo,
+          giocatore: g ? { nome: g.nome, cognome: g.cognome } : { nome: '', cognome: '' }
         }
+      })
 
-        const { data: md, error: me } = await supabase
-          .from('marcatori')
-          .select('periodo, giocatore_id')
-          .eq('partita_id', id);
-
-        let marcWithNames: MarcatoriEntry[] = [];
-        if (md?.length) {
-          const ids = Array.from(new Set(md.map(m => m.giocatore_id)));
-          const { data: gd } = await supabase
-            .from('giocatori')
-            .select('id, nome, cognome')
-            .in('id', ids);
-
-          if (gd) {
-            marcWithNames = md.map(m => {
-              const g = gd.find(x => x.id === m.giocatore_id)!;
-              return {
-                id: m.giocatore_id,
-                periodo: m.periodo,
-                giocatore: { nome: g.nome, cognome: g.cognome },
-              };
-            });
-          }
-        }
-
-        setPartita({ ...pd, marcatori: marcWithNames });
-      } catch (err) {
-        console.error("Errore:", err);
-      } finally {
-        setLoading(false);
-      }
+      setPartita({ ...(pd as any), marcatori })
+      setLoading(false)
     }
 
-    if (user) fetchDetail();
-  }, [id, user]);
-
-  const handleDelete = async () => {
-    if (!id || !window.confirm('Eliminare questa partita?')) return;
-    const { error } = await supabase.from('partite').delete().eq('id', id);
-    if (error) alert('Errore eliminazione');
-    else navigate('/risultati');
-  };
+    if (user) fetchDetail()
+  }, [id, user, authLoading, navigate])
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <span>Caricamento…</span>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#6B7280] to-[#bfb9b9]">
+        <div className="text-white text-lg">Caricamento…</div>
       </div>
-    );
+    )
   }
-
   if (!partita) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500">
-        Partita non trovata
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#6B7280] to-[#bfb9b9]">
+        <div className="text-white text-lg">Partita non trovata</div>
       </div>
-    );
+    )
   }
 
-  const isCasa = partita.casa.id === MONTECARLO_ID;
-  const montecarlo = isCasa ? partita.casa : partita.ospite;
-  const avversario = isCasa ? partita.ospite : partita.casa;
-  const goalMC = isCasa ? partita.goal_a : partita.goal_b;
-  const goalAVV = isCasa ? partita.goal_b : partita.goal_a;
+  const dataFormatted = new Date(partita.data_ora)
+    .toLocaleDateString('it-IT', {
+      weekday: 'long',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
+    .replace(/^./, ch => ch.toUpperCase())
 
-  const goalMCxTempo = [
-    isCasa ? partita.goal_a1 : partita.goal_b1,
-    isCasa ? partita.goal_a2 : partita.goal_b2,
-    isCasa ? partita.goal_a3 : partita.goal_b3,
-    isCasa ? partita.goal_a4 : partita.goal_b4,
-  ];
-  const goalAVVxTempo = [
-    isCasa ? partita.goal_b1 : partita.goal_a1,
-    isCasa ? partita.goal_b2 : partita.goal_a2,
-    isCasa ? partita.goal_b3 : partita.goal_a3,
-    isCasa ? partita.goal_b4 : partita.goal_a4,
-  ];
+  const goalCasaArr = [
+    partita.goal_a1,
+    partita.goal_a2,
+    partita.goal_a3,
+    partita.goal_a4,
+  ]
+  const goalOspiteArr = [
+    partita.goal_b1,
+    partita.goal_b2,
+    partita.goal_b3,
+    partita.goal_b4,
+  ]
 
-  const dataFormatted = new Date(partita.data_ora).toLocaleDateString('it-IT', {
-    weekday: 'short',
-    day: '2-digit',
-    month: '2-digit',
-  });
+  const renderSezione = (
+    squadra: SquadraInfo,
+    goals: number[]
+  ) => {
+    const total = goals.reduce((a, b) => a + b, 0)
+    const isMonte = squadra.nome === 'Montecarlo'
+    const marcatoriByTempo = (t: number) =>
+      partita.marcatori.filter(m => m.periodo === t)
+
+    return (
+      <div className="bg-white rounded-lg shadow-montecarlo overflow-hidden">
+        <div
+          className={`p-4 flex items-center justify-between ${
+            isMonte
+              ? 'bg-montecarlo-red-50 border border-montecarlo-red-200'
+              : 'bg-montecarlo-gray-50 border border-montecarlo-gray-200'
+          }`}
+        >
+          <span
+            className={`font-bold text-lg ${
+              isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'
+            }`}
+          >
+            {squadra.nome}
+          </span>
+          <span
+            className={`font-bold text-2xl ${
+              isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'
+            }`}
+          >
+            {total}
+          </span>
+        </div>
+        <div className="p-4 space-y-4">
+          {[1, 2, 3, 4].map(tempo => (
+            <div key={tempo}>
+              <div className="flex justify-between">
+                <span
+                  className={`font-medium ${
+                    isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'
+                  }`}
+                >
+                  {tempo}° Tempo
+                </span>
+                <span
+                  className={`font-semibold ${
+                    isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'
+                  }`}
+                >
+                  {goals[tempo - 1]}
+                </span>
+              </div>
+              {isMonte && (
+                <ul className="list-disc list-inside text-gray-700 text-lg mt-2">
+                  {marcatoriByTempo(tempo).map((m, i) => (
+                    <li key={i}>
+                      {m.giocatore.cognome} {m.giocatore.nome}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-montecarlo-light">
-      <div className="container mx-auto px-4 py-6">
-        <div className="relative mb-6">
-          <Link
-            to="/risultati"
-            className="absolute left-4 top-1/2 transform -translate-y-1/2 text-montecarlo-secondary hover:text-montecarlo-primary"
-          >
-            <ArrowLeft size={20} />
-          </Link>
-
-          <div className="text-center text-sm font-medium text-montecarlo-secondary">
-            {dataFormatted}
+    <div className="min-h-screen px-4 pb-6">
+      <div className="max-w-md mx-auto text-xl" ref={containerRef}>
+        <div className="bg-white rounded-xl shadow-montecarlo -mt-2">
+          {/* header: solo data */}
+          <div className="bg-montecarlo-red-50 border-l-4 border-montecarlo-secondary flex justify-end px-6 py-4 rounded-t-xl">
+            <span className="bg-montecarlo-accent text-montecarlo-secondary px-3 py-1 rounded-full text-sm font-medium shadow-gold">
+              {dataFormatted}
+            </span>
           </div>
 
-          {canEdit && (
-            <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex space-x-2">
-              <button
-                onClick={() => navigate(`/gestione-risultato/${id}`)}
-                className="px-2 py-1 text-xs bg-yellow-400 text-white rounded hover:bg-yellow-500"
-              >
-                <Edit2 size={14} />
-              </button>
-              <button
-                onClick={handleDelete}
-                className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="bg-white rounded-xl shadow p-4 mb-6 text-center">
-          <div className="text-montecarlo-secondary font-bold text-lg">{montecarlo.nome}</div>
-          <div className="text-4xl font-extrabold text-montecarlo-purple">{goalMC} - {goalAVV}</div>
-          <div className="text-montecarlo-secondary font-bold text-lg">{avversario.nome}</div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow p-4 mb-6">
-          <h3 className="text-center text-montecarlo-secondary font-semibold mb-3">Risultato per tempo</h3>
-          <div className="grid grid-cols-2 gap-2 text-sm text-center text-montecarlo-neutral">
-            {[0, 1, 2, 3].map(i => (
-              <React.Fragment key={i}>
-                <div>{i + 1}° Tempo</div>
-                <div>{goalMCxTempo[i]} - {goalAVVxTempo[i]}</div>
-              </React.Fragment>
-            ))}
+          <div className="p-6 space-y-6">
+            {renderSezione(partita.casa, goalCasaArr)}
+            {renderSezione(partita.ospite, goalOspiteArr)}
           </div>
         </div>
-
-        {partita.marcatori.length > 0 && (
-          <div className="bg-white rounded-xl shadow p-4">
-            <h3 className="text-center text-montecarlo-secondary font-semibold mb-3">
-              Marcatori Montecarlo
-            </h3>
-            <ul className="text-sm text-gray-700 space-y-1">
-              {partita.marcatori
-                .sort((a, b) => a.periodo - b.periodo)
-                .map((m, i) => (
-                  <li key={i} className="text-montecarlo-neutral">
-                    <span className="font-medium">
-                      {m.giocatore.cognome} {m.giocatore.nome}
-                    </span>{' '}
-                    - {m.periodo}° Tempo
-                  </li>
-                ))}
-            </ul>
-          </div>
-        )}
       </div>
     </div>
-  );
+  )
 }

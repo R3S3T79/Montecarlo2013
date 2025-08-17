@@ -1,7 +1,7 @@
 // src/pages/tornei/NuovoTorneo/Step1_DettagliBase.tsx
-import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../../lib/supabaseClient';
+import React, { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../../../lib/supabaseClient";
 
 interface Stagione {
   id: string;
@@ -9,24 +9,20 @@ interface Stagione {
 }
 
 export default function Step1_DettagliBase() {
-  const [torneoNome, setTorneoNome] = useState('');
-  const [torneoLuogo, setTorneoLuogo] = useState('');
+  const [torneoNome, setTorneoNome] = useState("");
+  const [torneoLuogo, setTorneoLuogo] = useState("");
   const [stagioni, setStagioni] = useState<Stagione[]>([]);
-  const [stagioneSelezionata, setStagioneSelezionata] = useState('');
+  const [stagioneSelezionata, setStagioneSelezionata] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const navigate = useNavigate();
 
   const fetchStagioni = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('stagioni')
-      .select('id, nome')
-      .order('data_inizio', { ascending: false });
+    const { data } = await supabase
+      .from("stagioni")
+      .select("id, nome")
+      .order("data_inizio", { ascending: false });
 
-    if (error) {
-      console.error('Errore fetch stagioni:', error.message);
-      return;
-    }
     setStagioni(data ?? []);
   }, []);
 
@@ -36,12 +32,11 @@ export default function Step1_DettagliBase() {
 
   const handleSubmit = () => {
     if (!torneoNome.trim() || !torneoLuogo.trim() || !stagioneSelezionata) {
-      setErrorMsg('Compila tutti i campi.');
+      setErrorMsg("Compila tutti i campi.");
       return;
     }
     setErrorMsg(null);
-    // CORREZIONE: trattino anziché underscore
-    navigate('/tornei/nuovo/step1-5', {
+    navigate("/tornei/nuovo/step1-5", {
       state: {
         torneoNome,
         torneoLuogo,
@@ -51,44 +46,41 @@ export default function Step1_DettagliBase() {
   };
 
   return (
-    <div className="max-w-md mx-auto px-4 py-6">
-      <button
-        onClick={() => navigate(-1)}
-        className="inline-flex items-center text-gray-600 hover:text-gray-800 mb-4"
-      >
-        ← Indietro
-      </button>
+    <div className="max-w-md mx-auto mt-8 px-4 py-6 bg-white rounded-lg shadow space-y-6">
+      
 
-      <h2 className="text-2xl font-bold mb-6 text-center">Crea Nuovo Torneo</h2>
       <div className="space-y-4">
+        {/* Nome Torneo */}
         <div>
-          <label className="block text-sm font-medium">Nome Torneo</label>
+          <label className="block text-sm font-medium mb-1">Nome Torneo</label>
           <input
             type="text"
             value={torneoNome}
             onChange={(e) => setTorneoNome(e.target.value)}
-            className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
             placeholder="Es. Torneo Primavera 2025"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
           />
         </div>
 
+        {/* Luogo */}
         <div>
-          <label className="block text-sm font-medium">Luogo</label>
+          <label className="block text-sm font-medium mb-1">Luogo</label>
           <input
             type="text"
             value={torneoLuogo}
             onChange={(e) => setTorneoLuogo(e.target.value)}
-            className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
             placeholder="Es. Montecarlo"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
           />
         </div>
 
+        {/* Stagione */}
         <div>
-          <label className="block text-sm font-medium">Stagione</label>
+          <label className="block text-sm font-medium mb-1">Stagione</label>
           <select
             value={stagioneSelezionata}
             onChange={(e) => setStagioneSelezionata(e.target.value)}
-            className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 bg-white"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
           >
             <option value="">– Seleziona stagione –</option>
             {stagioni.map((s) => (
@@ -99,16 +91,29 @@ export default function Step1_DettagliBase() {
           </select>
         </div>
 
+        {/* Errore */}
         {errorMsg && (
-          <div className="text-red-600 text-sm text-center">{errorMsg}</div>
+          <div className="text-red-600 text-sm text-center bg-red-50 border border-red-200 py-2 rounded">
+            {errorMsg}
+          </div>
         )}
 
-        <button
-          onClick={handleSubmit}
-          className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Continua
-        </button>
+        {/* Pulsanti */}
+        <div className="space-y-2 pt-2">
+          <button
+            onClick={handleSubmit}
+            className="w-full bg-blue-600 text-white text-lg py-2 rounded-lg hover:bg-blue-700 transition"
+          >
+            Continua
+          </button>
+
+          <button
+            onClick={() => navigate("/tornei")}
+            className="w-full bg-gray-200 text-black py-2 rounded-lg hover:bg-gray-300 transition"
+          >
+            Indietro
+          </button>
+        </div>
       </div>
     </div>
   );

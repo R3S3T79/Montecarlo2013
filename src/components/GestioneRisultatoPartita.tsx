@@ -1,590 +1,641 @@
 // src/components/GestioneRisultatoPartita.tsx
+// Data creazione: 16/08/2025
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import {
-  Clock,
-  ListChecks,
-  Play,
-  Pause,
-  RotateCw,
-  Save,
-} from "lucide-react";
+import TimerCircolare from "./TimerCircolare";
 
-interface SquadraInfo {
-  id: string;
-  nome: string;
-  logo_url?: string;
-}
-
-interface PartitaPropria {
-  id: string;
-  data_ora: string;
-  casa: SquadraInfo;
-  ospite: SquadraInfo;
-}
-
-interface Giocatore {
-  id: string;
-  nome: string;
-  cognome: string;
-}
-
-interface MarcatoreRecord {
-  giocatore_id: string;
-  periodo: number;
+interface TimerState {
   partita_id: string;
-}
-
-interface PresenzaRecord {
-  partita_id: string;
-  giocatore_id: string;
+  timer_started_at: string | null;
+  timer_offset_ms: number;
+  timer_status: "running" | "paused" | "stopped";
+  timer_duration_min?: number;
 }
 
 export default function GestioneRisultatoPartita() {
+  const { id } = useParams();
   const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
+  const MONTECARLO_ID = "a16a8645-9f86-41d9-a81f-a92931f1cc67";
 
-  const [partita, setPartita] = useState<PartitaPropria | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [partita, setPartita] = useState<any>(null);
+  const [squadraCasa, setSquadraCasa] = useState<any>(null);
+  const [squadraOspite, setSquadraOspite] = useState<any>(null);
 
-  const [giocatori, setGiocatori] = useState<Giocatore[]>([]);
-  const [showFormazione, setShowFormazione] = useState(false);
-  const [formazioneCasa, setFormazioneCasa] = useState<string[]>([]);
+  const [giocatori, setGiocatori] = useState<
+    { id: string; nome: string | null; cognome: string | null; giocatore_uid?: string }[]
+  >([]);
+  const [convocati, setConvocati] = useState<string[]>([]);
+
+  const [formazioneAperta, setFormazioneAperta] = useState(false);
   const [goalCasa, setGoalCasa] = useState([0, 0, 0, 0]);
   const [goalOspite, setGoalOspite] = useState([0, 0, 0, 0]);
-  const [marcatori, setMarcatori] = useState<{ [tempo: number]: (string | null)[] }>({});
-  const [tempiVisible, setTempiVisible] = useState([false, false, false, false]);
-  const [submitting, setSubmitting] = useState(false);
+  const [tempo, setTempo] = useState<number | null>(null);
 
-  const [inputMinutes, setInputMinutes] = useState(20);
-  const [countdownSec, setCountdownSec] = useState(20 * 60);
-  const [timerActive, setTimerActive] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [marcatori, setMarcatori] = useState<
+    Record<number, { goal_tempo: number; giocatore_stagione_id: string | null; id_supabase?: string }[]>
+  >({});
 
-  // Carica dati partita
+  // TIMER
+  const [timerState, setTimerState] = useState<TimerState | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+
+  const totale = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
+
+  const isMontecarlo = (teamId?: string, teamName?: string) =>
+    teamId === MONTECARLO_ID || (teamName || "").toLowerCase().includes("montecarlo");
+
+  // =====================
+  // FETCH DATI INIZIALI + REALTIME
+  // =====================
   useEffect(() => {
-    const fetchPartita = async () => {
-      if (!id) {
-        setError("ID non trovato");
-        setLoading(false);
-        return;
-      }
-      try {
-        const { data, error } = await supabase
-          .from("partite")
-          .select(`
-            id, data_ora,
-            goal_a1, goal_a2, goal_a3, goal_a4,
-            goal_b1, goal_b2, goal_b3, goal_b4,
-            squadra_casa:squadra_casa_id(id,nome,logo_url),
-            squadra_ospite:squadra_ospite_id(id,nome,logo_url)
-          `)
-          .eq("id", id)
-          .single();
-        if (error) throw error;
-        if (!data) {
-          setError("Partita non trovata");
-          setLoading(false);
-          return;
-        }
-        setPartita({
-          id: data.id,
-          data_ora: data.data_ora,
-          casa: {
-            id: data.squadra_casa.id,
-            nome: data.squadra_casa.nome,
-            logo_url: data.squadra_casa.logo_url,
-          },
-          ospite: {
-            id: data.squadra_ospite.id,
-            nome: data.squadra_ospite.nome,
-            logo_url: data.squadra_ospite.logo_url,
-          },
+    if (!id) return;
+    let subPartite: any = null;
+    let subMarcatori: any = null;
+    let subTimer: any = null;
+
+    (async () => {
+      const { data: p } = await supabase.from("partite").select("*").eq("id", id).single();
+      if (!p) return;
+      setPartita(p);
+      setGoalCasa([p.goal_a1, p.goal_a2, p.goal_a3, p.goal_a4]);
+      setGoalOspite([p.goal_b1, p.goal_b2, p.goal_b3, p.goal_b4]);
+
+      const [resCasa, resOspite] = await Promise.all([
+        supabase.from("squadre").select("*").eq("id", p.squadra_casa_id).single(),
+        supabase.from("squadre").select("*").eq("id", p.squadra_ospite_id).single(),
+      ]);
+      setSquadraCasa(resCasa.data);
+      setSquadraOspite(resOspite.data);
+
+      const { data: presenze } = await supabase
+        .from("presenze")
+        .select("giocatore_stagione_id, nome, cognome")
+        .eq("partita_id", id);
+
+      const { data: giocatoriStagione } = await supabase
+        .from("giocatori_stagioni")
+        .select("id, nome, cognome, giocatore_uid")
+        .eq("stagione_id", p.stagione_id);
+
+      const mapGiocatori = new Map<
+        string,
+        { id: string; nome: string | null; cognome: string | null; giocatore_uid?: string }
+      >();
+      (giocatoriStagione || []).forEach((g) => {
+        mapGiocatori.set(g.id, {
+          id: g.id,
+          nome: g.nome ?? null,
+          cognome: g.cognome ?? null,
+          giocatore_uid: g.giocatore_uid,
         });
-        setGoalCasa([
-          data.goal_a1 || 0,
-          data.goal_a2 || 0,
-          data.goal_a3 || 0,
-          data.goal_a4 || 0,
-        ]);
-        setGoalOspite([
-          data.goal_b1 || 0,
-          data.goal_b2 || 0,
-          data.goal_b3 || 0,
-          data.goal_b4 || 0,
-        ]);
-      } catch (err: any) {
-        console.error(err);
-        setError(err.message || "Errore caricamento");
-      } finally {
-        setLoading(false);
+      });
+      (presenze || []).forEach((pr) => {
+        const idg = pr.giocatore_stagione_id;
+        if (!idg) return;
+        if (!mapGiocatori.has(idg)) {
+          mapGiocatori.set(idg, {
+            id: idg,
+            nome: pr.nome ?? null,
+            cognome: pr.cognome ?? null,
+          });
+        }
+      });
+      const elencoGiocatori = Array.from(mapGiocatori.values()).sort((a, b) => {
+        const ac = (a.cognome || "").localeCompare(b.cognome || "");
+        return ac !== 0 ? ac : (a.nome || "").localeCompare(b.nome || "");
+      });
+      setGiocatori(elencoGiocatori);
+
+      if (presenze && presenze.length > 0) {
+        const ids = presenze
+          .map((x) => x.giocatore_stagione_id)
+          .filter((x): x is string => typeof x === "string");
+        setConvocati(ids);
+      } else {
+        setConvocati([]);
       }
+
+      const { data: marcatoriDB } = await supabase
+        .from("marcatori")
+        .select("giocatore_stagione_id, periodo, goal_tempo, id")
+        .eq("partita_id", p.id);
+
+      const perPeriodo: Record<number, any[]> = {};
+      marcatoriDB?.forEach((m) => {
+        perPeriodo[m.periodo] = perPeriodo[m.periodo] || [];
+        perPeriodo[m.periodo].push({
+          goal_tempo: m.goal_tempo,
+          giocatore_stagione_id: m.giocatore_stagione_id,
+          id_supabase: m.id,
+        });
+      });
+      setMarcatori(perPeriodo);
+
+      // realtime partite
+      subPartite = supabase
+        .channel("realtime-partite")
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "partite", filter: `id=eq.${p.id}` },
+          ({ new: u }) => {
+            setGoalCasa([u.goal_a1, u.goal_a2, u.goal_a3, u.goal_a4]);
+            setGoalOspite([u.goal_b1, u.goal_b2, u.goal_b3, u.goal_b4]);
+          }
+        )
+        .subscribe();
+
+      // realtime marcatori (qualsiasi evento)
+      subMarcatori = supabase
+        .channel("realtime-marcatori")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "marcatori", filter: `partita_id=eq.${p.id}` },
+          async () => {
+            const { data: live } = await supabase
+              .from("marcatori")
+              .select("giocatore_stagione_id, periodo, goal_tempo, id")
+              .eq("partita_id", p.id);
+            const perLive: Record<number, any[]> = {};
+            live?.forEach((m) => {
+              perLive[m.periodo] = perLive[m.periodo] || [];
+              perLive[m.periodo].push({
+                goal_tempo: m.goal_tempo,
+                giocatore_stagione_id: m.giocatore_stagione_id,
+                id_supabase: m.id,
+              });
+            });
+            setMarcatori(perLive);
+          }
+        )
+        .subscribe();
+
+      // stato timer iniziale
+      const { data: t } = await supabase
+        .from("partita_timer_state")
+        .select("*")
+        .eq("partita_id", p.id)
+        .single();
+      if (t) setTimerState(t);
+
+      // realtime timer
+      subTimer = supabase
+        .channel("realtime-timer")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "partita_timer_state", filter: `partita_id=eq.${p.id}` },
+          ({ new: u }) => {
+            setTimerState(u as TimerState);
+          }
+        )
+        .subscribe();
+    })();
+
+    return () => {
+      if (subPartite) supabase.removeChannel(subPartite);
+      if (subMarcatori) supabase.removeChannel(subMarcatori);
+      if (subTimer) supabase.removeChannel(subTimer);
     };
-    fetchPartita();
   }, [id]);
 
-  // Carica giocatori
+  // calcolo elapsed
   useEffect(() => {
-    const fetchGiocatori = async () => {
-      const { data, error } = await supabase
-        .from("giocatori")
-        .select("id,nome,cognome")
-        .order("cognome", { ascending: true });
-      if (!error && data) {
-        setGiocatori(data);
-        const init: { [tempo: number]: (string | null)[] } = {};
-        [1, 2, 3, 4].forEach((q) => (init[q] = []));
-        setMarcatori(init);
+    let interval: NodeJS.Timeout | null = null;
+    if (timerState) {
+      if (timerState.timer_status === "running" && timerState.timer_started_at) {
+        interval = setInterval(() => {
+          const started = new Date(timerState.timer_started_at!).getTime();
+          setElapsed(timerState.timer_offset_ms + (Date.now() - started));
+        }, 1000);
+      } else {
+        setElapsed(timerState.timer_offset_ms);
       }
+    }
+    return () => {
+      if (interval) clearInterval(interval);
     };
-    fetchGiocatori();
-  }, []);
+  }, [timerState]);
 
-  // Countdown timer
-  useEffect(() => {
-    if (timerActive && countdownSec > 0) {
-      timerRef.current = setTimeout(() => {
-        setCountdownSec((c) => c - 1);
-      }, 1000);
+  // durata corrente "sorgente unica"
+  const currentDuration = timerState?.timer_duration_min ?? 20;
+
+  // comandi timer (includono SEMPRE la durata per coerenza su prima creazione riga)
+  const startTimer = async () => {
+    if (!id) return;
+    await supabase.from("partita_timer_state").upsert({
+      partita_id: id,
+      timer_duration_min: currentDuration,
+      timer_started_at: new Date().toISOString(),
+      timer_status: "running",
+    });
+  };
+
+  const pauseTimer = async () => {
+    if (!id || !timerState?.timer_started_at) return;
+    const diff = Date.now() - new Date(timerState.timer_started_at).getTime();
+    await supabase
+      .from("partita_timer_state")
+      .update({
+        timer_offset_ms: timerState.timer_offset_ms + diff,
+        timer_started_at: null,
+        timer_status: "paused",
+      })
+      .eq("partita_id", id);
+  };
+
+  const resetTimer = async () => {
+    if (!id) return;
+    await supabase
+      .from("partita_timer_state")
+      .update({
+        timer_offset_ms: 0,
+        timer_started_at: null,
+        timer_status: "stopped",
+      })
+      .eq("partita_id", id);
+  };
+
+  // cambia durata iniziale (sincronizzato, e mette il timer in stopped/offset 0)
+  const changeDuration = async (minutes: number) => {
+    if (!id) return;
+    await supabase.from("partita_timer_state").upsert({
+      partita_id: id,
+      timer_duration_min: minutes,
+      timer_offset_ms: 0,
+      timer_started_at: null,
+      timer_status: "stopped",
+    });
+  };
+
+  // ---- helper marcatori: aggiorna stato locale per un periodo ----
+  const aggiornaMarcatori = (periodo: number, nuovi: any[]) => {
+    setMarcatori((prev) => ({ ...prev, [periodo]: nuovi }));
+  };
+
+  // gestione goal
+  const aggiornaGoal = async (goalA: number[], goalB: number[]) => {
+    if (!partita) return;
+    await supabase
+      .from("partite")
+      .update({
+        goal_a1: goalA[0],
+        goal_a2: goalA[1],
+        goal_a3: goalA[2],
+        goal_a4: goalA[3],
+        goal_b1: goalB[0],
+        goal_b2: goalB[1],
+        goal_b3: goalB[2],
+        goal_b4: goalB[3],
+        goal_a: totale(goalA),
+        goal_b: totale(goalB),
+      })
+      .eq("id", partita.id);
+  };
+
+  const incrementa = async (tipo: "casa" | "ospite") => {
+    if (tempo === null || !partita) return;
+    const idx = tempo - 1;
+    const nuovaA = [...goalCasa];
+    const nuovaB = [...goalOspite];
+    if (tipo === "casa") nuovaA[idx]++; else nuovaB[idx]++;
+    setGoalCasa(nuovaA);
+    setGoalOspite(nuovaB);
+    await aggiornaGoal(nuovaA, nuovaB);
+
+    // --- RIPRISTINO LOGICA: crea riga marcatore vuota per Montecarlo ---
+    const sideIsMontecarlo =
+      tipo === "casa"
+        ? isMontecarlo(partita.squadra_casa_id, squadraCasa?.nome)
+        : isMontecarlo(partita.squadra_ospite_id, squadraOspite?.nome);
+
+    if (sideIsMontecarlo) {
+      const goal_tempo = (marcatori[tempo]?.length || 0) + 1;
+      const { data, error } = await supabase
+        .from("marcatori")
+        .insert({
+          partita_id: partita.id,
+          stagione_id: partita.stagione_id,
+          periodo: tempo,
+          goal_tempo,
+          giocatore_stagione_id: null,
+          giocatore_uid: null,
+        })
+        .select("id")
+        .single();
+
+      if (!error && data) {
+        const attuali = marcatori[tempo] || [];
+        aggiornaMarcatori(tempo, [
+          ...attuali,
+          { goal_tempo, giocatore_stagione_id: null, id_supabase: data.id },
+        ]);
+      }
     }
-    return () => timerRef.current && clearTimeout(timerRef.current);
-  }, [timerActive, countdownSec]);
+  };
 
-  const toggleTimer = () => {
-    if (timerActive) {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      setTimerActive(false);
-    } else {
-      setCountdownSec((prev) => (prev > 0 ? prev : inputMinutes * 60));
-      setTimerActive(true);
+  const decrementa = async (tipo: "casa" | "ospite") => {
+    if (tempo === null || !partita) return;
+    const idx = tempo - 1;
+    const nuovaA = [...goalCasa];
+    const nuovaB = [...goalOspite];
+    if (tipo === "casa" && nuovaA[idx] > 0) nuovaA[idx]--;
+    if (tipo === "ospite" && nuovaB[idx] > 0) nuovaB[idx]--;
+    setGoalCasa(nuovaA);
+    setGoalOspite(nuovaB);
+    await aggiornaGoal(nuovaA, nuovaB);
+
+    // --- RIPRISTINO LOGICA: rimuovi ultima riga marcatore se Montecarlo ---
+    const sideIsMontecarlo =
+      tipo === "casa"
+        ? isMontecarlo(partita.squadra_casa_id, squadraCasa?.nome)
+        : isMontecarlo(partita.squadra_ospite_id, squadraOspite?.nome);
+
+    if (sideIsMontecarlo) {
+      const attuali = marcatori[tempo] || [];
+      const ultimo = attuali[attuali.length - 1];
+      if (ultimo?.id_supabase) {
+        await supabase.from("marcatori").delete().eq("id", ultimo.id_supabase);
+      }
+      aggiornaMarcatori(tempo, attuali.slice(0, -1));
     }
   };
 
-  const resetTimer = () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setTimerActive(false);
-    setCountdownSec(inputMinutes * 60);
-  };
+  // selezione marcatore nel dropdown
+  const selezionaMarcatore = async (periodo: number, goal_tempo: number, gStagioneId: string) => {
+    if (!partita) return;
 
-  const formatCountdown = (sec: number) => {
-    const m = Math.floor(sec / 60)
-      .toString()
-      .padStart(2, "0");
-    const s = (sec % 60).toString().padStart(2, "0");
-    return `${m}:${s}`;
-  };
+    const lista = marcatori[periodo] || [];
+    const marcatore = lista.find((m) => m.goal_tempo === goal_tempo);
+    const giocatore = giocatori.find((g) => g.id === gStagioneId);
 
-  const formatData = (d: string) =>
-    new Date(d).toLocaleDateString("it-IT", {
-      weekday: "short",
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
+    setMarcatori((prev) => {
+      const aggiornata = (prev[periodo] || []).map((m) =>
+        m.goal_tempo === goal_tempo ? { ...m, giocatore_stagione_id: gStagioneId } : m
+      );
+      return { ...prev, [periodo]: aggiornata };
     });
 
-  const totaleCasa = goalCasa.reduce((a, b) => a + b, 0);
-  const totaleOspite = goalOspite.reduce((a, b) => a + b, 0);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!partita) return;
-    setSubmitting(true);
-    try {
-      const totA = goalCasa.reduce((a, b) => a + b, 0);
-      const totB = goalOspite.reduce((a, b) => a + b, 0);
-      let { error: err1 } = await supabase
-        .from("partite")
+    if (marcatore?.id_supabase) {
+      await supabase
+        .from("marcatori")
         .update({
-          stato: "Giocata",
-          goal_a: totA,
-          goal_b: totB,
-          goal_a1: goalCasa[0],
-          goal_a2: goalCasa[1],
-          goal_a3: goalCasa[2],
-          goal_a4: goalCasa[3],
-          goal_b1: goalOspite[0],
-          goal_b2: goalOspite[1],
-          goal_b3: goalOspite[2],
-          goal_b4: goalOspite[3],
+          giocatore_stagione_id: gStagioneId,
+          giocatore_uid: giocatore?.giocatore_uid || null,
         })
-        .eq("id", partita.id);
-      if (err1) throw err1;
+        .eq("id", marcatore.id_supabase);
+    } else {
+      const { data, error } = await supabase
+        .from("marcatori")
+        .insert({
+          partita_id: partita.id,
+          stagione_id: partita.stagione_id,
+          periodo,
+          goal_tempo,
+          giocatore_stagione_id: gStagioneId,
+          giocatore_uid: giocatore?.giocatore_uid || null,
+        })
+        .select("id")
+        .single();
 
-      // presenze
-      const presArr = formazioneCasa.map((pid) => ({
-        partita_id: partita.id,
-        giocatore_id: pid,
-      }));
-      if (presArr.length) {
-        let { error: err2 } = await supabase
-          .from("presenze")
-          .upsert(presArr, { onConflict: ["partita_id", "giocatore_id"] });
-        if (err2) throw err2;
+      if (!error && data) {
+        setMarcatori((prev) => {
+          const aggiornata = (prev[periodo] || []).map((m) =>
+            m.goal_tempo === goal_tempo ? { ...m, id_supabase: data.id } : m
+          );
+          return { ...prev, [periodo]: aggiornata };
+        });
       }
-
-      // marcatori
-      const marcArr: MarcatoreRecord[] = Object.entries(marcatori).flatMap(
-        ([tempoStr, lista]) =>
-          lista
-            .filter((pid) => pid)
-            .map((pid) => ({
-              periodo: parseInt(tempoStr),
-              giocatore_id: pid!,
-              partita_id: partita.id,
-            }))
-      );
-      if (marcArr.length) {
-        let { error: err3 } = await supabase.from("marcatori").insert(marcArr);
-        if (err3) throw err3;
-      }
-
-      alert("Salvato!");
-      navigate("/prossima-partita");
-    } catch (err: any) {
-      console.error(err);
-      alert("Errore durante il salvataggio");
-    } finally {
-      setSubmitting(false);
     }
   };
 
-  if (loading)
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        Caricamento…
-      </div>
-    );
-  if (error)
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
-        <div className="text-red-600">{error}</div>
-        <button
-          onClick={() => navigate("/prossima-partita")}
-          className="px-4 py-2 bg-blue-600 text-white rounded"
-        >
-          Torna indietro
-        </button>
-      </div>
-    );
-  if (!partita)
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
-        <div>Partita non trovata</div>
-        <button
-          onClick={() => navigate("/prossima-partita")}
-          className="px-4 py-2 bg-blue-600 text-white rounded"
-        >
-          Torna indietro
-        </button>
-      </div>
-    );
+  const avviaInCorso = async () => {
+    if (!partita) return;
+    await supabase.from("partite").update({ stato: "InCorso" }).eq("id", partita.id);
+    setPartita({ ...partita, stato: "InCorso" });
+  };
 
-  // calcoli cerchio
-  const radius = 40;
-  const stroke = 4;
-  const normalizedRadius = radius - stroke / 2;
-  const circumference = 2 * Math.PI * normalizedRadius;
-  const fraction = countdownSec / (inputMinutes * 60);
-  const dashOffset = circumference - fraction * circumference;
+  const salvaStato = async () => {
+    if (!partita) return;
+    await supabase.from("partite").update({ stato: "Giocata" }).eq("id", partita.id);
+    navigate("/risultati");
+  };
+
+  // render dropdown marcatori SOLO per Montecarlo e SOLO per il tempo selezionato
+  const renderMarcatori = (squadraId: string) => {
+    if (!tempo || !squadraId) return null;
+    const sideIsMontecarloRender =
+      squadraId === MONTECARLO_ID ||
+      isMontecarlo(
+        squadraId,
+        squadraId === squadraCasa?.id ? squadraCasa?.nome : squadraOspite?.nome
+      );
+    if (!sideIsMontecarloRender) return null;
+
+    const lista = marcatori[tempo] || [];
+    const convocatiSet = new Set(convocati);
+    const opzioni = giocatori.filter((g) => convocatiSet.has(g.id));
+
+    return (
+      <div className="mt-2 space-y-1">
+        {lista.map((m) => (
+          <select
+            key={m.goal_tempo}
+            value={m.giocatore_stagione_id || ""}
+            onChange={(e) => selezionaMarcatore(tempo, m.goal_tempo, e.target.value)}
+            className="w-full border rounded px-2 py-1"
+          >
+            <option value="">-- Seleziona marcatore --</option>
+            {opzioni.map((g) => (
+              <option key={g.id} value={g.id}>
+                {(g.cognome || "").trim()} {(g.nome || "").trim()}
+              </option>
+            ))}
+          </select>
+        ))}
+      </div>
+    );
+  };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="min-h-screen bg-gradient-montecarlo-light p-6"
-    >
-      <div className="max-w-3xl mx-auto bg-white rounded-xl shadow p-6 space-y-6">
-        {/* Data */}
-        <div className="text-center">
-          <span className="text-2xl font-semibold">
-            {formatData(partita.data_ora)}
-          </span>
-        </div>
-
-        {/* Timer circolare */}
-        <div className="flex flex-col items-center space-y-4">
-          <Clock className="text-gray-400" size={24} />
-          <div className="relative">
-            <svg
-              height={radius * 2}
-              width={radius * 2}
-              className="-rotate-90"
-            >
-              <circle
-                stroke="#e5e7eb"
-                fill="transparent"
-                strokeWidth={stroke}
-                r={normalizedRadius}
-                cx={radius}
-                cy={radius}
-              />
-              <circle
-                stroke={timerActive ? "#f87171" : "#34d399"}
-                fill="transparent"
-                strokeWidth={stroke}
-                strokeDasharray={`${circumference} ${circumference}`}
-                strokeDashoffset={dashOffset}
-                r={normalizedRadius}
-                cx={radius}
-                cy={radius}
-                className="transition-stroke-dashoffset duration-300 ease-linear"
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="font-mono text-xl text-gray-800">
-                {formatCountdown(countdownSec)}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            <button
-              type="button"
-              onClick={toggleTimer}
-              className={`p-2 rounded-full text-white ${
-                timerActive ? "bg-yellow-500" : "bg-green-600"
-              }`}
-            >
-              {timerActive ? <Pause size={16} /> : <Play size={16} />}
-            </button>
-            <button
-              type="button"
-              onClick={resetTimer}
-              className="p-2 rounded-full bg-red-600 text-white"
-            >
-              <RotateCw size={16} />
-            </button>
-            {!timerActive && (
-              <input
-                type="number"
-                min={1}
-                max={999}
-                value={inputMinutes}
-                onChange={(e) => {
-                  const v = Math.max(1, Number(e.target.value) || 1);
-                  setInputMinutes(v);
-                  setCountdownSec(v * 60);
-                }}
-                className="w-12 text-center border rounded focus:outline-none"
-              />
+    <div className="bg-white min-h-screen p-6">
+      <div className="space-y-6">
+        <div className="bg-white rounded-xl shadow-montecarlo overflow-hidden">
+          <div className="bg-montecarlo-red-50 p-4 border-l-4 border-montecarlo-secondary flex items-center justify-center space-x-4">
+            <span className="bg-montecarlo-accent text-montecarlo-secondary px-3 py-1 rounded-full text-sm font-medium shadow-gold">
+              {partita?.campionato_torneo}
+            </span>
+            {partita?.stato === "DaGiocare" && (
+              <button
+                onClick={avviaInCorso}
+                className="bg-gradient-montecarlo text-white px-3 py-1 rounded-full text-sm font-medium hover:scale-105 transition"
+              >
+                Partita In Corso
+              </button>
             )}
           </div>
-        </div>
 
-        <hr className="border-gray-200" />
-
-        {/* Formazione */}
-        <div className="flex justify-center">
-          <button
-            type="button"
-            onClick={() => setShowFormazione((f) => !f)}
-            className="inline-flex items-center space-x-2 bg-gray-100 px-4 py-2 rounded-lg"
-          >
-            <ListChecks size={18} />
-            <span className="font-medium">Formazione</span>
-          </button>
-        </div>
-
-        {showFormazione && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-2">
-            <div className="flex justify-between items-center">
-              <h3 className="font-semibold">Formazione Casa</h3>
-              <button
-                type="button"
-                onClick={() => setShowFormazione(false)}
-                className="text-gray-500"
-              >
-                Chiudi
-              </button>
+          <div className="p-6 space-y-6">
+            {/* Timer */}
+            <div className="flex flex-col items-center space-y-2">
+              <TimerCircolare
+                elapsed={elapsed}
+                initialDuration={currentDuration}
+                onDurationChange={changeDuration}
+              />
+              <div className="flex space-x-2">
+                <button onClick={startTimer} className="bg-green-500 text-white px-3 py-1 rounded">Avvia</button>
+                <button onClick={pauseTimer} className="bg-yellow-500 text-white px-3 py-1 rounded">Pausa</button>
+                <button onClick={resetTimer} className="bg-red-500 text-white px-3 py-1 rounded">Reset</button>
+              </div>
             </div>
-            <div className="max-h-48 overflow-y-auto space-y-1">
-              {giocatori.map((g) => (
-                <label
-                  key={g.id}
-                  className="flex items-center space-x-2"
-                >
-                  <input
-                    type="checkbox"
-                    checked={formazioneCasa.includes(g.id)}
-                    onChange={(e) =>
-                      setFormazioneCasa((prev) =>
-                        e.target.checked
-                          ? [...prev, g.id]
-                          : prev.filter((pid) => pid !== g.id)
-                      )
-                    }
-                  />
-                  <span>
-                    {g.cognome} {g.nome}
+
+            {/* Pulsante apertura formazione */}
+            <button
+              onClick={() => setFormazioneAperta(true)}
+              className="bg-gradient-montecarlo text-white px-6 py-2 rounded-lg w-full hover:scale-105 transition"
+            >
+              Formazione
+            </button>
+
+            {/* Modal Formazione */}
+            {formazioneAperta && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white p-6 rounded-lg shadow-montecarlo max-w-md w-full space-y-4">
+                  <h2 className="text-center text-lg font-semibold">Seleziona Formazione</h2>
+                  <div className="max-h-64 overflow-y-auto">
+                    {giocatori.map((g) => (
+                      <label key={g.id} className="flex items-center gap-2 py-1">
+                        <input
+                          type="checkbox"
+                          checked={convocati.includes(g.id)}
+                          onChange={() =>
+                            setConvocati((prev) =>
+                              prev.includes(g.id) ? prev.filter((x) => x !== g.id) : [...prev, g.id]
+                            )
+                          }
+                        />
+                        {(g.cognome || "").trim()} {(g.nome || "").trim()}
+                      </label>
+                    ))}
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!partita) return;
+                      await supabase.from("presenze").delete().eq("partita_id", id);
+                      const rows = convocati.map((gid) => {
+                        const g = giocatori.find((x) => x.id === gid);
+                        return {
+                          partita_id: id,
+                          giocatore_stagione_id: gid,
+                          stagione_id: partita.stagione_id,
+                          nome: (g?.nome || "").trim(),
+                          cognome: (g?.cognome || "").trim(),
+                        };
+                      });
+                      if (rows.length > 0) await supabase.from("presenze").insert(rows);
+                      setFormazioneAperta(false);
+                    }}
+                    className="w-full bg-montecarlo-secondary text-white py-2 rounded-lg"
+                  >
+                    Salva
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Bottoni tempi + parziali */}
+            <div className="flex justify-center space-x-4">
+              {[1, 2, 3, 4].map((t) => (
+                <div key={t} className="flex flex-col items-center">
+                  <button
+                    onClick={() => setTempo(t)}
+                    className={`px-7 py-2 rounded-full font-medium ${
+                      tempo === t
+                        ? "bg-montecarlo-secondary text-white"
+                        : "bg-montecarlo-gray-50 text-gray-900 hover:bg-montecarlo-gray-100"
+                    }`}
+                  >
+                    {t}T
+                  </button>
+                  <span className="text-sm text-gray-900 mt-1">
+                    {goalCasa[t - 1]} – {goalOspite[t - 1]}
                   </span>
-                </label>
+                </div>
               ))}
             </div>
-          </div>
-        )}
 
-        {/* Pulsanti tempi */}
-        <div className="grid grid-cols-4 gap-2">
-          {([0, 1, 2, 3] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() =>
-                setTempiVisible((prev) =>
-                  prev.map((v, i) => (i === t ? !v : false))
-                )
-              }
-              className={`py-2 rounded-lg text-sm font-medium ${
-                tempiVisible[t]
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 text-gray-700"
-              }`}
-            >
-              {t + 1}° T
-            </button>
-          ))}
-        </div>
-
-        {/* Dettagli per ciascun tempo */}
-        {([0, 1, 2, 3] as const).map(
-          (t) =>
-            tempiVisible[t] && (
-              <div key={t} className="space-y-4">
-                <h4 className="text-lg font-semibold">{t + 1}° Tempo</h4>
-
+            {/* Sezione gestione goal */}
+            {tempo && (
+              <div className="space-y-6">
                 {/* Squadra Casa */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    {partita.casa.logo_url && (
-                      <img
-                        src={partita.casa.logo_url}
-                        alt={partita.casa.nome}
-                        className="w-6 h-6 object-contain"
-                      />
-                    )}
-                    <span className="font-medium">{partita.casa.nome}</span>
-                    <span className="text-gray-500">({totaleCasa})</span>
+                <div>
+                  <div className="flex items-center justify-between p-4 bg-montecarlo-red-50 rounded-lg border border-montecarlo-red-200">
+                    <div className="flex items-center space-x-4">
+                      {squadraCasa?.logo_url ? (
+                        <img
+                          src={squadraCasa.logo_url}
+                          alt={`${squadraCasa.nome} logo`}
+                          className="w-12 h-12 rounded-full border-2 border-montecarlo-accent"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-montecarlo-secondary rounded-full flex items-center justify-center text-white font-bold">
+                          {squadraCasa?.nome?.charAt(0)}
+                        </div>
+                      )}
+                      <span className="text-lg font-bold text-montecarlo-secondary">
+                        {squadraCasa?.nome} ({totale(goalCasa)})
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button onClick={() => decrementa("casa")} className="text-3xl">−</button>
+                      <span className="text-lg font-bold">{goalCasa[tempo - 1]}</span>
+                      <button onClick={() => incrementa("casa")} className="text-3xl">+</button>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setGoalCasa((prev) =>
-                          prev.map((v, i) => (i === t ? Math.max(0, v - 1) : v))
-                        );
-                        setMarcatori((prev) => {
-                          const arr = [...prev[t + 1]];
-                          arr.pop();
-                          return { ...prev, [t + 1]: arr };
-                        });
-                      }}
-                      className="px-2 py-1 bg-gray-200 rounded"
-                    >
-                      −
-                    </button>
-                    <span className="w-6 text-center">{goalCasa[t]}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setGoalCasa((prev) =>
-                          prev.map((v, i) => (i === t ? v + 1 : v))
-                        );
-                        setMarcatori((prev) => {
-                          const arr = [...prev[t + 1]];
-                          arr.push(null);
-                          return { ...prev, [t + 1]: arr };
-                        });
-                      }}
-                      className="px-2 py-1 bg-gray-200 rounded"
-                    >
-                      ＋
-                    </button>
-                  </div>
-                </div>
-
-                {/* Dropdown marcatori SOLO Montecarlo */}
-                <div className="space-y-2">
-                  {marcatori[t + 1].map((pid, idx) => (
-                    <select
-                      key={idx}
-                      value={pid || ""}
-                      onChange={(e) =>
-                        setMarcatori((prev) => {
-                          const arr = [...prev[t + 1]];
-                          arr[idx] = e.target.value || null;
-                          return { ...prev, [t + 1]: arr };
-                        })
-                      }
-                      className="w-full border rounded px-2 py-1"
-                    >
-                      <option value="">-- Seleziona marcatore --</option>
-                      {giocatori
-                        .filter((g) => formazioneCasa.includes(g.id))
-                        .map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.cognome} {g.nome}
-                          </option>
-                        ))}
-                    </select>
-                  ))}
+                  {renderMarcatori(squadraCasa?.id)}
                 </div>
 
                 {/* Squadra Ospite */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    {partita.ospite.logo_url && (
-                      <img
-                        src={partita.ospite.logo_url}
-                        alt={partita.ospite.nome}
-                        className="w-6 h-6 object-contain"
-                      />
-                    )}
-                    <span className="font-medium">{partita.ospite.nome}</span>
-                    <span className="text-gray-500">({totaleOspite})</span>
+                <div>
+                  <div className="flex items-center justify-between p-4 bg-montecarlo-gray-50 rounded-lg border border-montecarlo-gray-200">
+                    <div className="flex items-center space-x-4">
+                      {squadraOspite?.logo_url ? (
+                        <img
+                          src={squadraOspite.logo_url}
+                          alt={`${squadraOspite.nome} logo`}
+                          className="w-12 h-12 rounded-full border-2 border-montecarlo-accent"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-montecarlo-secondary rounded-full flex items-center justify-center text-white font-bold">
+                          {squadraOspite?.nome?.charAt(0)}
+                        </div>
+                      )}
+                      <span className="text-lg font-bold text-montecarlo-secondary">
+                        {squadraOspite?.nome} ({totale(goalOspite)})
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button onClick={() => decrementa("ospite")} className="text-3xl">−</button>
+                      <span className="text-lg font-bold">{goalOspite[tempo - 1]}</span>
+                      <button onClick={() => incrementa("ospite")} className="text-3xl">+</button>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setGoalOspite((prev) =>
-                          prev.map((v, i) => (i === t ? Math.max(0, v - 1) : v))
-                        )
-                      }
-                      className="px-2 py-1 bg-gray-200 rounded"
-                    >
-                      −
-                    </button>
-                    <span className="w-6 text-center">{goalOspite[t]}</span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setGoalOspite((prev) =>
-                          prev.map((v, i) => (i === t ? v + 1 : v))
-                        )
-                      }
-                      className="px-2 py-1 bg-gray-200 rounded"
-                    >
-                      ＋
-                    </button>
-                  </div>
+                  {renderMarcatori(squadraOspite?.id)}
                 </div>
               </div>
-            )
-        )}
+            )}
 
-        {/* Bottone Salva */}
-        <div className="text-center mt-6">
-          <button
-            type="submit"
-            disabled={submitting}
-            className="inline-flex items-center space-x-2 bg-gradient-montecarlo px-6 py-3 rounded-lg text-white disabled:opacity-50"
-          >
-            <Save size={18} />
-            <span>{submitting ? "Salvataggio…" : "Salva risultato"}</span>
-          </button>
+            {/* Salva stato partita */}
+            <button
+              onClick={salvaStato}
+              className="w-full bg-montecarlo-secondary text-white py-2 rounded-lg mt-4"
+            >
+              Salva
+            </button>
+          </div>
         </div>
       </div>
-    </form>
+    </div>
   );
 }
