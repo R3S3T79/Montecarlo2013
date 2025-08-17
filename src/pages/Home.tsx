@@ -4,7 +4,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import stemma from "../assets/montecarlo.png";
 
 // ========================
 // Tipi
@@ -527,7 +526,7 @@ const fbPluginSrc = useMemo(() => {
     <header style={styles.header}>
   <div style={styles.heroInner}>
     <img
-      src={stemma}
+      src="/montecarlo.png"
       alt="Stemma Montecarlo"
       style={styles.heroLogo}
     />
