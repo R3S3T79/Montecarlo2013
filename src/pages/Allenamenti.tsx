@@ -120,20 +120,29 @@ export default function Allenamenti(): JSX.Element {
                   <th className={`px-4 py-3 text-center text-red-600 uppercase ${colBg[3]}`}>Ass.</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-300">
-                {rows.map(r => (
-                  <tr
-                    key={r.record_id}
-                    onClick={() => navigate(`/allenamenti/${r.giocatore_uid}`)}
-                    className="cursor-pointer hover:bg-red-50 transition-colors duration-200"
-                  >
-                    <td className={`px-4 py-2 text-gray-800 ${colBg[0]}`}>{r.cognome} {r.nome}</td>
-                    <td className={`px-4 py-2 text-center text-gray-800 ${colBg[1]}`}>{r.totaleAll}</td>
-                    <td className={`px-4 py-2 text-center text-gray-800 ${colBg[2]}`}>{r.presenze}</td>
-                    <td className={`px-4 py-2 text-center text-gray-800 ${colBg[3]}`}>{r.assenze}</td>
-                  </tr>
-                ))}
-              </tbody>
+              <tbody>
+  {rows.map((r, idx) => (
+    <tr
+      key={r.record_id}
+      onClick={() => navigate(`/allenamenti/${r.giocatore_uid}`)}
+      className="cursor-pointer hover:bg-red-50 transition-colors duration-200"
+    >
+      <td className="px-4 py-2 text-gray-800 bg-red-50 border-b border-gray-300">
+        {r.cognome} {r.nome}
+      </td>
+      <td className="px-4 py-2 text-center text-gray-800 bg-white border-b border-gray-300">
+        {r.totaleAll}
+      </td>
+      <td className="px-4 py-2 text-center text-gray-800 bg-red-50 border-b border-gray-300">
+        {r.presenze}
+      </td>
+      <td className="px-4 py-2 text-center text-gray-800 bg-white border-b border-gray-300">
+        {r.assenze}
+      </td>
+    </tr>
+  ))}
+</tbody>
+
             </table>
           </div>
         </div>

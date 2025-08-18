@@ -1,5 +1,5 @@
 // src/components/SidebarLayout.tsx
-// Data creazione chat: 2025-08-02
+// Data creazione chat: 2025-08-02 (rev con stella votazioni)
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -66,6 +66,7 @@ export default function SidebarLayout(): JSX.Element {
   const matchStoricoAllenamenti = useMatch('/allenamenti/storico-allenamenti');
   const matchAllenamentiGiocatore = useMatch('/allenamenti/:id');
   const matchProssimaPartita = useMatch('/prossima-partita');
+  const matchVotazioni = useMatch('/partita/:id/votazioni');
   const matchEditPartitaGiocata = useMatch('/modifica-partita-giocata/:id');
 
   const teamId = matchTeamDetail?.params.id ?? null;
@@ -166,6 +167,7 @@ export default function SidebarLayout(): JSX.Element {
     { to: '/statistiche/squadra', label: 'Statistiche Squadra' },
     { to: '/statistiche/giocatori', label: 'Statistiche Giocatori' },
     { to: '/tornei', label: 'Tornei' },
+    { to: '/galleria', label: 'Galleria' },
   ];
   const group4 = canAdmin
     ? [
@@ -191,6 +193,7 @@ export default function SidebarLayout(): JSX.Element {
   else if (matchCalendario) pageTitle = 'Calendario';
   else if (matchStatisticheGiocatori) pageTitle = 'Statistiche Giocatori';
   else if (matchStatisticheSquadra) pageTitle = 'Statistiche Squadra';
+  else if (location.pathname === '/galleria') pageTitle = 'Galleria';
   else if (matchTornei) pageTitle = 'Tornei';
   else if (matchNuovoTorneo) pageTitle = 'Nuovo Torneo';
   else if (matchFormatoTorneo) pageTitle = 'Formato Torneo';
@@ -206,6 +209,7 @@ export default function SidebarLayout(): JSX.Element {
   else if (matchAllenamenti) pageTitle = 'Presenze Allenamenti';
   else if (matchAllenamentiGiocatore) pageTitle = 'Storico Allenamenti';
   else if (matchProssimaPartita) pageTitle = 'Prossima Partita';
+  else if (matchVotazioni) pageTitle = 'Voto Partita';
   else if (matchEditPartitaGiocata) pageTitle = 'Modifica Partita';
   else if (location.pathname === '/risultati') pageTitle = 'Risultati';
   else if (location.pathname === '/') pageTitle = 'Home';
@@ -217,6 +221,7 @@ export default function SidebarLayout(): JSX.Element {
     <div className="relative h-screen flex overflow-hidden bg-gradient-to-br from-[#6B7280] to-[#BFB9B9]">
       {/* HEADER */}
       <header className="fixed top-0 left-0 right-0 z-50 flex items-center px-4 py-2 bg-gradient-to-br from-[#6B7280] to-[#BFB9B9] text-white">
+        {/* Pulsante hamburger */}
         <button
           onClick={() => setDrawerOpen(true)}
           aria-label="Apri menu"
@@ -224,6 +229,19 @@ export default function SidebarLayout(): JSX.Element {
         >
           <Menu size={24} />
         </button>
+
+        {/* Stella solo su dettaglio partita */}
+        {matchDetail && (
+          <button
+            onClick={() => navigate(`/partita/${detailId}/votazioni`)}
+            aria-label="Vota Giocatori"
+            className="mr-3 hover:scale-110 transition"
+          >
+            ⭐
+          </button>
+        )}
+
+        {/* Titolo pagina */}
         <div className="flex-1 text-center">
           <h1 className="text-lg font-bold">{pageTitle}</h1>
           {matchGestione && gestioneData && gestioneOra && (
@@ -234,6 +252,7 @@ export default function SidebarLayout(): JSX.Element {
             </div>
           )}
         </div>
+
 
         {matchCalendario && canAdmin && (
           <button
@@ -264,6 +283,8 @@ export default function SidebarLayout(): JSX.Element {
             <PlusCircle size={24} />
           </button>
         )}
+
+
 
         {matchAllenamenti && canAdmin && (
           <>

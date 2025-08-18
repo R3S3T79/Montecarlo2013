@@ -1,5 +1,5 @@
 // src/components/GestioneRisultatoPartita.tsx
-// Data creazione: 16/08/2025
+// Data creazione: 18/08/2025 (rev: aggiunta gestione goal subiti portieri + squadra_segnante_id)
 
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -24,7 +24,7 @@ export default function GestioneRisultatoPartita() {
   const [squadraOspite, setSquadraOspite] = useState<any>(null);
 
   const [giocatori, setGiocatori] = useState<
-    { id: string; nome: string | null; cognome: string | null; giocatore_uid?: string }[]
+    { id: string; nome: string | null; cognome: string | null; ruolo?: string | null; giocatore_uid?: string }[]
   >([]);
   const [convocati, setConvocati] = useState<string[]>([]);
 
@@ -34,7 +34,16 @@ export default function GestioneRisultatoPartita() {
   const [tempo, setTempo] = useState<number | null>(null);
 
   const [marcatori, setMarcatori] = useState<
-    Record<number, { goal_tempo: number; giocatore_stagione_id: string | null; id_supabase?: string }[]>
+    Record<
+      number,
+      {
+        goal_tempo: number;
+        giocatore_stagione_id: string | null;
+        portiere_subisce_id?: string | null;
+        squadra_segnante_id?: string | null;
+        id_supabase?: string;
+      }[]
+    >
   >({});
 
   // TIMER
@@ -76,18 +85,19 @@ export default function GestioneRisultatoPartita() {
 
       const { data: giocatoriStagione } = await supabase
         .from("giocatori_stagioni")
-        .select("id, nome, cognome, giocatore_uid")
+        .select("id, nome, cognome, ruolo, giocatore_uid")
         .eq("stagione_id", p.stagione_id);
 
       const mapGiocatori = new Map<
         string,
-        { id: string; nome: string | null; cognome: string | null; giocatore_uid?: string }
+        { id: string; nome: string | null; cognome: string | null; ruolo?: string | null; giocatore_uid?: string }
       >();
       (giocatoriStagione || []).forEach((g) => {
         mapGiocatori.set(g.id, {
           id: g.id,
           nome: g.nome ?? null,
           cognome: g.cognome ?? null,
+          ruolo: g.ruolo ?? null,
           giocatore_uid: g.giocatore_uid,
         });
       });
@@ -119,7 +129,9 @@ export default function GestioneRisultatoPartita() {
 
       const { data: marcatoriDB } = await supabase
         .from("marcatori")
-        .select("giocatore_stagione_id, periodo, goal_tempo, id")
+        .select(
+          "giocatore_stagione_id, periodo, goal_tempo, portiere_subisce_id, squadra_segnante_id, id"
+        )
         .eq("partita_id", p.id);
 
       const perPeriodo: Record<number, any[]> = {};
@@ -128,6 +140,8 @@ export default function GestioneRisultatoPartita() {
         perPeriodo[m.periodo].push({
           goal_tempo: m.goal_tempo,
           giocatore_stagione_id: m.giocatore_stagione_id,
+          portiere_subisce_id: m.portiere_subisce_id,
+          squadra_segnante_id: m.squadra_segnante_id,
           id_supabase: m.id,
         });
       });
@@ -146,7 +160,7 @@ export default function GestioneRisultatoPartita() {
         )
         .subscribe();
 
-      // realtime marcatori (qualsiasi evento)
+      // realtime marcatori
       subMarcatori = supabase
         .channel("realtime-marcatori")
         .on(
@@ -155,7 +169,9 @@ export default function GestioneRisultatoPartita() {
           async () => {
             const { data: live } = await supabase
               .from("marcatori")
-              .select("giocatore_stagione_id, periodo, goal_tempo, id")
+              .select(
+                "giocatore_stagione_id, periodo, goal_tempo, portiere_subisce_id, squadra_segnante_id, id"
+              )
               .eq("partita_id", p.id);
             const perLive: Record<number, any[]> = {};
             live?.forEach((m) => {
@@ -163,6 +179,8 @@ export default function GestioneRisultatoPartita() {
               perLive[m.periodo].push({
                 goal_tempo: m.goal_tempo,
                 giocatore_stagione_id: m.giocatore_stagione_id,
+                portiere_subisce_id: m.portiere_subisce_id,
+                squadra_segnante_id: m.squadra_segnante_id,
                 id_supabase: m.id,
               });
             });
@@ -172,12 +190,13 @@ export default function GestioneRisultatoPartita() {
         .subscribe();
 
       // stato timer iniziale
-      const { data: t } = await supabase
-        .from("partita_timer_state")
-        .select("*")
-        .eq("partita_id", p.id)
-        .single();
-      if (t) setTimerState(t);
+      const { data: t, error: tErr } = await supabase
+  .from("partita_timer_state")
+  .select("*")
+  .eq("partita_id", p.id)
+  .maybeSingle();
+if (tErr) console.warn("[partita_timer_state] maybeSingle:", tErr.message);
+if (t) setTimerState(t);
 
       // realtime timer
       subTimer = supabase
@@ -220,7 +239,7 @@ export default function GestioneRisultatoPartita() {
   // durata corrente "sorgente unica"
   const currentDuration = timerState?.timer_duration_min ?? 20;
 
-  // comandi timer (includono SEMPRE la durata per coerenza su prima creazione riga)
+  // comandi timer
   const startTimer = async () => {
     if (!id) return;
     await supabase.from("partita_timer_state").upsert({
@@ -256,7 +275,6 @@ export default function GestioneRisultatoPartita() {
       .eq("partita_id", id);
   };
 
-  // cambia durata iniziale (sincronizzato, e mette il timer in stopped/offset 0)
   const changeDuration = async (minutes: number) => {
     if (!id) return;
     await supabase.from("partita_timer_state").upsert({
@@ -268,13 +286,14 @@ export default function GestioneRisultatoPartita() {
     });
   };
 
-  // ---- helper marcatori: aggiorna stato locale per un periodo ----
-  const aggiornaMarcatori = (periodo: number, nuovi: any[]) => {
+  // =====================
+  // MARCATORI / PORTIERI – helper locali & DB
+  // =====================
+  const aggiornaMarcatoriLocal = (periodo: number, nuovi: any[]) => {
     setMarcatori((prev) => ({ ...prev, [periodo]: nuovi }));
   };
 
-  // gestione goal
-  const aggiornaGoal = async (goalA: number[], goalB: number[]) => {
+  const aggiornaGoalDB = async (goalA: number[], goalB: number[]) => {
     if (!partita) return;
     await supabase
       .from("partite")
@@ -293,82 +312,168 @@ export default function GestioneRisultatoPartita() {
       .eq("id", partita.id);
   };
 
-  const incrementa = async (tipo: "casa" | "ospite") => {
-    if (tempo === null || !partita) return;
-    const idx = tempo - 1;
-    const nuovaA = [...goalCasa];
-    const nuovaB = [...goalOspite];
-    if (tipo === "casa") nuovaA[idx]++; else nuovaB[idx]++;
-    setGoalCasa(nuovaA);
-    setGoalOspite(nuovaB);
-    await aggiornaGoal(nuovaA, nuovaB);
+  // Inserisce una riga "gol segnato da Montecarlo" (marcatore da scegliere)
+  const aggiungiMarcatore = async (periodo: number) => {
+    if (!partita) return;
+    const goal_tempo = (marcatori[periodo]?.length || 0) + 1;
 
-    // --- RIPRISTINO LOGICA: crea riga marcatore vuota per Montecarlo ---
-    const sideIsMontecarlo =
-      tipo === "casa"
-        ? isMontecarlo(partita.squadra_casa_id, squadraCasa?.nome)
-        : isMontecarlo(partita.squadra_ospite_id, squadraOspite?.nome);
+    const { data, error } = await supabase
+      .from("marcatori")
+      .insert({
+        partita_id: partita.id,
+        stagione_id: partita.stagione_id,
+        periodo,
+        goal_tempo,
+        giocatore_stagione_id: null,
+        giocatore_uid: null,
+        portiere_subisce_id: null,
+        squadra_segnante_id: MONTECARLO_ID,
+      })
+      .select(
+        "id, periodo, goal_tempo, giocatore_stagione_id, portiere_subisce_id, squadra_segnante_id"
+      )
+      .single();
 
-    if (sideIsMontecarlo) {
-      const goal_tempo = (marcatori[tempo]?.length || 0) + 1;
-      const { data, error } = await supabase
-        .from("marcatori")
-        .insert({
-          partita_id: partita.id,
-          stagione_id: partita.stagione_id,
-          periodo: tempo,
-          goal_tempo,
-          giocatore_stagione_id: null,
-          giocatore_uid: null,
-        })
-        .select("id")
-        .single();
-
-      if (!error && data) {
-        const attuali = marcatori[tempo] || [];
-        aggiornaMarcatori(tempo, [
-          ...attuali,
-          { goal_tempo, giocatore_stagione_id: null, id_supabase: data.id },
-        ]);
-      }
+    if (!error && data) {
+      const attuali = marcatori[periodo] || [];
+      aggiornaMarcatoriLocal(periodo, [
+        ...attuali,
+        {
+          goal_tempo: data.goal_tempo,
+          giocatore_stagione_id: data.giocatore_stagione_id,
+          portiere_subisce_id: data.portiere_subisce_id,
+          squadra_segnante_id: data.squadra_segnante_id,
+          id_supabase: data.id,
+        },
+      ]);
     }
   };
 
-  const decrementa = async (tipo: "casa" | "ospite") => {
-    if (tempo === null || !partita) return;
-    const idx = tempo - 1;
-    const nuovaA = [...goalCasa];
-    const nuovaB = [...goalOspite];
-    if (tipo === "casa" && nuovaA[idx] > 0) nuovaA[idx]--;
-    if (tipo === "ospite" && nuovaB[idx] > 0) nuovaB[idx]--;
-    setGoalCasa(nuovaA);
-    setGoalOspite(nuovaB);
-    await aggiornaGoal(nuovaA, nuovaB);
+  // Inserisce una riga "gol SUBITO da Montecarlo" (portiere da scegliere)
+  const aggiungiGolSubito = async (periodo: number, side: "casa" | "ospite") => {
+    if (!partita) return;
+    const goal_tempo = (marcatori[periodo]?.length || 0) + 1;
+    const squadraSegnanteId =
+      side === "casa" ? partita.squadra_casa_id : partita.squadra_ospite_id;
 
-    // --- RIPRISTINO LOGICA: rimuovi ultima riga marcatore se Montecarlo ---
-    const sideIsMontecarlo =
-      tipo === "casa"
-        ? isMontecarlo(partita.squadra_casa_id, squadraCasa?.nome)
-        : isMontecarlo(partita.squadra_ospite_id, squadraOspite?.nome);
+    const { data, error } = await supabase
+      .from("marcatori")
+      .insert({
+        partita_id: partita.id,
+        stagione_id: partita.stagione_id,
+        periodo,
+        goal_tempo,
+        giocatore_stagione_id: null, // non è un marcatore MC
+        giocatore_uid: null,
+        portiere_subisce_id: null, // lo scegli dopo
+        squadra_segnante_id: squadraSegnanteId,
+      })
+      .select(
+        "id, periodo, goal_tempo, giocatore_stagione_id, portiere_subisce_id, squadra_segnante_id"
+      )
+      .single();
 
-    if (sideIsMontecarlo) {
-      const attuali = marcatori[tempo] || [];
-      const ultimo = attuali[attuali.length - 1];
-      if (ultimo?.id_supabase) {
-        await supabase.from("marcatori").delete().eq("id", ultimo.id_supabase);
-      }
-      aggiornaMarcatori(tempo, attuali.slice(0, -1));
+    if (!error && data) {
+      const attuali = marcatori[periodo] || [];
+      aggiornaMarcatoriLocal(periodo, [
+        ...attuali,
+        {
+          goal_tempo: data.goal_tempo,
+          giocatore_stagione_id: data.giocatore_stagione_id,
+          portiere_subisce_id: data.portiere_subisce_id,
+          squadra_segnante_id: data.squadra_segnante_id,
+          id_supabase: data.id,
+        },
+      ]);
     }
   };
 
-  // selezione marcatore nel dropdown
+  // Incrementa/decrementa punteggio + crea/elimina riga marcatori coerentemente
+  const incrementa = async (side: "casa" | "ospite") => {
+    if (!tempo || !partita) return;
+
+    // aggiorna scoreboard locale
+    const idx = tempo - 1;
+    const nuovaA = [...goalCasa];
+    const nuovaB = [...goalOspite];
+    if (side === "casa") nuovaA[idx]++; else nuovaB[idx]++;
+    setGoalCasa(nuovaA);
+    setGoalOspite(nuovaB);
+    await aggiornaGoalDB(nuovaA, nuovaB);
+
+    // determina chi è Montecarlo su questo lato
+    const haSegnatoMontecarlo =
+      side === "casa"
+        ? isMontecarlo(partita.squadra_casa_id, squadraCasa?.nome)
+        : isMontecarlo(partita.squadra_ospite_id, squadraOspite?.nome);
+
+    // crea riga marcatori coerente
+    if (haSegnatoMontecarlo) {
+      await aggiungiMarcatore(tempo);
+    } else {
+      await aggiungiGolSubito(tempo, side);
+    }
+  };
+
+  const decrementa = async (side: "casa" | "ospite") => {
+  if (!tempo || !partita) return;
+
+  const idx = tempo - 1;
+
+  // 1) individua quale squadra ha segnato (quella del lato su cui stiamo togliendo)
+  const squadraSegnanteId =
+    side === "casa" ? partita.squadra_casa_id : partita.squadra_ospite_id;
+
+  const attuali = marcatori[tempo] || [];
+
+  // 2) trova l’ULTIMA riga di quel periodo per quella squadra
+  let targetIndex = -1;
+  for (let i = attuali.length - 1; i >= 0; i--) {
+    if (attuali[i].squadra_segnante_id === squadraSegnanteId) {
+      targetIndex = i;
+      break;
+    }
+  }
+
+  // Se non c'è una riga coerente da togliere, non toccare lo score
+  if (targetIndex === -1) return;
+
+  const target = attuali[targetIndex];
+
+  // 3) aggiorna lo scoreboard locale
+  const nuovaA = [...goalCasa];
+  const nuovaB = [...goalOspite];
+  if (side === "casa" && nuovaA[idx] > 0) nuovaA[idx]--;
+  if (side === "ospite" && nuovaB[idx] > 0) nuovaB[idx]--;
+  setGoalCasa(nuovaA);
+  setGoalOspite(nuovaB);
+
+  // 4) elimina dal DB la riga corretta
+  if (target?.id_supabase) {
+    await supabase.from("marcatori").delete().eq("id", target.id_supabase);
+  } else {
+    await supabase
+      .from("marcatori")
+      .delete()
+      .eq("partita_id", partita.id)
+      .eq("periodo", tempo)
+      .eq("goal_tempo", target.goal_tempo)
+      .eq("squadra_segnante_id", squadraSegnanteId);
+  }
+
+  // 5) aggiorna lo stato locale dei marcatori e il totale DB
+  const nuovaLista = [...attuali.slice(0, targetIndex), ...attuali.slice(targetIndex + 1)];
+  aggiornaMarcatoriLocal(tempo, nuovaLista);
+  await aggiornaGoalDB(nuovaA, nuovaB);
+};
+
+
+  // Assegna marcatore (solo per gol segnati da MC)
   const selezionaMarcatore = async (periodo: number, goal_tempo: number, gStagioneId: string) => {
     if (!partita) return;
+    const gioc = giocatori.find((g) => g.id === gStagioneId);
 
-    const lista = marcatori[periodo] || [];
-    const marcatore = lista.find((m) => m.goal_tempo === goal_tempo);
-    const giocatore = giocatori.find((g) => g.id === gStagioneId);
-
+    // update locale
     setMarcatori((prev) => {
       const aggiornata = (prev[periodo] || []).map((m) =>
         m.goal_tempo === goal_tempo ? { ...m, giocatore_stagione_id: gStagioneId } : m
@@ -376,63 +481,73 @@ export default function GestioneRisultatoPartita() {
       return { ...prev, [periodo]: aggiornata };
     });
 
-    if (marcatore?.id_supabase) {
+    // update DB
+    const entry = (marcatori[periodo] || []).find((m) => m.goal_tempo === goal_tempo);
+    if (entry?.id_supabase) {
       await supabase
         .from("marcatori")
         .update({
           giocatore_stagione_id: gStagioneId,
-          giocatore_uid: giocatore?.giocatore_uid || null,
+          giocatore_uid: gioc?.giocatore_uid || null,
         })
-        .eq("id", marcatore.id_supabase);
+        .eq("id", entry.id_supabase);
     } else {
-      const { data, error } = await supabase
+      await supabase
         .from("marcatori")
-        .insert({
-          partita_id: partita.id,
-          stagione_id: partita.stagione_id,
-          periodo,
-          goal_tempo,
+        .update({
           giocatore_stagione_id: gStagioneId,
-          giocatore_uid: giocatore?.giocatore_uid || null,
+          giocatore_uid: gioc?.giocatore_uid || null,
         })
-        .select("id")
-        .single();
-
-      if (!error && data) {
-        setMarcatori((prev) => {
-          const aggiornata = (prev[periodo] || []).map((m) =>
-            m.goal_tempo === goal_tempo ? { ...m, id_supabase: data.id } : m
-          );
-          return { ...prev, [periodo]: aggiornata };
-        });
-      }
+        .eq("partita_id", partita.id)
+        .eq("periodo", periodo)
+        .eq("goal_tempo", goal_tempo);
     }
   };
 
-  const avviaInCorso = async () => {
+  // Assegna portiere che subisce (solo per gol NON MC)
+  const selezionaPortiereSubisce = async (periodo: number, goal_tempo: number, gStagioneId: string) => {
     if (!partita) return;
-    await supabase.from("partite").update({ stato: "InCorso" }).eq("id", partita.id);
-    setPartita({ ...partita, stato: "InCorso" });
-  };
 
-  const salvaStato = async () => {
-    if (!partita) return;
-    await supabase.from("partite").update({ stato: "Giocata" }).eq("id", partita.id);
-    navigate("/risultati");
-  };
-
-  // render dropdown marcatori SOLO per Montecarlo e SOLO per il tempo selezionato
-  const renderMarcatori = (squadraId: string) => {
-    if (!tempo || !squadraId) return null;
-    const sideIsMontecarloRender =
-      squadraId === MONTECARLO_ID ||
-      isMontecarlo(
-        squadraId,
-        squadraId === squadraCasa?.id ? squadraCasa?.nome : squadraOspite?.nome
+    // update locale
+    setMarcatori((prev) => {
+      const aggiornata = (prev[periodo] || []).map((m) =>
+        m.goal_tempo === goal_tempo ? { ...m, portiere_subisce_id: gStagioneId } : m
       );
-    if (!sideIsMontecarloRender) return null;
+      return { ...prev, [periodo]: aggiornata };
+    });
 
-    const lista = marcatori[tempo] || [];
+    // update DB
+    const entry = (marcatori[periodo] || []).find((m) => m.goal_tempo === goal_tempo);
+    if (entry?.id_supabase) {
+      await supabase
+        .from("marcatori")
+        .update({ portiere_subisce_id: gStagioneId || null })
+        .eq("id", entry.id_supabase);
+    } else {
+      await supabase
+        .from("marcatori")
+        .update({ portiere_subisce_id: gStagioneId || null })
+        .eq("partita_id", partita.id)
+        .eq("periodo", periodo)
+        .eq("goal_tempo", goal_tempo);
+    }
+  };
+
+  // =====================
+  // RENDER helper
+  // =====================
+  // Dropdown marcatori: SOLO sotto Montecarlo (mostra tutte le righe con squadra_segnante_id === MC)
+  const renderMarcatori = (squadraId?: string) => {
+    if (!tempo || !squadraId) return null;
+    const isMC = isMontecarlo(
+      squadraId,
+      squadraId === squadraCasa?.id ? squadraCasa?.nome : squadraOspite?.nome
+    );
+    if (!isMC) return null;
+
+    const lista = (marcatori[tempo] || []).filter(
+      (m) => m.squadra_segnante_id === MONTECARLO_ID
+    );
     const convocatiSet = new Set(convocati);
     const opzioni = giocatori.filter((g) => convocatiSet.has(g.id));
 
@@ -457,10 +572,68 @@ export default function GestioneRisultatoPartita() {
     );
   };
 
+  // Dropdown portieri: SOLO sotto l’altra squadra (righe con squadra_segnante_id !== MC)
+  const renderPortieriSubiti = (squadraId?: string) => {
+    if (!tempo || !squadraId) return null;
+    const isMC = isMontecarlo(
+      squadraId,
+      squadraId === squadraCasa?.id ? squadraCasa?.nome : squadraOspite?.nome
+    );
+    if (isMC) return null;
+
+    const lista = (marcatori[tempo] || []).filter(
+      (m) => m.squadra_segnante_id && m.squadra_segnante_id !== MONTECARLO_ID
+    );
+    const convocatiSet = new Set(convocati);
+
+    const opzioniPortieri = giocatori.filter(
+      (g) => convocatiSet.has(g.id) && (g.ruolo || "").toLowerCase() === "portiere"
+    );
+
+    return (
+      <div className="mt-2 space-y-1">
+        {lista.map((m) => (
+          <select
+            key={m.goal_tempo}
+            value={m.portiere_subisce_id || ""}
+            onChange={(e) => selezionaPortiereSubisce(tempo, m.goal_tempo, e.target.value)}
+            className="w-full border rounded px-2 py-1"
+          >
+            <option value="">-- Seleziona portiere --</option>
+            {opzioniPortieri.map((g) => (
+              <option key={g.id} value={g.id}>
+                {(g.cognome || "").trim()} {(g.nome || "").trim()}
+              </option>
+            ))}
+          </select>
+        ))}
+      </div>
+    );
+  };
+
+  // =====================
+  // Altre azioni di pagina
+  // =====================
+  const avviaInCorso = async () => {
+    if (!partita) return;
+    await supabase.from("partite").update({ stato: "InCorso" }).eq("id", partita.id);
+    setPartita({ ...partita, stato: "InCorso" });
+  };
+
+  const salvaStato = async () => {
+    if (!partita) return;
+    await supabase.from("partite").update({ stato: "Giocata" }).eq("id", partita.id);
+    navigate("/risultati");
+  };
+
+  // =====================
+  // RENDER
+  // =====================
   return (
     <div className="bg-white min-h-screen p-6">
       <div className="space-y-6">
         <div className="bg-white rounded-xl shadow-montecarlo overflow-hidden">
+          {/* Testata con campionato + pulsante stato */}
           <div className="bg-montecarlo-red-50 p-4 border-l-4 border-montecarlo-secondary flex items-center justify-center space-x-4">
             <span className="bg-montecarlo-accent text-montecarlo-secondary px-3 py-1 rounded-full text-sm font-medium shadow-gold">
               {partita?.campionato_torneo}
@@ -476,7 +649,7 @@ export default function GestioneRisultatoPartita() {
           </div>
 
           <div className="p-6 space-y-6">
-            {/* Timer */}
+            {/* TIMER */}
             <div className="flex flex-col items-center space-y-2">
               <TimerCircolare
                 elapsed={elapsed}
@@ -515,7 +688,7 @@ export default function GestioneRisultatoPartita() {
                             )
                           }
                         />
-                        {(g.cognome || "").trim()} {(g.nome || "").trim()}
+                        {(g.cognome || "").trim()} {(g.nome || "").trim()} {g.ruolo ? `(${g.ruolo})` : ""}
                       </label>
                     ))}
                   </div>
@@ -575,7 +748,7 @@ export default function GestioneRisultatoPartita() {
                       {squadraCasa?.logo_url ? (
                         <img
                           src={squadraCasa.logo_url}
-                          alt={`${squadraCasa.nome} logo`}
+                          alt={`${squadraCasa?.nome || "Casa"} logo`}
                           className="w-12 h-12 rounded-full border-2 border-montecarlo-accent"
                         />
                       ) : (
@@ -593,7 +766,10 @@ export default function GestioneRisultatoPartita() {
                       <button onClick={() => incrementa("casa")} className="text-3xl">+</button>
                     </div>
                   </div>
-                  {renderMarcatori(squadraCasa?.id)}
+                  {/* SOTTO MONTECARLO: marcatori ; SOTTO NON-MC: portieri subiti */}
+                  {isMontecarlo(squadraCasa?.id, squadraCasa?.nome)
+                    ? renderMarcatori(squadraCasa?.id)
+                    : renderPortieriSubiti(squadraCasa?.id)}
                 </div>
 
                 {/* Squadra Ospite */}
@@ -603,7 +779,7 @@ export default function GestioneRisultatoPartita() {
                       {squadraOspite?.logo_url ? (
                         <img
                           src={squadraOspite.logo_url}
-                          alt={`${squadraOspite.nome} logo`}
+                          alt={`${squadraOspite?.nome || "Ospite"} logo`}
                           className="w-12 h-12 rounded-full border-2 border-montecarlo-accent"
                         />
                       ) : (
@@ -621,12 +797,15 @@ export default function GestioneRisultatoPartita() {
                       <button onClick={() => incrementa("ospite")} className="text-3xl">+</button>
                     </div>
                   </div>
-                  {renderMarcatori(squadraOspite?.id)}
+                  {/* SOTTO MONTECARLO: marcatori ; SOTTO NON-MC: portieri subiti */}
+                  {isMontecarlo(squadraOspite?.id, squadraOspite?.nome)
+                    ? renderMarcatori(squadraOspite?.id)
+                    : renderPortieriSubiti(squadraOspite?.id)}
                 </div>
               </div>
             )}
 
-            {/* Salva stato partita */}
+            {/* Salva stato */}
             <button
               onClick={salvaStato}
               className="w-full bg-montecarlo-secondary text-white py-2 rounded-lg mt-4"

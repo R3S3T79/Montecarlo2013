@@ -1,0 +1,260 @@
+// src/pages/VotazioniPartita.tsx
+// Data creazione chat: 18/08/2025
+
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../context/AuthContext';
+
+type Convocato = {
+  giocatore_uid: string;
+  nome: string | null;
+  cognome: string | null;
+  foto_url: string | null;
+};
+
+type VotoRow = {
+  giocatore_id: string;
+  voto: number;
+};
+
+export default function VotazioniPartita(): JSX.Element {
+  const { id: partitaId } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const [loading, setLoading] = useState(true);
+  const [salvando, setSalvando] = useState(false);
+  const [errore, setErrore] = useState<string | null>(null);
+
+  const [statoPartita, setStatoPartita] = useState<string | null>(null);
+  const [stagioneId, setStagioneId] = useState<string | null>(null);
+  const [convocati, setConvocati] = useState<Convocato[]>([]);
+  const [voti, setVoti] = useState<Record<string, number>>({}); // key: giocatore_uid
+
+  // Carica info partita + convocati (solo ID) + anagrafiche da gsv + eventuali voti già dati
+  useEffect(() => {
+    if (!partitaId || !user) return;
+
+    (async () => {
+      setLoading(true);
+      setErrore(null);
+      try {
+        // 1) Stato e stagione della partita
+        const { data: p, error: pErr } = await supabase
+          .from('partite')
+          .select('stato, stagione_id')
+          .eq('id', partitaId)
+          .single();
+
+        if (pErr) throw pErr;
+        setStatoPartita(p?.stato ?? null);
+        setStagioneId(p?.stagione_id ?? null);
+
+        // 2) Convocati: SOLO gli ID dalla tabella presenze
+        const { data: pres, error: presErr } = await supabase
+          .from('presenze')
+          .select('giocatore_uid')
+          .eq('partita_id', partitaId);
+
+        if (presErr) throw presErr;
+
+        const ids: string[] =
+          (pres?.map((r: { giocatore_uid: string | null }) => r.giocatore_uid).filter(Boolean) as string[]) ?? [];
+
+        if (ids.length === 0) {
+          setConvocati([]);
+        } else {
+          // 3) Anagrafiche dalla vista stagionale (nome, cognome, foto, ruolo)
+          // NB: gsv contiene i dati per stagione → filtriamo per stagione e per elenco uid
+          const { data: gsv, error: gsvErr } = await supabase
+            .from('giocatori_stagioni_view')
+            .select('giocatore_uid, nome, cognome, foto_url')
+            .eq('stagione_id', p?.stagione_id)
+            .in('giocatore_uid', ids)
+            .order('cognome', { ascending: true });
+
+          if (gsvErr) throw gsvErr;
+
+          const conv: Convocato[] = (gsv ?? []).map((r: any) => ({
+            giocatore_uid: r.giocatore_uid,
+            nome: r.nome ?? null,
+            cognome: r.cognome ?? null,
+            foto_url: r.foto_url ?? null,
+          }));
+
+          setConvocati(conv);
+        }
+
+        // 4) Voti già inseriti dall'utente per questa partita
+        const { data: votes, error: vErr } = await supabase
+          .from('voti_giocatori')
+          .select('giocatore_id, voto')
+          .eq('partita_id', partitaId)
+          .eq('user_id', user.id);
+
+        if (vErr) throw vErr;
+
+        const iniziali: Record<string, number> = {};
+        (votes as VotoRow[] | null)?.forEach((r) => {
+          iniziali[r.giocatore_id] = r.voto;
+        });
+        setVoti(iniziali);
+      } catch (e: any) {
+        setErrore(e?.message ?? 'Errore di caricamento');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [partitaId, user]);
+
+  // Tutti i convocati hanno un voto valido (4..10)?
+  const tuttiVotati = useMemo(() => {
+    if (!convocati.length) return false;
+    return convocati.every((g) => {
+      const v = voti[g.giocatore_uid];
+      return Number.isInteger(v) && v >= 4 && v <= 10;
+    });
+  }, [convocati, voti]);
+
+  const onChangeVoto = (giocatoreId: string, value: string) => {
+    const v = Number(value);
+    setVoti((prev) => ({ ...prev, [giocatoreId]: v }));
+  };
+
+  const onSalva = async () => {
+    if (!partitaId || !user) return;
+    if (!tuttiVotati) {
+      setErrore('Devi votare tutti i convocati (voto 4–10).');
+      return;
+    }
+    setErrore(null);
+    setSalvando(true);
+
+    try {
+      const payload = convocati.map((g) => ({
+        partita_id: partitaId,
+        giocatore_id: g.giocatore_uid,
+        user_id: user.id,
+        voto: voti[g.giocatore_uid],
+      }));
+
+      const { error } = await supabase.from('voti_giocatori').upsert(payload, {
+        onConflict: 'partita_id,giocatore_id,user_id',
+      });
+
+      if (error) throw error;
+
+      navigate(`/partita/${partitaId}`, { replace: true });
+    } catch (e: any) {
+      setErrore(e?.message ?? 'Errore durante il salvataggio');
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const votoDisabilitato = statoPartita && statoPartita !== 'Giocata';
+
+  return (
+    <div className="min-h-screen p-4 sm:p-6">
+      <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-montecarlo p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-4">
+          
+        </div>
+
+        {statoPartita && (
+          <div className="mb-3 text-sm">
+            Stato partita:{' '}
+            <span
+              className={
+                statoPartita === 'Giocata'
+                  ? 'text-green-600 font-semibold'
+                  : 'text-orange-600 font-semibold'
+              }
+            >
+              {statoPartita}
+            </span>
+          </div>
+        )}
+
+        {votoDisabilitato && (
+          <div className="mb-4 p-3 rounded bg-yellow-50 text-yellow-800 text-sm">
+            Le votazioni sono abilitate solo per partite con stato <strong>Giocata</strong>.
+          </div>
+        )}
+
+        {loading ? (
+          <div>Caricamento…</div>
+        ) : errore ? (
+          <div className="p-3 rounded bg-red-50 text-red-700 text-sm">{errore}</div>
+        ) : convocati.length === 0 ? (
+          <div className="text-montecarlo-neutral">Nessun convocato trovato per questa partita.</div>
+        ) : (
+          <>
+            <div className="space-y-3">
+              {convocati.map((g) => (
+                <div
+                  key={g.giocatore_uid}
+                  className="flex items-center justify-between border rounded-lg px-3 py-2"
+                >
+                  <div className="flex items-center gap-3">
+                    {g.foto_url ? (
+                      <img
+                        src={g.foto_url}
+                        alt="foto"
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-xs text-white">
+                        ?
+                      </div>
+                    )}
+                    <div className="flex flex-col leading-tight">
+                      <span className="font-medium">{g.cognome ?? ''}</span>
+                      <span className="text-sm text-gray-600">{g.nome ?? ''}</span>
+                    </div>
+                  </div>
+
+                  <select
+                    className="border rounded-md px-2 py-1 text-sm"
+                    value={voti[g.giocatore_uid] ?? ''}
+                    onChange={(e) => onChangeVoto(g.giocatore_uid, e.target.value)}
+                    disabled={votoDisabilitato}
+                  >
+                    <option value="">Voto</option>
+                    {Array.from({ length: 7 }, (_, i) => i + 4).map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                onClick={() => navigate(`/partita/${partitaId}`)}
+                className="px-3 py-2 rounded border text-sm hover:bg-gray-50"
+                disabled={salvando}
+              >
+                Annulla
+              </button>
+              <button
+                onClick={onSalva}
+                disabled={salvando || votoDisabilitato || !tuttiVotati}
+                className={`px-4 py-2 rounded text-white text-sm font-semibold ${
+                  salvando || votoDisabilitato || !tuttiVotati
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-montecarlo-red-600 hover:bg-montecarlo-red-700'
+                }`}
+              >
+                {salvando ? 'Salvataggio…' : 'Salva voti'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
