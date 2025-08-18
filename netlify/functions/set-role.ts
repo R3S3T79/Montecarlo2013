@@ -18,17 +18,19 @@ export const handler: Handler = async (event) => {
   } catch {
     return { statusCode: 400, body: JSON.stringify({ error: "Invalid JSON" }) };
   }
+
   const { email, role } = body;
   if (!email || !role) {
     return { statusCode: 400, body: JSON.stringify({ error: "Missing email or role" }) };
   }
 
-  // 1. Recupera pending_user
+  // 🔍 Recupera pending_user confermato
   const { data: pending, error: pErr } = await supabaseAdmin
     .from("pending_users")
     .select("username, password, confirmed")
     .eq("email", email)
     .single();
+
   if (pErr || !pending) {
     return { statusCode: 404, body: JSON.stringify({ error: "Pending user not found" }) };
   }
@@ -36,10 +38,11 @@ export const handler: Handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: "Email not yet confirmed" }) };
   }
 
-  // 2. Controlla se esiste in Auth
+  // 👤 Controlla se utente esiste già in Auth
   const { data: listRes, error: listErr } = await supabaseAdmin.auth.admin.listUsers({
     filter: `email=eq.${email}`,
   });
+
   if (listErr) {
     return {
       statusCode: 500,
@@ -49,13 +52,14 @@ export const handler: Handler = async (event) => {
 
   let userId: string;
   if (listRes.users.length === 0) {
-    // Non esiste → crea
+    // 2a. Non esiste → crea
     const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: pending.password!,
       user_metadata: { username: pending.username, role },
       email_confirm: true,
     });
+
     if (createErr) {
       return {
         statusCode: 500,
@@ -64,7 +68,7 @@ export const handler: Handler = async (event) => {
     }
     userId = newUser.id;
   } else {
-    // Esiste → aggiorna role
+    // 2b. Esiste → aggiorna solo il role
     const existing = listRes.users[0];
     userId = existing.id;
     const existingMeta = existing.user_metadata || {};
@@ -79,10 +83,10 @@ export const handler: Handler = async (event) => {
     }
   }
 
-  // 3. Aggiorna pending_users (pulisci password + salva ruolo)
+  // ✅ Aggiorna pending_users senza toccare la password
   await supabaseAdmin
     .from("pending_users")
-    .update({ password: null, role })
+    .update({ role })
     .eq("email", email);
 
   return {
