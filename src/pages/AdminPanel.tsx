@@ -1,5 +1,5 @@
 // src/pages/AdminPanel.tsx
-// Data creazione chat: 2025-08-02 (rev: aggiunto pulsante Gestione Notizie)
+// Data creazione chat: 2025-08-02 (rev: aggiunto pulsante Gestione Notizie + fix approve-user)
 
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -11,7 +11,7 @@ import {
   User,
   Crown,
   Mail,
-  Newspaper, // icona per il pulsante
+  Newspaper,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -80,7 +80,7 @@ export default function AdminPanel() {
     }
   };
 
-  // Imposta ruolo via set-role
+  // Imposta ruolo via approve-user
   const setRole = async (email: string, role: UserRole) => {
     if (processing.has(email)) return;
     setProcessing((prev) => new Set(prev).add(email));
@@ -90,7 +90,7 @@ export default function AdminPanel() {
       } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error("Sessione scaduta");
 
-      const res = await fetch("/api/set-role", {
+      const res = await fetch("/.netlify/functions/approve-user", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -98,9 +98,10 @@ export default function AdminPanel() {
         },
         body: JSON.stringify({ email, role }),
       });
+
       if (!res.ok) {
         const text = await res.text();
-        console.error("set-role failed:", res.status, text);
+        console.error("approve-user failed:", res.status, text);
         alert(`Errore server: ${res.status}`);
       } else {
         alert(`Utente ${email} promosso a ${role}`);
