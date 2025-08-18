@@ -23,7 +23,7 @@ export const handler: Handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: "Missing email or role" }) };
   }
 
-  // 1. Recupera pending_user confermato
+  // 1. Recupera pending_user
   const { data: pending, error: pErr } = await supabaseAdmin
     .from("pending_users")
     .select("username, password, confirmed")
@@ -36,7 +36,7 @@ export const handler: Handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: "Email not yet confirmed" }) };
   }
 
-  // 2. Cerca in Auth con listUsers()
+  // 2. Controlla se esiste in Auth
   const { data: listRes, error: listErr } = await supabaseAdmin.auth.admin.listUsers({
     filter: `email=eq.${email}`,
   });
@@ -49,7 +49,7 @@ export const handler: Handler = async (event) => {
 
   let userId: string;
   if (listRes.users.length === 0) {
-    // 2a. Non esiste → crea
+    // Non esiste → crea
     const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: pending.password!,
@@ -64,7 +64,7 @@ export const handler: Handler = async (event) => {
     }
     userId = newUser.id;
   } else {
-    // 2b. Esiste → aggiorna il solo role
+    // Esiste → aggiorna role
     const existing = listRes.users[0];
     userId = existing.id;
     const existingMeta = existing.user_metadata || {};
@@ -79,7 +79,7 @@ export const handler: Handler = async (event) => {
     }
   }
 
-  // 3. Pulisci la password e salva il role in pending_users
+  // 3. Aggiorna pending_users (pulisci password + salva ruolo)
   await supabaseAdmin
     .from("pending_users")
     .update({ password: null, role })
