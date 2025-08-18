@@ -1,5 +1,5 @@
 // src/pages/StatisticheGiocatori.tsx
-// Data creazione chat: 15/08/2025
+// Data creazione chat: 18/08/2025 (rev: adattato a v_stat_giocatore_stagione)
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -7,33 +7,22 @@ import { supabase } from '../lib/supabaseClient';
 
 interface Stagione {
   id: string;
-  nome: string;  
+  nome: string;
   data_inizio: string;
   data_fine: string;
 }
 
-interface ViewStatRow {
-  giocatore_uid: string;
-  stagione_id: string;
-  goal_totali: number;
-  presenze_totali: number;
-}
-
-interface GiocatoreStagioneRow {
-  giocatore_uid: string;
-  nome: string | null;
-  cognome: string | null;
-  foto_url: string | null;
-}
-
 interface Statistica {
   giocatore_uid: string;
-  nome: string | null;
-  cognome: string | null;
+  giocatore_nome: string | null;
+  giocatore_cognome: string | null;
   foto_url: string | null;
-  gol: number;
+  ruolo: string | null;
   presenze: number;
+  gol: number;
+  subiti: number;
   media: number;
+  media_voti: number;
 }
 
 export default function StatisticheGiocatori(): JSX.Element {
@@ -43,10 +32,9 @@ export default function StatisticheGiocatori(): JSX.Element {
   const [stagioneSelezionata, setStagioneSelezionata] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
-  const [rowsView, setRowsView] = useState<ViewStatRow[]>([]);
-  const [rowsGiocatori, setRowsGiocatori] = useState<GiocatoreStagioneRow[]>([]);
+  const [rows, setRows] = useState<Statistica[]>([]);
 
-  const [sortField, setSortField] = useState<'giocatore' | 'gol' | 'presenze' | 'media'>('giocatore');
+  const [sortField, setSortField] = useState<'giocatore' | 'gol' | 'presenze' | 'media' | 'media_voti'>('giocatore');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Carica stagioni
@@ -66,47 +54,52 @@ export default function StatisticheGiocatori(): JSX.Element {
     })();
   }, []);
 
-  // Carica statistiche (view) + anagrafiche (v_giocatori_stagioni) per la stagione selezionata
+  // Carica statistiche dalla vista unica
   useEffect(() => {
     if (!stagioneSelezionata) {
-      setRowsView([]);
-      setRowsGiocatori([]);
+      setRows([]);
       return;
     }
 
     (async () => {
       setLoading(true);
       try {
-        // 1) Statistiche aggregate dalla view ufficiale
-        const { data: vData, error: vErr } = await supabase
+        const { data, error } = await supabase
           .from('v_stat_giocatore_stagione')
-          .select('giocatore_uid, stagione_id, goal_totali, presenze_totali')
+          .select('giocatore_uid, giocatore_nome, giocatore_cognome, foto_url, ruolo, presenze_totali, goal_totali, goal_subiti, media_voti')
           .eq('stagione_id', stagioneSelezionata);
 
-        if (vErr || !vData) {
-          setRowsView([]);
+        if (error || !data) {
+          setRows([]);
         } else {
-          setRowsView(vData as ViewStatRow[]);
-        }
+          const mapped: Statistica[] = data.map((r: any) => {
+            const presenze = r.presenze_totali ?? 0;
+            const gol = r.goal_totali ?? 0;
+            const subiti = r.goal_subiti ?? 0;
+            let media = 0;
 
-        // 2) Anagrafiche giocatori (con foto) dalla view v_giocatori_stagioni
-        const { data: gData, error: gErr } = await supabase
-          .from('v_giocatori_stagioni')
-          .select('giocatore_id, nome, cognome, foto_url')
-          .eq('stagione_id', stagioneSelezionata)
-          .order('cognome', { ascending: true });
+            if (presenze > 0) {
+              if (r.ruolo?.toLowerCase() === 'portiere') {
+                media = parseFloat((subiti / presenze).toFixed(2));
+              } else {
+                media = parseFloat((gol / presenze).toFixed(2));
+              }
+            }
 
-        if (gErr || !gData) {
-          setRowsGiocatori([]);
-        } else {
-          // rinomino giocatore_id in giocatore_uid per coerenza
-          const mapped = gData.map((g) => ({
-            giocatore_uid: g.giocatore_id,
-            nome: g.nome,
-            cognome: g.cognome,
-            foto_url: g.foto_url,
-          }));
-          setRowsGiocatori(mapped as GiocatoreStagioneRow[]);
+            return {
+              giocatore_uid: r.giocatore_uid,
+              giocatore_nome: r.giocatore_nome,
+              giocatore_cognome: r.giocatore_cognome,
+              foto_url: r.foto_url,
+              ruolo: r.ruolo,
+              presenze,
+              gol,
+              subiti,
+              media,
+              media_voti: r.media_voti ?? 0,
+            };
+          });
+          setRows(mapped);
         }
       } finally {
         setLoading(false);
@@ -114,33 +107,8 @@ export default function StatisticheGiocatori(): JSX.Element {
     })();
   }, [stagioneSelezionata]);
 
-  // Merge view + anagrafiche
-  const statistiche: Statistica[] = useMemo(() => {
-    if (!rowsGiocatori.length) return [];
-
-    const byUid = new Map<string, ViewStatRow>();
-    rowsView.forEach((r) => byUid.set(r.giocatore_uid, r));
-
-    return rowsGiocatori.map((g) => {
-      const agg = byUid.get(g.giocatore_uid);
-      const gol = agg?.goal_totali ?? 0;
-      const presenze = agg?.presenze_totali ?? 0;
-      const media = presenze > 0 ? parseFloat((gol / presenze).toFixed(2)) : 0;
-
-      return {
-        giocatore_uid: g.giocatore_uid,
-        nome: g.nome ?? null,
-        cognome: g.cognome ?? null,
-        foto_url: g.foto_url ?? null,
-        gol,
-        presenze,
-        media,
-      };
-    });
-  }, [rowsGiocatori, rowsView]);
-
   // Ordinamento
-  const sortData = (field: 'giocatore' | 'gol' | 'presenze' | 'media') => {
+  const sortData = (field: 'giocatore' | 'gol' | 'presenze' | 'media' | 'media_voti') => {
     if (sortField === field) {
       setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -149,25 +117,27 @@ export default function StatisticheGiocatori(): JSX.Element {
     }
   };
 
-  const sortedStatistiche = useMemo(() => {
-    const out = [...statistiche];
+  const sortedRows = useMemo(() => {
+    const out = [...rows];
     out.sort((a, b) => {
       let cmp = 0;
       if (sortField === 'giocatore') {
-        const an = `${a.cognome ?? ''} ${a.nome ?? ''}`.trim();
-        const bn = `${b.cognome ?? ''} ${b.nome ?? ''}`.trim();
+        const an = `${a.giocatore_cognome ?? ''} ${a.giocatore_nome ?? ''}`.trim();
+        const bn = `${b.giocatore_cognome ?? ''} ${b.giocatore_nome ?? ''}`.trim();
         cmp = an.localeCompare(bn);
       } else if (sortField === 'gol') {
         cmp = a.gol - b.gol;
       } else if (sortField === 'presenze') {
         cmp = a.presenze - b.presenze;
-      } else {
+      } else if (sortField === 'media') {
         cmp = a.media - b.media;
+      } else {
+        cmp = a.media_voti - b.media_voti;
       }
       return sortOrder === 'asc' ? cmp : -cmp;
     });
     return out;
-  }, [statistiche, sortField, sortOrder]);
+  }, [rows, sortField, sortOrder]);
 
   return (
     <div className="min-h-screen">
@@ -189,7 +159,8 @@ export default function StatisticheGiocatori(): JSX.Element {
           <div className="text-sm text-gray-600 flex space-x-6 px-2">
             <span><strong>G</strong> = Gol</span>
             <span><strong>P</strong> = Presenze</span>
-            <span><strong>M</strong> = Media</span>
+            <span><strong>M</strong> = Media Goal Fatti/Subiti</span>
+            <span><strong>M.V</strong> = Media Voti</span>
           </div>
 
           {loading ? (
@@ -211,10 +182,13 @@ export default function StatisticheGiocatori(): JSX.Element {
                     <th className="px-4 py-2 text-center cursor-pointer" onClick={() => sortData('media')}>
                       M
                     </th>
+                    <th className="px-4 py-2 text-center cursor-pointer" onClick={() => sortData('media_voti')}>
+                      M.V
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedStatistiche.map((st) => (
+                  {sortedRows.map((st) => (
                     <tr
                       key={st.giocatore_uid}
                       className="border-b last:border-0 hover:bg-gray-50 cursor-pointer"
@@ -232,16 +206,20 @@ export default function StatisticheGiocatori(): JSX.Element {
                             ?
                           </div>
                         )}
-                        <span>{`${st.cognome ?? ''} ${st.nome ?? ''}`.trim()}</span>
+                        <div className="flex flex-col">
+                          <span>{st.giocatore_cognome}</span>
+                          <span>{st.giocatore_nome}</span>
+                        </div>
                       </td>
                       <td className="px-4 py-2 text-center">{st.gol}</td>
                       <td className="px-4 py-2 text-center">{st.presenze}</td>
                       <td className="px-4 py-2 text-center">{st.media.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-center">{st.media_voti.toFixed(2)}</td>
                     </tr>
                   ))}
-                  {sortedStatistiche.length === 0 && (
+                  {sortedRows.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="px-4 py-6 text-center text-montecarlo-neutral">
+                      <td colSpan={5} className="px-4 py-6 text-center text-montecarlo-neutral">
                         Nessun dato disponibile
                       </td>
                     </tr>

@@ -1,5 +1,6 @@
 // src/pages/Tornei.tsx
 // Data creazione chat: 2025-08-01
+
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../../lib/supabaseClient";
@@ -19,7 +20,6 @@ interface TorneoMeta {
 export default function Tornei() {
   const [listaTornei, setListaTornei] = useState<TorneoMeta[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hoveredRow, setHoveredRow] = useState<number | null>(null);
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const role =
@@ -152,81 +152,68 @@ export default function Tornei() {
   return (
     <div className="min-h-screen px-4 pb-6">
       <div className="w-full">
-        <div className="bg-white rounded-xl shadow-montecarlo p-6 overflow-x-auto">
+        <div className="bg-white rounded-xl shadow-montecarlo p-6">
           {listaTornei.length === 0 ? (
             <p className="text-center text-gray-600 italic">
               Nessun torneo disponibile.
             </p>
           ) : (
-            <table className="table-auto w-full divide-y divide-gray-300">
-              <thead>
-                <tr>
-                  <th className="px-4 py-2 text-left bg-gradient-to-br from-[#d61f1f] to-[#f45e5e] text-white">
-                    Nome Torneo
-                  </th>
-                  <th className="px-4 py-2 text-left bg-gradient-to-br from-[#d61f1f] to-[#f45e5e] text-white">
-                    Luogo
-                  </th>
-                  <th className="px-4 py-2 text-left bg-gradient-to-br from-[#d61f1f] to-[#f45e5e] text-white">
-                    Data Inizio
-                  </th>
-                  <th className="px-4 py-2 text-left bg-gradient-to-br from-[#d61f1f] to-[#f45e5e] text-white">
-                    Stagione
-                  </th>
-                  <th className="px-4 py-2 text-left bg-gradient-to-br from-[#d61f1f] to-[#f45e5e] text-white">
-                    Tipo
-                  </th>
-                  {canAdd && (
-                    <th className="px-4 py-2 text-left bg-gradient-to-br from-[#d61f1f] to-[#f45e5e] text-white">
-                      Azioni
-                    </th>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-100">
-                {listaTornei.map((t, idx) => (
-                  <tr
-                    key={t.id}
-                    onClick={() => apriTorneo(t.id, t.formato)}
-                    onMouseEnter={() => setHoveredRow(idx)}
-                    onMouseLeave={() => setHoveredRow(null)}
-                    className={`cursor-pointer transition-colors duration-200 ${
-                      hoveredRow === idx
-                        ? "bg-red-50"
-                        : idx % 2 === 0
-                        ? "bg-gray-50"
-                        : ""
-                    }`}
-                  >
-                    <td className="px-4 py-2 whitespace-nowrap text-gray-800">
-                      {t.nome}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-gray-800">
-                      {t.luogo || "–"}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-gray-800">
-                      {formatDate(t.dataInizio)}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-gray-800">
-                      {t.stagioneNome}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-gray-800">
-                      {t.formato.replace("_", " ")}
-                    </td>
+            <ul className="space-y-3">
+              {listaTornei.map((t, idx) => (
+                <li
+                  key={t.id}
+                  onClick={() => apriTorneo(t.id, t.formato)}
+                  className="group cursor-pointer rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm transition hover:shadow-md"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="truncate font-semibold text-gray-900">
+                          {t.nome}
+                        </h3>
+                        <span className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ring-red-200 bg-red-50 text-red-700">
+                          {t.formato.replace("_", " ")}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-sm text-gray-600">
+                        {t.luogo || "—"}
+                      </p>
+                    </div>
+
                     {canAdd && (
-                      <td className="px-4 py-2 whitespace-nowrap text-gray-800">
-                        <button
-                          onClick={(e) => eliminaTorneo(e, t.id)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          <X size={16} />
-                        </button>
-                      </td>
+                      <button
+                        onClick={(e) => eliminaTorneo(e, t.id)}
+                        className="opacity-70 transition hover:opacity-100 text-red-600 hover:text-red-700"
+                        title="Elimina torneo"
+                      >
+                        <X size={18} />
+                      </button>
                     )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-sm text-gray-700 sm:grid-cols-4">
+                    <div className="rounded-lg bg-gray-50 px-3 py-2">
+                      <div className="text-xs text-gray-500">Luogo</div>
+                      <div className="font-medium">{t.luogo || "—"}</div>
+                    </div>
+                    <div className="rounded-lg bg-gray-50 px-3 py-2">
+                      <div className="text-xs text-gray-500">Data Inizio</div>
+                      <div className="font-medium">{formatDate(t.dataInizio)}</div>
+                    </div>
+                    <div className="rounded-lg bg-gray-50 px-3 py-2">
+                      <div className="text-xs text-gray-500">Stagione</div>
+                      <div className="font-medium">{t.stagioneNome}</div>
+                    </div>
+                    <div className="rounded-lg bg-gray-50 px-3 py-2">
+                      <div className="text-xs text-gray-500">Tipo</div>
+                      <div className="font-medium">
+                        {t.formato.replace("_", " ")}
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       </div>

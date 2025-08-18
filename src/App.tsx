@@ -30,7 +30,7 @@ import EditPartitaPage from "./pages/EditPartitaPage";
 import DettaglioPartita from "./pages/DettaglioPartita";
 import EditPartitaGiocata from "./pages/EditPartitaGiocata";
 import MenuFormazione from "./components/MenuFormazione";
-
+import Galleria from "./pages/Galleria";
 // statistiche
 import StatisticheSquadra from "./pages/StatisticheSquadra";
 import StatisticheGiocatori from "./pages/StatisticheGiocatori";
@@ -44,6 +44,11 @@ import StoricoAllenamenti from "./pages/StoricoAllenamenti";
 // prossima partita
 import ProssimaPartita from "./pages/ProssimaPartita";
 import GestioneRisultatoPartita from "./components/GestioneRisultatoPartita";
+import VotazioniPartita from './pages/VotazioniPartita';
+
+// ...
+<Route path="/partita/:id/votazioni" element={<VotazioniPartita />} />
+
 
 // tornei
 import LegacyFaseGironiRedirect from "./pages/tornei/LegacyFaseGironiRedirect";
@@ -112,6 +117,8 @@ export default function App() {
           {/* Dashboard principale */}
           <Route path="/" element={<Home />} />
           <Route path="/profilo" element={<UserProfile />} />
+          <Route path="/galleria" element={<Galleria />} />
+
 
           {/* Calendario e partite */}
           <Route path="/calendario" element={<Calendario />} />
@@ -136,6 +143,8 @@ export default function App() {
           {/* Prossima partita */}
           <Route path="/prossima-partita" element={<ProssimaPartita />} />
           <Route path="/gestione-risultato/:id" element={<GestioneRisultatoPartita />} />
+          <Route path="/partita/:id/votazioni" element={<VotazioniPartita />} />
+          
 
           {/* Tornei */}
           <Route path="/modifica-partita-fasegironi/:id" element={<LegacyFaseGironiRedirect />} />

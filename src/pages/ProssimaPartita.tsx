@@ -50,6 +50,7 @@ interface Marcatore {
   giocatore_uid: string;
   partita_id: string;
   stagione_id: string;
+  squadra_segnante_id: string | null;
 }
 
 interface Giocatore {
@@ -218,6 +219,7 @@ export default function ProssimaPartita() {
     giocatore_uid: String(row.giocatore_uid ?? row.giocatore_stagione_id ?? ""),
     partita_id: row.partita_id,
     stagione_id: row.stagione_id,
+    squadra_segnante_id: row.squadra_segnante_id ?? null,
   });
 
   // 4) fetch marcatori
@@ -226,7 +228,7 @@ export default function ProssimaPartita() {
     (async () => {
       const { data } = await supabase
         .from("marcatori")
-        .select("id,periodo,goal_tempo,giocatore_uid,giocatore_stagione_id,partita_id,stagione_id")
+        .select("id,periodo,goal_tempo,giocatore_uid,giocatore_stagione_id,partita_id,stagione_id,squadra_segnante_id")
         .eq("partita_id", partita.id)
         .order("periodo", { ascending: true });
 
@@ -364,11 +366,24 @@ export default function ProssimaPartita() {
     new Date(d).toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
   const formatOra = (d: string) => new Date(d).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
 
-  const marcatoriByPeriodo = useMemo(() => {
+  // Parziali per tempi: sempre usato sotto la squadra che NON è Montecarlo
+const renderParziali = (vals: number[]) => (
+  <div className="w-full grid grid-cols-4 text-center text-sm">
+    <div>1°T: {vals[0]}</div>
+    <div>2°T: {vals[1]}</div>
+    <div>3°T: {vals[2]}</div>
+    <div>4°T: {vals[3]}</div>
+  </div>
+);
+  
+  // SOLO marcatori di Montecarlo
+  const mcMarcatoriByPeriodo = useMemo(() => {
     const map: Record<number, Marcatore[]> = {};
     for (const m of marcatoriLive) {
-      map[m.periodo] ??= [];
-      map[m.periodo].push(m);
+      if (m.squadra_segnante_id === MONTECARLO_ID) {
+        map[m.periodo] ??= [];
+        map[m.periodo].push(m);
+      }
     }
     return map;
   }, [marcatoriLive]);
@@ -384,12 +399,17 @@ export default function ProssimaPartita() {
   }
 
   if (!partita) {
-    return (
-      <div className="min-h-screen">
+  return (
+    <div className="min-h-screen">
+      <div className="container mx-auto px-4 pt-10">   {/* ⬅ aggiunto container + padding */}
         <div className="bg-white p-8 rounded-xl shadow-montecarlo text-center">
           <Calendar className="mx-auto text-montecarlo-neutral mb-4" size={48} />
-          <h2 className="text-xl font-bold text-montecarlo-secondary mb-4">Nessuna partita programmata</h2>
-          <p className="text-montecarlo-neutral mb-6">Non ci sono partite in programma al momento.</p>
+          <h2 className="text-xl font-bold text-montecarlo-secondary mb-4">
+            Nessuna partita programmata
+          </h2>
+          <p className="text-montecarlo-neutral mb-6">
+            Non ci sono partite in programma al momento.
+          </p>
           <button
             onClick={handleCrea}
             className="bg-gradient-montecarlo text-white px-6 py-3 rounded-lg flex items-center mx-auto hover:scale-105 transition"
@@ -398,8 +418,10 @@ export default function ProssimaPartita() {
           </button>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
+
 
   const canEdit = role === "admin" || role === "creator";
   const isMontecarloCasa = partita.casa.id === MONTECARLO_ID;
@@ -480,27 +502,23 @@ export default function ProssimaPartita() {
                   </span>
                 </div>
 
-                {isMontecarloCasa ? (
-                  <div className="w-full grid grid-cols-2 gap-4">
-                    {Object.entries(marcatoriByPeriodo).map(([periodo, lista]) => (
-                      <div key={periodo} className="text-sm">
-                        <h4 className="font-medium">{`${periodo}° Tempo`}</h4>
-                        <ul className="list-disc list-inside">
-                          {lista.map((m) => (
-                            <li key={m.id}>{renderNomeMarcatore(m)}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                ) : partita.stato === "InCorso" ? (
-                  <div className="w-full grid grid-cols-4 text-center text-sm">
-                    <div>1T: {perTimeCasa[0]}</div>
-                    <div>2T: {perTimeCasa[1]}</div>
-                    <div>3T: {perTimeCasa[2]}</div>
-                    <div>4T: {perTimeCasa[3]}</div>
-                  </div>
-                ) : null}
+                {isMontecarloCasa
+  ? (
+      <div className="w-full grid grid-cols-2 gap-4">
+        {Object.entries(mcMarcatoriByPeriodo).map(([periodo, lista]) => (
+          <div key={periodo} className="text-sm">
+            <h4 className="font-medium">{`${periodo}° Tempo`}</h4>
+            <ul className="list-disc list-inside">
+              {lista.map((m) => (
+                <li key={m.id}>{renderNomeMarcatore(m)}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    )
+  : renderParziali(perTimeCasa)}
+
               </div>
 
               {/* VS + timer */}
@@ -560,27 +578,23 @@ export default function ProssimaPartita() {
                   </span>
                 </div>
 
-                {isMontecarloOspite ? (
-                  <div className="w-full grid grid-cols-2 gap-4">
-                    {Object.entries(marcatoriByPeriodo).map(([periodo, lista]) => (
-                      <div key={periodo} className="text-sm">
-                        <h4 className="font-medium">{`${periodo}° Tempo`}</h4>
-                        <ul className="list-disc list-inside">
-                          {lista.map((m) => (
-                            <li key={m.id}>{renderNomeMarcatore(m)}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                ) : partita.stato === "InCorso" ? (
-                  <div className="w-full grid grid-cols-4 text-center text-sm">
-                    <div>1T: {perTimeOspite[0]}</div>
-                    <div>2T: {perTimeOspite[1]}</div>
-                    <div>3T: {perTimeOspite[2]}</div>
-                    <div>4T: {perTimeOspite[3]}</div>
-                  </div>
-                ) : null}
+                {isMontecarloOspite
+  ? (
+      <div className="w-full grid grid-cols-2 gap-4">
+        {Object.entries(mcMarcatoriByPeriodo).map(([periodo, lista]) => (
+          <div key={periodo} className="text-sm">
+            <h4 className="font-medium">{`${periodo}° Tempo`}</h4>
+            <ul className="list-disc list-inside">
+              {lista.map((m) => (
+                <li key={m.id}>{renderNomeMarcatore(m)}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    )
+  : renderParziali(perTimeOspite)}
+
               </div>
 
               {/* Pulsanti */}

@@ -524,38 +524,62 @@ const fbPluginSrc = useMemo(() => {
   <div style={styles.page}>
     {/* HERO HEADER: logo + titolo centrati */}
     <header style={styles.header}>
-  <div style={styles.heroInner}>
-    <img
-      src="/montecarlo.png"
-      alt="Stemma Montecarlo"
-      style={styles.heroLogo}
-    />
-    <h1 style={styles.heroTitle}>Montecarlo 2013</h1>
+  <div style={{ position: "relative", textAlign: "center" }}>
+    {/* Bande rosse dietro lo stemma */}
+    <div style={{
+      position: "absolute",
+      top: "50%",
+      left: 0,
+      right: 0,
+      transform: "translateY(-50%)",
+      display: "flex",
+      flexDirection: "column",
+      gap: "8px",
+      zIndex: 1
+    }}>
+      <div style={{ height: "6px", backgroundColor: "red" }}></div>
+      <div style={{ height: "6px", backgroundColor: "red" }}></div>
+      <div style={{ height: "6px", backgroundColor: "red" }}></div>
+    </div>
+
+    {/* Logo + Titolo sopra */}
+    <div style={{ position: "relative", zIndex: 2, display: "flex", alignItems: "center", justifyContent: "center", gap: 16 }}>
+      <img
+        src="/montecarlo.png"
+        alt="Stemma Montecarlo"
+        style={styles.heroLogo}
+      />
+      <h1 style={styles.heroTitle}>Montecarlo 2013</h1>
+    </div>
   </div>
 </header>
 
       {/* NOTIZIE */}
       <section style={{ ...styles.card, ...styles.cardLarge }}>
-        <div style={styles.newsStrip}>
-          <div style={styles.marqueeMask}>
-            <div ref={newsTrackRef} style={styles.marqueeTrack}>
-              {marqueeLoop.map((n, idx) => (
-                <span
-                  key={idx}
-                  style={{
-                    ...(n.isDot ? styles.dot : styles.newsItem),
-                    color: n.colore || (n.isDot ? undefined : "inherit"),
-                    fontWeight: n.bold ? "bold" : "normal",
-                    fontStyle: n.italic ? "italic" : "normal",
-                  }}
-                >
-                  {n.testo}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+  <div style={styles.newsStrip}>
+    <div style={styles.marqueeMask}>
+      <div
+        ref={newsTrackRef}
+        style={styles.marqueeTrack}
+        className="marqueeTrack"   // <--- aggiunta qui
+      >
+        {marqueeLoop.map((n, idx) => (
+          <span
+            key={idx}
+            style={{
+              ...(n.isDot ? styles.dot : styles.newsItem),
+              color: n.colore || (n.isDot ? undefined : "inherit"),
+              fontWeight: n.bold ? "bold" : "normal",
+              fontStyle: n.italic ? "italic" : "normal",
+            }}
+          >
+            {n.testo}
+          </span>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
 
       {/* COMPLEANNO GIOCATORE */}
       <section style={styles.card}>
@@ -878,9 +902,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   heroTitle: {
     margin: 0,
-    fontSize: 30,
-    fontWeight: 500, // meno bold
-    color: "red",
+    fontSize: 35,
+    fontWeight: 600, // meno bold
+    color: "white",
     letterSpacing: 0.3,
   },
 
@@ -912,11 +936,14 @@ const styles: Record<string, React.CSSProperties> = {
     height: 40, // più alto
   },
   marqueeTrack: {
-    position: "absolute",
-    whiteSpace: "nowrap",
-    willChange: "transform",
-    animation: "scrollLeft 20s linear infinite",
-  },
+  position: "absolute",
+  whiteSpace: "nowrap",
+  willChange: "transform",
+  animation: "scrollLeft 20s linear infinite",
+  height: "40px",
+  display: "flex",
+  alignItems: "center",
+},
   newsItem: { marginRight: 24, fontSize: 18 }, // testo più grande
   dot: { marginRight: 24, opacity: 0.5, fontSize: 18 },
 
@@ -1092,6 +1119,11 @@ if (!styleEl) {
 }
 .blink {
   animation: blink 1s linear infinite;
+}
+
+/* pausa marquee quando utente tiene sopra il cursore o seleziona */
+.marqueeTrack:hover {
+  animation-play-state: paused;
 }
 `;
   document.head.appendChild(s);
