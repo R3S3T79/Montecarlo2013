@@ -24,6 +24,7 @@ export const handler: Handler = async (event) => {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) }
   }
 
+  // --- Controllo token JWT ---
   const authHeader = event.headers.authorization || ''
   if (!authHeader.startsWith('Bearer ')) {
     return { statusCode: 401, body: JSON.stringify({ error: 'Missing or invalid authorization header' }) }
@@ -37,54 +38,80 @@ export const handler: Handler = async (event) => {
     return { statusCode: 401, body: JSON.stringify({ error: 'Invalid token', details: e.message }) }
   }
 
-  // Controllo ruolo "creator"
   const userRole = decoded.app_metadata?.role || decoded.raw_app_meta_data?.role
   if (userRole !== 'creator') {
     return { statusCode: 403, body: JSON.stringify({ error: 'Access denied: Creators only' }) }
   }
 
-  let body: { email?: string }
+  // --- Leggi body ---
+  let body: { email?: string; role?: string }
   try {
     body = JSON.parse(event.body || '{}')
   } catch {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON body' }) }
   }
-  const { email } = body
-  if (!email) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Missing email' }) }
+  const { email, role } = body
+  if (!email || !role) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Missing email or role' }) }
   }
 
+  // --- Recupera pending user ---
   const { data: pendingUser, error: selectError } = await supabase
     .from('pending_users')
-    .select('username, password')
+    .select('username, password, confirmed')
     .eq('email', email)
-    .eq('confirmed', true)
     .single()
 
-  if (selectError || !pendingUser) {
+  if (selectError || !pendingUser || !pendingUser.confirmed) {
     return { statusCode: 404, body: JSON.stringify({ error: 'Pending user not found or not confirmed' }) }
   }
+
   const { username, password } = pendingUser
 
-  const { data: createdUser, error: createError } = await supabase.auth.admin.createUser({
-    email,
-    password,
-    user_metadata: { username },
-    email_confirm: true,
-  })
-  if (createError) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'Error creating user', details: createError.message }) }
+  // --- Controlla se esiste già in Auth ---
+  const { data: listRes, error: listErr } = await supabase.auth.admin.listUsers({ filter: `email=eq.${email}` })
+  if (listErr) {
+    return { statusCode: 500, body: JSON.stringify({ error: 'Error listing users', details: listErr.message }) }
   }
 
-  await supabase.from('pending_users').update({ password: '' }).eq('email', email)
+  let userId: string
+  if (listRes.users.length === 0) {
+    // Non esiste → crea
+    const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      user_metadata: { username, role },
+      email_confirm: true,
+    })
+    if (createError) {
+      return { statusCode: 500, body: JSON.stringify({ error: 'Error creating user', details: createError.message }) }
+    }
+    userId = newUser.id
+  } else {
+    // Esiste → aggiorna ruolo
+    const existing = listRes.users[0]
+    userId = existing.id
+    const existingMeta = existing.user_metadata || {}
+    const { error: updateErr } = await supabase.auth.admin.updateUserById(userId, {
+      user_metadata: { ...existingMeta, role },
+    })
+    if (updateErr) {
+      return { statusCode: 500, body: JSON.stringify({ error: 'Error updating role', details: updateErr.message }) }
+    }
+  }
+
+  // --- Aggiorna pending_users (password vuota + ruolo) ---
+  await supabase.from('pending_users').update({ password: null, role }).eq('email', email)
+
+  // --- Invia mail ---
   await transporter.sendMail({
     from: process.env.SMTP_FROM,
     to: email,
     subject: 'Benvenuto su Montecarlo 2013',
     html: `
       <p>Ciao ${username},</p>
-      <p>La tua registrazione è stata approvata. Ora puoi accedere con email e password.</p>
-      <p><a href=\"https://montecarlo2013.it/login\">Accedi</a></p>
+      <p>La tua registrazione è stata approvata con ruolo <b>${role}</b>. Ora puoi accedere con email e password.</p>
+      <p><a href="https://montecarlo2013.it/login">Accedi</a></p>
     `,
   })
 
