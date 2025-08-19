@@ -117,7 +117,10 @@ export default function SidebarLayout(): JSX.Element {
 
   // Gruppi link
   const group1 = [
-    { to: '/', label: 'Home' },
+    {
+      to: '/',
+      label: `Ciao ${user?.user_metadata?.nome ?? ''}`,
+    },
     { to: '/risultati', label: 'Risultati' },
     { to: '/calendario', label: 'Calendario' },
     { to: '/prossima-partita', label: 'Prossima Partita' },
@@ -173,7 +176,8 @@ export default function SidebarLayout(): JSX.Element {
   else if (matchVotazioni) pageTitle = 'Voto Partita';
   else if (matchEditPartitaGiocata) pageTitle = 'Modifica Partita';
   else if (location.pathname === '/risultati') pageTitle = 'Risultati';
-  else if (location.pathname === '/') pageTitle = 'Home';
+  else if (location.pathname === '/')
+  pageTitle = `Ciao ${user?.user_metadata?.nome ?? user?.user_metadata?.username ?? ''}`;
   else pageTitle = '';
 
   if (authLoading) return <div className="min-h-screen">Caricamento…</div>;
