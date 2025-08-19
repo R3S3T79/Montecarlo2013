@@ -1,5 +1,5 @@
 // src/pages/AdminPanel.tsx
-// Data creazione chat: 2025-08-02 (rev: aggiunto pulsante Gestione Notizie + fix approve-user)
+// Data creazione chat: 2025-08-19 (rev: flusso approvazione utente corretto)
 
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -10,7 +10,6 @@ import {
   Shield,
   User,
   Crown,
-  Mail,
   Newspaper,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -20,7 +19,7 @@ interface PendingUser {
   email: string;
   username: string;
   created_at: string;
-  confirmed: boolean;
+  confirmed: boolean; // true = già passato in auth.users
   role: UserRole | null;
 }
 
@@ -51,37 +50,8 @@ export default function AdminPanel() {
       minute: "2-digit",
     });
 
-  // Reinvia link di conferma
-  const resendEmail = async (email: string) => {
-    if (processing.has(email)) return;
-    setProcessing((prev) => new Set(prev).add(email));
-    try {
-      const res = await fetch("/api/resend-confirm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        console.error("resend-confirm failed:", json);
-        alert("Errore: " + json.error);
-      } else {
-        alert("Link di conferma reinviato!");
-      }
-    } catch (err: any) {
-      console.error(err);
-      alert("Errore di connessione: " + err.message);
-    } finally {
-      setProcessing((prev) => {
-        const next = new Set(prev);
-        next.delete(email);
-        return next;
-      });
-    }
-  };
-
-  // Imposta ruolo via approve-user
-  const setRole = async (email: string, role: UserRole) => {
+  // Approva utente: chiama Netlify Function
+  const approveUser = async (email: string, role: UserRole) => {
     if (processing.has(email)) return;
     setProcessing((prev) => new Set(prev).add(email));
     try {
@@ -104,9 +74,11 @@ export default function AdminPanel() {
         console.error("approve-user failed:", res.status, text);
         alert(`Errore server: ${res.status}`);
       } else {
-        alert(`Utente ${email} promosso a ${role}`);
+        alert(`Utente ${email} approvato come ${role}`);
         setPendingUsers((prev) =>
-          prev.map((u) => (u.email === email ? { ...u, role } : u))
+          prev.map((u) =>
+            u.email === email ? { ...u, role, confirmed: true } : u
+          )
         );
       }
     } catch (err: any) {
@@ -151,75 +123,46 @@ export default function AdminPanel() {
           </tr>
         </thead>
         <tbody>
-          {pendingUsers.map((u) => {
-            const roles: UserRole[] = ["user", "creator", "admin"];
-            const toShow = u.confirmed
-              ? roles.filter((r) => r !== u.role)
-              : [];
-
-            return (
-              <tr key={u.id} className="hover:bg-gray-50">
-                <td className="p-2">
-                  <div className="font-medium">{u.username}</div>
-                  <div className="text-sm text-gray-600">{u.email}</div>
-                </td>
-                <td className="p-2">
-                  {u.confirmed ? (
-                    <span className="text-green-700 flex items-center">
-                      <CheckCircle className="mr-1" size={16} /> Confermato
-                    </span>
-                  ) : (
-                    <span className="text-yellow-700 flex items-center">
-                      <Clock className="mr-1" size={16} /> In attesa
-                    </span>
-                  )}
-                </td>
-                <td className="p-2 text-sm text-gray-600">
-                  {formatDate(u.created_at)}
-                </td>
-                <td className="p-2 flex space-x-2">
-                  {u.confirmed ? (
-                    toShow.map((r) => {
-                      const Icon =
-                        r === "user"
-                          ? User
-                          : r === "creator"
-                          ? Shield
-                          : Crown;
-                      return (
-                        <button
-                          key={r}
-                          onClick={() => setRole(u.email, r)}
-                          disabled={processing.has(u.email)}
-                          className="px-3 py-1 border rounded inline-flex items-center text-sm"
-                        >
-                          <Icon className="mr-1" size={14} />
-                          {r.charAt(0).toUpperCase() + r.slice(1)}
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <button
-                      onClick={() => resendEmail(u.email)}
-                      disabled={processing.has(u.email)}
-                      className="px-3 py-1 border rounded inline-flex items-center text-sm"
-                    >
-                      <Mail className="mr-1" size={14} /> Reinvia Link
-                    </button>
-                  )}
-                  {u.confirmed && (
-                    <button
-                      onClick={() => resendEmail(u.email)}
-                      disabled={processing.has(u.email)}
-                      className="px-3 py-1 border rounded inline-flex items-center text-sm"
-                    >
-                      <Mail className="mr-1" size={14} /> Email
-                    </button>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
+          {pendingUsers.map((u) => (
+            <tr key={u.id} className="hover:bg-gray-50">
+              <td className="p-2">
+                <div className="font-medium">{u.username}</div>
+                <div className="text-sm text-gray-600">{u.email}</div>
+              </td>
+              <td className="p-2">
+                {u.confirmed ? (
+                  <span className="text-green-700 flex items-center">
+                    <CheckCircle className="mr-1" size={16} /> Confermato
+                  </span>
+                ) : (
+                  <span className="text-yellow-700 flex items-center">
+                    <Clock className="mr-1" size={16} /> In attesa approvazione
+                  </span>
+                )}
+              </td>
+              <td className="p-2 text-sm text-gray-600">
+                {formatDate(u.created_at)}
+              </td>
+              <td className="p-2 flex space-x-2">
+                {!u.confirmed &&
+                  (["user", "creator", "admin"] as UserRole[]).map((r) => {
+                    const Icon =
+                      r === "user" ? User : r === "creator" ? Shield : Crown;
+                    return (
+                      <button
+                        key={r}
+                        onClick={() => approveUser(u.email, r)}
+                        disabled={processing.has(u.email)}
+                        className="px-3 py-1 border rounded inline-flex items-center text-sm"
+                      >
+                        <Icon className="mr-1" size={14} />
+                        {r.charAt(0).toUpperCase() + r.slice(1)}
+                      </button>
+                    );
+                  })}
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
