@@ -1,5 +1,5 @@
 // src/pages/AdminPanel.tsx
-// Data creazione chat: 2025-08-19 (rev: flusso approvazione + cambio ruolo post-conferma)
+// Data creazione chat: 2025-08-19 (rev: aggiunta eliminazione utente + approvazione/cambio ruolo)
 
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -11,6 +11,7 @@ import {
   User,
   Crown,
   Newspaper,
+  Trash2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -50,8 +51,8 @@ export default function AdminPanel() {
       minute: "2-digit",
     });
 
-  // Approva o aggiorna ruolo
-  const setRole = async (email: string, role: UserRole, isNew: boolean) => {
+  // Approva nuovo utente (crea in auth + invia email di conferma)
+  const approveUser = async (email: string, role: UserRole) => {
     if (processing.has(email)) return;
     setProcessing((prev) => new Set(prev).add(email));
     try {
@@ -60,11 +61,7 @@ export default function AdminPanel() {
       } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error("Sessione scaduta");
 
-      const endpoint = isNew
-        ? "/.netlify/functions/approve-user"
-        : "/.netlify/functions/set-role"; // set-role solo aggiorna
-
-      const res = await fetch(endpoint, {
+      const res = await fetch("/.netlify/functions/approve-user", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -75,19 +72,99 @@ export default function AdminPanel() {
 
       if (!res.ok) {
         const text = await res.text();
-        console.error("setRole failed:", res.status, text);
+        console.error("approve-user failed:", res.status, text);
         alert(`Errore server: ${res.status}`);
       } else {
-        alert(
-          isNew
-            ? `Utente ${email} approvato come ${role}`
-            : `Ruolo di ${email} aggiornato a ${role}`
-        );
+        alert(`Utente ${email} approvato come ${role}`);
         setPendingUsers((prev) =>
           prev.map((u) =>
             u.email === email ? { ...u, role, confirmed: true } : u
           )
         );
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert("Errore di connessione: " + err.message);
+    } finally {
+      setProcessing((prev) => {
+        const next = new Set(prev);
+        next.delete(email);
+        return next;
+      });
+    }
+  };
+
+  // Cambia ruolo a utente già confermato
+  const changeRole = async (email: string, role: UserRole) => {
+    if (processing.has(email)) return;
+    setProcessing((prev) => new Set(prev).add(email));
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Sessione scaduta");
+
+      const res = await fetch("/.netlify/functions/set-role", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ email, role }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("set-role failed:", res.status, text);
+        alert(`Errore server: ${res.status}`);
+      } else {
+        alert(`Ruolo di ${email} aggiornato a ${role}`);
+        setPendingUsers((prev) =>
+          prev.map((u) =>
+            u.email === email ? { ...u, role, confirmed: true } : u
+          )
+        );
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert("Errore di connessione: " + err.message);
+    } finally {
+      setProcessing((prev) => {
+        const next = new Set(prev);
+        next.delete(email);
+        return next;
+      });
+    }
+  };
+
+  // Elimina utente (auth + pending_users)
+  const deleteUser = async (email: string) => {
+    if (processing.has(email)) return;
+    if (!window.confirm(`Eliminare definitivamente l'utente ${email}?`)) return;
+
+    setProcessing((prev) => new Set(prev).add(email));
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Sessione scaduta");
+
+      const res = await fetch("/.netlify/functions/delete-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("delete-user failed:", res.status, text);
+        alert(`Errore server: ${res.status}`);
+      } else {
+        alert(`Utente ${email} eliminato`);
+        setPendingUsers((prev) => prev.filter((u) => u.email !== email));
       }
     } catch (err: any) {
       console.error(err);
@@ -131,48 +208,61 @@ export default function AdminPanel() {
           </tr>
         </thead>
         <tbody>
-          {pendingUsers.map((u) => (
-            <tr key={u.id} className="hover:bg-gray-50">
-              <td className="p-2">
-                <div className="font-medium">{u.username}</div>
-                <div className="text-sm text-gray-600">{u.email}</div>
-              </td>
-              <td className="p-2">
-                {u.confirmed ? (
-                  <span className="text-green-700 flex items-center">
-                    <CheckCircle className="mr-1" size={16} /> Confermato (
-                    {u.role})
-                  </span>
-                ) : (
-                  <span className="text-yellow-700 flex items-center">
-                    <Clock className="mr-1" size={16} /> In attesa approvazione
-                  </span>
-                )}
-              </td>
-              <td className="p-2 text-sm text-gray-600">
-                {formatDate(u.created_at)}
-              </td>
-              <td className="p-2 flex space-x-2">
-                {(["user", "creator", "admin"] as UserRole[])
-                  .filter((r) => r !== u.role) // non mostra quello già attivo
-                  .map((r) => {
-                    const Icon =
-                      r === "user" ? User : r === "creator" ? Shield : Crown;
-                    return (
-                      <button
-                        key={r}
-                        onClick={() => setRole(u.email, r, !u.confirmed)}
-                        disabled={processing.has(u.email)}
-                        className="px-3 py-1 border rounded inline-flex items-center text-sm"
-                      >
-                        <Icon className="mr-1" size={14} />
-                        {r.charAt(0).toUpperCase() + r.slice(1)}
-                      </button>
-                    );
-                  })}
-              </td>
-            </tr>
-          ))}
+          {pendingUsers.map((u) => {
+            const availableRoles: UserRole[] = ["user", "creator", "admin"];
+            const roleButtons = availableRoles
+              .filter((r) => r !== u.role)
+              .map((r) => {
+                const Icon = r === "user" ? User : r === "creator" ? Shield : Crown;
+                const onClick = u.confirmed
+                  ? () => changeRole(u.email, r)
+                  : () => approveUser(u.email, r);
+                return (
+                  <button
+                    key={r}
+                    onClick={onClick}
+                    disabled={processing.has(u.email)}
+                    className="px-3 py-1 border rounded inline-flex items-center text-sm"
+                  >
+                    <Icon className="mr-1" size={14} />
+                    {r.charAt(0).toUpperCase() + r.slice(1)}
+                  </button>
+                );
+              });
+
+            return (
+              <tr key={u.id} className="hover:bg-gray-50">
+                <td className="p-2">
+                  <div className="font-medium">{u.username}</div>
+                  <div className="text-sm text-gray-600">{u.email}</div>
+                </td>
+                <td className="p-2">
+                  {u.confirmed ? (
+                    <span className="text-green-700 flex items-center">
+                      <CheckCircle className="mr-1" size={16} /> Confermato ({u.role})
+                    </span>
+                  ) : (
+                    <span className="text-yellow-700 flex items-center">
+                      <Clock className="mr-1" size={16} /> In attesa approvazione
+                    </span>
+                  )}
+                </td>
+                <td className="p-2 text-sm text-gray-600">{formatDate(u.created_at)}</td>
+                <td className="p-2 flex flex-wrap gap-2 items-center">
+                  {roleButtons}
+                  <button
+                    onClick={() => deleteUser(u.email)}
+                    disabled={processing.has(u.email)}
+                    className="px-3 py-1 border rounded inline-flex items-center text-sm text-red-700 hover:bg-red-50"
+                    title="Elimina utente"
+                  >
+                    <Trash2 className="mr-1" size={14} />
+                    Elimina
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
