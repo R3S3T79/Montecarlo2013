@@ -197,6 +197,17 @@ export default function AdminPanel() {
         </Link>
       </div>
 
+      {/* Nuovo: pulsante crea nuovo utente */}
+      <div className="mb-6">
+        <Link
+          to="/nuovo-utente"
+          className="px-4 py-2 bg-green-600 text-white rounded inline-flex items-center hover:bg-green-700"
+        >
+          <User className="mr-2" size={18} />
+          Crea Nuovo Utente
+        </Link>
+      </div>
+
       <h3 className="text-xl font-semibold mb-2">Utenti</h3>
       <table className="w-full border">
         <thead>
