@@ -1,5 +1,5 @@
 // src/pages/AdminPanel.tsx
-// Data creazione chat: 2025-08-19 (rev: flusso approvazione utente corretto)
+// Data creazione chat: 2025-08-19 (rev: flusso approvazione + cambio ruolo post-conferma)
 
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -50,8 +50,8 @@ export default function AdminPanel() {
       minute: "2-digit",
     });
 
-  // Approva utente: chiama Netlify Function
-  const approveUser = async (email: string, role: UserRole) => {
+  // Approva o aggiorna ruolo
+  const setRole = async (email: string, role: UserRole, isNew: boolean) => {
     if (processing.has(email)) return;
     setProcessing((prev) => new Set(prev).add(email));
     try {
@@ -60,7 +60,11 @@ export default function AdminPanel() {
       } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error("Sessione scaduta");
 
-      const res = await fetch("/.netlify/functions/approve-user", {
+      const endpoint = isNew
+        ? "/.netlify/functions/approve-user"
+        : "/.netlify/functions/set-role"; // set-role solo aggiorna
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -71,10 +75,14 @@ export default function AdminPanel() {
 
       if (!res.ok) {
         const text = await res.text();
-        console.error("approve-user failed:", res.status, text);
+        console.error("setRole failed:", res.status, text);
         alert(`Errore server: ${res.status}`);
       } else {
-        alert(`Utente ${email} approvato come ${role}`);
+        alert(
+          isNew
+            ? `Utente ${email} approvato come ${role}`
+            : `Ruolo di ${email} aggiornato a ${role}`
+        );
         setPendingUsers((prev) =>
           prev.map((u) =>
             u.email === email ? { ...u, role, confirmed: true } : u
@@ -112,7 +120,7 @@ export default function AdminPanel() {
         </Link>
       </div>
 
-      <h3 className="text-xl font-semibold mb-2">Utenti in Attesa</h3>
+      <h3 className="text-xl font-semibold mb-2">Utenti</h3>
       <table className="w-full border">
         <thead>
           <tr className="bg-gray-100">
@@ -132,7 +140,8 @@ export default function AdminPanel() {
               <td className="p-2">
                 {u.confirmed ? (
                   <span className="text-green-700 flex items-center">
-                    <CheckCircle className="mr-1" size={16} /> Confermato
+                    <CheckCircle className="mr-1" size={16} /> Confermato (
+                    {u.role})
                   </span>
                 ) : (
                   <span className="text-yellow-700 flex items-center">
@@ -144,14 +153,15 @@ export default function AdminPanel() {
                 {formatDate(u.created_at)}
               </td>
               <td className="p-2 flex space-x-2">
-                {!u.confirmed &&
-                  (["user", "creator", "admin"] as UserRole[]).map((r) => {
+                {(["user", "creator", "admin"] as UserRole[])
+                  .filter((r) => r !== u.role) // non mostra quello già attivo
+                  .map((r) => {
                     const Icon =
                       r === "user" ? User : r === "creator" ? Shield : Crown;
                     return (
                       <button
                         key={r}
-                        onClick={() => approveUser(u.email, r)}
+                        onClick={() => setRole(u.email, r, !u.confirmed)}
                         disabled={processing.has(u.email)}
                         className="px-3 py-1 border rounded inline-flex items-center text-sm"
                       >
