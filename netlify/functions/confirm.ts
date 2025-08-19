@@ -1,5 +1,5 @@
 // netlify/functions/confirm.ts
-// Data: 19/08/2025 – Alla conferma: crea l’utente in auth.users e reindirizza al login (senza auto-login)
+// Data: 18/08/2025 – Conferma registrazione: sposta utente da pending a auth.users
 
 import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
@@ -11,97 +11,53 @@ const supabase = createClient(
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "GET") {
-    return { statusCode: 405, body: "Method Not Allowed" };
+    return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
   const token = event.queryStringParameters?.token;
   if (!token) {
-    return {
-      statusCode: 302,
-      headers: { Location: "https://montecarlo2013.it/#/login?error=missing_token" },
-      body: "",
-    };
+    return { statusCode: 400, body: JSON.stringify({ error: "Missing confirmation token" }) };
   }
 
+  // cerca pending_user
   const { data: pending, error: selErr } = await supabase
     .from("pending_users")
-    .select("email, username, password, role, approved, confirmed, expires_at")
+    .select("email, username, role, confirmed")
     .eq("confirmation_token", token)
     .single();
 
   if (selErr || !pending) {
-    return {
-      statusCode: 302,
-      headers: { Location: "https://montecarlo2013.it/#/login?error=invalid" },
-      body: "",
-    };
-  }
-
-  if (!pending.approved) {
-    return {
-      statusCode: 302,
-      headers: { Location: "https://montecarlo2013.it/#/login?error=not_approved" },
-      body: "",
-    };
+    return { statusCode: 404, body: JSON.stringify({ error: "Invalid or expired token" }) };
   }
 
   if (pending.confirmed) {
-    return {
-      statusCode: 302,
-      headers: { Location: "https://montecarlo2013.it/#/login?info=already_confirmed" },
-      body: "",
-    };
+    return { statusCode: 400, body: JSON.stringify({ error: "User already confirmed" }) };
   }
 
-  if (pending.expires_at && new Date(pending.expires_at) < new Date()) {
-    return {
-      statusCode: 302,
-      headers: { Location: "https://montecarlo2013.it/#/login?error=expired" },
-      body: "",
-    };
-  }
-
-  if (!pending.password) {
-    return {
-      statusCode: 302,
-      headers: { Location: "https://montecarlo2013.it/#/login?error=no_password" },
-      body: "",
-    };
-  }
-
-  // CREA UTENTE IN AUTH ORA — aggiunge anche role in app_metadata
-  const { error: createErr } = await supabase.auth.admin.createUser({
-    email: pending.email,
-    password: pending.password,
-    app_metadata: { role: pending.role || "user" },
-    user_metadata: {
-      username: pending.username,
-      role: pending.role || "user",
-    },
-    email_confirm: true,
-  });
-
-  if (createErr) {
-    return {
-      statusCode: 302,
-      headers: { Location: "https://montecarlo2013.it/#/login?error=create_failed" },
-      body: "",
-    };
-  }
-
-  // marca come confermato e rimuove la password
+  // marca come confirmed
   await supabase
     .from("pending_users")
-    .update({ confirmed: true, password: null })
-    .eq("confirmation_token", token);
+    .update({ confirmed: true })
+    .eq("email", pending.email);
 
-  // ✅ reindirizza SEMPRE alla pagina di login (senza auto-login)
+  // aggiorna ruolo nei metadata di auth.users
+  const { data: allUsers, error: authErr } = await supabase.auth.admin.listUsers();
+  if (authErr) {
+    return { statusCode: 500, body: JSON.stringify({ error: "Error fetching auth users" }) };
+  }
+
+  const targetUser = allUsers?.users.find((u) => u.email === pending.email);
+  if (targetUser) {
+    const { error: updateError } = await supabase.auth.admin.updateUserById(targetUser.id, {
+      user_metadata: { ...targetUser.user_metadata, role: pending.role || "user" },
+    });
+    if (updateError) {
+      return { statusCode: 500, body: JSON.stringify({ error: "Error updating user metadata", details: updateError.message }) };
+    }
+  }
+
   return {
-    statusCode: 302,
-    headers: {
-      Location: "https://montecarlo2013.it/#/login?info=confirmed",
-      "Cache-Control": "no-cache",
-    },
-    body: "",
+    statusCode: 200,
+    body: JSON.stringify({ success: true, message: "User confirmed" }),
   };
 };
