@@ -82,6 +82,8 @@ import EditSquadra from "./pages/EditSquadra";
 // admin panel
 import AdminPanel from "./pages/AdminPanel";
 import AdminNotizie from "./pages/AdminNotizie"; // <--- aggiungi import
+import NuovoUtente from "./pages/NuovoUtente"; // nuova pagina
+
 
 
 // fallback
@@ -178,6 +180,7 @@ export default function App() {
           {/* Admin Panel */}
           <Route path="/admin-panel" element={<AdminPanel />} />
           <Route path="/admin-notizie" element={<AdminNotizie />} />
+          <Route path="/nuovo-utente" element={<NuovoUtente />} /> {/* nuova */}
 
 
           {/* Fallback */}
