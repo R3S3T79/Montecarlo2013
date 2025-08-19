@@ -78,13 +78,10 @@ export const handler: Handler = async (event) => {
     .update({ confirmed: true, password: null })
     .eq("confirmation_token", token);
 
-  return {
-    statusCode: 200,
-    headers: { "Content-Type": "text/html" },
-    body: `
-      <h1>Email confermata!</h1>
-      <p>Ora puoi accedere con le tue credenziali.</p>
-      <a href="https://montecarlo2013.it/#/login">Vai al Login</a>
-    `,
-  };
+return {
+  statusCode: 302,
+  headers: {
+    Location: "https://montecarlo2013.it/#/login", // 🔴 reindirizza direttamente al login
+  },
+  body: "",
 };
