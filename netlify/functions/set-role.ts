@@ -31,9 +31,8 @@ export const handler: Handler = async (event) => {
 
     // 2. Aggiorna ruolo in auth.users (metadata + ruolo principale)
     const { error: updateError } = await supabase.auth.admin.updateUserById(user.id, {
-      user_metadata: { ...user.user_metadata, role },
-      role, // campo principale
-    });
+  user_metadata: { ...user.user_metadata, role },
+});
 
     if (updateError) throw updateError;
 
