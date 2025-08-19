@@ -1,4 +1,7 @@
 // netlify/functions/register.ts
+// Data: 18/08/2025 – Flusso nuovo: NESSUNA email all’utente al momento della registrazione.
+// Solo insert in pending_users e notifica al creator.
+
 import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
@@ -21,28 +24,19 @@ const transporter = nodemailer.createTransport({
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ error: "Method Not Allowed" }),
-    };
+    return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
   let body: { email?: string; username?: string; password?: string };
   try {
     body = JSON.parse(event.body || "{}");
   } catch {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: "Invalid JSON body" }),
-    };
+    return { statusCode: 400, body: JSON.stringify({ error: "Invalid JSON body" }) };
   }
 
   const { email, username, password } = body;
   if (!email || !username || !password) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: "Missing required fields" }),
-    };
+    return { statusCode: 400, body: JSON.stringify({ error: "Missing required fields" }) };
   }
 
   try {
@@ -50,38 +44,34 @@ export const handler: Handler = async (event) => {
 
     const { error: insertError } = await supabase
       .from("pending_users")
-      .insert({ email, username, password, confirmation_token });
+      .insert({
+        email,
+        username,
+        password,                 // <-- la teniamo fino alla conferma
+        confirmation_token,
+        approved: false,          // <-- nuovo flusso
+        confirmed: false,
+      });
 
     if (insertError) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: insertError.message }),
-      };
+      return { statusCode: 400, body: JSON.stringify({ error: insertError.message }) };
     }
 
-    const confirmUrl = `https://montecarlo2013.it/api/confirm?token=${confirmation_token}`;
-
+    // NOTIFICA SOLO AL CREATOR (niente email all’utente)
     await transporter.sendMail({
       from: process.env.SMTP_FROM,
-      to: email,
-      subject: "Conferma la tua registrazione – Montecarlo 2013",
+      to: "marcomiressi@gmail.com",
+      subject: "Nuova registrazione in attesa di approvazione",
       html: `
-        <p>Ciao ${username},</p>
-        <p>Per completare la registrazione clicca qui:</p>
-        <p><a href="${confirmUrl}">${confirmUrl}</a></p>
-        <p>Il link scade tra 24 ore.</p>
+        <p>Nuova richiesta di registrazione.</p>
+        <p><b>Utente:</b> ${username} &lt;${email}&gt;</p>
+        <p>Apri il <a href="https://montecarlo2013.it/#/admin-panel">Pannello Admin</a> per approvare.</p>
       `,
     });
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ success: true }),
-    };
+    return { statusCode: 200, body: JSON.stringify({ success: true }) };
   } catch (err: any) {
     console.error("Register error:", err);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: "Internal server error", details: err.message }),
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: "Internal server error", details: err.message }) };
   }
 };
