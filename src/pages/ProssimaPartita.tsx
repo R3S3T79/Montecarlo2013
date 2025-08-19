@@ -401,7 +401,7 @@ const renderParziali = (vals: number[]) => (
   if (!partita) {
   return (
     <div className="min-h-screen">
-      <div className="container mx-auto px-4 pt-10">   {/* ⬅ aggiunto container + padding */}
+      <div className="container mx-auto px-4 pt-10">
         <div className="bg-white p-8 rounded-xl shadow-montecarlo text-center">
           <Calendar className="mx-auto text-montecarlo-neutral mb-4" size={48} />
           <h2 className="text-xl font-bold text-montecarlo-secondary mb-4">
@@ -410,17 +410,20 @@ const renderParziali = (vals: number[]) => (
           <p className="text-montecarlo-neutral mb-6">
             Non ci sono partite in programma al momento.
           </p>
-          <button
-            onClick={handleCrea}
-            className="bg-gradient-montecarlo text-white px-6 py-3 rounded-lg flex items-center mx-auto hover:scale-105 transition"
-          >
-            <Plus className="mr-2" size={20} /> Crea Nuova Partita
-          </button>
+          {canEdit && (   // 👈 aggiunto controllo ruolo
+            <button
+              onClick={handleCrea}
+              className="bg-gradient-montecarlo text-white px-6 py-3 rounded-lg flex items-center mx-auto hover:scale-105 transition"
+            >
+              <Plus className="mr-2" size={20} /> Crea Nuova Partita
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 }
+
 
 
   const canEdit = role === "admin" || role === "creator";
