@@ -1,5 +1,5 @@
 // netlify/functions/confirm.ts
-// Data: 18/08/2025 – Alla conferma: crea l’utente in auth.users e completa la registrazione.
+// Data: 19/08/2025 – Alla conferma: crea l’utente in auth.users e reindirizza al login.
 
 import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
@@ -19,7 +19,6 @@ export const handler: Handler = async (event) => {
     return { statusCode: 400, headers: { "Content-Type": "text/html" }, body: `<h1>Token mancante</h1>` };
   }
 
-  // prendo pending_user con approved=true
   const { data: pending, error: selErr } = await supabase
     .from("pending_users")
     .select("email, username, password, role, approved, confirmed, expires_at")
@@ -36,16 +35,16 @@ export const handler: Handler = async (event) => {
 
   if (pending.confirmed) {
     return {
-      statusCode: 200,
-      headers: { "Content-Type": "text/html" },
-      body: `
-        <h1>Email già confermata</h1>
-        <a href="https://montecarlo2013.it/#/login">Vai al Login</a>
-      `,
+      statusCode: 302,
+      headers: {
+        Location: "https://montecarlo2013.it/#/login",
+        "Cache-Control": "no-cache",
+      },
+      body: "",
     };
   }
 
-  if (new Date(pending.expires_at) < new Date()) {
+  if (pending.expires_at && new Date(pending.expires_at) < new Date()) {
     return { statusCode: 410, headers: { "Content-Type": "text/html" }, body: `<h1>Link scaduto</h1>` };
   }
 
@@ -53,15 +52,18 @@ export const handler: Handler = async (event) => {
     return { statusCode: 500, headers: { "Content-Type": "text/html" }, body: `<h1>Errore: password mancante</h1>` };
   }
 
-  // CREA UTENTE IN AUTH ORA
+  // CREA UTENTE IN AUTH ORA — app_metadata + user_metadata
   const { error: createErr } = await supabase.auth.admin.createUser({
     email: pending.email,
     password: pending.password,
+    app_metadata: {
+      role: pending.role || "user",
+    },
     user_metadata: {
       username: pending.username,
       role: pending.role || "user",
     },
-    email_confirm: true, // confermiamo noi
+    email_confirm: true,
   });
 
   if (createErr) {
@@ -72,16 +74,18 @@ export const handler: Handler = async (event) => {
     };
   }
 
-  // marca confirmed=true e pulisce la password
   await supabase
     .from("pending_users")
     .update({ confirmed: true, password: null })
     .eq("confirmation_token", token);
 
-return {
-  statusCode: 302,
-  headers: {
-    Location: "https://montecarlo2013.it/#/login", // 🔴 reindirizza direttamente al login
-  },
-  body: "",
+  // Redirect diretto al login
+  return {
+    statusCode: 302,
+    headers: {
+      Location: "https://montecarlo2013.it/#/login",
+      "Cache-Control": "no-cache",
+    },
+    body: "",
+  };
 };
