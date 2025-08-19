@@ -66,13 +66,29 @@ export const handler: Handler = async (event) => {
     return { statusCode: 404, body: JSON.stringify({ error: "Pending user not found" }) };
   }
 
-  // marca approved=true e salva ruolo
+  // marca approved=true e salva ruolo nella tabella pending_users
   await supabase
     .from("pending_users")
     .update({ approved: true, role })
     .eq("email", email);
 
-  // invia adesso l’email di conferma
+  // aggiorna ruolo anche nei metadata di auth.users
+  const { data: allUsers, error: authErr } = await supabase.auth.admin.listUsers();
+  if (authErr) {
+    return { statusCode: 500, body: JSON.stringify({ error: "Error fetching auth users" }) };
+  }
+
+  const targetUser = allUsers?.users.find((u) => u.email === email);
+  if (targetUser) {
+    const { error: updateError } = await supabase.auth.admin.updateUserById(targetUser.id, {
+      user_metadata: { ...targetUser.user_metadata, role },
+    });
+    if (updateError) {
+      return { statusCode: 500, body: JSON.stringify({ error: "Error updating user metadata", details: updateError.message }) };
+    }
+  }
+
+  // invia l’email di conferma
   const confirmUrl = `https://montecarlo2013.it/api/confirm?token=${pending.confirmation_token}`;
   await transporter.sendMail({
     from: process.env.SMTP_FROM,
