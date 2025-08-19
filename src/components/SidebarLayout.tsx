@@ -1,5 +1,5 @@
 // src/components/SidebarLayout.tsx
-// Data creazione chat: 2025-08-02 (rev con stella votazioni)
+// Data creazione chat: 2025-08-02 (rev con stella votazioni + fix visibilità Admin Panel)
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -111,46 +111,9 @@ export default function SidebarLayout(): JSX.Element {
     (user?.user_metadata?.role as UserRole) ||
     (user?.app_metadata?.role as UserRole) ||
     UserRole.Authenticated;
+
+  const canCreator = role === UserRole.Creator;
   const canAdmin = role === UserRole.Admin || role === UserRole.Creator;
-
-  // Handlers
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/login', { replace: true });
-  };
-
-  const handleTeamDelete = async () => {
-    if (!teamId || !window.confirm('Eliminare questa squadra?')) return;
-    const { error } = await supabase.from('squadre').delete().eq('id', teamId);
-    if (!error) navigate('/squadre', { replace: true });
-  };
-
-  const handlePlayerDelete = async () => {
-    if (!playerId || !window.confirm('Eliminare questo giocatore e tutti i dati collegati?')) return;
-
-    // Elimina collegamenti da tabelle figlie
-    await supabase.from('giocatori_stagioni').delete().eq('giocatore_uid', playerId);
-    await supabase.from('marcatori').delete().eq('giocatore_uid', playerId);
-    await supabase.from('allenamenti').delete().eq('giocatore_uid', playerId);
-
-    // Elimina giocatore
-    const { error } = await supabase.from('giocatori').delete().eq('id', playerId);
-    if (!error) navigate('/rosa', { replace: true });
-  };
-
-  const handlePreDelete = async () => {
-    if (!preId || !window.confirm('Eliminare questa partita?')) return;
-    const { error } = await supabase.from('partite').delete().eq('id', preId);
-    if (!error) navigate('/calendario', { replace: true });
-  };
-
-  const handleDetailDelete = async () => {
-    if (!detailId || !window.confirm('Eliminare definitivamente questa partita?')) return;
-    await supabase.from('marcatori').delete().eq('partita_id', detailId);
-    await supabase.from('presenze').delete().eq('partita_id', detailId);
-    await supabase.from('partite').delete().eq('id', detailId);
-    navigate('/calendario', { replace: true });
-  };
 
   // Gruppi link
   const group1 = [
@@ -169,12 +132,10 @@ export default function SidebarLayout(): JSX.Element {
     { to: '/tornei', label: 'Tornei' },
     { to: '/galleria', label: 'Galleria' },
   ];
-  const group4 = canAdmin
-    ? [
-        { to: '/allenamenti', label: 'Allenamenti' },
-        { to: '/admin-panel', label: 'Pannello Admin' },
-      ]
-    : [];
+  const group4 = [
+    ...(canAdmin ? [{ to: '/allenamenti', label: 'Allenamenti' }] : []),
+    ...(canCreator ? [{ to: '/admin-panel', label: 'Pannello Admin' }] : []),
+  ];
 
   // Titolo dinamico
   let pageTitle = '';
@@ -217,6 +178,45 @@ export default function SidebarLayout(): JSX.Element {
 
   if (authLoading) return <div className="min-h-screen">Caricamento…</div>;
 
+  // Handlers
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/login', { replace: true });
+  };
+
+  const handleTeamDelete = async () => {
+    if (!teamId || !window.confirm('Eliminare questa squadra?')) return;
+    const { error } = await supabase.from('squadre').delete().eq('id', teamId);
+    if (!error) navigate('/squadre', { replace: true });
+  };
+
+  const handlePlayerDelete = async () => {
+    if (!playerId || !window.confirm('Eliminare questo giocatore e tutti i dati collegati?')) return;
+
+    // Elimina collegamenti da tabelle figlie
+    await supabase.from('giocatori_stagioni').delete().eq('giocatore_uid', playerId);
+    await supabase.from('marcatori').delete().eq('giocatore_uid', playerId);
+    await supabase.from('allenamenti').delete().eq('giocatore_uid', playerId);
+
+    // Elimina giocatore
+    const { error } = await supabase.from('giocatori').delete().eq('id', playerId);
+    if (!error) navigate('/rosa', { replace: true });
+  };
+
+  const handlePreDelete = async () => {
+    if (!preId || !window.confirm('Eliminare questa partita?')) return;
+    const { error } = await supabase.from('partite').delete().eq('id', preId);
+    if (!error) navigate('/calendario', { replace: true });
+  };
+
+  const handleDetailDelete = async () => {
+    if (!detailId || !window.confirm('Eliminare definitivamente questa partita?')) return;
+    await supabase.from('marcatori').delete().eq('partita_id', detailId);
+    await supabase.from('presenze').delete().eq('partita_id', detailId);
+    await supabase.from('partite').delete().eq('id', detailId);
+    navigate('/calendario', { replace: true });
+  };
+
   return (
     <div className="relative h-screen flex overflow-hidden bg-gradient-to-br from-[#6B7280] to-[#BFB9B9]">
       {/* HEADER */}
@@ -253,7 +253,6 @@ export default function SidebarLayout(): JSX.Element {
           )}
         </div>
 
-
         {matchCalendario && canAdmin && (
           <button
             onClick={() => navigate('/nuova-partita')}
@@ -284,8 +283,6 @@ export default function SidebarLayout(): JSX.Element {
           </button>
         )}
 
-
-
         {matchAllenamenti && canAdmin && (
           <>
             <button
@@ -305,7 +302,7 @@ export default function SidebarLayout(): JSX.Element {
           </>
         )}
 
-                {matchTornei && canAdmin && (
+        {matchTornei && canAdmin && (
           <button
             onClick={() => navigate('/tornei/nuovo/step1')}
             aria-label="Nuovo Torneo"
@@ -314,7 +311,6 @@ export default function SidebarLayout(): JSX.Element {
             <PlusCircle size={24} />
           </button>
         )}
-
 
         {matchTeamDetail && canAdmin && (
           <>
