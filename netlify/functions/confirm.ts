@@ -1,5 +1,5 @@
 // netlify/functions/confirm.ts
-// Data: 19/08/2025 – Alla conferma: crea l’utente in auth.users e reindirizza al login.
+// Data: 19/08/2025 – Alla conferma: crea l’utente in auth.users e reindirizza al login (senza auto-login)
 
 import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
@@ -11,12 +11,16 @@ const supabase = createClient(
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "GET") {
-    return { statusCode: 405, headers: { "Content-Type": "text/html" }, body: `<h1>405</h1>` };
+    return { statusCode: 405, body: "Method Not Allowed" };
   }
 
   const token = event.queryStringParameters?.token;
   if (!token) {
-    return { statusCode: 400, headers: { "Content-Type": "text/html" }, body: `<h1>Token mancante</h1>` };
+    return {
+      statusCode: 302,
+      headers: { Location: "https://montecarlo2013.it/#/login?error=missing_token" },
+      body: "",
+    };
   }
 
   const { data: pending, error: selErr } = await supabase
@@ -26,39 +30,50 @@ export const handler: Handler = async (event) => {
     .single();
 
   if (selErr || !pending) {
-    return { statusCode: 404, headers: { "Content-Type": "text/html" }, body: `<h1>Link non valido</h1>` };
+    return {
+      statusCode: 302,
+      headers: { Location: "https://montecarlo2013.it/#/login?error=invalid" },
+      body: "",
+    };
   }
 
   if (!pending.approved) {
-    return { statusCode: 403, headers: { "Content-Type": "text/html" }, body: `<h1>Registrazione non ancora approvata</h1>` };
+    return {
+      statusCode: 302,
+      headers: { Location: "https://montecarlo2013.it/#/login?error=not_approved" },
+      body: "",
+    };
   }
 
   if (pending.confirmed) {
     return {
       statusCode: 302,
-      headers: {
-        Location: "https://montecarlo2013.it/#/login",
-        "Cache-Control": "no-cache",
-      },
+      headers: { Location: "https://montecarlo2013.it/#/login?info=already_confirmed" },
       body: "",
     };
   }
 
   if (pending.expires_at && new Date(pending.expires_at) < new Date()) {
-    return { statusCode: 410, headers: { "Content-Type": "text/html" }, body: `<h1>Link scaduto</h1>` };
+    return {
+      statusCode: 302,
+      headers: { Location: "https://montecarlo2013.it/#/login?error=expired" },
+      body: "",
+    };
   }
 
   if (!pending.password) {
-    return { statusCode: 500, headers: { "Content-Type": "text/html" }, body: `<h1>Errore: password mancante</h1>` };
+    return {
+      statusCode: 302,
+      headers: { Location: "https://montecarlo2013.it/#/login?error=no_password" },
+      body: "",
+    };
   }
 
-  // CREA UTENTE IN AUTH ORA — app_metadata + user_metadata
+  // CREA UTENTE IN AUTH ORA — aggiunge anche role in app_metadata
   const { error: createErr } = await supabase.auth.admin.createUser({
     email: pending.email,
     password: pending.password,
-    app_metadata: {
-      role: pending.role || "user",
-    },
+    app_metadata: { role: pending.role || "user" },
     user_metadata: {
       username: pending.username,
       role: pending.role || "user",
@@ -68,22 +83,23 @@ export const handler: Handler = async (event) => {
 
   if (createErr) {
     return {
-      statusCode: 500,
-      headers: { "Content-Type": "text/html" },
-      body: `<h1>Errore creazione account</h1><p>${createErr.message}</p>`,
+      statusCode: 302,
+      headers: { Location: "https://montecarlo2013.it/#/login?error=create_failed" },
+      body: "",
     };
   }
 
+  // marca come confermato e rimuove la password
   await supabase
     .from("pending_users")
     .update({ confirmed: true, password: null })
     .eq("confirmation_token", token);
 
-  // Redirect diretto al login
+  // ✅ reindirizza SEMPRE alla pagina di login (senza auto-login)
   return {
     statusCode: 302,
     headers: {
-      Location: "https://montecarlo2013.it/#/login",
+      Location: "https://montecarlo2013.it/#/login?info=confirmed",
       "Cache-Control": "no-cache",
     },
     body: "",
