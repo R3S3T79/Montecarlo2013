@@ -23,3 +23,5 @@ pnpm-lock.yaml
 # funzioni/debug locali da NON pushare
 netlify/functions/reset-auth-role.ts
 src/pages/DebugRole.tsx
+
+GitPortable/
