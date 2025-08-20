@@ -109,92 +109,89 @@ export default function ProssimaPartita() {
     })();
   }, []);
 
-  // 2) prossima partita + timer associato + scontri precedenti
-  useEffect(() => {
-    const fetchPartita = async () => {
-      setLoading(true);
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const tomorrow = new Date(today);
-      tomorrow.setDate(today.getDate() + 1);
+// 2) prossima partita + timer associato + scontri precedenti
+useEffect(() => {
+  const fetchPartita = async () => {
+    setLoading(true);
 
-      const todayIso = today.toISOString();
-      const tomorrowIso = tomorrow.toISOString();
+    const commonSelect = `
+      id, stagione_id, data_ora, stato,
+      squadra_casa_id, squadra_ospite_id,
+      campionato_torneo, luogo_torneo,
+      goal_a, goal_b,
+      goal_a1, goal_a2, goal_a3, goal_a4,
+      goal_b1, goal_b2, goal_b3, goal_b4,
+      casa:squadra_casa_id(id,nome,logo_url),
+      ospite:squadra_ospite_id(id,nome,logo_url)
+    `;
 
-      let { data } = await supabase
+    // 1) Se c'è una partita IN CORSO, ha precedenza (indipendentemente dall’orario)
+    let { data: inCorso } = await supabase
+      .from("partite")
+      .select(commonSelect)
+      .eq("stato", "InCorso")
+      .order("data_ora", { ascending: true })
+      .limit(1);
+
+    let nextData = inCorso && inCorso.length ? inCorso : null;
+
+    // 2) Altrimenti prendo la prossima DA GIOCARE con data_ora >= adesso
+    if (!nextData) {
+      const nowIso = new Date().toISOString();
+      const { data: future } = await supabase
         .from("partite")
-        .select(`
-          id, stagione_id, data_ora, stato,
-          squadra_casa_id, squadra_ospite_id,
-          campionato_torneo, luogo_torneo,
-          goal_a, goal_b,
-          goal_a1, goal_a2, goal_a3, goal_a4,
-          goal_b1, goal_b2, goal_b3, goal_b4,
-          casa:squadra_casa_id(id,nome,logo_url),
-          ospite:squadra_ospite_id(id,nome,logo_url)
-        `)
-        .in("stato", ["DaGiocare", "InCorso"])
-        .gte("data_ora", todayIso)
-        .lt("data_ora", tomorrowIso)
+        .select(commonSelect)
+        .eq("stato", "DaGiocare")
+        .gte("data_ora", nowIso)
         .order("data_ora", { ascending: true })
         .limit(1);
+      if (future && future.length) nextData = future;
+    }
 
-      if (!data?.length) {
-        ({ data } = await supabase
-          .from("partite")
-          .select(`
-            id, stagione_id, data_ora, stato,
-            squadra_casa_id, squadra_ospite_id,
-            campionato_torneo, luogo_torneo,
-            goal_a, goal_b,
-            goal_a1, goal_a2, goal_a3, goal_a4,
-            goal_b1, goal_b2, goal_b3, goal_b4,
-            casa:squadra_casa_id(id,nome,logo_url),
-            ospite:squadra_ospite_id(id,nome,logo_url)
-          `)
-          .in("stato", ["DaGiocare", "InCorso"])
-          .gte("data_ora", tomorrowIso)
-          .order("data_ora", { ascending: true })
-          .limit(1));
-      }
+    if (nextData?.length) {
+      const next = nextData[0] as PartitaProssima;
+      setPartita(next);
+      setPerTimeCasa([next.goal_a1, next.goal_a2, next.goal_a3, next.goal_a4]);
+      setPerTimeOspite([next.goal_b1, next.goal_b2, next.goal_b3, next.goal_b4]);
 
-      if (data?.length) {
-        const next = data[0] as PartitaProssima;
-        setPartita(next);
-        setPerTimeCasa([next.goal_a1, next.goal_a2, next.goal_a3, next.goal_a4]);
-        setPerTimeOspite([next.goal_b1, next.goal_b2, next.goal_b3, next.goal_b4]);
+      // TIMER
+      const { data: t } = await supabase
+        .from("partita_timer_state")
+        .select("*")
+        .eq("partita_id", next.id)
+        .maybeSingle();
+      if (t) setTimerState(t as TimerState);
 
-        // TIMER
-        const { data: t } = await supabase
-          .from("partita_timer_state")
-          .select("*")
-          .eq("partita_id", next.id)
-          .maybeSingle();
-        if (t) setTimerState(t as TimerState);
+      // PRECEDENTI
+      const { data: prevData } = await supabase
+        .from("partite")
+        .select(`
+          id, data_ora, goal_a, goal_b,
+          casa:squadra_casa_id(nome),
+          ospite:squadra_ospite_id(nome)
+        `)
+        .or(
+          `and(squadra_casa_id.eq.${next.squadra_casa_id},squadra_ospite_id.eq.${next.squadra_ospite_id}),` +
+          `and(squadra_casa_id.eq.${next.squadra_ospite_id},squadra_ospite_id.eq.${next.squadra_casa_id})`
+        )
+        .lt("data_ora", next.data_ora)
+        .order("data_ora", { ascending: false })
+        .limit(5);
 
-        // PRECEDENTI
-        const { data: prevData } = await supabase
-          .from("partite")
-          .select(`
-            id, data_ora, goal_a, goal_b,
-            casa:squadra_casa_id(nome),
-            ospite:squadra_ospite_id(nome)
-          `)
-          .or(
-            `and(squadra_casa_id.eq.${next.squadra_casa_id},squadra_ospite_id.eq.${next.squadra_ospite_id}),` +
-              `and(squadra_casa_id.eq.${next.squadra_ospite_id},squadra_ospite_id.eq.${next.squadra_casa_id})`
-          )
-          .lt("data_ora", next.data_ora)
-          .order("data_ora", { ascending: false })
-          .limit(5);
+      setPrecedenti((prevData || []) as ScontroPrecedente[]);
+    } else {
+      // nessuna partita trovata
+      setPartita(null);
+      setPrecedenti([]);
+      setTimerState(null);
+    }
 
-        setPrecedenti((prevData || []) as ScontroPrecedente[]);
-      }
+    setLoading(false);
+  };
 
-      setLoading(false);
-    };
-    fetchPartita();
-  }, []);
+  fetchPartita();
+}, []);
+
 
   // 3) elenco giocatori stagione
   useEffect(() => {
