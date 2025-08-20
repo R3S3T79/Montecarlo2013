@@ -534,12 +534,12 @@ const fbPluginSrc = useMemo(() => {
       transform: "translateY(-50%)",
       display: "flex",
       flexDirection: "column",
-      gap: "8px",
+      gap: "4px",
       zIndex: 1
     }}>
-      <div style={{ height: "6px", backgroundColor: "red" }}></div>
-      <div style={{ height: "6px", backgroundColor: "red" }}></div>
-      <div style={{ height: "6px", backgroundColor: "red" }}></div>
+      <div style={{ height: "4px", backgroundColor: "red" }}></div>
+      <div style={{ height: "4px", backgroundColor: "red" }}></div>
+      <div style={{ height: "4px", backgroundColor: "red" }}></div>
     </div>
 
     {/* Logo + Titolo sopra */}
@@ -896,13 +896,13 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 16,
   },
   heroLogo: {
-    width: 65,
-    height: 65,
+    width: 55,
+    height: 55,
     objectFit: "contain",
   },
   heroTitle: {
     margin: 0,
-    fontSize: 35,
+    fontSize: 38,
     fontWeight: 600, // meno bold
     color: "white",
     letterSpacing: 0.3,
