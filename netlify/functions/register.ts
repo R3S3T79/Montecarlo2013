@@ -1,80 +1,75 @@
-// netlify/functions/register.ts
-// Data: 18/08/2025 – Registrazione utente: crea pending_user e invia email di conferma
+// src/functions/register.ts
+// Data creazione: 20/08/2025 (rev: nuovo flusso approvazione → email solo admin)
 
 import { Handler } from "@netlify/functions";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "../lib/supabaseClient";
 import crypto from "crypto";
-import nodemailer from "nodemailer";
+import { sendEmail } from "./send-email"; // tua utility già presente
 
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || "465"),
-  secure: process.env.SMTP_SECURE === "true",
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
-
-export const handler: Handler = async (event) => {
-  if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
-  }
-
-  let body: { email?: string; password?: string; username?: string };
+const handler: Handler = async (event) => {
   try {
-    body = JSON.parse(event.body || "{}");
-  } catch {
-    return { statusCode: 400, body: JSON.stringify({ error: "Invalid JSON body" }) };
+    if (!event.body) {
+      return { statusCode: 400, body: "Missing body" };
+    }
+
+    const { email, username, password } = JSON.parse(event.body);
+
+    if (!email || !username) {
+      return { statusCode: 400, body: "Email e username obbligatori" };
+    }
+
+    // 1. Genera token di conferma
+    const confirmationToken = crypto.randomUUID();
+
+    // 2. Inserisci in pending_users
+    const { error: insertError } = await supabase
+      .from("pending_users")
+      .insert([
+        {
+          email,
+          username,
+          password: password || null,
+          confirmation_token: confirmationToken,
+          confirmed: false,
+          approved: false,
+          role: null,
+        },
+      ]);
+
+    if (insertError) {
+      console.error("Errore inserimento pending_users:", insertError);
+      return { statusCode: 500, body: "Errore registrazione utente" };
+    }
+
+    // 3. Invia mail all'ADMIN (non all'utente)
+    const adminEmail = "marcomiressi@gmail.com";
+    const adminLink = `${process.env.SITE_URL}/admin`; // link pannello admin
+
+    await sendEmail({
+      to: adminEmail,
+      subject: "Nuova registrazione in attesa di approvazione",
+      html: `
+        <p>Ciao Admin,</p>
+        <p>Un nuovo utente si è registrato ed è in attesa di approvazione:</p>
+        <ul>
+          <li><b>Email:</b> ${email}</li>
+          <li><b>Username:</b> ${username}</li>
+        </ul>
+        <p>Puoi approvare l'utente dal pannello admin:</p>
+        <p><a href="${adminLink}" target="_blank">Vai al pannello</a></p>
+      `,
+    });
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        message: "Registrazione completata. L'amministratore valuterà la richiesta.",
+      }),
+    };
+  } catch (err) {
+    console.error("Errore generale register.ts:", err);
+    return { statusCode: 500, body: "Errore interno server" };
   }
-
-  const { email, password, username } = body;
-  if (!email || !password || !username) {
-    return { statusCode: 400, body: JSON.stringify({ error: "Missing required fields" }) };
-  }
-
-  // crea utente in Supabase Auth (di default con ruolo user nei metadata)
-  const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: false,
-    user_metadata: { role: "user", username },
-  });
-
-  if (authErr || !authUser.user) {
-    return { statusCode: 500, body: JSON.stringify({ error: "Error creating auth user", details: authErr?.message }) };
-  }
-
-  // crea pending_user con token di conferma
-  const token = crypto.randomUUID();
-  await supabase.from("pending_users").insert([
-    {
-      email,
-      username,
-      confirmation_token: token,
-      approved: false,
-      confirmed: false,
-      role: "user",
-    },
-  ]);
-
-  // invia email di conferma
-  const confirmUrl = `https://montecarlo2013.it/api/confirm?token=${token}`;
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM,
-    to: email,
-    subject: "Conferma registrazione – Montecarlo 2013",
-    html: `
-      <p>Ciao ${username},</p>
-      <p>Grazie per esserti registrato. Conferma ora la tua email cliccando qui:</p>
-      <p><a href="${confirmUrl}">${confirmUrl}</a></p>
-    `,
-  });
-
-  return { statusCode: 200, body: JSON.stringify({ success: true }) };
 };
+
+export { handler };
