@@ -164,14 +164,37 @@ export default function Step6_FaseGironi() {
   }, [partitePerGirone]);
 
   const handleEditPartita = (matchId: string) => {
-    if (!torneoId) return;
+    if (!torneoId || !canEdit) return;
     navigate(`/tornei/nuovo/step6-fasegironi/${torneoId}/partita/${matchId}/edit`, {
       state: { torneoId },
     });
   };
 
+  // ✅ Fix: gli utenti "user" possono avanzare solo navigando (senza modifiche)
   const handleNextPhase = async () => {
-    if (!canEdit || !torneoId) return;
+    if (!torneoId) return;
+
+    // READ-ONLY: nessuna scrittura, solo decide dove andare
+    if (!canEdit) {
+      // se esiste una fase eliminazione registrata → step8, altrimenti step7
+      const { data: elim, error: elimErr } = await supabase
+        .from("fasi_torneo")
+        .select("id")
+        .eq("torneo_id", torneoId)
+        .eq("tipo_fase", "eliminazione")
+        .maybeSingle();
+
+      if (!elimErr && elim?.id) {
+        navigate(`/tornei/nuovo/step8-fasegironi/${torneoId}`);
+      } else {
+        navigate(`/tornei/nuovo/step7-fasegironi/${torneoId}`, {
+          state: { formulaType: "gironi" as const },
+        });
+      }
+      return;
+    }
+
+    // EDITOR/ADMIN: logica esistente
     setSavingFormula(true);
 
     const { data: existing } = await supabase
@@ -267,7 +290,7 @@ export default function Step6_FaseGironi() {
 
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-6 print:p-0">
-      {/* ⛔️ Nascosto in stampa */}
+      {/* ⛔️ Select visibile solo a chi può editare */}
       {canEdit && (
         <div className="flex justify-center items-center gap-2 print:hidden no-print">
           <label className="font-medium">Formula fase successiva:</label>
@@ -286,25 +309,61 @@ export default function Step6_FaseGironi() {
 
       {Object.entries(partitePerGirone).map(([girone, matches]) => (
         <div key={girone} className="space-y-4 avoid-break">
-          <h3 className="text-lg font-semibold text-center">{girone}</h3>
+          <h3 className="text-lg font-semibold text-center text-white print:text-black">
+  {girone}
+</h3>
 
-          {matches.map((m) => (
-            <div
-              key={m.id}
-              onClick={canEdit ? () => handleEditPartita(m.id) : undefined}
-              className="grid grid-cols-3 items-center bg-gray-100 shadow rounded-lg p-2 mb-1 hover:bg-gray-200 cursor-pointer"
-            >
-              <span className="text-sm truncate">{m.squadra_casa?.nome}</span>
-              <span className="text-sm font-medium text-center">
-                {m.giocata ? `${m.gol_casa} – ${m.gol_ospite}` : "VS"}
-              </span>
-              <span className="text-sm text-right truncate">
-                {m.squadra_ospite?.nome}
-              </span>
-            </div>
-          ))}
+<table className="w-full table-fixed border-collapse text-sm mb-4 print:mb-6">
+  <colgroup>
+    <col style={{ width: "42%" }} />
+    <col style={{ width: "16%" }} />
+    <col style={{ width: "42%" }} />
+  </colgroup>
+  <tbody>
+    {matches.map((m) => (
+      <tr
+        key={m.id}
+        onClick={canEdit ? () => handleEditPartita(m.id) : undefined}
+        className={canEdit ? "hover:bg-gray-100 cursor-pointer print:cursor-auto" : ""}
+      >
+        {/* Casa */}
+        <td className="border px-2 py-1">
+          <div className="flex items-center gap-2 min-w-0">
+            {m.squadra_casa?.logo_url && (
+              <img
+                src={m.squadra_casa.logo_url}
+                alt={m.squadra_casa.nome}
+                className="w-4 h-4 rounded-full flex-none"
+              />
+            )}
+            <span className="truncate">{m.squadra_casa?.nome}</span>
+          </div>
+        </td>
 
-          {/* CLASSIFICA: tabella fissa con nome troncato */}
+        {/* Risultato */}
+        <td className="border px-2 py-1 text-center font-medium whitespace-nowrap">
+          {m.giocata ? `${m.gol_casa} – ${m.gol_ospite}` : "VS"}
+        </td>
+
+        {/* Ospite */}
+        <td className="border px-2 py-1">
+          <div className="flex items-center gap-2 justify-end min-w-0">
+            <span className="truncate">{m.squadra_ospite?.nome}</span>
+            {m.squadra_ospite?.logo_url && (
+              <img
+                src={m.squadra_ospite.logo_url}
+                alt={m.squadra_ospite.nome}
+                className="w-4 h-4 rounded-full flex-none"
+              />
+            )}
+          </div>
+        </td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+
+          {/* CLASSIFICA */}
           <table className="w-full table-fixed border-collapse text-center text-sm mb-6">
             <thead>
               <tr className="bg-gray-100">
@@ -351,7 +410,7 @@ export default function Step6_FaseGironi() {
         </div>
       ))}
 
-      {/* Pulsanti: già nascosti con print:hidden */}
+      {/* Pulsanti */}
       <div className="flex justify-between print:hidden space-x-2">
         <button
           onClick={() => navigate(-1)}
