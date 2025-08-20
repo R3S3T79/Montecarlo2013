@@ -534,12 +534,12 @@ const fbPluginSrc = useMemo(() => {
       transform: "translateY(-50%)",
       display: "flex",
       flexDirection: "column",
-      gap: "8px",
+      gap: "4px",
       zIndex: 1
     }}>
-      <div style={{ height: "6px", backgroundColor: "red" }}></div>
-      <div style={{ height: "6px", backgroundColor: "red" }}></div>
-      <div style={{ height: "6px", backgroundColor: "red" }}></div>
+      <div style={{ height: "4px", backgroundColor: "red" }}></div>
+      <div style={{ height: "4px", backgroundColor: "red" }}></div>
+      <div style={{ height: "4px", backgroundColor: "red" }}></div>
     </div>
 
     {/* Logo + Titolo sopra */}
