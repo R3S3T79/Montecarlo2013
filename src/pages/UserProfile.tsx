@@ -371,15 +371,12 @@ export default function UserProfile(): JSX.Element {
         </label>
 
         {/* Ruolo: visibile, non editabile */}
-        <label className="block">
-          <span className="text-sm font-medium">Ruolo</span>
-          <input
-            type="text"
-            value={profile.role}
-            readOnly
-            className="mt-1 block w-full border rounded bg-gray-100 px-2 py-1"
-          />
-        </label>
+        <div className="block">
+  <span className="text-sm font-medium">Ruolo</span>
+  <div className="mt-1 px-2 py-1 rounded bg-gray-100 border text-gray-700">
+    {profile.role}
+  </div>
+</div>
 
         <div className="flex gap-3">
           <button
@@ -482,3 +479,4 @@ export default function UserProfile(): JSX.Element {
     </div>
   );
 }
+
