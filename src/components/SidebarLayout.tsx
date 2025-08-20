@@ -409,8 +409,8 @@ export default function SidebarLayout(): JSX.Element {
       {/* SIDEBAR */}
       <aside
         className={`fixed inset-y-0 left-0 w-64 bg-gradient-to-br from-[#6B7280] to-[#BFB9B9]
-        text-white z-40 pt-16 transform transition-transform duration-300
-        ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}
+  text-white z-40 pt-16 pb-4 transform transition-transform duration-300
+  ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <nav className="flex flex-col h-full px-4 space-y-2 overflow-y-auto">
           {/* BRAND: Montecarlo 2013 + tre strisce rosse */}
@@ -495,4 +495,5 @@ export default function SidebarLayout(): JSX.Element {
     </div>
   );
 }
+
 
