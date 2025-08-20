@@ -412,7 +412,7 @@ export default function SidebarLayout(): JSX.Element {
         text-white z-40 pt-16 transform transition-transform duration-300
         ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        <nav className="flex flex-col h-full px-4 space-y-2">
+        <nav className="flex flex-col h-full px-4 space-y-2 overflow-y-auto">
           {/* BRAND: Montecarlo 2013 + tre strisce rosse */}
           <div className="px-2 py-4">
   <div className="relative h-16 overflow-hidden"> {/* ↑ altezza area: h-12 / h-16 / h-20 */}
@@ -495,3 +495,4 @@ export default function SidebarLayout(): JSX.Element {
     </div>
   );
 }
+
