@@ -99,7 +99,11 @@ export default function ProssimaPartita() {
         setRoleLoading(false);
         return;
       }
-      const { data } = await supabase.from("pending_users").select("role").eq("email", email).single();
+      const { data } = await supabase
+        .from("pending_users")
+        .select("role")
+        .eq("email", email)
+        .single();
       setRole(data?.role ?? null);
       setRoleLoading(false);
     })();
@@ -160,16 +164,15 @@ export default function ProssimaPartita() {
         setPerTimeCasa([next.goal_a1, next.goal_a2, next.goal_a3, next.goal_a4]);
         setPerTimeOspite([next.goal_b1, next.goal_b2, next.goal_b3, next.goal_b4]);
 
-        // ---- TIMER: leggo la riga collegata a questa partita (LOG #1) ----
-        const { data: t, error: terr } = await supabase
+        // TIMER
+        const { data: t } = await supabase
           .from("partita_timer_state")
           .select("*")
           .eq("partita_id", next.id)
           .maybeSingle();
-
-        console.log("[ProssimaPartita] timer_select", { partitaId: next.id, row: t, err: terr }); // LOG #1
         if (t) setTimerState(t as TimerState);
 
+        // PRECEDENTI
         const { data: prevData } = await supabase
           .from("partite")
           .select(`
@@ -276,23 +279,35 @@ export default function ProssimaPartita() {
     if (!partita) return;
     const ch2 = supabase
       .channel("realtime-marcatori")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "marcatori", filter: `partita_id=eq.${partita.id}` }, ({ new: row }) => {
-        const n = normalizeMarcatore(row);
-        setMarcatoriLive((prev) => [...prev, n]);
-      })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "marcatori", filter: `partita_id=eq.${partita.id}` }, ({ new: row }) => {
-        const n = normalizeMarcatore(row);
-        setMarcatoriLive((prev) => {
-          const i = prev.findIndex((m) => m.id === n.id);
-          if (i === -1) return [...prev, n];
-          const copy = [...prev];
-          copy[i] = n;
-          return copy;
-        });
-      })
-      .on("postgres_changes", { event: "DELETE", schema: "public", table: "marcatori", filter: `partita_id=eq.${partita.id}` }, ({ old }) => {
-        setMarcatoriLive((prev) => prev.filter((m) => m.id !== old.id));
-      })
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "marcatori", filter: `partita_id=eq.${partita.id}` },
+        ({ new: row }) => {
+          const n = normalizeMarcatore(row);
+          setMarcatoriLive((prev) => [...prev, n]);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "marcatori", filter: `partita_id=eq.${partita.id}` },
+        ({ new: row }) => {
+          const n = normalizeMarcatore(row);
+          setMarcatoriLive((prev) => {
+            const i = prev.findIndex((m) => m.id === n.id);
+            if (i === -1) return [...prev, n];
+            const copy = [...prev];
+            copy[i] = n;
+            return copy;
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "marcatori", filter: `partita_id=eq.${partita.id}` },
+        ({ old }) => {
+          setMarcatoriLive((prev) => prev.filter((m) => m.id !== old.id));
+        }
+      )
       .subscribe();
     return () => supabase.removeChannel(ch2);
   }, [partita]);
@@ -313,7 +328,6 @@ export default function ProssimaPartita() {
     };
 
     (async () => {
-      // realtime
       ch = supabase
         .channel(`realtime-timer-${partita.id}`)
         .on(
@@ -323,7 +337,6 @@ export default function ProssimaPartita() {
         )
         .subscribe();
 
-      // poll di sicurezza
       poll = setInterval(fetchTimer, 2000);
     })();
 
@@ -352,11 +365,10 @@ export default function ProssimaPartita() {
     return () => clearInterval(interval);
   }, [timerState]);
 
-  // 9) remaining sec (LOG #2)
+  // 9) remaining sec
   useEffect(() => {
     const durationMin = timerState?.timer_duration_min ?? 20;
     const remaining = Math.floor(durationMin * 60) - Math.floor((elapsedMs || 0) / 1000);
-    console.log("[ProssimaPartita] remaining", { id: timerState?.partita_id, status: timerState?.timer_status, remaining }); // LOG #2
     setTotalSeconds(remaining);
   }, [elapsedMs, timerState]);
 
@@ -367,15 +379,15 @@ export default function ProssimaPartita() {
   const formatOra = (d: string) => new Date(d).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
 
   // Parziali per tempi: sempre usato sotto la squadra che NON è Montecarlo
-const renderParziali = (vals: number[]) => (
-  <div className="w-full grid grid-cols-4 text-center text-sm">
-    <div>1°T: {vals[0]}</div>
-    <div>2°T: {vals[1]}</div>
-    <div>3°T: {vals[2]}</div>
-    <div>4°T: {vals[3]}</div>
-  </div>
-);
-  
+  const renderParziali = (vals: number[]) => (
+    <div className="w-full grid grid-cols-4 text-center text-sm">
+      <div>1°T: {vals[0]}</div>
+      <div>2°T: {vals[1]}</div>
+      <div>3°T: {vals[2]}</div>
+      <div>4°T: {vals[3]}</div>
+    </div>
+  );
+
   // SOLO marcatori di Montecarlo
   const mcMarcatoriByPeriodo = useMemo(() => {
     const map: Record<number, Marcatore[]> = {};
@@ -388,6 +400,9 @@ const renderParziali = (vals: number[]) => (
     return map;
   }, [marcatoriLive]);
 
+  // ===== FIX: calcolo canEdit PRIMA dell'early return su !partita =====
+  const canEdit = role === "admin" || role === "creator";
+
   if (loading || roleLoading) {
     return (
       <div className="min-h-screen">
@@ -399,34 +414,31 @@ const renderParziali = (vals: number[]) => (
   }
 
   if (!partita) {
-  return (
-    <div className="min-h-screen">
-      <div className="container mx-auto px-4 pt-10">
-        <div className="bg-white p-8 rounded-xl shadow-montecarlo text-center">
-          <Calendar className="mx-auto text-montecarlo-neutral mb-4" size={48} />
-          <h2 className="text-xl font-bold text-montecarlo-secondary mb-4">
-            Nessuna partita programmata
-          </h2>
-          <p className="text-montecarlo-neutral mb-6">
-            Non ci sono partite in programma al momento.
-          </p>
-          {canEdit && (   // 👈 aggiunto controllo ruolo
-            <button
-              onClick={handleCrea}
-              className="bg-gradient-montecarlo text-white px-6 py-3 rounded-lg flex items-center mx-auto hover:scale-105 transition"
-            >
-              <Plus className="mr-2" size={20} /> Crea Nuova Partita
-            </button>
-          )}
+    return (
+      <div className="min-h-screen">
+        <div className="container mx-auto px-4 pt-10">
+          <div className="bg-white p-8 rounded-xl shadow-montecarlo text-center">
+            <Calendar className="mx-auto text-montecarlo-neutral mb-4" size={48} />
+            <h2 className="text-xl font-bold text-montecarlo-secondary mb-4">
+              Nessuna partita programmata
+            </h2>
+            <p className="text-montecarlo-neutral mb-6">
+              Non ci sono partite in programma al momento.
+            </p>
+            {canEdit && (
+              <button
+                onClick={handleCrea}
+                className="bg-gradient-montecarlo text-white px-6 py-3 rounded-lg flex items-center mx-auto hover:scale-105 transition"
+              >
+                <Plus className="mr-2" size={20} /> Crea Nuova Partita
+              </button>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-
-
-  const canEdit = role === "admin" || role === "creator";
   const isMontecarloCasa = partita.casa.id === MONTECARLO_ID;
   const isMontecarloOspite = partita.ospite.id === MONTECARLO_ID;
 
@@ -505,23 +517,22 @@ const renderParziali = (vals: number[]) => (
                   </span>
                 </div>
 
-                {isMontecarloCasa
-  ? (
-      <div className="w-full grid grid-cols-2 gap-4">
-        {Object.entries(mcMarcatoriByPeriodo).map(([periodo, lista]) => (
-          <div key={periodo} className="text-sm">
-            <h4 className="font-medium">{`${periodo}° Tempo`}</h4>
-            <ul className="list-disc list-inside">
-              {lista.map((m) => (
-                <li key={m.id}>{renderNomeMarcatore(m)}</li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-    )
-  : renderParziali(perTimeCasa)}
-
+                {isMontecarloCasa ? (
+                  <div className="w-full grid grid-cols-2 gap-4">
+                    {Object.entries(mcMarcatoriByPeriodo).map(([periodo, lista]) => (
+                      <div key={periodo} className="text-sm">
+                        <h4 className="font-medium">{`${periodo}° Tempo`}</h4>
+                        <ul className="list-disc list-inside">
+                          {lista.map((m) => (
+                            <li key={m.id}>{renderNomeMarcatore(m)}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  renderParziali(perTimeCasa)
+                )}
               </div>
 
               {/* VS + timer */}
@@ -581,23 +592,22 @@ const renderParziali = (vals: number[]) => (
                   </span>
                 </div>
 
-                {isMontecarloOspite
-  ? (
-      <div className="w-full grid grid-cols-2 gap-4">
-        {Object.entries(mcMarcatoriByPeriodo).map(([periodo, lista]) => (
-          <div key={periodo} className="text-sm">
-            <h4 className="font-medium">{`${periodo}° Tempo`}</h4>
-            <ul className="list-disc list-inside">
-              {lista.map((m) => (
-                <li key={m.id}>{renderNomeMarcatore(m)}</li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-    )
-  : renderParziali(perTimeOspite)}
-
+                {isMontecarloOspite ? (
+                  <div className="w-full grid grid-cols-2 gap-4">
+                    {Object.entries(mcMarcatoriByPeriodo).map(([periodo, lista]) => (
+                      <div key={periodo} className="text-sm">
+                        <h4 className="font-medium">{`${periodo}° Tempo`}</h4>
+                        <ul className="list-disc list-inside">
+                          {lista.map((m) => (
+                            <li key={m.id}>{renderNomeMarcatore(m)}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  renderParziali(perTimeOspite)
+                )}
               </div>
 
               {/* Pulsanti */}
