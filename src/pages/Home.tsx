@@ -902,13 +902,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   heroTitle: {
     margin: 0,
-    fontSize: 36,
+    fontSize: 37,
     fontWeight: 600, // meno bold
     color: "white",
     letterSpacing: 0.3,
   },
 
-  // Cards
+  
+  // Card base
   card: {
     background: "#ffffff",
     border: "1px solid #e8e8e8",
@@ -916,13 +917,17 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 14,
     marginBottom: 14,
     boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+    position: "relative", // necessario per layering
+    zIndex: 0,
   },
+
+  // Card più grande
   cardLarge: {
     paddingTop: 18,
     paddingBottom: 18,
   },
 
-  // Notizie (ingrandite)
+  // Notizie
   newsStrip: {
     display: "flex",
     alignItems: "center",
@@ -936,16 +941,23 @@ const styles: Record<string, React.CSSProperties> = {
     height: 40, // più alto
   },
   marqueeTrack: {
-  position: "absolute",
-  whiteSpace: "nowrap",
-  willChange: "transform",
-  animation: "scrollLeft 20s linear infinite",
-  height: "40px",
-  display: "flex",
-  alignItems: "center",
-},
-  newsItem: { marginRight: 24, fontSize: 18 }, // testo più grande
-  dot: { marginRight: 24, opacity: 0.5, fontSize: 18 },
+    position: "absolute",
+    whiteSpace: "nowrap",
+    willChange: "transform",
+    animation: "scrollLeft 20s linear infinite",
+    height: "40px",
+    display: "flex",
+    alignItems: "center",
+  },
+  newsItem: {
+    marginRight: 24,
+    fontSize: 18,
+  },
+  dot: {
+    marginRight: 24,
+    opacity: 0.5,
+    fontSize: 18,
+  },
 
   // Compleanni
   blockHeader: {
@@ -970,138 +982,151 @@ const styles: Record<string, React.CSSProperties> = {
   playerName: { fontSize: 24, fontWeight: 700, textAlign: "center" },
   playerNameMuted: { fontSize: 14, opacity: 0.8 },
 
-  // Facebook (senza intestazione)
-  fbWrap: { width: "100%", height: 600, overflow: "hidden", borderRadius: 8 },
-  fbIframe: { width: "100%", height: "100%", border: "none" },
+  // Facebook
+  fbWrap: {
+    width: "100%",
+    height: 600,
+    overflow: "hidden",
+    borderRadius: 8,
+    paddingTop: 4,
+    position: "relative",
+    zIndex: 2, // sopra alle altre card
+  },
+  fbIframe: {
+    width: "100%",
+    height: "100%",
+    border: "none",
+  },
+};
+
 
   // Prossimo Impegno
-  fixtureBox: {},
+  fixtureBox: {}
   fixtureMetaCentered: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 10,
-  },
+    display: "flex"
+    flexDirection: "column"
+    alignItems: "center"
+    gap: 6
+    marginBottom: 10
+  }
   badge: {
-    fontSize: 13,
-    background: "#f0ff66f8",
-    border: "1px solid #eee",
-    borderRadius: 6,
-    padding: "4px 10px",
-  },
-  fixtureDate: { fontSize: 15, opacity: 0.9 },
-
+    fontSize: 13
+    background: "#f0ff66f8"
+    border: "1px solid #eee"
+    borderRadius: 6
+    padding: "4px 10px"
+  }
+  fixtureDate: { fontSize: 15 opacity: 0.9 }
   teamsRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
+    display: "flex"
+    alignItems: "center"
+    justifyContent: "space-between"
     gap: 10,
-    marginTop: 6,
-  },
-  teamCol: { flex: 1, textAlign: "center" as const },
+    marginTop: 6
+  }
+  teamCol: { flex: 1, textAlign: "center" as const }
   teamHead: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  teamLogo: { width: 32, height: 32, objectFit: "contain" },
-  teamName: { fontSize: 20, fontWeight: 700 },
-  scoreBubble: { marginLeft: 6, fontSize: 14, fontWeight: 700, opacity: 0.8 },
-  vs: { fontSize: 16, opacity: 0.7, minWidth: 50, textAlign: "center" as const },
-  liveHint: { marginTop: 8, fontSize: 12, opacity: 0.7 },
+    display: "flex"
+    alignItems: "center"
+    justifyContent: "center"
+    gap: 8
+  }
+  teamLogo: { width: 32 height: 32 objectFit: "contain" }
+  teamName: { fontSize: 20 fontWeight: 700 },
+  scoreBubble: { marginLeft: 6 fontSize: 14 fontWeight: 700 opacity: 0.8 }
+  vs: { fontSize: 16 opacity: 0.7 minWidth: 50 textAlign: "center" as const }
+  liveHint: { marginTop: 8 fontSize: 12 opacity: 0.7 }
 
   livePillInline: {
-    display: "inline-block",
-    marginLeft: 8,
-    padding: "2px 8px",
-    borderRadius: 999,
-    background: "#ffebeb",
-    border: "1px solid #ffd2d2",
-    fontSize: 12,
-    fontWeight: 700,
-    color: "#c00",
-  },
+    display: "inline-block"
+    marginLeft: 8
+    padding: "2px 8px"
+    borderRadius: 999
+    background: "#ffebeb"
+    border: "1px solid #ffd2d2"
+    fontSize: 12
+    fontWeight: 700
+    color: "#c00"
+  }
 
   liveScoreRow: {
-    marginTop: 8,
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    justifyContent: "center",
-  },
-  liveScore: { fontSize: 26, fontWeight: 800 },
+    marginTop: 8
+    display: "flex"
+    alignItems: "center"
+    gap: 10
+    justifyContent: "center"
+  }
+  liveScore: { fontSize: 26 fontWeight: 800 }
 
   livePill: {
-    display: "inline-block",
-    padding: "2px 8px",
-    borderRadius: 999,
-    background: "#ffebeb",
-    border: "1px solid #ffd2d2",
-    fontSize: 12,
-    fontWeight: 700,
-  },
+    display: "inline-block"
+    padding: "2px 8px"
+    borderRadius: 999
+    background: "#ffebeb"
+    border: "1px solid #ffd2d2"
+    fontSize: 12
+    fontWeight: 700
+  }
 
   // Struttura LIVE personalizzata
   teamsLiveRow: {
-    display: "flex",
-    flexDirection: "column", // <-- verticale invece che affiancate
-    gap: 20,
-    marginTop: 10,
-  },
+    display: "flex"
+    flexDirection: "column" // <-- verticale invece che affiancate
+    gap: 20
+    marginTop: 10
+  }
 
-  teamLiveCol: { flex: 1 },
+  teamLiveCol: { flex: 1 }
   teamLiveHead: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 6,
-  },
+    display: "flex"
+    alignItems: "center"
+    justifyContent: "space-between"
+    marginBottom: 6
+  }
   liveScoreBlink: {
-    fontSize: 22,
-    fontWeight: 800,
-    color: "red",
-    animation: "blink 1s linear infinite",
-  },
+    fontSize: 22
+    fontWeight: 800
+    color: "red"
+    animation: "blink 1s linear infinite"
+  }
 
   scorersWrapper: {
-    marginTop: 10,
-    borderTop: "1px dashed #eee",
-    paddingTop: 8,
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: 8,
-  },
-  scorerCol: {},
-  scorersTitle: { fontSize: 13, fontWeight: 700, marginBottom: 6 },
-  scorersUl: { margin: 0, paddingLeft: 16 },
+    marginTop: 10
+    borderTop: "1px dashed #eee"
+    paddingTop: 8
+    display: "grid"
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))"
+    gap: 8
+  }
+  scorerCol: {}
+  scorersTitle: { fontSize: 13, fontWeight: 700, marginBottom: 6 }
+  scorersUl: { margin: 0 paddingLeft: 16 }
   scorerItem: {
-    fontSize: 13,
-    lineHeight: 1.3,
-    whiteSpace: "nowrap",
-    display: "inline-block",
-  },
-  scorersListMuted: { fontSize: 12, opacity: 0.7 },
+    fontSize: 13
+    lineHeight: 1.3
+    whiteSpace: "nowrap"
+    display: "inline-block"
+  }
+  scorersListMuted: { fontSize: 12 opacity: 0.7 }
 
   perTimeRow: {
-    marginTop: 8,
-    display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0,1fr))",
-    gap: 6,
-    fontSize: 12,
-    opacity: 0.85,
-  },
+    marginTop: 8
+    display: "grid"
+    gridTemplateColumns: "repeat(4, minmax(0,1fr))"
+    gap: 6
+    fontSize: 12
+    opacity: 0.85
+  }
 
-  actions: { marginTop: 10, textAlign: "center" as const },
+  actions: { marginTop: 10 textAlign: "center" as const }
   linkBtn: {
-    display: "inline-block",
-    padding: "8px 12px",
-    borderRadius: 8,
-    border: "1px solid #e5e5e5",
-    textDecoration: "none",
-  },
-};
+    display: "inline-block"
+    padding: "8px 12px"
+    borderRadius: 8
+    border: "1px solid #e5e5e5"
+    textDecoration: "none"
+  }
+;
 
 // Animazioni CSS (marquee + blink)
 const styleEl = document.getElementById("home-inline-anim");
@@ -1128,4 +1153,3 @@ if (!styleEl) {
 `;
   document.head.appendChild(s);
 }
-
