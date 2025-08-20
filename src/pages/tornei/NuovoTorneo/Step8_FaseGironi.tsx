@@ -139,11 +139,9 @@ export default function Step8_FaseGironi() {
     if (!m.giocata) return "VS";
     const score = `${m.gol_casa} – ${m.gol_ospite}`;
     if (m.gol_casa === m.gol_ospite && m.rigori_vincitore) {
-      // se casa ha vinto ai rigori
       if (m.rigori_vincitore === m.squadra_casa?.id) {
         return `(Rig) ${score}`;
       }
-      // se ospite ha vinto ai rigori
       if (m.rigori_vincitore === m.squadra_ospite?.id) {
         return `${score} (Rig)`;
       }
@@ -157,34 +155,59 @@ export default function Step8_FaseGironi() {
       {/* Scontri diretti */}
       {elimMatches.map((m) => (
         <div key={m.id} className="space-y-2">
-          <h3 className="text-lg font-semibold text-center">
+          <h3 className="text-lg font-semibold text-center text-white print:text-black">
             {labelMap[m.match_number] || `Match ${m.match_number}`}
           </h3>
-          <div
+
+          <table
             onClick={() =>
               canEdit &&
               navigate(`/modifica-partita-fasegironi/${m.id}`, {
                 state: { torneoId },
               })
             }
-            className={`grid grid-cols-3 items-center bg-gray-100 shadow-md rounded-lg p-3 mb-2 ${
+            className={`w-full table-fixed border-collapse text-center text-sm mb-2 ${
               canEdit ? "cursor-pointer hover:bg-gray-200" : ""
             }`}
           >
-            <span className="text-sm truncate">{m.squadra_casa?.nome}</span>
-            <span className="text-sm font-medium text-center">
-              {formatScore(m)}
-            </span>
-            <span className="text-sm text-right truncate">
-              {m.squadra_ospite?.nome}
-            </span>
-          </div>
+            <tbody>
+              <tr>
+                <td className="border px-3 py-2 text-left">
+                  <div className="flex items-center space-x-2">
+                    {m.squadra_casa?.logo_url && (
+                      <img
+                        src={m.squadra_casa.logo_url}
+                        alt={m.squadra_casa.nome}
+                        className="w-5 h-5 rounded-full"
+                      />
+                    )}
+                    <span>{m.squadra_casa?.nome}</span>
+                  </div>
+                </td>
+                <td className="border px-3 py-2 font-medium">
+                  {formatScore(m)}
+                </td>
+                <td className="border px-3 py-2 text-right">
+                  <div className="flex items-center justify-end space-x-2">
+                    <span>{m.squadra_ospite?.nome}</span>
+                    {m.squadra_ospite?.logo_url && (
+                      <img
+                        src={m.squadra_ospite.logo_url}
+                        alt={m.squadra_ospite.nome}
+                        className="w-5 h-5 rounded-full"
+                      />
+                    )}
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       ))}
 
       {/* Classifica Finale */}
       <div className="pt-6">
-        <h3 className="text-xl font-semibold text-center mb-2">
+        <h3 className="text-xl font-semibold text-center mb-2 text-white print:text-black">
           Classifica Finale
         </h3>
         <table className="w-full table-auto border-collapse text-center text-sm">
@@ -198,15 +221,17 @@ export default function Step8_FaseGironi() {
             {classifica.map((e) => (
               <tr key={e.squadra.id}>
                 <td className="border px-3 py-1">{e.posizione}</td>
-                <td className="border px-3 py-1 flex items-center space-x-2">
-                  {e.squadra.logo_url && (
-                    <img
-                      src={e.squadra.logo_url}
-                      alt={e.squadra.nome}
-                      className="w-5 h-5 rounded-full"
-                    />
-                  )}
-                  <span>{e.squadra.nome}</span>
+                <td className="border px-3 py-1">
+                  <div className="flex items-center space-x-2">
+                    {e.squadra.logo_url && (
+                      <img
+                        src={e.squadra.logo_url}
+                        alt={e.squadra.nome}
+                        className="w-5 h-5 rounded-full"
+                      />
+                    )}
+                    <span>{e.squadra.nome}</span>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -216,21 +241,18 @@ export default function Step8_FaseGironi() {
 
       {/* Pulsanti */}
       <div className="flex justify-between print:hidden space-x-2">
-        {/* Tutti vedono Esci */}
         <button
           onClick={() => navigate(-1)}
           className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
         >
           Esci
         </button>
-        {/* Tutti vedono Stampa */}
         <button
           onClick={() => window.print()}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
         >
           Stampa
         </button>
-        {/* Solo Admin/Creator vedono Salva ed Esci */}
         {canEdit && (
           <button
             onClick={() => navigate("/tornei")}
