@@ -1,5 +1,5 @@
 // src/components/SidebarLayout.tsx
-// Data creazione chat: 2025-08-02 (rev con stella votazioni + fix visibilità Admin Panel)
+// Data creazione chat: 2025-08-02 (rev: brand "Montecarlo 2013" + 3 strisce rosse, Home link, titolo home "Ciao {username}")
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -9,16 +9,11 @@ import {
   useLocation,
   useMatch,
 } from 'react-router-dom';
-import {
-  Menu,
-  PlusCircle,
-  Trash2,
-  Edit2,
-  Camera,
-} from 'lucide-react';
+import { Menu, PlusCircle, Trash2, Edit2, Camera } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import { UserRole } from '../lib/roles';
+// (presente nei tuoi import originali)
 import Step3_GuNumeroSquadre from '../pages/tornei/NuovoTorneo/Step3_GuNumeroSquadre';
 
 export default function SidebarLayout(): JSX.Element {
@@ -26,6 +21,20 @@ export default function SidebarLayout(): JSX.Element {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Username da user_profiles per titolo "Ciao {username}"
+  const [profileUsername, setProfileUsername] = useState<string>('');
+  useEffect(() => {
+    (async () => {
+      if (!user?.id) return;
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('username')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (!error && data?.username) setProfileUsername(data.username);
+    })();
+  }, [user?.id]);
 
   // Chiudi sidebar al cambio pagina
   useEffect(() => {
@@ -56,7 +65,7 @@ export default function SidebarLayout(): JSX.Element {
   const matchNumeroSquadre = useMatch('/tornei/nuovo/step3-enumerosquadre/:torneoId');
   const matchSelezionaSquadre = useMatch('/tornei/nuovo/step4-eliminazione/:torneoId');
   const matchStep5Eliminazione = useMatch('/tornei/nuovo/step5-eliminazione/:torneoId');
-  const matchSpetp3GuNumeroSquadre = useMatch('/tornei/nuovo/step3-gunumerosquadre/:torneoId')
+  const matchSpetp3GuNumeroSquadre = useMatch('/tornei/nuovo/step3-gunumerosquadre/:torneoId');
   const matchStep4GironeUnico = useMatch('/tornei/nuovo/step4-gironeunico/:torneoId');
   const matchStep5GironeUnico = useMatch('/tornei/nuovo/step5-gironeunico/:torneoId');
   const matchStep3FgNumeroSquadre = useMatch('/tornei/nuovo/step3-fgnumerosquadre/:torneoId');
@@ -115,12 +124,9 @@ export default function SidebarLayout(): JSX.Element {
   const canCreator = role === UserRole.Creator;
   const canAdmin = role === UserRole.Admin || role === UserRole.Creator;
 
-  // Gruppi link
+  // Gruppi link — PRIMA voce: "Home"
   const group1 = [
-    {
-      to: '/',
-      label: `Ciao ${user?.user_metadata?.nome ?? ''}`,
-    },
+    { to: '/', label: 'Home' },
     { to: '/risultati', label: 'Risultati' },
     { to: '/calendario', label: 'Calendario' },
     { to: '/prossima-partita', label: 'Prossima Partita' },
@@ -140,7 +146,7 @@ export default function SidebarLayout(): JSX.Element {
     ...(canCreator ? [{ to: '/admin-panel', label: 'Pannello Admin' }] : []),
   ];
 
-  // Titolo dinamico
+  // Titolo dinamico — sulla home: "Ciao {username da user_profiles}"
   let pageTitle = '';
   if (matchTeamEdit) pageTitle = 'Modifica Squadra';
   else if (matchTeamNew) pageTitle = 'Nuova Squadra';
@@ -163,7 +169,7 @@ export default function SidebarLayout(): JSX.Element {
   else if (matchFormatoTorneo) pageTitle = 'Formato Torneo';
   else if (matchNumeroSquadre) pageTitle = 'Numero Squadre';
   else if (matchSelezionaSquadre) pageTitle = 'Seleziona Squadre';
-  else if (matchStep5Eliminazione) pageTitle = 'Date Fasi'
+  else if (matchStep5Eliminazione) pageTitle = 'Date Fasi';
   else if (matchSpetp3GuNumeroSquadre) pageTitle = 'Numero Squadre';
   else if (matchStep4GironeUnico) pageTitle = 'Seleziona Squadre';
   else if (matchStep5GironeUnico) pageTitle = 'Date Match';
@@ -177,11 +183,10 @@ export default function SidebarLayout(): JSX.Element {
   else if (matchEditPartitaGiocata) pageTitle = 'Modifica Partita';
   else if (location.pathname === '/risultati') pageTitle = 'Risultati';
   else if (location.pathname === '/')
-  pageTitle = `Ciao ${user?.user_metadata?.nome ?? user?.user_metadata?.username ?? ''}`;
+    pageTitle = `Ciao ${profileUsername || user?.user_metadata?.username || ''}`;
   else pageTitle = '';
 
   if (authLoading) return <div className="min-h-screen">Caricamento…</div>;
-
   // Handlers
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -189,35 +194,35 @@ export default function SidebarLayout(): JSX.Element {
   };
 
   const handleTeamDelete = async () => {
-    if (!teamId || !window.confirm('Eliminare questa squadra?')) return;
-    const { error } = await supabase.from('squadre').delete().eq('id', teamId);
+    const id = matchTeamDetail?.params.id;
+    if (!id || !window.confirm('Eliminare questa squadra?')) return;
+    const { error } = await supabase.from('squadre').delete().eq('id', id);
     if (!error) navigate('/squadre', { replace: true });
   };
 
   const handlePlayerDelete = async () => {
-    if (!playerId || !window.confirm('Eliminare questo giocatore e tutti i dati collegati?')) return;
-
-    // Elimina collegamenti da tabelle figlie
-    await supabase.from('giocatori_stagioni').delete().eq('giocatore_uid', playerId);
-    await supabase.from('marcatori').delete().eq('giocatore_uid', playerId);
-    await supabase.from('allenamenti').delete().eq('giocatore_uid', playerId);
-
-    // Elimina giocatore
-    const { error } = await supabase.from('giocatori').delete().eq('id', playerId);
+    const id = matchPlayer?.params.id;
+    if (!id || !window.confirm('Eliminare questo giocatore e tutti i dati collegati?')) return;
+    await supabase.from('giocatori_stagioni').delete().eq('giocatore_uid', id);
+    await supabase.from('marcatori').delete().eq('giocatore_uid', id);
+    await supabase.from('allenamenti').delete().eq('giocatore_uid', id);
+    const { error } = await supabase.from('giocatori').delete().eq('id', id);
     if (!error) navigate('/rosa', { replace: true });
   };
 
   const handlePreDelete = async () => {
-    if (!preId || !window.confirm('Eliminare questa partita?')) return;
-    const { error } = await supabase.from('partite').delete().eq('id', preId);
+    const id = matchPre?.params.id;
+    if (!id || !window.confirm('Eliminare questa partita?')) return;
+    const { error } = await supabase.from('partite').delete().eq('id', id);
     if (!error) navigate('/calendario', { replace: true });
   };
 
   const handleDetailDelete = async () => {
-    if (!detailId || !window.confirm('Eliminare definitivamente questa partita?')) return;
-    await supabase.from('marcatori').delete().eq('partita_id', detailId);
-    await supabase.from('presenze').delete().eq('partita_id', detailId);
-    await supabase.from('partite').delete().eq('id', detailId);
+    const id = matchDetail?.params.id;
+    if (!id || !window.confirm('Eliminare definitivamente questa partita?')) return;
+    await supabase.from('marcatori').delete().eq('partita_id', id);
+    await supabase.from('presenze').delete().eq('partita_id', id);
+    await supabase.from('partite').delete().eq('id', id);
     navigate('/calendario', { replace: true });
   };
 
@@ -226,18 +231,14 @@ export default function SidebarLayout(): JSX.Element {
       {/* HEADER */}
       <header className="fixed top-0 left-0 right-0 z-50 flex items-center px-4 py-2 bg-gradient-to-br from-[#6B7280] to-[#BFB9B9] text-white">
         {/* Pulsante hamburger */}
-        <button
-          onClick={() => setDrawerOpen(true)}
-          aria-label="Apri menu"
-          className="mr-4"
-        >
+        <button onClick={() => setDrawerOpen(true)} aria-label="Apri menu" className="mr-4">
           <Menu size={24} />
         </button>
 
         {/* Stella solo su dettaglio partita */}
         {matchDetail && (
           <button
-            onClick={() => navigate(`/partita/${detailId}/votazioni`)}
+            onClick={() => navigate(`/partita/${matchDetail.params.id}/votazioni`)}
             aria-label="Vota Giocatori"
             className="mr-3 hover:scale-110 transition"
           >
@@ -319,7 +320,7 @@ export default function SidebarLayout(): JSX.Element {
         {matchTeamDetail && canAdmin && (
           <>
             <button
-              onClick={() => navigate(`/squadre/${teamId}/edit`)}
+              onClick={() => navigate(`/squadre/${matchTeamDetail.params.id}/edit`)}
               aria-label="Modifica Squadra"
               className="mx-2 hover:scale-105 transition"
             >
@@ -338,7 +339,7 @@ export default function SidebarLayout(): JSX.Element {
         {matchPlayer && canAdmin && (
           <>
             <button
-              onClick={() => navigate(`/edit-giocatore/${playerId}`)}
+              onClick={() => navigate(`/edit-giocatore/${matchPlayer.params.id}`)}
               aria-label="Modifica Giocatore"
               className="mx-2 hover:scale-105 transition"
             >
@@ -357,7 +358,7 @@ export default function SidebarLayout(): JSX.Element {
         {matchPre && canAdmin && (
           <>
             <button
-              onClick={() => navigate(`/partita/${preId}/edit`)}
+              onClick={() => navigate(`/partita/${matchPre.params.id}/edit`)}
               aria-label="Modifica Pre-partita"
               className="mx-2 hover:scale-105 transition"
             >
@@ -376,7 +377,7 @@ export default function SidebarLayout(): JSX.Element {
         {matchDetail && canAdmin && (
           <>
             <button
-              onClick={() => navigate(`/modifica-partita-giocata/${detailId}`)}
+              onClick={() => navigate(`/modifica-partita-giocata/${matchDetail.params.id}`)}
               aria-label="Modifica Partita Giocata"
               className="mx-2 hover:scale-105 transition"
             >
@@ -402,28 +403,58 @@ export default function SidebarLayout(): JSX.Element {
 
       {/* BACKDROP */}
       {drawerOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-30"
-          onClick={() => setDrawerOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black/50 z-30" onClick={() => setDrawerOpen(false)} />
       )}
 
       {/* SIDEBAR */}
       <aside
         className={`fixed inset-y-0 left-0 w-64 bg-gradient-to-br from-[#6B7280] to-[#BFB9B9]
-      text-white z-40 pt-16 transform transition-transform duration-300
-      ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        text-white z-40 pt-16 transform transition-transform duration-300
+        ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <nav className="flex flex-col h-full px-4 space-y-2">
-          <div className="px-2 py-3 text-xl font-bold">MONTECARLO</div>
+          {/* BRAND: Montecarlo 2013 + tre strisce rosse */}
+          <div className="px-2 py-4">
+  <div className="relative h-16 overflow-hidden"> {/* ↑ altezza area: h-12 / h-16 / h-20 */}
+    {/* righe rosse */}
+    <div aria-hidden className="absolute inset-0 flex flex-col justify-center gap-[4px]">
+      <div className="h-[2px] bg-red-600 rounded" />
+      <div className="h-[2px] bg-red-600 rounded" />
+      <div className="h-[2px] bg-red-600 rounded" />
+    </div>
+
+    {/* testo sopra (posizionamento assoluto) */}
+    <div
+      className="
+        absolute
+        left-2                 /* ← spostamento orizzontale: left-0/1/2/3/4... o left-[12px] */
+        top-1/2 -translate-y-1/2  /* ← centrato verticalmente sulle righe */
+        z-10
+      "
+    >
+      <div
+        className="
+          text-2xl md:text-2xl  /* ← dimensione testo: text-xl/2xl/3xl... */
+          font-bold
+          tracking-wide
+          text-white
+          drop-shadow
+        "
+      >
+        <div className="text-[23px] md:text-3xl font-bold tracking-wide text-white drop-shadow">
+  Montecarlo 2013
+</div>
+      </div>
+    </div>
+  </div>
+</div>
+
           {[...group1, ...group2, ...group3, ...group4].map((link) => (
             <React.Fragment key={link.to}>
               <NavLink
                 to={link.to}
                 className={({ isActive }) =>
-                  `block p-2 rounded ${
-                    isActive ? 'bg-white text-gray-800' : 'hover:bg-white/20'
-                  }`
+                  `block p-2 rounded ${isActive ? 'bg-white text-gray-800' : 'hover:bg-white/20'}`
                 }
               >
                 {link.label}
@@ -435,6 +466,8 @@ export default function SidebarLayout(): JSX.Element {
               {link.to === '/statistiche/giocatori' && <hr className="border-t border-white/20 my-2" />}
             </React.Fragment>
           ))}
+
+          {/* Footer sidebar */}
           <div className="mt-auto pt-4 border-t border-white/20 px-2">
             {user ? (
               <div className="flex items-center justify-between">
@@ -442,12 +475,9 @@ export default function SidebarLayout(): JSX.Element {
                   onClick={() => navigate('/profilo')}
                   className="text-sm underline hover:text-gray-200"
                 >
-                  {user.user_metadata?.username ?? user.email}
+                  {profileUsername || user.user_metadata?.username || user.email}
                 </button>
-                <button
-                  onClick={handleLogout}
-                  className="underline hover:text-gray-200 text-sm"
-                >
+                <button onClick={handleLogout} className="underline hover:text-gray-200 text-sm">
                   Logout
                 </button>
               </div>
