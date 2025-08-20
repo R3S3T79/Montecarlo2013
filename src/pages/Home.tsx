@@ -902,7 +902,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   heroTitle: {
     margin: 0,
-    fontSize: 38,
+    fontSize: 36,
     fontWeight: 600, // meno bold
     color: "white",
     letterSpacing: 0.3,
@@ -1128,3 +1128,4 @@ if (!styleEl) {
 `;
   document.head.appendChild(s);
 }
+
