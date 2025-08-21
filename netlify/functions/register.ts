@@ -1,6 +1,6 @@
 // netlify/functions/register.ts
-// Data: 21/08/2025 – Registrazione utente: inserisce in pending_users e avvisa l'admin
-// L'utente NON riceve alcuna email a questo stadio
+// Data: 21/08/2025 – Registrazione utente: inserisce solo in pending_users e avvisa l'admin
+// Nessun utente creato in Auth a questo stadio
 
 import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
@@ -39,7 +39,7 @@ export const handler: Handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: "Missing required fields" }) };
   }
 
-  // 1) Token per conferma (verrà usato dopo)
+  // 1) Token per eventuale conferma custom
   const token = crypto.randomUUID();
 
   // 2) Inserimento in pending_users
