@@ -74,19 +74,18 @@ export const handler: Handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: "Errore creazione utente Auth" }) };
   }
 
-  // 4) Genera link di verifica email (signup)
-  const gen = await supabase.auth.admin.generateLink({
-    type: "signup",
-    email,
-    password: pending.password || undefined,
-  });
+  // 4) Genera link di verifica email (invito)
+const gen = await supabase.auth.admin.generateLink({
+  type: "invite",
+  email,
+});
 
-  if (gen.error || !gen.data?.action_link) {
-    console.error("Errore generateLink:", gen.error);
-    return { statusCode: 500, body: JSON.stringify({ error: "Errore generazione link conferma" }) };
-  }
+if (gen.error || !gen.data?.action_link) {
+  console.error("Errore generateLink:", gen.error);
+  return { statusCode: 500, body: JSON.stringify({ error: "Errore generazione link conferma" }) };
+}
 
-  const actionLink = gen.data.action_link;
+const actionLink = gen.data.action_link;
 
   // 5) Invia email all’utente con link di verifica
   try {
