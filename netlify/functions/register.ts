@@ -1,24 +1,23 @@
 // netlify/functions/register.ts
 // Data: 21/08/2025
-// Scopo: registra nuovo utente → inserisce in pending_users con confirmation_token
-// Invia email all’amministratore per approvazione.
+// Scopo: Registrazione utente → salva in pending_users e manda mail all'admin (NON all'utente)
 
 import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
 import crypto from "crypto";
 
-/* ================================
- * 1) Setup Supabase (service role)
- * ================================ */
+// =========================
+// Supabase client (service)
+// =========================
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-/* ==================================
- * 2) Setup mailer (SMTP del progetto)
- * ================================== */
+// =========================
+// Nodemailer (SMTP)
+// =========================
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT || "465"),
@@ -29,87 +28,69 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-/* =========================================
- * 3) Handler principale
- * ========================================= */
+// =========================
+// Handler
+// =========================
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ error: "Method Not Allowed" }),
-    };
+    return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
-  let body: { email?: string; password?: string; username?: string };
+  let body: { email?: string; username?: string; password?: string; role?: string };
   try {
     body = JSON.parse(event.body || "{}");
   } catch {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: "Invalid JSON body" }),
-    };
+    return { statusCode: 400, body: JSON.stringify({ error: "Invalid JSON body" }) };
   }
 
-  const { email, password, username } = body;
+  const { email, username, password, role } = body;
   if (!email || !password) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: "Missing required fields" }),
-    };
+    return { statusCode: 400, body: JSON.stringify({ error: "Missing required fields" }) };
   }
 
-  /* ------------------------------
-   * 3.1) Genera token conferma
-   * ------------------------------ */
-  const confirmation_token = crypto.randomUUID();
+  // =========================
+  // Inserimento in pending_users
+  // =========================
+  const confirmationToken = crypto.randomUUID();
 
-  /* ------------------------------
-   * 3.2) Inserisci utente in pending_users
-   * ------------------------------ */
-  const { error: insErr } = await supabase
-    .from("pending_users")
-    .insert([
-      {
-        email,
-        username: username || null,
-        password,
-        confirmation_token,
-        confirmed: false,
-        approved: false,
-      },
-    ]);
+  const { error: insertErr } = await supabase.from("pending_users").insert([
+    {
+      email,
+      username,
+      password,
+      role: role || "user",
+      approved: false,
+      confirmed: false,
+      confirmation_token: confirmationToken,
+    },
+  ]);
 
-  if (insErr) {
-    console.error("Errore insert pending_users:", insErr);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: "Errore salvataggio pending_users" }),
-    };
+  if (insertErr) {
+    console.error("Errore insert pending_users:", insertErr);
+    return { statusCode: 500, body: JSON.stringify({ error: "Errore salvataggio utente" }) };
   }
 
-  /* ------------------------------
-   * 3.3) Invia email all’amministratore
-   * ------------------------------ */
+  // =========================
+  // Email di notifica ADMIN
+  // =========================
   try {
     await transporter.sendMail({
       from: process.env.SMTP_FROM,
-      to: process.env.ADMIN_EMAIL, // riceve la notifica l’admin
+      to: "marcomiressi@gmail.com", // 🔴 ADMIN
       subject: "Nuovo utente in attesa di approvazione",
       html: `
-        <p>Nuovo utente registrato:</p>
+        <p>Nuova registrazione ricevuta:</p>
         <ul>
-          <li>Email: ${email}</li>
-          <li>Username: ${username || "-"}</li>
+          <li>Email: <b>${email}</b></li>
+          <li>Username: <b>${username || "-"}</b></li>
+          <li>Ruolo richiesto: <b>${role || "user"}</b></li>
         </ul>
-        <p>Accedi al <a href="https://montecarlo2013.it/admin">Pannello Admin</a> per approvarlo.</p>
+        <p>Puoi approvare l'utente dal <a href="https://montecarlo2013.it/admin">Pannello Admin</a></p>
       `,
     });
   } catch (mailErr) {
     console.error("Errore invio mail admin:", mailErr);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: "Errore invio email admin" }),
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: "Errore invio mail admin" }) };
   }
 
   return {
