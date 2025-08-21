@@ -61,23 +61,27 @@ export const handler: Handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: "Errore aggiornamento pending_users" }) };
   }
 
-  // 3) Crea (o recupera) utente in Auth con email non confermata
-  //    Se l'utente esiste già, NON forzare conferma qui.
-  //    Proviamo a creare: se c'è conflitto, proseguo.
-  const tryCreate = await supabase.auth.admin.createUser({
-    email,
-    password: pending.password || undefined,
-    email_confirm: false,
-    user_metadata: { role, username: pending.username || undefined },
-  });
+  // 3) Provo a creare l'utente in Auth solo se non esiste già
+  let userId: string | null = null;
 
-  if (tryCreate.error && tryCreate.error.message && !tryCreate.error.message.includes("User already registered")) {
-    console.error("Errore createUser:", tryCreate.error);
-    return { statusCode: 500, body: JSON.stringify({ error: "Errore creazione utente Auth" }) };
+  const existing = await supabase.auth.admin.listUsers({ email });
+  if (existing.data?.users?.length) {
+    userId = existing.data.users[0].id;
+  } else {
+    const create = await supabase.auth.admin.createUser({
+      email,
+      password: pending.password || undefined,
+      email_confirm: false,
+      user_metadata: { role, username: pending.username || undefined },
+    });
+    if (create.error) {
+      console.error("Errore createUser:", create.error);
+      return { statusCode: 500, body: JSON.stringify({ error: "Errore creazione utente Auth" }) };
+    }
+    userId = create.data?.user?.id || null;
   }
 
   // 4) Genera link di VERIFICA EMAIL (Supabase gestisce la conferma)
-  //    NB: type: 'signup' è adatto a inviare la mail di conferma.
   const gen = await supabase.auth.admin.generateLink({
     type: "signup",
     email,
@@ -91,7 +95,7 @@ export const handler: Handler = async (event) => {
 
   const actionLink = gen.data.action_link;
 
-  // 5) Invia email all’utente con il link di verifica (NON /api/confirm)
+  // 5) Invia email all’utente con link di verifica
   try {
     await transporter.sendMail({
       from: process.env.SMTP_FROM,
@@ -100,8 +104,15 @@ export const handler: Handler = async (event) => {
       html: `
         <p>Ciao ${pending.username || ""},</p>
         <p>Sei stato approvato dall'amministratore. Verifica il tuo indirizzo email cliccando qui:</p>
-        <p><a href="${actionLink}" target="_blank">${actionLink}</a></p>
-        <p>Dopo la verifica verrai reindirizzato al sito.</p>
+        <p>
+          <a href="${actionLink}"
+             style="display:inline-block;padding:10px 20px;
+                    background:#004aad;color:#fff;
+                    text-decoration:none;border-radius:5px;">
+            Verifica Email
+          </a>
+        </p>
+        <p>Dopo la verifica potrai accedere al sito.</p>
       `,
     });
   } catch (mailErr) {
