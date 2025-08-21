@@ -1,6 +1,6 @@
 // netlify/functions/approve-user.ts
-// Data: 21/08/2025 – Approvazione da Admin: setta role+approved, crea utente Auth se serve,
-// e invia link di VERIFICA EMAIL/MAGICLINK all'utente (qui NON si tocca pending_users.confirmed)
+// Data: 21/08/2025 – Approvazione da Admin: crea l’utente in Auth, setta role+approved,
+// e invia link di verifica email (signup) all'utente
 
 import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
@@ -61,46 +61,25 @@ export const handler: Handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: "Errore aggiornamento pending_users" }) };
   }
 
-  // 3) Controllo se l'utente esiste già in Auth
-  let userId: string | null = null;
-  const list = await supabase.auth.admin.listUsers();
-  const found = list.data?.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+  // 3) Crea utente in Auth (solo adesso, NON in fase di registrazione)
+  const create = await supabase.auth.admin.createUser({
+    email,
+    password: pending.password || undefined,
+    email_confirm: false,
+    user_metadata: { role, username: pending.username || undefined },
+  });
 
-  if (found) {
-    console.log("Utente già esistente in Auth:", email);
-    userId = found.id;
-  } else {
-    const create = await supabase.auth.admin.createUser({
-      email,
-      password: pending.password || undefined,
-      email_confirm: false,
-      user_metadata: { role, username: pending.username || undefined },
-    });
-
-    if (create.error) {
-      console.error("Errore createUser:", create.error);
-      return { statusCode: 500, body: JSON.stringify({ error: "Errore creazione utente Auth" }) };
-    }
-
-    userId = create.data?.user?.id || null;
+  if (create.error) {
+    console.error("Errore createUser:", create.error);
+    return { statusCode: 500, body: JSON.stringify({ error: "Errore creazione utente Auth" }) };
   }
 
-  // 4) Genera link corretto: magiclink se utente esiste, signup se nuovo
-  let gen;
-  if (userId) {
-    // Utente già in Auth → uso magiclink per verifica
-    gen = await supabase.auth.admin.generateLink({
-      type: "magiclink",
-      email,
-    });
-  } else {
-    // Utente nuovo → uso signup link
-    gen = await supabase.auth.admin.generateLink({
-      type: "signup",
-      email,
-      password: pending.password || undefined,
-    });
-  }
+  // 4) Genera link di verifica email (signup)
+  const gen = await supabase.auth.admin.generateLink({
+    type: "signup",
+    email,
+    password: pending.password || undefined,
+  });
 
   if (gen.error || !gen.data?.action_link) {
     console.error("Errore generateLink:", gen.error);
