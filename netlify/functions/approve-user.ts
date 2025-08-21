@@ -61,12 +61,15 @@ export const handler: Handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: "Errore aggiornamento pending_users" }) };
   }
 
-  // 3) Provo a creare l'utente in Auth solo se non esiste già
+  // 3) Controllo se l'utente esiste già in Auth
   let userId: string | null = null;
+  const list = await supabase.auth.admin.listUsers();
 
-  const existing = await supabase.auth.admin.listUsers({ email });
-  if (existing.data?.users?.length) {
-    userId = existing.data.users[0].id;
+  const found = list.data?.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+
+  if (found) {
+    console.log("Utente già esistente in Auth:", email);
+    userId = found.id;
   } else {
     const create = await supabase.auth.admin.createUser({
       email,
@@ -74,14 +77,16 @@ export const handler: Handler = async (event) => {
       email_confirm: false,
       user_metadata: { role, username: pending.username || undefined },
     });
+
     if (create.error) {
       console.error("Errore createUser:", create.error);
       return { statusCode: 500, body: JSON.stringify({ error: "Errore creazione utente Auth" }) };
     }
+
     userId = create.data?.user?.id || null;
   }
 
-  // 4) Genera link di VERIFICA EMAIL (Supabase gestisce la conferma)
+  // 4) Genera SEMPRE il link di verifica email
   const gen = await supabase.auth.admin.generateLink({
     type: "signup",
     email,
