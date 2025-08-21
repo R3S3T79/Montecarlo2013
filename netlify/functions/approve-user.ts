@@ -31,32 +31,21 @@ const transporter = nodemailer.createTransport({
 
 /* ==========================================================
  * 3) Helper: prova più tipi di link finché ne otteniamo uno
- *    - per utente "nuovo": prima 'signup', poi 'invite'
- *    - per utente "esistente": 'invite' -> 'magiclink' -> 'recovery'
  * ========================================================== */
 async function generateBestLink(
   email: string,
-  isNewUser: boolean,
-  password?: string
+  isNewUser: boolean
 ): Promise<string | null> {
-  const typesNew = [
-    { type: "signup" as const, withPassword: true },
-    { type: "invite" as const, withPassword: false },
-  ];
-  const typesExisting = [
-    { type: "invite" as const, withPassword: false },
-    { type: "magiclink" as const, withPassword: false },
-    { type: "recovery" as const, withPassword: false },
-  ];
+  const typesNew = ["signup", "invite"] as const;
+  const typesExisting = ["invite", "magiclink", "recovery"] as const;
 
   const queue = isNewUser ? typesNew : typesExisting;
 
-  for (const item of queue) {
+  for (const type of queue) {
     const gen = await supabase.auth.admin.generateLink({
-      // @ts-expect-error – il tipo "type" accetta stringhe letterali specifiche
-      type: item.type,
+      // @ts-expect-error – tipo accetta stringhe letterali
+      type,
       email,
-      ...(item.withPassword ? { password } : {}),
     });
 
     if (gen?.data?.action_link) {
@@ -116,11 +105,9 @@ export const handler: Handler = async (event) => {
 
   /* ---------------------------------------------------------
    * 4.3) Verifica se l'utente esiste già in Auth
-   *      (può accadere per inserimenti precedenti)
    * --------------------------------------------------------- */
   let userExists = false;
 
-  // v2 non ha getUserByEmail, quindi facciamo listUsers e filtriamo
   const list = await supabase.auth.admin.listUsers();
   const existing = list.data?.users?.find(
     (u) => u.email?.toLowerCase() === email.toLowerCase()
@@ -132,13 +119,12 @@ export const handler: Handler = async (event) => {
   }
 
   /* ---------------------------------------------------------
-   * 4.4) Se NON esiste, crealo adesso in Auth (email non confermata)
+   * 4.4) Se NON esiste, crealo adesso in Auth (senza password)
    * --------------------------------------------------------- */
   if (!userExists) {
     const create = await supabase.auth.admin.createUser({
       email,
-      password: pending.password || undefined,
-      email_confirm: false,
+      email_confirm: false, // diventerà true dopo che clicca il link
       user_metadata: { role, username: pending.username || undefined },
     });
 
@@ -149,19 +135,12 @@ export const handler: Handler = async (event) => {
   }
 
   /* ----------------------------------------------------------------
-   * 4.5) Genera link migliore disponibile:
-   *      - se nuovo: preferiamo 'signup' (fallback 'invite')
-   *      - se già esistente: 'invite' -> 'magiclink' -> 'recovery'
+   * 4.5) Genera link migliore disponibile
    * ---------------------------------------------------------------- */
-  const actionLink = await generateBestLink(
-    email,
-    !userExists,
-    pending.password || undefined
-  );
+  const actionLink = await generateBestLink(email, !userExists);
 
   if (!actionLink) {
     console.error("Errore generateLink: null");
-    // Non blocchiamo: inviamo comunque una mail di benvenuto con link al sito.
   }
 
   /* ---------------------------------------------
@@ -178,13 +157,13 @@ export const handler: Handler = async (event) => {
         ${
           actionLink
             ? `
-              <p>Per completare l'accesso, clicca il pulsante qui sotto:</p>
+              <p>Per completare l'accesso e scegliere la tua password, clicca qui sotto:</p>
               <p>
                 <a href="${actionLink}"
                    style="display:inline-block;padding:10px 20px;
                           background:#004aad;color:#fff;
                           text-decoration:none;border-radius:5px;">
-                  Procedi all'accesso
+                  Completa registrazione
                 </a>
               </p>
             `
