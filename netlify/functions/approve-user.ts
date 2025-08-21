@@ -1,6 +1,6 @@
 // netlify/functions/approve-user.ts
 // Data: 21/08/2025 – Approvazione da Admin: setta role+approved, crea utente Auth se serve,
-// e invia link di VERIFICA EMAIL Supabase all'utente (qui NON si tocca pending_users.confirmed)
+// e invia link di VERIFICA EMAIL/MAGICLINK all'utente (qui NON si tocca pending_users.confirmed)
 
 import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
@@ -64,7 +64,6 @@ export const handler: Handler = async (event) => {
   // 3) Controllo se l'utente esiste già in Auth
   let userId: string | null = null;
   const list = await supabase.auth.admin.listUsers();
-
   const found = list.data?.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
 
   if (found) {
@@ -86,12 +85,22 @@ export const handler: Handler = async (event) => {
     userId = create.data?.user?.id || null;
   }
 
-  // 4) Genera SEMPRE il link di verifica email
-  const gen = await supabase.auth.admin.generateLink({
-    type: "signup",
-    email,
-    password: pending.password || undefined,
-  });
+  // 4) Genera link corretto: magiclink se utente esiste, signup se nuovo
+  let gen;
+  if (userId) {
+    // Utente già in Auth → uso magiclink per verifica
+    gen = await supabase.auth.admin.generateLink({
+      type: "magiclink",
+      email,
+    });
+  } else {
+    // Utente nuovo → uso signup link
+    gen = await supabase.auth.admin.generateLink({
+      type: "signup",
+      email,
+      password: pending.password || undefined,
+    });
+  }
 
   if (gen.error || !gen.data?.action_link) {
     console.error("Errore generateLink:", gen.error);
