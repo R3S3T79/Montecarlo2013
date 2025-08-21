@@ -1,16 +1,24 @@
 // netlify/functions/approve-user.ts
-// Data: 21/08/2025 – Approvazione da Admin: crea l’utente in Auth, setta role+approved,
-// e invia link di verifica email (signup) all'utente
+// Data: 21/08/2025
+// Scopo: approvazione da Admin → aggiorna pending_users (approved+role),
+// crea l'utente in Auth SE non esiste già, genera un link (signup/invite/magiclink/recovery)
+// e invia email all'utente. NON tocca pending_users.confirmed (diventa TRUE solo dopo conferma).
 
 import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
 
+/* ================================
+ * 1) Setup Supabase (service role)
+ * ================================ */
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+/* ==================================
+ * 2) Setup mailer (SMTP del progetto)
+ * ================================== */
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT || "465"),
@@ -21,6 +29,47 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+/* ==========================================================
+ * 3) Helper: prova più tipi di link finché ne otteniamo uno
+ *    - per utente "nuovo": prima 'signup', poi 'invite'
+ *    - per utente "esistente": 'invite' -> 'magiclink' -> 'recovery'
+ * ========================================================== */
+async function generateBestLink(
+  email: string,
+  isNewUser: boolean,
+  password?: string
+): Promise<string | null> {
+  const typesNew = [
+    { type: "signup" as const, withPassword: true },
+    { type: "invite" as const, withPassword: false },
+  ];
+  const typesExisting = [
+    { type: "invite" as const, withPassword: false },
+    { type: "magiclink" as const, withPassword: false },
+    { type: "recovery" as const, withPassword: false },
+  ];
+
+  const queue = isNewUser ? typesNew : typesExisting;
+
+  for (const item of queue) {
+    const gen = await supabase.auth.admin.generateLink({
+      // @ts-expect-error – il tipo "type" accetta stringhe letterali specifiche
+      type: item.type,
+      email,
+      ...(item.withPassword ? { password } : {}),
+    });
+
+    if (gen?.data?.action_link) {
+      return gen.data.action_link;
+    }
+  }
+
+  return null;
+}
+
+/* =========================================
+ * 4) Handler principale Netlify Function
+ * ========================================= */
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
@@ -38,7 +87,9 @@ export const handler: Handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: "Missing required fields" }) };
   }
 
-  // 1) Recupera pending_user
+  /* ------------------------------
+   * 4.1) Recupero pending_user
+   * ------------------------------ */
   const { data: pending, error: selErr } = await supabase
     .from("pending_users")
     .select("*")
@@ -50,7 +101,9 @@ export const handler: Handler = async (event) => {
     return { statusCode: 404, body: JSON.stringify({ error: "Pending user not found" }) };
   }
 
-  // 2) Aggiorna approved + role (NON confirmed!)
+  /* ------------------------------------------------------
+   * 4.2) Aggiorna approved + role (NON confirmed qui!)
+   * ------------------------------------------------------ */
   const { error: updErr } = await supabase
     .from("pending_users")
     .update({ approved: true, role, confirmed: false })
@@ -61,65 +114,87 @@ export const handler: Handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: "Errore aggiornamento pending_users" }) };
   }
 
-  // 3) Crea l'utente in Auth solo se non esiste già
-let authUser;
-const { data: existingUser, error: fetchError } = await supabase.auth.admin.getUserByEmail(email);
+  /* ---------------------------------------------------------
+   * 4.3) Verifica se l'utente esiste già in Auth
+   *      (può accadere per inserimenti precedenti)
+   * --------------------------------------------------------- */
+  let userExists = false;
 
-if (fetchError) {
-  console.error("Errore ricerca utente:", fetchError);
-}
+  // v2 non ha getUserByEmail, quindi facciamo listUsers e filtriamo
+  const list = await supabase.auth.admin.listUsers();
+  const existing = list.data?.users?.find(
+    (u) => u.email?.toLowerCase() === email.toLowerCase()
+  );
 
-if (existingUser?.user) {
-  console.log("Utente già esistente in Auth:", email);
-  authUser = existingUser.user;
-} else {
-  const create = await supabase.auth.admin.createUser({
-    email,
-    password: pending.password || undefined,
-    email_confirm: false,
-    user_metadata: { role, username: pending.username || undefined },
-  });
-
-  if (create.error) {
-    console.error("Errore createUser:", create.error);
-    return { statusCode: 500, body: JSON.stringify({ error: "Errore creazione utente Auth" }) };
+  if (existing) {
+    userExists = true;
+    console.info("Utente già esistente in Auth:", email);
   }
 
-  authUser = create.data.user;
-}
+  /* ---------------------------------------------------------
+   * 4.4) Se NON esiste, crealo adesso in Auth (email non confermata)
+   * --------------------------------------------------------- */
+  if (!userExists) {
+    const create = await supabase.auth.admin.createUser({
+      email,
+      password: pending.password || undefined,
+      email_confirm: false,
+      user_metadata: { role, username: pending.username || undefined },
+    });
 
-// 4) Genera link di verifica SOLO se l’utente è nuovo
-let actionLink: string | null = null;
-if (!existingUser?.user) {
-  const gen = await supabase.auth.admin.generateLink({
-    type: "invite",
-    email,
-  });
-
-  if (gen.error || !gen.data?.action_link) {
-    console.error("Errore generateLink:", gen.error);
-    return { statusCode: 500, body: JSON.stringify({ error: "Errore generazione link conferma" }) };
-  }
-
-  actionLink = gen.data.action_link;
-}
-
-// 5) Invia mail di benvenuto
-await transporter.sendMail({
-  from: process.env.SMTP_FROM,
-  to: email,
-  subject: "Benvenuto in Montecarlo2013",
-  html: `
-    <p>Ciao ${pending.username || "utente"},</p>
-    <p>Il tuo account è stato approvato con ruolo: <b>${role}</b>.</p>
-    ${
-      actionLink
-        ? `<p>Per completare la registrazione, clicca qui: <a href="${actionLink}">Conferma account</a></p>`
-        : `<p>Puoi accedere subito alla tua area: <a href="https://montecarlo2013.it/">Login</a></p>`
+    if (create.error) {
+      console.error("Errore createUser:", create.error);
+      return { statusCode: 500, body: JSON.stringify({ error: "Errore creazione utente Auth" }) };
     }
-  `,
-});
+  }
 
+  /* ----------------------------------------------------------------
+   * 4.5) Genera link migliore disponibile:
+   *      - se nuovo: preferiamo 'signup' (fallback 'invite')
+   *      - se già esistente: 'invite' -> 'magiclink' -> 'recovery'
+   * ---------------------------------------------------------------- */
+  const actionLink = await generateBestLink(
+    email,
+    !userExists,
+    pending.password || undefined
+  );
+
+  if (!actionLink) {
+    console.error("Errore generateLink: null");
+    // Non blocchiamo: inviamo comunque una mail di benvenuto con link al sito.
+  }
+
+  /* ---------------------------------------------
+   * 4.6) Invia email all'utente
+   * --------------------------------------------- */
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM,
+      to: email,
+      subject: "Accesso al portale Montecarlo 2013",
+      html: `
+        <p>Ciao ${pending.username || "utente"},</p>
+        <p>il tuo account è stato <b>approvato</b> con ruolo <b>${role}</b>.</p>
+        ${
+          actionLink
+            ? `
+              <p>Per completare l'accesso, clicca il pulsante qui sotto:</p>
+              <p>
+                <a href="${actionLink}"
+                   style="display:inline-block;padding:10px 20px;
+                          background:#004aad;color:#fff;
+                          text-decoration:none;border-radius:5px;">
+                  Procedi all'accesso
+                </a>
+              </p>
+            `
+            : `
+              <p>Non è stato possibile generare automaticamente il link di accesso.</p>
+              <p>Puoi comunque entrare dal sito: <a href="https://montecarlo2013.it/login">https://montecarlo2013.it/login</a></p>
+            `
+        }
+      `,
+    });
   } catch (mailErr) {
     console.error("Errore invio mail all'utente:", mailErr);
     return { statusCode: 500, body: JSON.stringify({ error: "Errore invio email all'utente" }) };
