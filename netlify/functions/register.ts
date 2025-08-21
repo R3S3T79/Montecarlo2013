@@ -1,6 +1,5 @@
 // netlify/functions/register.ts
-// Data: 20/08/2025 – Registrazione utente: inserisce in pending_users e avvisa l'admin
-// L'utente NON riceve alcuna email a questo stadio
+// Data: 21/08/2025 – Registrazione utente: inserisce in pending_users e avvisa l'admin
 
 import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
@@ -39,10 +38,10 @@ export const handler: Handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: "Missing required fields" }) };
   }
 
-  // 1. Genera token di conferma (lo useremo dopo, quando l'utente riceverà la mail di verifica)
+  // 1) Token per eventuale conferma custom o tracciamento
   const token = crypto.randomUUID();
 
-  // 2. Inserisci l'utente in pending_users
+  // 2) Inserimento in pending_users (NO confirmed, NO approved, NO role)
   const { error: insertErr } = await supabase.from("pending_users").insert([
     {
       email,
@@ -60,9 +59,15 @@ export const handler: Handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: "Errore registrazione utente" }) };
   }
 
-  // 3. Manda email all'admin
+  // 3) Email all'Admin con link certo al pannello
+  // Usa SITE_URL se presente, altrimenti prova a ricavare l'origine dalla richiesta,
+  // fallback alla prod di default.
+  const baseUrl =
+    process.env.SITE_URL ||
+    (event.headers.origin?.startsWith("http") ? event.headers.origin : "https://montecarlo2013.it");
+
+  const adminLink = `${baseUrl}/admin`;
   const adminEmail = "marcomiressi@gmail.com";
-  const adminLink = `${process.env.SITE_URL}/admin`;
 
   try {
     await transporter.sendMail({
@@ -76,12 +81,13 @@ export const handler: Handler = async (event) => {
           <li><b>Email:</b> ${email}</li>
           <li><b>Username:</b> ${username}</li>
         </ul>
-        <p>Puoi approvarlo dal pannello:</p>
+        <p>Apri il pannello per assegnare il ruolo:</p>
         <p><a href="${adminLink}" target="_blank">${adminLink}</a></p>
       `,
     });
   } catch (mailErr) {
     console.error("Errore invio mail admin:", mailErr);
+    // Non blocco la registrazione per un errore di invio mail all'admin
   }
 
   return {
