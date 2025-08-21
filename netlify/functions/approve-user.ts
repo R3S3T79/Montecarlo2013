@@ -61,7 +61,18 @@ export const handler: Handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: "Errore aggiornamento pending_users" }) };
   }
 
-  // 3) Crea utente in Auth (solo adesso, NON in fase di registrazione)
+  // 3) Crea l'utente in Auth solo se non esiste già
+let authUser;
+const { data: existingUser, error: fetchError } = await supabase.auth.admin.getUserByEmail(email);
+
+if (fetchError) {
+  console.error("Errore ricerca utente:", fetchError);
+}
+
+if (existingUser?.user) {
+  console.log("Utente già esistente in Auth:", email);
+  authUser = existingUser.user;
+} else {
   const create = await supabase.auth.admin.createUser({
     email,
     password: pending.password || undefined,
@@ -74,39 +85,41 @@ export const handler: Handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: "Errore creazione utente Auth" }) };
   }
 
-  // 4) Genera link di verifica email (invito)
-const gen = await supabase.auth.admin.generateLink({
-  type: "invite",
-  email,
-});
-
-if (gen.error || !gen.data?.action_link) {
-  console.error("Errore generateLink:", gen.error);
-  return { statusCode: 500, body: JSON.stringify({ error: "Errore generazione link conferma" }) };
+  authUser = create.data.user;
 }
 
-const actionLink = gen.data.action_link;
+// 4) Genera link di verifica SOLO se l’utente è nuovo
+let actionLink: string | null = null;
+if (!existingUser?.user) {
+  const gen = await supabase.auth.admin.generateLink({
+    type: "invite",
+    email,
+  });
 
-  // 5) Invia email all’utente con link di verifica
-  try {
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM,
-      to: email,
-      subject: "Verifica il tuo indirizzo email – Montecarlo 2013",
-      html: `
-        <p>Ciao ${pending.username || ""},</p>
-        <p>Sei stato approvato dall'amministratore. Verifica il tuo indirizzo email cliccando qui:</p>
-        <p>
-          <a href="${actionLink}"
-             style="display:inline-block;padding:10px 20px;
-                    background:#004aad;color:#fff;
-                    text-decoration:none;border-radius:5px;">
-            Verifica Email
-          </a>
-        </p>
-        <p>Dopo la verifica potrai accedere al sito.</p>
-      `,
-    });
+  if (gen.error || !gen.data?.action_link) {
+    console.error("Errore generateLink:", gen.error);
+    return { statusCode: 500, body: JSON.stringify({ error: "Errore generazione link conferma" }) };
+  }
+
+  actionLink = gen.data.action_link;
+}
+
+// 5) Invia mail di benvenuto
+await transporter.sendMail({
+  from: process.env.SMTP_FROM,
+  to: email,
+  subject: "Benvenuto in Montecarlo2013",
+  html: `
+    <p>Ciao ${pending.username || "utente"},</p>
+    <p>Il tuo account è stato approvato con ruolo: <b>${role}</b>.</p>
+    ${
+      actionLink
+        ? `<p>Per completare la registrazione, clicca qui: <a href="${actionLink}">Conferma account</a></p>`
+        : `<p>Puoi accedere subito alla tua area: <a href="https://montecarlo2013.it/">Login</a></p>`
+    }
+  `,
+});
+
   } catch (mailErr) {
     console.error("Errore invio mail all'utente:", mailErr);
     return { statusCode: 500, body: JSON.stringify({ error: "Errore invio email all'utente" }) };
