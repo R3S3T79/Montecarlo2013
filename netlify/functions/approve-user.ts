@@ -1,13 +1,13 @@
 // netlify/functions/approve-user.ts
-// Data: 18/08/2025 – Approva (creator): set approved=true + assegna role + invia email con link di conferma.
+// Data: 21/08/2025 – Approvazione da Admin: setta role+approved, crea utente Auth se serve,
+// e invia link di VERIFICA EMAIL Supabase all'utente (qui NON si tocca pending_users.confirmed)
 
 import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
-import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
 
 const supabase = createClient(
-  process.env.VITE_SUPABASE_URL!,
+  process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
@@ -26,81 +26,91 @@ export const handler: Handler = async (event) => {
     return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
-  const authHeader = event.headers.authorization || "";
-  if (!authHeader.startsWith("Bearer ")) {
-    return { statusCode: 401, body: JSON.stringify({ error: "Missing or invalid authorization header" }) };
-  }
-
-  let decoded: any;
-  try {
-    decoded = jwt.verify(authHeader.replace("Bearer ", ""), process.env.SUPABASE_JWT_SECRET!);
-  } catch (e: any) {
-    return { statusCode: 401, body: JSON.stringify({ error: "Invalid token", details: e.message }) };
-  }
-
-  const requesterRole = decoded.app_metadata?.role || decoded.raw_app_meta_data?.role;
-  if (requesterRole !== "creator") {
-    return { statusCode: 403, body: JSON.stringify({ error: "Access denied: Creators only" }) };
-  }
-
-  let body: { email?: string; role?: "user" | "creator" | "admin" };
+  let body: { email?: string; role?: string };
   try {
     body = JSON.parse(event.body || "{}");
   } catch {
     return { statusCode: 400, body: JSON.stringify({ error: "Invalid JSON body" }) };
   }
 
-  const { email, role = "user" } = body;
-  if (!email) {
-    return { statusCode: 400, body: JSON.stringify({ error: "Missing email" }) };
+  const { email, role } = body;
+  if (!email || !role) {
+    return { statusCode: 400, body: JSON.stringify({ error: "Missing required fields" }) };
   }
 
-  // prendi pending_user
+  // 1) Recupera pending_user
   const { data: pending, error: selErr } = await supabase
     .from("pending_users")
-    .select("username, confirmation_token, approved, confirmed")
+    .select("*")
     .eq("email", email)
-    .single();
+    .maybeSingle();
 
   if (selErr || !pending) {
+    console.error("Utente pending non trovato:", selErr);
     return { statusCode: 404, body: JSON.stringify({ error: "Pending user not found" }) };
   }
 
-  // marca approved=true e salva ruolo nella tabella pending_users
-  await supabase
+  // 2) Aggiorna approved + role (NON confirmed!)
+  const { error: updErr } = await supabase
     .from("pending_users")
-    .update({ approved: true, role })
+    .update({ approved: true, role, confirmed: false })
     .eq("email", email);
 
-  // aggiorna ruolo anche nei metadata di auth.users
-  const { data: allUsers, error: authErr } = await supabase.auth.admin.listUsers();
-  if (authErr) {
-    return { statusCode: 500, body: JSON.stringify({ error: "Error fetching auth users" }) };
+  if (updErr) {
+    console.error("Errore update pending_users:", updErr);
+    return { statusCode: 500, body: JSON.stringify({ error: "Errore aggiornamento pending_users" }) };
   }
 
-  const targetUser = allUsers?.users.find((u) => u.email === email);
-  if (targetUser) {
-    const { error: updateError } = await supabase.auth.admin.updateUserById(targetUser.id, {
-      user_metadata: { ...targetUser.user_metadata, role },
-    });
-    if (updateError) {
-      return { statusCode: 500, body: JSON.stringify({ error: "Error updating user metadata", details: updateError.message }) };
-    }
-  }
-
-  // invia l’email di conferma
-  const confirmUrl = `https://montecarlo2013.it/api/confirm?token=${pending.confirmation_token}`;
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM,
-    to: email,
-    subject: "Conferma la tua email – Montecarlo 2013",
-    html: `
-      <p>Ciao ${pending.username},</p>
-      <p>La tua registrazione è stata approvata. Conferma ora la tua email cliccando qui:</p>
-      <p><a href="${confirmUrl}">${confirmUrl}</a></p>
-      <p>Dopo la conferma potrai accedere all’app.</p>
-    `,
+  // 3) Crea (o recupera) utente in Auth con email non confermata
+  //    Se l'utente esiste già, NON forzare conferma qui.
+  //    Proviamo a creare: se c'è conflitto, proseguo.
+  const tryCreate = await supabase.auth.admin.createUser({
+    email,
+    password: pending.password || undefined,
+    email_confirm: false,
+    user_metadata: { role, username: pending.username || undefined },
   });
 
-  return { statusCode: 200, body: JSON.stringify({ success: true }) };
+  if (tryCreate.error && tryCreate.error.message && !tryCreate.error.message.includes("User already registered")) {
+    console.error("Errore createUser:", tryCreate.error);
+    return { statusCode: 500, body: JSON.stringify({ error: "Errore creazione utente Auth" }) };
+  }
+
+  // 4) Genera link di VERIFICA EMAIL (Supabase gestisce la conferma)
+  //    NB: type: 'signup' è adatto a inviare la mail di conferma.
+  const gen = await supabase.auth.admin.generateLink({
+    type: "signup",
+    email,
+    password: pending.password || undefined,
+  });
+
+  if (gen.error || !gen.data?.action_link) {
+    console.error("Errore generateLink:", gen.error);
+    return { statusCode: 500, body: JSON.stringify({ error: "Errore generazione link conferma" }) };
+  }
+
+  const actionLink = gen.data.action_link;
+
+  // 5) Invia email all’utente con il link di verifica (NON /api/confirm)
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM,
+      to: email,
+      subject: "Verifica il tuo indirizzo email – Montecarlo 2013",
+      html: `
+        <p>Ciao ${pending.username || ""},</p>
+        <p>Sei stato approvato dall'amministratore. Verifica il tuo indirizzo email cliccando qui:</p>
+        <p><a href="${actionLink}" target="_blank">${actionLink}</a></p>
+        <p>Dopo la verifica verrai reindirizzato al sito.</p>
+      `,
+    });
+  } catch (mailErr) {
+    console.error("Errore invio mail all'utente:", mailErr);
+    return { statusCode: 500, body: JSON.stringify({ error: "Errore invio email all'utente" }) };
+  }
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ success: true }),
+  };
 };
