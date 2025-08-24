@@ -189,8 +189,8 @@ export default function EditPartitaGiocata() {
   };
 
   return (
-    <div className="min-h-screen pt-16 px-4 pb-6">
-      <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-montecarlo p-6">
+    <div className="min-h-screen pt-2 px-2 pb-6">
+      <div className="min-h-screen p-4 sm:p-6 bg-white/70">
         
         {/* Data, Ora e Formazione */}
         <div className="grid grid-cols-1 sm:grid-cols-[120px_100px_auto] gap-4 mb-6 items-end">

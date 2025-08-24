@@ -109,9 +109,9 @@ export default function DettaglioPrePartita(): JSX.Element {
   });
 
   return (
-    <div className="min-h-screen pt-12 px-4 pb-6">
+    <div className="min-h-screen pt-2 px-2 pb-6">
       <div className="w-full">
-        <div className="bg-white rounded-xl shadow-montecarlo p-6">
+        <div className="min-h-screen p-4 sm:p-6 bg-white/90">
           {/* Dettaglio squadre */}
           <div className="flex flex-col items-center space-y-6 mb-6">
             <div className="flex items-center space-x-4">

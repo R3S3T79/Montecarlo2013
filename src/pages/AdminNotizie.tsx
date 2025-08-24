@@ -83,9 +83,10 @@ export default function AdminNotizie() {
   };
 
   return (
-    <div className="pt-20 px-4 max-w-lg mx-auto">
-      <h2 className="text-xl font-bold mb-4 text-center">Gestione Notizie</h2>
-
+    <div className="pt-2 px-2 max-w-lg mx-auto">
+      <h2 className="text-xl font-bold mb-4 text-center text-white">
+  Gestione Notizie
+</h2>
       {/* Form aggiunta */}
       <div className="bg-white p-4 rounded shadow mb-4">
         <textarea
@@ -247,6 +248,7 @@ export default function AdminNotizie() {
           )}
         </div>
       ))}
-    </div>
-  );
+    </div>  
+  );  
 }
+

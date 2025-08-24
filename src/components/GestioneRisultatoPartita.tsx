@@ -552,7 +552,7 @@ if (t) setTimerState(t);
     const opzioni = giocatori.filter((g) => convocatiSet.has(g.id));
 
     return (
-      <div className="mt-2 space-y-1">
+      <div className="container mx-auto px-2">
         {lista.map((m) => (
           <select
             key={m.goal_tempo}
@@ -591,7 +591,7 @@ if (t) setTimerState(t);
     );
 
     return (
-      <div className="mt-2 space-y-1">
+      <div className="container mx-auto px-2">
         {lista.map((m) => (
           <select
             key={m.goal_tempo}
@@ -630,9 +630,9 @@ if (t) setTimerState(t);
   // RENDER
   // =====================
   return (
-    <div className="bg-white min-h-screen p-6">
+    <div className="bg-white p-6 mt-8">
       <div className="space-y-6">
-        <div className="bg-white rounded-xl shadow-montecarlo overflow-hidden">
+        
           {/* Testata con campionato + pulsante stato */}
           <div className="bg-montecarlo-red-50 p-4 border-l-4 border-montecarlo-secondary flex items-center justify-center space-x-4">
             <span className="bg-montecarlo-accent text-montecarlo-secondary px-3 py-1 rounded-full text-sm font-medium shadow-gold">
@@ -674,7 +674,7 @@ if (t) setTimerState(t);
             {/* Modal Formazione */}
             {formazioneAperta && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div className="bg-white p-6 rounded-lg shadow-montecarlo max-w-md w-full space-y-4">
+                <div className="bg-white p-6 rounded-lg shadow-montecarlo max-w-md w-full mx-2 space-y-4">
                   <h2 className="text-center text-lg font-semibold">Seleziona Formazione</h2>
                   <div className="max-h-64 overflow-y-auto">
                     {giocatori.map((g) => (
@@ -815,6 +815,6 @@ if (t) setTimerState(t);
           </div>
         </div>
       </div>
-    </div>
+   
   );
 }

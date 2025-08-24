@@ -165,7 +165,7 @@ export default function Step5_5_FaseGironi() {
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
       
 
-      <label className="flex items-center space-x-2">
+      <label className="text-white flex items-center space-x-2">
         <input
           type="checkbox"
           checked={andataRitorno}
@@ -180,7 +180,7 @@ export default function Step5_5_FaseGironi() {
         const home = squadre.find((s) => s.id === casa)!;
         const away = squadre.find((s) => s.id === ospite)!;
         return (
-          <div key={key} className="bg-white shadow rounded-lg p-4 mb-4">
+          <div key={key} className="bg-white/90 shadow rounded-lg p-4 mb-4">
             <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
               <span>Girone {girone}</span>
             </div>

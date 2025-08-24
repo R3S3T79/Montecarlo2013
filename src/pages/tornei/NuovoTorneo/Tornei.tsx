@@ -1,5 +1,5 @@
 // src/pages/Tornei.tsx
-// Data creazione chat: 2025-08-01
+// Data creazione chat: 2025-08-01 (rev: margini uniformi 2 + distanza dalla navbar)
 
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -150,20 +150,21 @@ export default function Tornei() {
   }
 
   return (
-    <div className="min-h-screen px-4 pb-6">
+    <div className="min-h-screen mt-2 px-2 pb-6">
       <div className="w-full">
-        <div className="bg-white rounded-xl shadow-montecarlo p-6">
+        {/* wrapper trasparente: lo sfondo si vede tra tornei */}
+        <div className="rounded-xl shadow-montecarlo p-2 bg-transparent">
           {listaTornei.length === 0 ? (
             <p className="text-center text-gray-600 italic">
               Nessun torneo disponibile.
             </p>
           ) : (
             <ul className="space-y-3">
-              {listaTornei.map((t, idx) => (
+              {listaTornei.map((t) => (
                 <li
                   key={t.id}
                   onClick={() => apriTorneo(t.id, t.formato)}
-                  className="group cursor-pointer rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm transition hover:shadow-md"
+                  className="group cursor-pointer rounded-xl border border-gray-200 bg-white/85 px-4 py-3 shadow-sm transition hover:shadow-md"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">

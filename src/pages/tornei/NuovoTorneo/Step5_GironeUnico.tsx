@@ -157,7 +157,7 @@ export default function Step5_GironeUnico() {
   };
 
   return (
-    <div className="max-w-md mx-auto p-6 space-y-6">
+    <div className="max-w-md mx-auto p-2 space-y-4">
       
 
       <label className="flex items-center space-x-2">
@@ -167,7 +167,7 @@ export default function Step5_GironeUnico() {
           onChange={(e) => setAndataRitorno(e.target.checked)}
           className="form-checkbox h-4 w-4 text-blue-600"
         />
-        <span className="text-sm">Andata e ritorno</span>
+        <span className="text-sm text-white">Andata e ritorno</span>
       </label>
 
       {accoppiamenti.map(([a, b], idx) => {
@@ -177,7 +177,7 @@ export default function Step5_GironeUnico() {
         return (
           <div
             key={key}
-            className={`relative bg-white shadow rounded-lg p-4 ${
+            className={`relative bg-white/90 shadow rounded-lg p-4 ${
               idx < accoppiamenti.length - 1 ? 'mb-4' : ''
             }`}
           >
@@ -198,7 +198,7 @@ export default function Step5_GironeUnico() {
                   className="w-6 h-6 rounded-full"
                 />
               )}
-              <span className="text-sm font-medium">{casa?.nome}</span>
+              <span className="text-base font-medium">{casa?.nome}</span>
             </div>
 
             <div className="flex items-center space-x-2 mb-4">
@@ -209,7 +209,7 @@ export default function Step5_GironeUnico() {
                   className="w-6 h-6 rounded-full"
                 />
               )}
-              <span className="text-sm font-medium">{ospite?.nome}</span>
+              <span className="text-base font-medium">{ospite?.nome}</span>
             </div>
 
             <div className="mb-4">

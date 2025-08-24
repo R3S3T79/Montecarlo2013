@@ -123,12 +123,12 @@ export default function Step4_FaseGironi() {
   const perGirone = numGironi ? state.numSquadre / numGironi : 0;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+    <div className="max-w-2xl mx-auto px-2 py-2 space-y-4">
       <div>
         <select
           value={numGironi ?? ''}
           onChange={(e) => setNumGironi(Number(e.target.value))}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2"
+          className="bg-white/90 border border-gray-300 rounded-lg px-3 py-2"
         >
           <option value="">– Seleziona numero di gironi –</option>
           {getOpzioniGironi().map((n) => (
@@ -147,7 +147,7 @@ export default function Step4_FaseGironi() {
           const idxList = Array.from({ length: perGirone }, (_, i) => startIdx + i);
 
           return (
-            <div key={g} className="mt-3 rounded-lg border border-gray-200 bg-white">
+            <div key={g} className="mt-3 rounded-lg border border-gray-200 bg-white/90">
               <div className="px-3 py-2 font-semibold bg-gray-50 rounded-t-lg">
                 Girone {lettera}
               </div>

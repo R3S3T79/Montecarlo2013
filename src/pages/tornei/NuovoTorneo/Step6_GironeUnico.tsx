@@ -1,5 +1,5 @@
 // src/pages/tornei/NuovoTorneo/Step6_GironeUnico.tsx
-// (identico a prima con unica aggiunta gestione rigori_vincitore nella classifica)
+// Data: 24/08/2025 (rev: classifica con rigori_vincitore + tabella con bordi rosso-200)
 
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate, useLocation, Outlet } from "react-router-dom";
@@ -55,7 +55,9 @@ export default function Step6_GironeUnico() {
 
       const { data: partiteData } = await supabase
         .from<Partita>("tornei_gironeunico")
-        .select("id, squadra_casa, squadra_ospite, gol_casa, gol_ospite, data_match, giocata, rigori_vincitore")
+        .select(
+          "id, squadra_casa, squadra_ospite, gol_casa, gol_ospite, data_match, giocata, rigori_vincitore"
+        )
         .eq("torneo_id", torneoId)
         .order("data_match", { ascending: true });
 
@@ -66,7 +68,9 @@ export default function Step6_GironeUnico() {
       });
       setMatches(ordered);
 
-      const ids = Array.from(new Set(ordered.flatMap((m) => [m.squadra_casa, m.squadra_ospite])));
+      const ids = Array.from(
+        new Set(ordered.flatMap((m) => [m.squadra_casa, m.squadra_ospite]))
+      );
       const { data: sData } = await supabase
         .from<Squadra>("squadre")
         .select("id, nome, logo_url")
@@ -114,30 +118,43 @@ export default function Step6_GironeUnico() {
       });
     });
 
-    matches.filter((m) => m.giocata).forEach((m) => {
-      const home = tbl[m.squadra_casa];
-      const away = tbl[m.squadra_ospite];
-      home.PG++;
-      away.PG++;
-      home.GF += m.gol_casa;
-      home.GS += m.gol_ospite;
-      away.GF += m.gol_ospite;
-      away.GS += m.gol_casa;
+    matches
+      .filter((m) => m.giocata)
+      .forEach((m) => {
+        const home = tbl[m.squadra_casa];
+        const away = tbl[m.squadra_ospite];
+        home.PG++;
+        away.PG++;
+        home.GF += m.gol_casa;
+        home.GS += m.gol_ospite;
+        away.GF += m.gol_ospite;
+        away.GS += m.gol_casa;
 
-      if (m.gol_casa > m.gol_ospite) {
-        home.V++; away.P++; home.Pt += 3;
-      } else if (m.gol_ospite > m.gol_casa) {
-        away.V++; home.P++; away.Pt += 3;
-      } else {
-        if (m.rigori_vincitore === m.squadra_casa) {
-          home.V++; away.P++; home.Pt += 3;
-        } else if (m.rigori_vincitore === m.squadra_ospite) {
-          away.V++; home.P++; away.Pt += 3;
+        if (m.gol_casa > m.gol_ospite) {
+          home.V++;
+          away.P++;
+          home.Pt += 3;
+        } else if (m.gol_ospite > m.gol_casa) {
+          away.V++;
+          home.P++;
+          away.Pt += 3;
         } else {
-          home.N++; away.N++; home.Pt++; away.Pt++;
+          if (m.rigori_vincitore === m.squadra_casa) {
+            home.V++;
+            away.P++;
+            home.Pt += 3;
+          } else if (m.rigori_vincitore === m.squadra_ospite) {
+            away.V++;
+            home.P++;
+            away.Pt += 3;
+          } else {
+            home.N++;
+            away.N++;
+            home.Pt++;
+            away.Pt++;
+          }
         }
-      }
-    });
+      });
 
     Object.values(tbl).forEach((r) => (r.DR = r.GF - r.GS));
 
@@ -160,9 +177,12 @@ export default function Step6_GironeUnico() {
   };
 
   const handleEdit = (matchId: string) => {
-    navigate(`/tornei/nuovo/step6-gironeunico/${torneoId}/partita/${matchId}/edit`, {
-      state: { torneoId },
-    });
+    navigate(
+      `/tornei/nuovo/step6-gironeunico/${torneoId}/partita/${matchId}/edit`,
+      {
+        state: { torneoId },
+      }
+    );
   };
 
   const handleSaveAndExit = () => navigate("/tornei");
@@ -170,82 +190,98 @@ export default function Step6_GironeUnico() {
   if (loading) return <p className="text-center py-6">Caricamento in corso…</p>;
 
   return (
-    <div className="max-w-3xl mx-auto p-4 print:p-0 space-y-6">
-
+    <div className="max-w-3xl mx-auto m-2 mt-2 p-2 print:p-0 space-y-6">
       <div className="space-y-3">
         {matches.map((m) => {
           const home = squadreMap[m.squadra_casa];
           const away = squadreMap[m.squadra_ospite];
           let score: React.ReactNode = <span className="text-sm">VS</span>;
           if (m.giocata) {
-            let a = String(m.gol_casa), b = String(m.gol_ospite);
-if (a === b && m.rigori_vincitore) {
-  if (m.rigori_vincitore === m.squadra_casa) {
-    a = "." + a;
-  } else if (m.rigori_vincitore === m.squadra_ospite) {
-    b = b + ".";
-  }
-}
-            score = <span className="text-sm font-medium">{a}-{b}</span>;
+            let a = String(m.gol_casa),
+              b = String(m.gol_ospite);
+            if (a === b && m.rigori_vincitore) {
+              if (m.rigori_vincitore === m.squadra_casa) {
+                a = "." + a;
+              } else if (m.rigori_vincitore === m.squadra_ospite) {
+                b = b + ".";
+              }
+            }
+            score = (
+              <span className="text-base font-medium">
+                {a}-{b}
+              </span>
+            );
           }
 
           return (
             <div
               key={m.id}
               onClick={canEdit ? () => handleEdit(m.id) : undefined}
-              className={`bg-white shadow rounded-lg p-2 ${
+              className={`bg-white/90 shadow rounded-lg p-2 ${
                 canEdit ? "cursor-pointer hover:bg-gray-50" : ""
               }`}
             >
-              <div className="text-xs text-gray-500 mb-1 text-center">
+              <div className="text-base text-gray-500 mb-1 text-center">
                 {formatDate(m.data_match)}
               </div>
               <div className="flex items-center">
-                <span className="w-1/3 text-left text-sm">{home?.nome}</span>
+                <span className="w-1/3 text-left text-base">
+                  {home?.nome}
+                </span>
                 <span className="w-1/3 text-center">{score}</span>
-                <span className="w-1/3 text-right text-sm">{away?.nome}</span>
+                <span className="w-1/3 text-right text-base">
+                  {away?.nome}
+                </span>
               </div>
             </div>
           );
         })}
       </div>
 
-      <table className="w-full table-auto border-collapse text-center text-sm mb-6">
+      {/* CLASSIFICA */}
+      <table className="bg-white/90 table-auto border-collapse text-center text-base mb-6 w-full border border-red-200">
         <thead>
           <tr>
-            <th className="px-2 py-1 border">Squadra</th>
-            <th className="px-2 py-1 border">PG</th>
-            <th className="px-2 py-1 border">V</th>
-            <th className="px-2 py-1 border">N</th>
-            <th className="px-2 py-1 border">P</th>
-            <th className="px-2 py-1 border">GF</th>
-            <th className="px-2 py-1 border">GS</th>
-            <th className="px-2 py-1 border">DR</th>
-            <th className="px-2 py-1 border">Pt</th>
+            <th className="px-2 py-1 border border-red-200 text-left">
+              Squadra
+            </th>
+            <th className="px-2 py-1 border border-red-200">PG</th>
+            <th className="px-2 py-1 border border-red-200">V</th>
+            <th className="px-2 py-1 border border-red-200">N</th>
+            <th className="px-2 py-1 border border-red-200">P</th>
+            <th className="px-2 py-1 border border-red-200">GF</th>
+            <th className="px-2 py-1 border border-red-200">GS</th>
+            <th className="px-2 py-1 border border-red-200">DR</th>
+            <th className="px-2 py-1 border border-red-200">Pt</th>
           </tr>
         </thead>
         <tbody>
           {classifica.map((r) => (
             <tr key={r.id}>
-              <td className="px-2 py-1 border flex items-center space-x-2">
+              <td className="px-2 py-1 border border-red-200 flex items-center space-x-2 whitespace-nowrap text-left">
                 {r.logo_url && (
-                  <img src={r.logo_url} alt="" className="w-4 h-4 rounded-full" />
+                  <img
+                    src={r.logo_url}
+                    alt=""
+                    className="w-4 h-4 rounded-full"
+                  />
                 )}
                 <span>{r.nome}</span>
               </td>
-              <td className="px-2 py-1 border">{r.PG}</td>
-              <td className="px-2 py-1 border">{r.V}</td>
-              <td className="px-2 py-1 border">{r.N}</td>
-              <td className="px-2 py-1 border">{r.P}</td>
-              <td className="px-2 py-1 border">{r.GF}</td>
-              <td className="px-2 py-1 border">{r.GS}</td>
-              <td className="px-2 py-1 border">{r.DR}</td>
-              <td className="px-2 py-1 border">{r.Pt}</td>
+              <td className="px-2 py-1 border border-red-200">{r.PG}</td>
+              <td className="px-2 py-1 border border-red-200">{r.V}</td>
+              <td className="px-2 py-1 border border-red-200">{r.N}</td>
+              <td className="px-2 py-1 border border-red-200">{r.P}</td>
+              <td className="px-2 py-1 border border-red-200">{r.GF}</td>
+              <td className="px-2 py-1 border border-red-200">{r.GS}</td>
+              <td className="px-2 py-1 border border-red-200">{r.DR}</td>
+              <td className="px-2 py-1 border border-red-200">{r.Pt}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
+      {/* BOTTONI */}
       <div className="flex justify-between print:hidden">
         <button
           onClick={() => navigate(-1)}

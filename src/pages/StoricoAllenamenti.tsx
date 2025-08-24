@@ -144,7 +144,7 @@ export default function StoricoAllenamenti(): JSX.Element {
     const displayDate = dt.toLocaleDateString('it-IT');
 
     return (
-      <div className="min-h-screen px-4">
+      <div className="min-h-screen px-2">
         <h2 className="text-2xl font-semibold mb-4 text-white">
           {dayName}, {displayDate}
         </h2>
@@ -161,18 +161,16 @@ export default function StoricoAllenamenti(): JSX.Element {
                 className="py-3 flex justify-between hover:bg-gray-100 cursor-pointer"
                 onClick={() => onPlayerClick(p.giocatore_id)}
               >
-                <span className="font-medium text-base text-white">
+                <span className="font-medium text-lg text-white">
                   {p.cognome} {p.nome}
                 </span>
                 <span
-                  className={
-                    p.presente
-                      ? 'text-green-600 font-semibold'
-                      : 'text-red-600 font-semibold'
-                  }
-                >
-                  {p.presente ? 'Presente' : 'Assente'}
-                </span>
+  className={`px-2 py-1 rounded bg-white/80 ${
+    p.presente ? "text-green-600" : "text-red-600"
+  } font-semibold`}
+>
+  {p.presente ? "Presente" : "Assente"}
+</span>
               </li>
             ))}
           </ul>

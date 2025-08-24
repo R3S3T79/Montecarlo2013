@@ -156,26 +156,13 @@ export default function VotazioniPartita(): JSX.Element {
   const votoDisabilitato = statoPartita && statoPartita !== 'Giocata';
 
   return (
-    <div className="min-h-screen p-4 sm:p-6">
-      <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-montecarlo p-4 sm:p-6">
+    <div className="min-h-screen p-2 sm:p-2">
+      <div className="max-w-3xl mx-auto bg-white/0 rounded-xl shadow-montecarlo p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           
         </div>
 
-        {statoPartita && (
-          <div className="mb-3 text-sm">
-            Stato partita:{' '}
-            <span
-              className={
-                statoPartita === 'Giocata'
-                  ? 'text-green-600 font-semibold'
-                  : 'text-orange-600 font-semibold'
-              }
-            >
-              {statoPartita}
-            </span>
-          </div>
-        )}
+        
 
         {votoDisabilitato && (
           <div className="mb-4 p-3 rounded bg-yellow-50 text-yellow-800 text-sm">
@@ -195,7 +182,7 @@ export default function VotazioniPartita(): JSX.Element {
               {convocati.map((g) => (
                 <div
                   key={g.giocatore_uid}
-                  className="flex items-center justify-between border rounded-lg px-3 py-2"
+                  className="flex items-center justify-between border rounded-lg px-3 py-2 bg-white/90"
                 >
                   <div className="flex items-center gap-3">
                     {g.foto_url ? (

@@ -7,12 +7,16 @@ import { AuthProvider } from "./context/AuthContext";
 import SidebarLayout from "./components/SidebarLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
+
 // pagine pubbliche
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ConfirmPage from "./pages/ConfirmPage";
 import AuthCallback from "./pages/AuthCallback";
 import UserProfile from './pages/UserProfile';
+import PostAuthSync from "./pages/PostAuthSync";
+import UpdatePassword from "./pages/UpdatePassword";
+import ForgotPassword from "./pages/ForgotPassword";
 
 // pagine utente
 import RosaGiocatori from "./pages/RosaGiocatori";
@@ -82,6 +86,8 @@ import EditSquadra from "./pages/EditSquadra";
 // admin panel
 import AdminPanel from "./pages/AdminPanel";
 import AdminNotizie from "./pages/AdminNotizie"; // <--- aggiungi import
+import NuovoUtente from "./pages/NuovoUtente"; // nuova pagina
+
 
 
 // fallback
@@ -97,7 +103,8 @@ export default function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/confirm" element={<ConfirmPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
-        
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/update-password" element={<UpdatePassword />} />
 
 
         {/* Layout protetto */}
@@ -178,6 +185,11 @@ export default function App() {
           {/* Admin Panel */}
           <Route path="/admin-panel" element={<AdminPanel />} />
           <Route path="/admin-notizie" element={<AdminNotizie />} />
+          <Route path="/nuovo-utente" element={<NuovoUtente />} /> {/* nuova */}
+          <Route path="/post-auth-sync" element={<PostAuthSync />} />
+          
+
+
 
 
           {/* Fallback */}
@@ -187,3 +199,7 @@ export default function App() {
     </AuthProvider>
   );
 }
+
+
+
+

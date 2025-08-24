@@ -247,14 +247,14 @@ export default function Step5_Eliminazione() {
   const totTurni = getNumeroTurni(squadre.length);
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-      <h2 className="text-2xl font-bold text-center border-b pb-2">
+    <div className="max-w-3xl mx-auto px-2 py-6 space-y-6">
+      <h2 className="text-2xl text-white font-bold text-center border-b pb-2">
         {getEtichettaFase(0, totTurni)}
       </h2>
 
       {accoppiamenti.map((m, i) => (
-        <div key={i} className="bg-white rounded-lg shadow p-4">
-          <div className="relative mb-3 h-6 text-sm font-medium text-gray-700">
+        <div key={i} className="bg-white/90 rounded-lg shadow p-4">
+          <div className="relative mb-3 h-6 text-base font-medium text-gray-700">
             <span className="absolute left-0">{squadre.find(s => s.id === m.casa)?.nome}</span>
             <span className="absolute right-0">{squadre.find(s => s.id === m.ospite)?.nome}</span>
             <button
@@ -281,7 +281,7 @@ export default function Step5_Eliminazione() {
         const startIdx = accoppiamenti.length + (accoppiamenti.length / 2) * (round - 1);
         return (
           <div key={round}>
-            <h3 className="text-xl font-semibold text-center mt-6">
+            <h3 className="text-2xl text-white font-semibold text-center mt-6">
               {getEtichettaFase(round, totTurni)}
             </h3>
             {arr.map((d, i) => {
@@ -289,8 +289,8 @@ export default function Step5_Eliminazione() {
               const prev1 = letters[startIdx - (accoppiamenti.length / Math.pow(2, round)) * 2 + 2 * i];
               const prev2 = letters[startIdx - (accoppiamenti.length / Math.pow(2, round)) * 2 + 2 * i + 1];
               return (
-                <div key={i} className="bg-white rounded-lg shadow p-4 mt-2">
-                  <div className="relative mb-3 h-6 text-sm font-medium text-gray-700">
+                <div key={i} className="bg-white/90 rounded-lg shadow p-4 mt-2">
+                  <div className="relative mb-3 h-6 text-base font-medium text-gray-700">
                     <span className="absolute left-0">Vincitrice {prev1}</span>
                     <span className="absolute right-0">Vincitrice {prev2}</span>
                     <div className="absolute inset-y-0 left-1/2 transform -translate-x-1/2">

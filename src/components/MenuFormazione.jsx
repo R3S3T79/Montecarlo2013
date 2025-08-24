@@ -76,7 +76,7 @@ export default function MenuFormazione() {
   if (loading) return <div className="p-4 text-center">Caricamento…</div>;
 
   return (
-    <div className="p-4 max-w-xl mx-auto">
+    <div className="container mx-auto px-2">
       <h2 className="text-xl font-bold mb-4 text-center">Seleziona Formazione</h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6">

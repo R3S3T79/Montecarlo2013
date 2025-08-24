@@ -103,50 +103,51 @@ export default function Allenamenti(): JSX.Element {
   const colBg = ['bg-red-50', 'bg-white', 'bg-red-50', 'bg-white'];
 
   return (
-    <div className="min-h-screen px-4 pb-6">
-      {rows.length === 0 ? (
-        <div className="text-center text-gray-500 italic">
-          Nessun giocatore trovato per la stagione attuale.
-        </div>
-      ) : (
-        <div className="w-full">
-          <div className="bg-white rounded-xl shadow-montecarlo p-6 overflow-x-auto">
-            <table className="table-auto w-full border-separate" style={{ borderSpacing: 0 }}>
-              <thead className="bg-gradient-to-br from-[#d61f1f] to-[#f45e5e]">
-                <tr>
-                  <th className={`px-4 py-3 text-left text-red-600 uppercase ${colBg[0]}`}>Giocatore</th>
-                  <th className={`px-4 py-3 text-center text-red-600 uppercase ${colBg[1]}`}>All.</th>
-                  <th className={`px-4 py-3 text-center text-red-600 uppercase ${colBg[2]}`}>Pres.</th>
-                  <th className={`px-4 py-3 text-center text-red-600 uppercase ${colBg[3]}`}>Ass.</th>
-                </tr>
-              </thead>
-              <tbody>
-  {rows.map((r, idx) => (
-    <tr
-      key={r.record_id}
-      onClick={() => navigate(`/allenamenti/${r.giocatore_uid}`)}
-      className="cursor-pointer hover:bg-red-50 transition-colors duration-200"
-    >
-      <td className="px-4 py-2 text-gray-800 bg-red-50 border-b border-gray-300">
-        {r.cognome} {r.nome}
-      </td>
-      <td className="px-4 py-2 text-center text-gray-800 bg-white border-b border-gray-300">
-        {r.totaleAll}
-      </td>
-      <td className="px-4 py-2 text-center text-gray-800 bg-red-50 border-b border-gray-300">
-        {r.presenze}
-      </td>
-      <td className="px-4 py-2 text-center text-gray-800 bg-white border-b border-gray-300">
-        {r.assenze}
-      </td>
-    </tr>
-  ))}
-</tbody>
+  <div className="min-h-screen px-2 pb-2">
+    {rows.length === 0 ? (
+      <div className="text-center text-gray-500 italic">
+        Nessun giocatore trovato per la stagione attuale.
+      </div>
+    ) : (
+      <div className="w-full">
+        {/* ❌ nessun container con bg/padding */}
+        <div className="overflow-x-auto">
+          <table className="table-auto w-full border-separate" style={{ borderSpacing: 0 }}>
+            <thead className="bg-gradient-to-br from-[#d61f1f]/90 to-[#f45e5e]/90">
+              <tr>
+                <th className="px-4 py-3 text-left text-white uppercase">Giocatore</th>
+                <th className="px-4 py-3 text-center text-white uppercase">All.</th>
+                <th className="px-4 py-3 text-center text-white uppercase">Pres.</th>
+                <th className="px-4 py-3 text-center text-white uppercase">Ass.</th>
+              </tr>
+            </thead>
 
-            </table>
-          </div>
+            <tbody>
+              {rows.map((r, idx) => {
+                // 🎯 riga semitrasparente (alternata)
+                const rowBg = idx % 2 === 0 ? 'bg-white/90' : 'bg-white/85';
+                const rowHover = 'hover:bg-white/80';
+                const cell = `px-4 py-2 text-gray-900 border-b border-white/30 ${rowBg} ${rowHover}`;
+
+                return (
+                  <tr
+                    key={r.record_id}
+                    onClick={() => navigate(`/allenamenti/${r.giocatore_uid}`)}
+                    className="cursor-pointer transition-colors duration-200"
+                  >
+                    <td className={cell}>{r.cognome} {r.nome}</td>
+                    <td className={`${cell} text-center`}>{r.totaleAll}</td>
+                    <td className={`${cell} text-center`}>{r.presenze}</td>
+                    <td className={`${cell} text-center`}>{r.assenze}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-      )}
-    </div>
-  );
+      </div>
+    )}
+  </div>
+);
+
 }

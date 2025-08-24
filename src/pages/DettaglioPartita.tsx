@@ -15,6 +15,7 @@ interface MarcatoriEntry {
 interface SquadraInfo {
   id: string
   nome: string
+  logo_url?: string | null
 }
 
 interface PartitaDettaglio {
@@ -81,8 +82,8 @@ export default function DettaglioPartita() {
           data_ora,
           goal_a1, goal_a2, goal_a3, goal_a4,
           goal_b1, goal_b2, goal_b3, goal_b4,
-          casa: squadra_casa_id ( id, nome ),
-          ospite: squadra_ospite_id ( id, nome )
+          casa: squadra_casa_id ( id, nome, logo_url ),
+          ospite: squadra_ospite_id ( id, nome, logo_url )
         `)
         .eq('id', id)
         .single()
@@ -172,7 +173,7 @@ export default function DettaglioPartita() {
       partita.marcatori.filter(m => m.periodo === t)
 
     return (
-      <div className="bg-white rounded-lg shadow-montecarlo overflow-hidden">
+      <div className="bg-white/90 rounded-lg shadow-montecarlo overflow-hidden">
         <div
           className={`p-4 flex items-center justify-between ${
             isMonte
@@ -180,13 +181,22 @@ export default function DettaglioPartita() {
               : 'bg-montecarlo-gray-50 border border-montecarlo-gray-200'
           }`}
         >
-          <span
-            className={`font-bold text-lg ${
-              isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'
-            }`}
-          >
-            {squadra.nome}
-          </span>
+          <div className="flex items-center gap-2">
+            {squadra.logo_url && (
+              <img
+                src={squadra.logo_url}
+                alt={squadra.nome}
+                className="w-8 h-8 object-contain"
+              />
+            )}
+            <span
+              className={`font-bold text-lg ${
+                isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'
+              }`}
+            >
+              {squadra.nome}
+            </span>
+          </div>
           <span
             className={`font-bold text-2xl ${
               isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'
@@ -228,14 +238,14 @@ export default function DettaglioPartita() {
         </div>
       </div>
     )
-  }
+  };
 
   return (
-    <div className="min-h-screen px-4 pb-6">
+    <div className="min-h-screen px-2 pb-2">
       <div className="max-w-md mx-auto text-xl" ref={containerRef}>
-        <div className="bg-white rounded-xl shadow-montecarlo -mt-2">
+        <div className="bg-white/20 rounded-xl shadow-montecarlo -mt-2">
           {/* header: solo data */}
-          <div className="bg-montecarlo-red-50 border-l-4 border-montecarlo-secondary flex justify-end px-6 py-4 rounded-t-xl">
+          <div className="bg-montecarlo-red-10/20 border-l-4 border-montecarlo-secondary flex justify-end px-6 py-4 rounded-t-xl">
             <span className="bg-montecarlo-accent text-montecarlo-secondary px-3 py-1 rounded-full text-sm font-medium shadow-gold">
               {dataFormatted}
             </span>

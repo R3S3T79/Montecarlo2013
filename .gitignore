@@ -19,3 +19,7 @@ pnpm-lock.yaml
 
 # cartelle strumenti
 .netlify/
+
+# funzioni/debug locali da NON pushare
+netlify/functions/reset-auth-role.ts
+src/pages/DebugRole.tsx

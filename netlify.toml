@@ -1,23 +1,23 @@
-# netlify.toml
-
 [build]
-  command   = "npm run build"
-  publish   = "dist"
+  command = "npm run build"
+  publish = "dist"
   functions = "netlify/functions"
 
-[build.environment]
-  # Questo disattiva il rilevamento di chiavi sensibili nel bundle
-  SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,SENDGRID_API_KEY"
+[dev]
+  framework = "vite"
+  targetPort = 5173
+  port = 8888
+  envFiles = [".env"]  # <-- carica .env in netlify dev
 
-# 1) Instrada tutte le chiamate /api/* verso le Netlify Functions
+# Redirect API -> Functions (vale sia in dev che in prod)
 [[redirects]]
-  from   = "/api/*"
-  to     = "/.netlify/functions/:splat"
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
   status = 200
-  force  = true
+  force = true
 
-# 2) Catch-all per la tua Single Page App (serve index.html su ogni URL non /api)
+# SPA fallback
 [[redirects]]
-  from   = "/*"
-  to     = "/index.html"
+  from = "/*"
+  to = "/index.html"
   status = 200

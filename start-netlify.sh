@@ -1,0 +1,13 @@
+#!/bin/bash
+# Aggiunge Node al PATH
+export PATH=$PATH:/d/Progetto/node-v22.17.1-win-x64/node-v22.17.1-win-x64
+
+# Vai nella cartella del progetto
+cd /d/Progetto/Montecarlo2013 || exit
+
+# Avvia Netlify Dev
+npx netlify dev -- --host=0.0.0.0
+
+# Mantieni aperto quando termina
+echo "Server terminato. Premi INVIO per chiudere..."
+read

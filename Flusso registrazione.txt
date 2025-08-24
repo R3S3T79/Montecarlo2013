@@ -1,0 +1,47 @@
+[ Utente compila form registrazione ]
+          |
+          v
+┌──────────────────────────────┐
+│ register.ts                  │
+│ - Crea riga in pending_users │
+│   (email, username, role,    │
+│    password temporanea)      │
+└──────────────────────────────┘
+          |
+          v
+[ Mail di conferma → link ]
+          |
+          v
+┌──────────────────────────────┐
+│ confirm.ts                   │
+│ - Segna confirmed=true        │
+│ - Se già in auth.users,       │
+│   aggiorna metadata (ruolo)   │
+└──────────────────────────────┘
+          |
+          v
+[ Admin approva utente ]
+          |
+          v
+┌──────────────────────────────┐
+│ approve-user.ts              │
+│ - Segna approved=true in DB  │
+│ - Se non esiste in auth,     │
+│   crea utente in auth.users  │
+│   con email e password       │
+│ - Manda link INVITE Supabase │
+│   → redirect /post-auth-sync │
+└──────────────────────────────┘
+          |
+          v
+[ Utente clicca link invito ]
+          |
+          v
+┌──────────────────────────────┐
+│ post-auth-sync               │
+│ - Completa login (Supabase)  │
+│ - Sincronizza stato UI       │
+└──────────────────────────────┘
+          |
+          v
+✅ Utente entra normalmente con email + password

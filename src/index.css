@@ -11,11 +11,15 @@ html, body, #root {
   margin: 0;
 }
 
-/* Sfondo solo a schermo (non in stampa) */
+/* ===== Sfondo solo a schermo (non in stampa) ===== */
 @media screen {
+  html, body, #root { 
+    min-height: 100%; 
+  }
+
   body {
-    background: linear-gradient(180deg, #6b7280 0%, #e5e7eb 100%);
-    background-attachment: fixed;
+    background: url("/Sfondo.png") no-repeat center center fixed !important;
+    background-size: cover !important;
   }
 }
 

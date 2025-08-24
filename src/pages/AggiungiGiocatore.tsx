@@ -188,8 +188,8 @@ const giocatoreId = inserted.id;
 
   return (
     <div className="min-h-screen">
-      <div className="container mx-auto px-4 max-w-md">
-        <div className="bg-white rounded-2xl shadow-montecarlo p-6 space-y-5">
+      <div className="container mx-auto px-2 pt-2 max-w-md">
+        <div className="bg-white/95 rounded-2xl shadow-montecarlo p-6 space-y-5">
           {/* Anteprima immagine */}
           <div className="flex justify-center mb-4">
             {previewUrl ? (

@@ -534,12 +534,12 @@ const fbPluginSrc = useMemo(() => {
       transform: "translateY(-50%)",
       display: "flex",
       flexDirection: "column",
-      gap: "8px",
+      gap: "4px",
       zIndex: 1
     }}>
-      <div style={{ height: "6px", backgroundColor: "red" }}></div>
-      <div style={{ height: "6px", backgroundColor: "red" }}></div>
-      <div style={{ height: "6px", backgroundColor: "red" }}></div>
+      <div style={{ height: "4px", backgroundColor: "red" }}></div>
+      <div style={{ height: "4px", backgroundColor: "red" }}></div>
+      <div style={{ height: "4px", backgroundColor: "red" }}></div>
     </div>
 
     {/* Logo + Titolo sopra */}
@@ -561,8 +561,11 @@ const fbPluginSrc = useMemo(() => {
       <div
         ref={newsTrackRef}
         style={styles.marqueeTrack}
-        className="marqueeTrack"   // <--- aggiunta qui
-      >
+        onMouseEnter={() => newsTrackRef.current?.classList.add("paused")}
+  onMouseLeave={() => newsTrackRef.current?.classList.remove("paused")}
+  onTouchStart={() => newsTrackRef.current?.classList.add("paused")}
+  onTouchEnd={() => newsTrackRef.current?.classList.remove("paused")}
+>
         {marqueeLoop.map((n, idx) => (
           <span
             key={idx}
@@ -613,13 +616,23 @@ const fbPluginSrc = useMemo(() => {
               </div>
             </div>
 
-            <div style={styles.birthdayNames}>
-              {nextBirthday.players.map((p) => (
-                <div key={p.uid} style={styles.playerName}>
-                  {(p.cognome || "").trim()} {(p.nome || "").trim()}
-                </div>
-              ))}
-            </div>
+            {/* Lista giocatori festeggiati */}
+<div style={styles.birthdayNames}>
+  {nextBirthday.players.map((p) => (
+    <div key={p.uid} style={styles.birthdayPlayerBox}>
+      {p.foto_url && (
+        <img
+          src={p.foto_url}
+          alt={`${p.nome} ${p.cognome}`}
+          style={styles.birthdayPhoto}
+        />
+      )}
+      <div style={styles.playerName}>
+        {(p.cognome || "").trim()} {(p.nome || "").trim()}
+      </div>
+    </div>
+  ))}
+</div>
           </div>
         ) : (
           <div style={styles.birthdayRow}>
@@ -880,10 +893,26 @@ const styles: Record<string, React.CSSProperties> = {
   page: {
     maxWidth: 980,
     margin: "0 auto",
-    padding: "16px",
+    padding: "8px",
+    paddingTop: 0,
     fontFamily:
       "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
   },
+
+birthdayPlayerBox: {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  marginBottom: 8,
+},
+birthdayPhoto: {
+  width: 48,
+  height: 48,
+  borderRadius: "50%",
+  objectFit: "cover",
+  border: "2px solid #eee",
+},
+
 
   // HERO
   header: {
@@ -908,10 +937,10 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: 0.3,
   },
 
-  // Cards
+   // Cards
   card: {
-    background: "#ffffff",
-    border: "1px solid #e8e8e8",
+    background: "rgba(255,255,255,0.8)",   // bianco semitrasparente 90%
+    border: "2px solid #e8e8e8",           // bordo più spesso
     borderRadius: 12,
     padding: 14,
     marginBottom: 14,
@@ -936,14 +965,14 @@ const styles: Record<string, React.CSSProperties> = {
     height: 40, // più alto
   },
   marqueeTrack: {
-  position: "absolute",
-  whiteSpace: "nowrap",
-  willChange: "transform",
-  animation: "scrollLeft 20s linear infinite",
-  height: "40px",
-  display: "flex",
-  alignItems: "center",
-},
+    position: "absolute",
+    whiteSpace: "nowrap",
+    willChange: "transform",
+    animation: "scrollLeft 20s linear infinite",
+    height: "40px",
+    display: "flex",
+    alignItems: "center",
+  },
   newsItem: { marginRight: 24, fontSize: 18 }, // testo più grande
   dot: { marginRight: 24, opacity: 0.5, fontSize: 18 },
 
@@ -1122,9 +1151,8 @@ if (!styleEl) {
 }
 
 /* pausa marquee quando utente tiene sopra il cursore o seleziona */
-.marqueeTrack:hover {
-  animation-play-state: paused;
-}
+.marqueeTrack:hover { animation-play-state: paused; }
+.marqueeTrack.paused { animation-play-state: paused; }
 `;
   document.head.appendChild(s);
 }

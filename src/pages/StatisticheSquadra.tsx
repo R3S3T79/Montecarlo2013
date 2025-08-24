@@ -176,10 +176,10 @@ export default function StatisticheSquadra() {
   }, [stagioneSelezionata, montecarloId]);
 
   return (
-    <div className="min-h-screen px-4 md:px-8">
+    <div className="min-h-screen px-2 md:px-8">
       <div className="container mx-auto flex flex-col md:flex-row gap-6">
         {/* Left: tabella statistiche */}
-        <div className="bg-white rounded-xl shadow-montecarlo flex-1 p-6 md:p-8">
+        <div className="bg-white/90 rounded-xl shadow-montecarlo flex-1 p-6 md:p-8">
           <select
             value={stagioneSelezionata}
             onChange={e => setStagioneSelezionata(e.target.value)}
@@ -252,7 +252,7 @@ export default function StatisticheSquadra() {
         {/* Right: record match */}
         <div className="flex-1 md:w-1/3 space-y-4">
           {matchMaxFatti && (
-            <div className="bg-white p-4 md:p-6 rounded-xl shadow-montecarlo">
+            <div className="bg-white/90 p-4 md:p-6 rounded-xl shadow-montecarlo">
               <h3 className="font-semibold text-montecarlo-secondary mb-1">Massimo Gol Fatti</h3>
               <p className="text-gray-900">
                 {matchMaxFatti.casa.nome} {matchMaxFatti.goal_a} - {matchMaxFatti.goal_b} {matchMaxFatti.ospite.nome}
@@ -260,7 +260,7 @@ export default function StatisticheSquadra() {
             </div>
           )}
           {matchMaxSubiti && (
-            <div className="bg-white p-4 md:p-6 rounded-xl shadow-montecarlo">
+            <div className="bg-white/90 p-4 md:p-6 rounded-xl shadow-montecarlo">
               <h3 className="font-semibold text-montecarlo-secondary mb-1">Massimo Gol Subiti</h3>
               <p className="text-gray-900">
                 {matchMaxSubiti.casa.nome} {matchMaxSubiti.goal_a} - {matchMaxSubiti.goal_b} {matchMaxSubiti.ospite.nome}
@@ -268,7 +268,7 @@ export default function StatisticheSquadra() {
             </div>
           )}
           {matchMaxDifferenza && (
-            <div className="bg-white p-4 md:p-6 rounded-xl shadow-montecarlo">
+            <div className="bg-white/90 p-4 md:p-6 rounded-xl shadow-montecarlo">
               <h3 className="font-semibold text-montecarlo-secondary mb-1">Maggior Differenza Reti</h3>
               <p className="text-gray-900">
                 {matchMaxDifferenza.casa.nome} {matchMaxDifferenza.goal_a} - {matchMaxDifferenza.goal_b} {matchMaxDifferenza.ospite.nome}

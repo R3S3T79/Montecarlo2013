@@ -250,7 +250,7 @@ export default function EditGiocatore() {
   const handleAnnulla = () => navigate('/rosa');
 
   return (
-    <div className="max-w-md mx-auto bg-white p-6 rounded-lg shadow-md">
+    <div className="bg-white/90 max-w-md mx-auto bg-white p-6 rounded-lg shadow-md">
       {/* Nome */}
       <label className="block font-medium">Nome</label>
       <input
@@ -310,10 +310,10 @@ export default function EditGiocatore() {
           onChange={handleFileChange}
           className="hidden"
         />
-        <label className="bg-green-600 text-white px-4 py-2 rounded cursor-pointer">
-          <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-          Carica File
-        </label>
+        <label className="bg-green-600 text-white px-4 py-2 rounded cursor-pointer flex items-center justify-center">
+  <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+  Carica File
+</label>
         {fotoUrl && <img src={fotoUrl} alt="anteprima" className="w-16 h-16 rounded-full" />}
       </div>
 
@@ -334,13 +334,13 @@ export default function EditGiocatore() {
 
       {/* Azioni */}
       <div className="flex justify-between">
-        <button onClick={handleSubmit} className="bg-red-600 text-white px-4 py-2 rounded">
-          {isNew ? 'Crea' : 'Aggiorna'}
-        </button>
-        <button onClick={handleAnnulla} className="bg-gray-400 text-white px-4 py-2 rounded">
-          Annulla
-        </button>
-      </div>
+  <button onClick={handleAnnulla} className="bg-gray-400 text-white px-4 py-2 rounded">
+    Annulla
+  </button>
+  <button onClick={handleSubmit} className="bg-red-600 text-white px-4 py-2 rounded">
+    {isNew ? 'Crea' : 'Aggiorna'}
+  </button>
+</div>
     </div>
   );
 }

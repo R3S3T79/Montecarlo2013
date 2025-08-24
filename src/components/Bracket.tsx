@@ -116,7 +116,7 @@ export default function Bracket({ teams, matches, onEditResult }: BracketProps) 
     <div className="p-4">
       <div className="overflow-x-auto overflow-y-hidden">
         <div className="flex justify-center min-w-max">
-          <svg width={size.width} height={size.height} className="bg-gray-50 p-6 rounded border">
+          <svg width={size.width} height={size.height} className="bg-white/80 p-6 rounded border">
             <defs>
               <linearGradient id="matchGradient" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0%" stopColor="#e0f7ff" />

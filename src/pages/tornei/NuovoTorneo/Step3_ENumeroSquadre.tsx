@@ -43,7 +43,7 @@ export default function Step3_ENumeroSquadre() {
   };
 
   return (
-    <div className="max-w-md mx-auto mt-10 px-4 py-6 bg-white rounded-lg shadow space-y-6">
+    <div className="max-w-md mx-auto mt-10 px-4 py-6 bg-white/90 rounded-lg shadow space-y-6">
      
 
       <div className="grid grid-cols-2 gap-4 pt-2">

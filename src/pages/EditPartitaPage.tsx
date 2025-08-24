@@ -124,8 +124,8 @@ export default function EditPartitaPage() {
   }
 
   return (
-    <div className="min-h-screen pt-10 px-4 pb-6">
-      <div className="max-w-lg mx-auto bg-white rounded-2xl shadow-montecarlo p-6">
+    <div className="min-h-screen pt-2 px-2 pb-6">
+      <div className="p-4 sm:p-6 bg-white/90 rounded-lg">
         
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
