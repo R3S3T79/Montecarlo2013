@@ -61,8 +61,8 @@ export default function Calendario(): JSX.Element {
   }
 
   return (
-    <div className="min-h-screen">
-      <div className="container mx-auto px-4 py-6">
+    <div className="min-h-screen pt-2 pb-2 ">
+      <div className="container mx-auto px-2 ">
 
         {/* Contenuto Partite */}
         {loading ? (
@@ -100,7 +100,7 @@ export default function Calendario(): JSX.Element {
                 </div>
 
                 {/* Corpo cella con squadre */}
-                <div className="bg-white rounded-b-lg shadow-montecarlo hover:shadow-montecarlo-lg border-l-4 border-montecarlo-secondary p-4 space-y-2">
+                <div className="bg-white rounded-b-lg shadow-montecarlo hover:shadow-montecarlo-lg border-l-4 border-montecarlo-secondary p-4 space-y-2 bg-white/90 rounded-lg">
                   <div className="flex items-center justify-start space-x-3">
                     {partita.casa.logo_url ? (
                       <img

@@ -173,14 +173,14 @@ export default function DettaglioGiocatore() {
 
   return (
     <div className="min-h-screen">
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto pt-2 px-2 py-6">
         {stagioniDisponibili.length > 0 && (
           <div className="mb-4">
             
             <select
               value={stagioneSelezionata}
               onChange={(e) => setStagioneSelezionata(e.target.value)}
-              className="border rounded px-3 py-2 w-full"
+              className="bg-white/90 border rounded px-3 py-2 w-full"
             >
               {stagioniDisponibili.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -191,7 +191,7 @@ export default function DettaglioGiocatore() {
           </div>
         )}
 
-        <div className="bg-white rounded-xl shadow-montecarlo p-6 flex flex-col items-center">
+        <div className="bg-white/90 rounded-xl shadow-montecarlo p-6 flex flex-col items-center">
           <div className="w-32 h-32 rounded-full bg-gray-200 overflow-hidden mb-4 border-2 border-montecarlo-accent">
             {giocatore.foto_url ? (
               <img

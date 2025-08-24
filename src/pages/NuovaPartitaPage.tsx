@@ -11,7 +11,7 @@ interface Giocatore { id: string; nome: string; cognome: string; }
 
 export default function NuovaPartitaPage() {
   const navigate = useNavigate();
-  const MONTE_ID = '5bca3e07-974a-4d12-9208-d85975906fe4';
+  const MONTE_ID = 'a16a8645-9f86-41d9-a81f-a92931f1cc67';
 
   // stati locali
   const [squadre, setSquadre] = useState<Squadra[]>([]);
@@ -67,13 +67,21 @@ export default function NuovaPartitaPage() {
     })();
   }, [formData.stagione_id]);
 
-  // sposta Montecarlo in cima delle liste
-  const squadreOrd = useMemo(() => {
-    const arr = [...squadre];
-    const idx = arr.findIndex(s => s.id === MONTE_ID);
-    if (idx > -1) arr.unshift(arr.splice(idx, 1)[0]);
-    return arr;
-  }, [squadre]);
+  // sposta Montecarlo in cima e ordina le altre in ordine alfabetico
+const squadreOrd = useMemo(() => {
+  const arr = [...squadre];
+  const idx = arr.findIndex(s => s.id === MONTE_ID);
+
+  // estraggo Montecarlo
+  const monte = idx > -1 ? arr.splice(idx, 1)[0] : null;
+
+  // ordino alfabeticamente le altre
+  arr.sort((a, b) => a.nome.localeCompare(b.nome));
+
+  // reinserisco Montecarlo in cima
+  return monte ? [monte, ...arr] : arr;
+}, [squadre]);
+
 
   // determino se Montecarlo è in casa
   const isMCcasa = formData.squadra_casa_id === MONTE_ID;
@@ -184,7 +192,7 @@ export default function NuovaPartitaPage() {
 
   return (
     <div className="min-h-screen">
-      <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-montecarlo p-8">
+      <div className="max-w-2xl mx-auto bg-white/85 rounded-2xl shadow-montecarlo p-8">
         
 
         <form onSubmit={handleSubmit} className="space-y-6">

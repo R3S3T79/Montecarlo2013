@@ -51,7 +51,7 @@ export default function ListaSquadre() {
 
   return (
     <div className="min-h-screen">
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto pt-2 px-2 py-6">
         {/* ➡️ Rimosso l'header interno "Lista Squadre" e il + */}
 
         {/* Griglia di squadre */}
@@ -60,7 +60,7 @@ export default function ListaSquadre() {
             <div
               key={squadra.id}
               onClick={() => navigate(`/squadre/${squadra.id}`)}
-              className="bg-white rounded-xl shadow-montecarlo p-4 cursor-pointer hover:shadow-montecarlo-lg transition-all duration-200 transform hover:scale-[1.02]"
+              className="bg-white/90 rounded-xl shadow-montecarlo p-4 cursor-pointer hover:shadow-montecarlo-lg transition-all duration-200 transform hover:scale-[1.02]"
             >
               <div className="flex items-center space-x-4">
                 <div className="w-16 h-16 flex-shrink-0">

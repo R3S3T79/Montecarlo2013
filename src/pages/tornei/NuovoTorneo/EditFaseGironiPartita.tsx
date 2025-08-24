@@ -115,10 +115,8 @@ export default function EditFaseGironiPartita() {
   const ospite = partita.squadra_ospite;
 
   return (
-    <div className="max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow space-y-6">
-      <h2 className="text-xl font-semibold text-center border-b pb-2 mb-4">
-        Modifica Risultato
-      </h2>
+    <div className="max-w-md mx-auto mt-2 p-6 bg-white/85 rounded-lg shadow space-y-6">
+     
 
       {/* CASA */}
       <div className="text-xs text-gray-500 uppercase mb-1">Casa</div>

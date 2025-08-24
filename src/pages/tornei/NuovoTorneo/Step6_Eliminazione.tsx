@@ -97,7 +97,7 @@ export default function Step6_Eliminazione() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
+    <div className="max-w-7xl mx-auto px-2 py-6 space-y-4">
       
       <div className="overflow-x-auto overflow-y-hidden pb-4">
         <div className="flex flex-col items-center min-w-max pb-6">

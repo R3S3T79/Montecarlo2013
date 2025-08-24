@@ -37,7 +37,7 @@ export default function Step3_FgNumeroSquadre() {
           <button
             key={n}
             onClick={() => handleClick(n)}
-            className="bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition-colors"
+            className="bg-green-500 text-white py-2 rounded-lg hover:bg-green-700 transition-colors"
           >
             {n} squadre
           </button>

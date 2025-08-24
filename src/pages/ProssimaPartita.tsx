@@ -99,99 +99,99 @@ export default function ProssimaPartita() {
         setRoleLoading(false);
         return;
       }
-      const { data } = await supabase.from("pending_users").select("role").eq("email", email).single();
+      const { data } = await supabase
+        .from("pending_users")
+        .select("role")
+        .eq("email", email)
+        .single();
       setRole(data?.role ?? null);
       setRoleLoading(false);
     })();
   }, []);
 
-  // 2) prossima partita + timer associato + scontri precedenti
-  useEffect(() => {
-    const fetchPartita = async () => {
-      setLoading(true);
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const tomorrow = new Date(today);
-      tomorrow.setDate(today.getDate() + 1);
+// 2) prossima partita + timer associato + scontri precedenti
+useEffect(() => {
+  const fetchPartita = async () => {
+    setLoading(true);
 
-      const todayIso = today.toISOString();
-      const tomorrowIso = tomorrow.toISOString();
+    const commonSelect = `
+      id, stagione_id, data_ora, stato,
+      squadra_casa_id, squadra_ospite_id,
+      campionato_torneo, luogo_torneo,
+      goal_a, goal_b,
+      goal_a1, goal_a2, goal_a3, goal_a4,
+      goal_b1, goal_b2, goal_b3, goal_b4,
+      casa:squadra_casa_id(id,nome,logo_url),
+      ospite:squadra_ospite_id(id,nome,logo_url)
+    `;
 
-      let { data } = await supabase
+    // 1) Se c'è una partita IN CORSO, ha precedenza (indipendentemente dall’orario)
+    let { data: inCorso } = await supabase
+      .from("partite")
+      .select(commonSelect)
+      .eq("stato", "InCorso")
+      .order("data_ora", { ascending: true })
+      .limit(1);
+
+    let nextData = inCorso && inCorso.length ? inCorso : null;
+
+    // 2) Altrimenti prendo la prossima DA GIOCARE con data_ora >= adesso
+    if (!nextData) {
+      const nowIso = new Date().toISOString();
+      const { data: future } = await supabase
         .from("partite")
-        .select(`
-          id, stagione_id, data_ora, stato,
-          squadra_casa_id, squadra_ospite_id,
-          campionato_torneo, luogo_torneo,
-          goal_a, goal_b,
-          goal_a1, goal_a2, goal_a3, goal_a4,
-          goal_b1, goal_b2, goal_b3, goal_b4,
-          casa:squadra_casa_id(id,nome,logo_url),
-          ospite:squadra_ospite_id(id,nome,logo_url)
-        `)
-        .in("stato", ["DaGiocare", "InCorso"])
-        .gte("data_ora", todayIso)
-        .lt("data_ora", tomorrowIso)
+        .select(commonSelect)
+        .eq("stato", "DaGiocare")
+        .gte("data_ora", nowIso)
         .order("data_ora", { ascending: true })
         .limit(1);
+      if (future && future.length) nextData = future;
+    }
 
-      if (!data?.length) {
-        ({ data } = await supabase
-          .from("partite")
-          .select(`
-            id, stagione_id, data_ora, stato,
-            squadra_casa_id, squadra_ospite_id,
-            campionato_torneo, luogo_torneo,
-            goal_a, goal_b,
-            goal_a1, goal_a2, goal_a3, goal_a4,
-            goal_b1, goal_b2, goal_b3, goal_b4,
-            casa:squadra_casa_id(id,nome,logo_url),
-            ospite:squadra_ospite_id(id,nome,logo_url)
-          `)
-          .in("stato", ["DaGiocare", "InCorso"])
-          .gte("data_ora", tomorrowIso)
-          .order("data_ora", { ascending: true })
-          .limit(1));
-      }
+    if (nextData?.length) {
+      const next = nextData[0] as PartitaProssima;
+      setPartita(next);
+      setPerTimeCasa([next.goal_a1, next.goal_a2, next.goal_a3, next.goal_a4]);
+      setPerTimeOspite([next.goal_b1, next.goal_b2, next.goal_b3, next.goal_b4]);
 
-      if (data?.length) {
-        const next = data[0] as PartitaProssima;
-        setPartita(next);
-        setPerTimeCasa([next.goal_a1, next.goal_a2, next.goal_a3, next.goal_a4]);
-        setPerTimeOspite([next.goal_b1, next.goal_b2, next.goal_b3, next.goal_b4]);
+      // TIMER
+      const { data: t } = await supabase
+        .from("partita_timer_state")
+        .select("*")
+        .eq("partita_id", next.id)
+        .maybeSingle();
+      if (t) setTimerState(t as TimerState);
 
-        // ---- TIMER: leggo la riga collegata a questa partita (LOG #1) ----
-        const { data: t, error: terr } = await supabase
-          .from("partita_timer_state")
-          .select("*")
-          .eq("partita_id", next.id)
-          .maybeSingle();
+      // PRECEDENTI
+      const { data: prevData } = await supabase
+        .from("partite")
+        .select(`
+          id, data_ora, goal_a, goal_b,
+          casa:squadra_casa_id(nome),
+          ospite:squadra_ospite_id(nome)
+        `)
+        .or(
+          `and(squadra_casa_id.eq.${next.squadra_casa_id},squadra_ospite_id.eq.${next.squadra_ospite_id}),` +
+          `and(squadra_casa_id.eq.${next.squadra_ospite_id},squadra_ospite_id.eq.${next.squadra_casa_id})`
+        )
+        .lt("data_ora", next.data_ora)
+        .order("data_ora", { ascending: false })
+        .limit(5);
 
-        console.log("[ProssimaPartita] timer_select", { partitaId: next.id, row: t, err: terr }); // LOG #1
-        if (t) setTimerState(t as TimerState);
+      setPrecedenti((prevData || []) as ScontroPrecedente[]);
+    } else {
+      // nessuna partita trovata
+      setPartita(null);
+      setPrecedenti([]);
+      setTimerState(null);
+    }
 
-        const { data: prevData } = await supabase
-          .from("partite")
-          .select(`
-            id, data_ora, goal_a, goal_b,
-            casa:squadra_casa_id(nome),
-            ospite:squadra_ospite_id(nome)
-          `)
-          .or(
-            `and(squadra_casa_id.eq.${next.squadra_casa_id},squadra_ospite_id.eq.${next.squadra_ospite_id}),` +
-              `and(squadra_casa_id.eq.${next.squadra_ospite_id},squadra_ospite_id.eq.${next.squadra_casa_id})`
-          )
-          .lt("data_ora", next.data_ora)
-          .order("data_ora", { ascending: false })
-          .limit(5);
+    setLoading(false);
+  };
 
-        setPrecedenti((prevData || []) as ScontroPrecedente[]);
-      }
+  fetchPartita();
+}, []);
 
-      setLoading(false);
-    };
-    fetchPartita();
-  }, []);
 
   // 3) elenco giocatori stagione
   useEffect(() => {
@@ -276,23 +276,35 @@ export default function ProssimaPartita() {
     if (!partita) return;
     const ch2 = supabase
       .channel("realtime-marcatori")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "marcatori", filter: `partita_id=eq.${partita.id}` }, ({ new: row }) => {
-        const n = normalizeMarcatore(row);
-        setMarcatoriLive((prev) => [...prev, n]);
-      })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "marcatori", filter: `partita_id=eq.${partita.id}` }, ({ new: row }) => {
-        const n = normalizeMarcatore(row);
-        setMarcatoriLive((prev) => {
-          const i = prev.findIndex((m) => m.id === n.id);
-          if (i === -1) return [...prev, n];
-          const copy = [...prev];
-          copy[i] = n;
-          return copy;
-        });
-      })
-      .on("postgres_changes", { event: "DELETE", schema: "public", table: "marcatori", filter: `partita_id=eq.${partita.id}` }, ({ old }) => {
-        setMarcatoriLive((prev) => prev.filter((m) => m.id !== old.id));
-      })
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "marcatori", filter: `partita_id=eq.${partita.id}` },
+        ({ new: row }) => {
+          const n = normalizeMarcatore(row);
+          setMarcatoriLive((prev) => [...prev, n]);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "marcatori", filter: `partita_id=eq.${partita.id}` },
+        ({ new: row }) => {
+          const n = normalizeMarcatore(row);
+          setMarcatoriLive((prev) => {
+            const i = prev.findIndex((m) => m.id === n.id);
+            if (i === -1) return [...prev, n];
+            const copy = [...prev];
+            copy[i] = n;
+            return copy;
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "marcatori", filter: `partita_id=eq.${partita.id}` },
+        ({ old }) => {
+          setMarcatoriLive((prev) => prev.filter((m) => m.id !== old.id));
+        }
+      )
       .subscribe();
     return () => supabase.removeChannel(ch2);
   }, [partita]);
@@ -313,7 +325,6 @@ export default function ProssimaPartita() {
     };
 
     (async () => {
-      // realtime
       ch = supabase
         .channel(`realtime-timer-${partita.id}`)
         .on(
@@ -323,7 +334,6 @@ export default function ProssimaPartita() {
         )
         .subscribe();
 
-      // poll di sicurezza
       poll = setInterval(fetchTimer, 2000);
     })();
 
@@ -352,11 +362,10 @@ export default function ProssimaPartita() {
     return () => clearInterval(interval);
   }, [timerState]);
 
-  // 9) remaining sec (LOG #2)
+  // 9) remaining sec
   useEffect(() => {
     const durationMin = timerState?.timer_duration_min ?? 20;
     const remaining = Math.floor(durationMin * 60) - Math.floor((elapsedMs || 0) / 1000);
-    console.log("[ProssimaPartita] remaining", { id: timerState?.partita_id, status: timerState?.timer_status, remaining }); // LOG #2
     setTotalSeconds(remaining);
   }, [elapsedMs, timerState]);
 
@@ -367,15 +376,15 @@ export default function ProssimaPartita() {
   const formatOra = (d: string) => new Date(d).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
 
   // Parziali per tempi: sempre usato sotto la squadra che NON è Montecarlo
-const renderParziali = (vals: number[]) => (
-  <div className="w-full grid grid-cols-4 text-center text-sm">
-    <div>1°T: {vals[0]}</div>
-    <div>2°T: {vals[1]}</div>
-    <div>3°T: {vals[2]}</div>
-    <div>4°T: {vals[3]}</div>
-  </div>
-);
-  
+  const renderParziali = (vals: number[]) => (
+    <div className="w-full grid grid-cols-4 text-center text-sm">
+      <div>1°T: {vals[0]}</div>
+      <div>2°T: {vals[1]}</div>
+      <div>3°T: {vals[2]}</div>
+      <div>4°T: {vals[3]}</div>
+    </div>
+  );
+
   // SOLO marcatori di Montecarlo
   const mcMarcatoriByPeriodo = useMemo(() => {
     const map: Record<number, Marcatore[]> = {};
@@ -388,6 +397,9 @@ const renderParziali = (vals: number[]) => (
     return map;
   }, [marcatoriLive]);
 
+  // ===== FIX: calcolo canEdit PRIMA dell'early return su !partita =====
+  const canEdit = role === "admin" || role === "creator";
+
   if (loading || roleLoading) {
     return (
       <div className="min-h-screen">
@@ -399,31 +411,30 @@ const renderParziali = (vals: number[]) => (
   }
 
   if (!partita) {
-  return (
-    <div className="min-h-screen">
-      <div className="container mx-auto px-4 pt-10">   {/* ⬅ aggiunto container + padding */}
-        <div className="bg-white p-8 rounded-xl shadow-montecarlo text-center">
-          <Calendar className="mx-auto text-montecarlo-neutral mb-4" size={48} />
-          <h2 className="text-xl font-bold text-montecarlo-secondary mb-4">
-            Nessuna partita programmata
-          </h2>
-          <p className="text-montecarlo-neutral mb-6">
-            Non ci sono partite in programma al momento.
-          </p>
-          <button
-            onClick={handleCrea}
-            className="bg-gradient-montecarlo text-white px-6 py-3 rounded-lg flex items-center mx-auto hover:scale-105 transition"
-          >
-            <Plus className="mr-2" size={20} /> Crea Nuova Partita
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+    return (
 
+        <div className="container mx-auto px-2">
+          
+            <Calendar className="mx-auto text-montecarlo-neutral mb-4" size={48} />
+            <h2 className="text-xl font-bold text-montecarlo-secondary mb-4">
+              Nessuna partita programmata
+            </h2>
+            <p className="text-montecarlo-neutral mb-6">
+              Non ci sono partite in programma al momento.
+            </p>
+            {canEdit && (
+              <button
+                onClick={handleCrea}
+                className="bg-gradient-montecarlo text-white px-6 py-3 rounded-lg flex items-center mx-auto hover:scale-105 transition"
+              >
+                <Plus className="mr-2" size={20} /> Crea Nuova Partita
+              </button>
+            )}
+          </div>
+      
+    );
+  }
 
-  const canEdit = role === "admin" || role === "creator";
   const isMontecarloCasa = partita.casa.id === MONTECARLO_ID;
   const isMontecarloOspite = partita.ospite.id === MONTECARLO_ID;
 
@@ -442,11 +453,11 @@ const renderParziali = (vals: number[]) => (
   const timerClass = timerIsNegative ? "border-red-500 text-red-500" : "border-green-500 text-green-500";
 
   return (
-    <div className="min-h-screen">
-      <div className="container mx-auto px-4 pt-10">
-        <div className="max-w-md mx-auto space-y-6">
+    
+      <div className="container mx-auto px-2">
+        <div className="max-w-md mx-auto space-y-6 ">
           {/* Card prossima partita */}
-          <div className="bg-white rounded-xl shadow-montecarlo overflow-hidden">
+          <div className="bg-white/90 rounded-xl shadow-montecarlo overflow-hidden">
             <div className="bg-montecarlo-red-50 p-4 border-l-4 border-montecarlo-secondary">
               <div className="flex justify-center items-center space-x-4 text-montecarlo-secondary">
                 <div className="flex items-center">
@@ -502,23 +513,22 @@ const renderParziali = (vals: number[]) => (
                   </span>
                 </div>
 
-                {isMontecarloCasa
-  ? (
-      <div className="w-full grid grid-cols-2 gap-4">
-        {Object.entries(mcMarcatoriByPeriodo).map(([periodo, lista]) => (
-          <div key={periodo} className="text-sm">
-            <h4 className="font-medium">{`${periodo}° Tempo`}</h4>
-            <ul className="list-disc list-inside">
-              {lista.map((m) => (
-                <li key={m.id}>{renderNomeMarcatore(m)}</li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-    )
-  : renderParziali(perTimeCasa)}
-
+                {isMontecarloCasa ? (
+                  <div className="w-full grid grid-cols-2 gap-4">
+                    {Object.entries(mcMarcatoriByPeriodo).map(([periodo, lista]) => (
+                      <div key={periodo} className="text-sm">
+                        <h4 className="font-medium">{`${periodo}° Tempo`}</h4>
+                        <ul className="list-disc list-inside">
+                          {lista.map((m) => (
+                            <li key={m.id}>{renderNomeMarcatore(m)}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  renderParziali(perTimeCasa)
+                )}
               </div>
 
               {/* VS + timer */}
@@ -578,23 +588,22 @@ const renderParziali = (vals: number[]) => (
                   </span>
                 </div>
 
-                {isMontecarloOspite
-  ? (
-      <div className="w-full grid grid-cols-2 gap-4">
-        {Object.entries(mcMarcatoriByPeriodo).map(([periodo, lista]) => (
-          <div key={periodo} className="text-sm">
-            <h4 className="font-medium">{`${periodo}° Tempo`}</h4>
-            <ul className="list-disc list-inside">
-              {lista.map((m) => (
-                <li key={m.id}>{renderNomeMarcatore(m)}</li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-    )
-  : renderParziali(perTimeOspite)}
-
+                {isMontecarloOspite ? (
+                  <div className="w-full grid grid-cols-2 gap-4">
+                    {Object.entries(mcMarcatoriByPeriodo).map(([periodo, lista]) => (
+                      <div key={periodo} className="text-sm">
+                        <h4 className="font-medium">{`${periodo}° Tempo`}</h4>
+                        <ul className="list-disc list-inside">
+                          {lista.map((m) => (
+                            <li key={m.id}>{renderNomeMarcatore(m)}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  renderParziali(perTimeOspite)
+                )}
               </div>
 
               {/* Pulsanti */}
@@ -612,7 +621,7 @@ const renderParziali = (vals: number[]) => (
 
           {/* Scontri precedenti */}
           {precedenti.length > 0 && (
-            <div className="bg-white rounded-xl shadow-montecarlo p-6">
+            <div className="bg-white/90 rounded-xl shadow-montecarlo p-6">
               <h3 className="text-lg font-bold mb-4">Scontri precedenti</h3>
               <ul className="space-y-3">
                 {precedenti.map((p) => (
@@ -628,6 +637,6 @@ const renderParziali = (vals: number[]) => (
           )}
         </div>
       </div>
-    </div>
+   
   );
 }

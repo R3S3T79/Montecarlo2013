@@ -90,11 +90,11 @@ export default function RosaGiocatori(): JSX.Element {
 
   return (
     <div className="min-h-screen">
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto pt-2 px-4 py-6">
         {/* Selettore stagione */}
         <div className="mb-4">
           <select
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
+            className="bg-white/90 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
             value={stagioneSelezionata || ''}
             onChange={(e) => setStagioneSelezionata(e.target.value)}
           >
@@ -114,7 +114,7 @@ export default function RosaGiocatori(): JSX.Element {
               <div
                 key={g.giocatore_uid}
                 onClick={() => navigate(`/giocatore/${g.giocatore_uid}`)}
-                className="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-lg transition"
+                className="bg-white/90 rounded-lg shadow p-4 cursor-pointer hover:shadow-lg transition"
               >
                 <div className="flex items-center space-x-3">
                   <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-montecarlo-accent">

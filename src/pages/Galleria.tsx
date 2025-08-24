@@ -222,7 +222,7 @@ export default function Galleria(): JSX.Element {
 
   // ======= RENDER =======
   return (
-    <div style={{ padding: 20 }}>
+    <div className="min-h-screen mt-2 px-2 pb-6">
       <h1 style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span role="img" aria-label="camera">
           

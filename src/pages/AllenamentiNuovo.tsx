@@ -71,7 +71,6 @@ export default function AllenamentiNuovo(): JSX.Element {
       if (!selectedSeasonId) return;
       setLoading(true);
 
-      // Uso della view con id reale del giocatore
       const { data: gsData, error: gsError } = await supabase
         .from('v_giocatori_stagioni')
         .select('giocatore_id, nome, cognome')
@@ -87,7 +86,7 @@ export default function AllenamentiNuovo(): JSX.Element {
       }
 
       const list = gsData.map(r => ({
-        id: r.giocatore_id,   // id vero della tabella giocatori
+        id: r.giocatore_id,
         nome: r.nome,
         cognome: r.cognome
       }));
@@ -108,7 +107,7 @@ export default function AllenamentiNuovo(): JSX.Element {
 
   const handleSave = async () => {
     const records = players.map(p => ({
-      giocatore_uid: p.id,   // colonna corretta della tabella allenamenti
+      giocatore_uid: p.id,
       data_allenamento: date,
       presente: selections[p.id] === true,
       stagione_id: selectedSeasonId
@@ -128,82 +127,83 @@ export default function AllenamentiNuovo(): JSX.Element {
   }
 
   return (
-    <div className="min-h-screen px-4">
-      {/* Selettore giorno, data e stagione */}
-      <div className="mb-6 text-center">
-        <div className="inline-flex items-center space-x-4">
-          <span className="text-lg text-white font-semibold">{selectedDayName}</span>
-          <input
-            type="date"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            className="rounded-md bg-white border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-          />
-          <select
-            value={selectedSeasonId}
-            onChange={e => setSelectedSeasonId(e.target.value)}
-            className="rounded-md bg-white border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-          >
-            {seasons.map(s => (
-              <option key={s.id} value={s.id}>
-                {s.nome}
-              </option>
-            ))}
-          </select>
+    <div className="min-h-screen px-2 py-4">
+      <div className="max-w-2xl mx-auto bg-white/60 rounded-lg shadow p-6">
+        {/* Selettore giorno, data e stagione */}
+        <div className="mb-6 text-center">
+          <div className="inline-flex items-center space-x-4">
+            <span className="text-lg text-gray-800 font-semibold">{selectedDayName}</span>
+            <input
+              type="date"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              className="rounded-md bg-white border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+            />
+            <select
+              value={selectedSeasonId}
+              onChange={e => setSelectedSeasonId(e.target.value)}
+              className="rounded-md bg-white border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+            >
+              {seasons.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.nome}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-      </div>
 
-      {/* Lista giocatori */}
-      <ul className="divide-y divide-gray-200 mb-6">
-        {players.map(p => {
-          const isPresente = selections[p.id];
-          return (
-            <li key={p.id} className="flex items-center justify-between py-3 pr-2">
-              <span className="text-lg text-white pl-3">
-                {p.cognome} {p.nome}
-              </span>
-              {/* Pulsanti verticali */}
-              <div className="flex flex-col space-y-2 pr-2">
-                <button
-                  onClick={() => togglePresenza(p.id, true)}
-                  className={`px-4 py-1 rounded ${
-                    isPresente
-                      ? 'bg-green-600 text-white'
-                      : 'bg-green-200 text-green-800'
-                  }`}
-                >
-                  Presente
-                </button>
-                <button
-                  onClick={() => togglePresenza(p.id, false)}
-                  className={`px-4 py-1 rounded ${
-                    !isPresente
-                      ? 'bg-red-600 text-white'
-                      : 'bg-red-200 text-red-800'
-                  }`}
-                >
-                  Assente
-                </button>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+        {/* Lista giocatori con divisori rossi */}
+        <ul className="divide-y divide-red-400 mb-6">
+          {players.map(p => {
+            const isPresente = selections[p.id];
+            return (
+              <li key={p.id} className="flex items-center justify-between py-3 px-2">
+                <span className="text-lg text-gray-900">
+                  {p.cognome} {p.nome}
+                </span>
+                <div className="flex flex-col space-y-2 pr-2">
+                  <button
+                    onClick={() => togglePresenza(p.id, true)}
+                    className={`px-4 py-1 rounded ${
+                      isPresente
+                        ? 'bg-green-600 text-white'
+                        : 'bg-green-200 text-green-800'
+                    }`}
+                  >
+                    Presente
+                  </button>
+                  <button
+                    onClick={() => togglePresenza(p.id, false)}
+                    className={`px-4 py-1 rounded ${
+                      !isPresente
+                        ? 'bg-red-600 text-white'
+                        : 'bg-red-200 text-red-800'
+                    }`}
+                  >
+                    Assente
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
 
-      {/* Azioni */}
-      <div className="flex justify-center space-x-6">
-        <button
-          onClick={() => navigate(-1)}
-          className="px-6 py-2 border border-black-400 rounded-lg text-white hover:bg-gray-100 transition"
-        >
-          Annulla
-        </button>
-        <button
-          onClick={handleSave}
-          className="px-6 py-2 bg-red-600 text-white rounded-lg hover:opacity-90 transition"
-        >
-          Salva
-        </button>
+        {/* Azioni */}
+        <div className="flex justify-center space-x-6">
+          <button
+            onClick={() => navigate(-1)}
+            className="px-6 py-2 border border-gray-400 rounded-lg text-gray-700 hover:bg-gray-100 transition"
+          >
+            Annulla
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-6 py-2 bg-red-600 text-white rounded-lg hover:opacity-90 transition"
+          >
+            Salva
+          </button>
+        </div>
       </div>
     </div>
   );

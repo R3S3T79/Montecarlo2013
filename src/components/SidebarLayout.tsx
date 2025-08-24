@@ -1,5 +1,5 @@
 // src/components/SidebarLayout.tsx
-// Data creazione chat: 2025-08-02 (rev con stella votazioni)
+// Data creazione chat: 2025-08-02 (rev: brand "Montecarlo 2013" + 3 strisce rosse, Home link, titolo home "Ciao {username}")
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -9,16 +9,11 @@ import {
   useLocation,
   useMatch,
 } from 'react-router-dom';
-import {
-  Menu,
-  PlusCircle,
-  Trash2,
-  Edit2,
-  Camera,
-} from 'lucide-react';
+import { Menu, PlusCircle, Trash2, Edit2, Camera } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import { UserRole } from '../lib/roles';
+// (presente nei tuoi import originali)
 import Step3_GuNumeroSquadre from '../pages/tornei/NuovoTorneo/Step3_GuNumeroSquadre';
 
 export default function SidebarLayout(): JSX.Element {
@@ -26,6 +21,20 @@ export default function SidebarLayout(): JSX.Element {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Username da user_profiles per titolo "Ciao {username}"
+  const [profileUsername, setProfileUsername] = useState<string>('');
+  useEffect(() => {
+    (async () => {
+      if (!user?.id) return;
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('username')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (!error && data?.username) setProfileUsername(data.username);
+    })();
+  }, [user?.id]);
 
   // Chiudi sidebar al cambio pagina
   useEffect(() => {
@@ -56,15 +65,18 @@ export default function SidebarLayout(): JSX.Element {
   const matchNumeroSquadre = useMatch('/tornei/nuovo/step3-enumerosquadre/:torneoId');
   const matchSelezionaSquadre = useMatch('/tornei/nuovo/step4-eliminazione/:torneoId');
   const matchStep5Eliminazione = useMatch('/tornei/nuovo/step5-eliminazione/:torneoId');
-  const matchSpetp3GuNumeroSquadre = useMatch('/tornei/nuovo/step3-gunumerosquadre/:torneoId')
+  const matchSpetp3GuNumeroSquadre = useMatch('/tornei/nuovo/step3-gunumerosquadre/:torneoId');
   const matchStep4GironeUnico = useMatch('/tornei/nuovo/step4-gironeunico/:torneoId');
   const matchStep5GironeUnico = useMatch('/tornei/nuovo/step5-gironeunico/:torneoId');
+  const matchEditGironeUnico = useMatch('/tornei/nuovo/step6-gironeunico/:torneoId/partita/:id/edit');
+  const matcheditfasegironi = useMatch('/tornei/nuovo/step6-fasegironi/:torneoId/partita/:id/edit');
+  const matchEditRisultatoEliminazione = useMatch('/tornei/nuovo/step6-eliminazione/:torneoId/partita/:id');
   const matchStep3FgNumeroSquadre = useMatch('/tornei/nuovo/step3-fgnumerosquadre/:torneoId');
   const matchStep4FaseGironi = useMatch('/tornei/nuovo/step4-FaseGironi/:torneoId');
   const matchStep5_5FaseGironi = useMatch('/tornei/nuovo/step5-5-FaseGironi/:torneoId');
-  const matchAllenamenti = useMatch('/allenamenti');
+  const matchAllenamenti = useMatch({ path: '/allenamenti', end: true });
+  const matchAllenamentiNuovo = useMatch('/allenamenti/nuovo');
   const matchStoricoAllenamenti = useMatch('/allenamenti/storico-allenamenti');
-  const matchAllenamentiGiocatore = useMatch('/allenamenti/:id');
   const matchProssimaPartita = useMatch('/prossima-partita');
   const matchVotazioni = useMatch('/partita/:id/votazioni');
   const matchEditPartitaGiocata = useMatch('/modifica-partita-giocata/:id');
@@ -111,48 +123,11 @@ export default function SidebarLayout(): JSX.Element {
     (user?.user_metadata?.role as UserRole) ||
     (user?.app_metadata?.role as UserRole) ||
     UserRole.Authenticated;
+
+  const canCreator = role === UserRole.Creator;
   const canAdmin = role === UserRole.Admin || role === UserRole.Creator;
 
-  // Handlers
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/login', { replace: true });
-  };
-
-  const handleTeamDelete = async () => {
-    if (!teamId || !window.confirm('Eliminare questa squadra?')) return;
-    const { error } = await supabase.from('squadre').delete().eq('id', teamId);
-    if (!error) navigate('/squadre', { replace: true });
-  };
-
-  const handlePlayerDelete = async () => {
-    if (!playerId || !window.confirm('Eliminare questo giocatore e tutti i dati collegati?')) return;
-
-    // Elimina collegamenti da tabelle figlie
-    await supabase.from('giocatori_stagioni').delete().eq('giocatore_uid', playerId);
-    await supabase.from('marcatori').delete().eq('giocatore_uid', playerId);
-    await supabase.from('allenamenti').delete().eq('giocatore_uid', playerId);
-
-    // Elimina giocatore
-    const { error } = await supabase.from('giocatori').delete().eq('id', playerId);
-    if (!error) navigate('/rosa', { replace: true });
-  };
-
-  const handlePreDelete = async () => {
-    if (!preId || !window.confirm('Eliminare questa partita?')) return;
-    const { error } = await supabase.from('partite').delete().eq('id', preId);
-    if (!error) navigate('/calendario', { replace: true });
-  };
-
-  const handleDetailDelete = async () => {
-    if (!detailId || !window.confirm('Eliminare definitivamente questa partita?')) return;
-    await supabase.from('marcatori').delete().eq('partita_id', detailId);
-    await supabase.from('presenze').delete().eq('partita_id', detailId);
-    await supabase.from('partite').delete().eq('id', detailId);
-    navigate('/calendario', { replace: true });
-  };
-
-  // Gruppi link
+  // Gruppi link — PRIMA voce: "Home"
   const group1 = [
     { to: '/', label: 'Home' },
     { to: '/risultati', label: 'Risultati' },
@@ -169,14 +144,12 @@ export default function SidebarLayout(): JSX.Element {
     { to: '/tornei', label: 'Tornei' },
     { to: '/galleria', label: 'Galleria' },
   ];
-  const group4 = canAdmin
-    ? [
-        { to: '/allenamenti', label: 'Allenamenti' },
-        { to: '/admin-panel', label: 'Pannello Admin' },
-      ]
-    : [];
+  const group4 = [
+    ...(canAdmin ? [{ to: '/allenamenti', label: 'Allenamenti' }] : []),
+    ...(canCreator ? [{ to: '/admin-panel', label: 'Pannello Admin' }] : []),
+  ];
 
-  // Titolo dinamico
+  // Titolo dinamico — sulla home: "Ciao {username da user_profiles}"
   let pageTitle = '';
   if (matchTeamEdit) pageTitle = 'Modifica Squadra';
   else if (matchTeamNew) pageTitle = 'Nuova Squadra';
@@ -199,41 +172,80 @@ export default function SidebarLayout(): JSX.Element {
   else if (matchFormatoTorneo) pageTitle = 'Formato Torneo';
   else if (matchNumeroSquadre) pageTitle = 'Numero Squadre';
   else if (matchSelezionaSquadre) pageTitle = 'Seleziona Squadre';
-  else if (matchStep5Eliminazione) pageTitle = 'Date Fasi'
+  else if (matchStep5Eliminazione) pageTitle = 'Date Fasi';
   else if (matchSpetp3GuNumeroSquadre) pageTitle = 'Numero Squadre';
   else if (matchStep4GironeUnico) pageTitle = 'Seleziona Squadre';
   else if (matchStep5GironeUnico) pageTitle = 'Date Match';
+  else if (matchEditGironeUnico) pageTitle = 'Modifica Risultato';
+  else if (matcheditfasegironi) pageTitle = 'Modifica Risultato';
+  else if (matchEditRisultatoEliminazione) pageTitle = 'Modifica Risultato';
   else if (matchStep3FgNumeroSquadre) pageTitle = 'Numero Squadre';
   else if (matchStep4FaseGironi) pageTitle = 'Gironi';
   else if (matchStep5_5FaseGironi) pageTitle = 'Date Match';
   else if (matchAllenamenti) pageTitle = 'Presenze Allenamenti';
-  else if (matchAllenamentiGiocatore) pageTitle = 'Storico Allenamenti';
+  else if (matchAllenamentiNuovo) pageTitle = 'Nuovo Allenamento';
+  else if (matchStoricoAllenamenti) pageTitle = 'Storico Allenamenti';
   else if (matchProssimaPartita) pageTitle = 'Prossima Partita';
   else if (matchVotazioni) pageTitle = 'Voto Partita';
   else if (matchEditPartitaGiocata) pageTitle = 'Modifica Partita';
   else if (location.pathname === '/risultati') pageTitle = 'Risultati';
-  else if (location.pathname === '/') pageTitle = 'Home';
+  else if (location.pathname === '/')
+    pageTitle = `Ciao ${profileUsername || user?.user_metadata?.username || ''}`;
   else pageTitle = '';
 
   if (authLoading) return <div className="min-h-screen">Caricamento…</div>;
+  // Handlers
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/login', { replace: true });
+  };
+
+  const handleTeamDelete = async () => {
+    const id = matchTeamDetail?.params.id;
+    if (!id || !window.confirm('Eliminare questa squadra?')) return;
+    const { error } = await supabase.from('squadre').delete().eq('id', id);
+    if (!error) navigate('/squadre', { replace: true });
+  };
+
+  const handlePlayerDelete = async () => {
+    const id = matchPlayer?.params.id;
+    if (!id || !window.confirm('Eliminare questo giocatore e tutti i dati collegati?')) return;
+    await supabase.from('giocatori_stagioni').delete().eq('giocatore_uid', id);
+    await supabase.from('marcatori').delete().eq('giocatore_uid', id);
+    await supabase.from('allenamenti').delete().eq('giocatore_uid', id);
+    const { error } = await supabase.from('giocatori').delete().eq('id', id);
+    if (!error) navigate('/rosa', { replace: true });
+  };
+
+  const handlePreDelete = async () => {
+    const id = matchPre?.params.id;
+    if (!id || !window.confirm('Eliminare questa partita?')) return;
+    const { error } = await supabase.from('partite').delete().eq('id', id);
+    if (!error) navigate('/calendario', { replace: true });
+  };
+
+  const handleDetailDelete = async () => {
+    const id = matchDetail?.params.id;
+    if (!id || !window.confirm('Eliminare definitivamente questa partita?')) return;
+    await supabase.from('marcatori').delete().eq('partita_id', id);
+    await supabase.from('presenze').delete().eq('partita_id', id);
+    await supabase.from('partite').delete().eq('id', id);
+    navigate('/calendario', { replace: true });
+  };
 
   return (
-    <div className="relative h-screen flex overflow-hidden bg-gradient-to-br from-[#6B7280] to-[#BFB9B9]">
+    <div className="relative h-screen flex overflow-hidden bg-transparent">
       {/* HEADER */}
-      <header className="fixed top-0 left-0 right-0 z-50 flex items-center px-4 py-2 bg-gradient-to-br from-[#6B7280] to-[#BFB9B9] text-white">
+       <header className="fixed top-0 left-0 right-0 z-50 flex items-center px-4 pt-3 pb-1 bg-transparent text-white">
         {/* Pulsante hamburger */}
-        <button
-          onClick={() => setDrawerOpen(true)}
-          aria-label="Apri menu"
-          className="mr-4"
-        >
+        <button onClick={() => setDrawerOpen(true)} aria-label="Apri menu" className="mr-4">
           <Menu size={24} />
         </button>
 
         {/* Stella solo su dettaglio partita */}
         {matchDetail && (
           <button
-            onClick={() => navigate(`/partita/${detailId}/votazioni`)}
+            onClick={() => navigate(`/partita/${matchDetail.params.id}/votazioni`)}
             aria-label="Vota Giocatori"
             className="mr-3 hover:scale-110 transition"
           >
@@ -242,18 +254,18 @@ export default function SidebarLayout(): JSX.Element {
         )}
 
         {/* Titolo pagina */}
-        <div className="flex-1 text-center">
-          <h1 className="text-lg font-bold">{pageTitle}</h1>
-          {matchGestione && gestioneData && gestioneOra && (
-            <div className="text-sm flex justify-center space-x-2">
-              <span>{gestioneData}</span>
-              <span>•</span>
-              <span>{gestioneOra}</span>
-            </div>
-          )}
-        </div>
+        <div className="flex-1 flex justify-center items-center relative">
+  <h1 className="text-lg font-bold">{pageTitle}</h1>
+  {matchGestione && gestioneData && gestioneOra && (
+    <div className="absolute top-full mt-1 text-sm flex justify-center space-x-2">
+      <span>{gestioneData}</span>
+      <span>•</span>
+      <span>{gestioneOra}</span>
+    </div>
+  )}
+</div>
 
-
+        {/* --- TUTTI I PULSANTI ADMIN/CREATOR INVARIATI --- */}
         {matchCalendario && canAdmin && (
           <button
             onClick={() => navigate('/nuova-partita')}
@@ -284,8 +296,6 @@ export default function SidebarLayout(): JSX.Element {
           </button>
         )}
 
-
-
         {matchAllenamenti && canAdmin && (
           <>
             <button
@@ -305,7 +315,7 @@ export default function SidebarLayout(): JSX.Element {
           </>
         )}
 
-                {matchTornei && canAdmin && (
+        {matchTornei && canAdmin && (
           <button
             onClick={() => navigate('/tornei/nuovo/step1')}
             aria-label="Nuovo Torneo"
@@ -315,11 +325,10 @@ export default function SidebarLayout(): JSX.Element {
           </button>
         )}
 
-
         {matchTeamDetail && canAdmin && (
           <>
             <button
-              onClick={() => navigate(`/squadre/${teamId}/edit`)}
+              onClick={() => navigate(`/squadre/${matchTeamDetail.params.id}/edit`)}
               aria-label="Modifica Squadra"
               className="mx-2 hover:scale-105 transition"
             >
@@ -338,7 +347,7 @@ export default function SidebarLayout(): JSX.Element {
         {matchPlayer && canAdmin && (
           <>
             <button
-              onClick={() => navigate(`/edit-giocatore/${playerId}`)}
+              onClick={() => navigate(`/edit-giocatore/${matchPlayer.params.id}`)}
               aria-label="Modifica Giocatore"
               className="mx-2 hover:scale-105 transition"
             >
@@ -357,7 +366,7 @@ export default function SidebarLayout(): JSX.Element {
         {matchPre && canAdmin && (
           <>
             <button
-              onClick={() => navigate(`/partita/${preId}/edit`)}
+              onClick={() => navigate(`/partita/${matchPre.params.id}/edit`)}
               aria-label="Modifica Pre-partita"
               className="mx-2 hover:scale-105 transition"
             >
@@ -376,7 +385,7 @@ export default function SidebarLayout(): JSX.Element {
         {matchDetail && canAdmin && (
           <>
             <button
-              onClick={() => navigate(`/modifica-partita-giocata/${detailId}`)}
+              onClick={() => navigate(`/modifica-partita-giocata/${matchDetail.params.id}`)}
               aria-label="Modifica Partita Giocata"
               className="mx-2 hover:scale-105 transition"
             >
@@ -402,28 +411,37 @@ export default function SidebarLayout(): JSX.Element {
 
       {/* BACKDROP */}
       {drawerOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-30"
-          onClick={() => setDrawerOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black/50 z-30" onClick={() => setDrawerOpen(false)} />
       )}
 
       {/* SIDEBAR */}
       <aside
-        className={`fixed inset-y-0 left-0 w-64 bg-gradient-to-br from-[#6B7280] to-[#BFB9B9]
-      text-white z-40 pt-16 transform transition-transform duration-300
-      ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 w-64 bg-neutral-900/90 text-white z-40 pt-16 pb-4 transform transition-transform duration-300
+  ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        <nav className="flex flex-col h-full px-4 space-y-2">
-          <div className="px-2 py-3 text-xl font-bold">MONTECARLO</div>
+        <nav className="flex flex-col h-full px-4 space-y-2 overflow-y-auto">
+          {/* BRAND */}
+          <div className="px-2 py-4">
+            <div className="relative h-16 overflow-hidden">
+              <div aria-hidden className="absolute inset-0 flex flex-col justify-center gap-[4px]">
+                <div className="h-[2px] bg-red-600 rounded" />
+                <div className="h-[2px] bg-red-600 rounded" />
+                <div className="h-[2px] bg-red-600 rounded" />
+              </div>
+              <div className="absolute left-2 top-1/2 -translate-y-1/2 z-10">
+                <div className="text-[23px] md:text-3xl font-bold tracking-wide text-white drop-shadow">
+                  Montecarlo 2013
+                </div>
+              </div>
+            </div>
+          </div>
+
           {[...group1, ...group2, ...group3, ...group4].map((link) => (
             <React.Fragment key={link.to}>
               <NavLink
                 to={link.to}
                 className={({ isActive }) =>
-                  `block p-2 rounded ${
-                    isActive ? 'bg-white text-gray-800' : 'hover:bg-white/20'
-                  }`
+                  `block p-2 rounded ${isActive ? 'bg-white text-gray-800' : 'hover:bg-white/20'}`
                 }
               >
                 {link.label}
@@ -435,6 +453,8 @@ export default function SidebarLayout(): JSX.Element {
               {link.to === '/statistiche/giocatori' && <hr className="border-t border-white/20 my-2" />}
             </React.Fragment>
           ))}
+
+          {/* Footer sidebar */}
           <div className="mt-auto pt-4 border-t border-white/20 px-2">
             {user ? (
               <div className="flex items-center justify-between">
@@ -442,12 +462,9 @@ export default function SidebarLayout(): JSX.Element {
                   onClick={() => navigate('/profilo')}
                   className="text-sm underline hover:text-gray-200"
                 >
-                  {user.user_metadata?.username ?? user.email}
+                  {profileUsername || user.user_metadata?.username || user.email}
                 </button>
-                <button
-                  onClick={handleLogout}
-                  className="underline hover:text-gray-200 text-sm"
-                >
+                <button onClick={handleLogout} className="underline hover:text-gray-200 text-sm">
                   Logout
                 </button>
               </div>
@@ -459,9 +476,11 @@ export default function SidebarLayout(): JSX.Element {
       </aside>
 
       {/* CONTENUTO PRINCIPALE */}
-      <main className="flex-1 pt-16 overflow-auto">
-        <Outlet />
-      </main>
+      <main className="flex-1 overflow-auto mt-[48px] px-2">
+  <div className="mt-2">
+  <Outlet />
+  </div>
+</main>
     </div>
   );
 }

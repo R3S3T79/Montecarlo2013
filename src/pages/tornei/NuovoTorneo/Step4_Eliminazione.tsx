@@ -151,8 +151,8 @@ export default function Step4_Eliminazione() {
 
   return (
     // Wrapper esterno per distanziare leggermente il contenuto dai bordi della pagina
-    <div className="p-4 sm:p-6 md:p-8">
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6 bg-white rounded-lg shadow">
+    <div className="p-2 sm:p-6 md:p-8">
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6 bg-white/90 rounded-lg shadow">
         <div className="space-y-6">
           {Array.from({ length: state.numSquadre / 2 }).map((_, groupIdx) => {
             const i1 = groupIdx * 2;

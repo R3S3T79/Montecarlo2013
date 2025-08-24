@@ -45,7 +45,7 @@ export default function Step1_5_FormatoTorneo() {
   };
 
   return (
-    <div className="max-w-md mx-auto mt-10 px-4 py-6 bg-white rounded-lg shadow space-y-6">
+    <div className="max-w-md mx-auto mt-2 p-2 px-4 py-6 bg-white/90 rounded-lg shadow space-y-6">
       
 
       <div className="grid grid-cols-1 gap-4 pt-2">

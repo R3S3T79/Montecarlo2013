@@ -114,54 +114,53 @@ export default function Risultati() {
 
   if (loading || loadingData) {
     return (
-      <div className="min-h-screen">
+       <div className="container mx-auto px-2">
         <span>Caricamento…</span>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen">
-      <div className="container mx-auto px-4">
-        <div className="relative mb-4">
-          <div className="bg-white rounded-xl shadow-montecarlo p-2 space-y-2">
-            {/* Input di ricerca */}
-            <input
-              type="text"
-              placeholder="Cerca Nome Squadra"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full border-2 border-montecarlo-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
-            />
+   <div className="container mx-auto px-2">
+    <div className="relative mb-4 mt-2">
+      <div className="bg-white rounded-xl shadow-montecarlo p-2 space-y-2 bg-white/90 rounded-lg">
+        {/* Input di ricerca */}
+        <input
+          type="text"
+          placeholder="Cerca Nome Squadra"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full border-2 border-montecarlo-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
+        />
 
-            {/* Dropdown Stagione e Competizioni */}
-            <div className="flex gap-2">
-              <select
-                value={stagioneSelezionata}
-                onChange={(e) => setStagioneSelezionata(e.target.value)}
-                className="flex-1 border-2 border-montecarlo-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
-              >
-                <option value="">Stagione</option>
-                {stagioni.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nome}
-                  </option>
-                ))}
-              </select>
+        {/* Dropdown Stagione e Competizioni */}
+        <div className="flex gap-2">
+          <select
+            value={stagioneSelezionata}
+            onChange={(e) => setStagioneSelezionata(e.target.value)}
+            className="flex-1 border-2 border-montecarlo-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
+          >
+            <option value="">Stagione</option>
+            {stagioni.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.nome}
+              </option>
+            ))}
+          </select>
 
-              <select
-                value={tipoCompetizione}
-                onChange={(e) => setTipoCompetizione(e.target.value)}
-                className="flex-1 border-2 border-montecarlo-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
-              >
-                <option value="">Tutti</option>
-                <option value="Campionato">Campionato</option>
-                <option value="Torneo">Torneo</option>
-                <option value="Amichevole">Amichevole</option>
-              </select>
-            </div>
-          </div>
+          <select
+            value={tipoCompetizione}
+            onChange={(e) => setTipoCompetizione(e.target.value)}
+            className="flex-1 border-2 border-montecarlo-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
+          >
+            <option value="">Tutti</option>
+            <option value="Campionato">Campionato</option>
+            <option value="Torneo">Torneo</option>
+            <option value="Amichevole">Amichevole</option>
+          </select>
         </div>
+      </div>
+    </div>
 
         {error && (
           <div className="bg-montecarlo-red-50 border-montecarlo-red-200 rounded-lg p-4 text-montecarlo-red-800">
@@ -181,7 +180,7 @@ export default function Risultati() {
               <div
                 key={p.id}
                 onClick={() => navigate(`/partita/${p.id}`)}
-                className="bg-white rounded-lg shadow-montecarlo hover:shadow-montecarlo-lg cursor-pointer transition-transform hover:scale-[1.02] border-l-4 border-montecarlo-secondary"
+                className="bg-white/90 rounded-lg shadow-montecarlo hover:shadow-montecarlo-lg cursor-pointer transition-transform hover:scale-[1.02] border-l-4 border-montecarlo-secondary"
               >
                 <div className="bg-gradient-montecarlo text-white px-4 py-2 rounded-t-lg">
                   <div className="text-sm font-medium text-center">
@@ -204,6 +203,5 @@ export default function Risultati() {
           </div>
         )}
       </div>
-    </div>
   );
 }

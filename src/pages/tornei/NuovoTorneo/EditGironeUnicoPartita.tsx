@@ -132,8 +132,8 @@ export default function EditGironeUnicoPartita() {
   const ospite = teams[partita.squadra_ospite];
 
   return (
-    <div className="max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow space-y-6">
-      <h2 className="text-xl font-semibold text-center border-b pb-2 mb-4">Modifica Risultato</h2>
+    <div className="max-w-md mx-auto mt-2 p-6 bg-white/85 rounded-lg shadow space-y-6">
+      
 
       {/* CASA */}
       <div className="text-xs text-gray-500 uppercase mb-1">Casa</div>
@@ -172,7 +172,7 @@ export default function EditGironeUnicoPartita() {
       {/* RIGORI */}
       {scoreCasa === scoreOspite && (
         <div className="space-y-2">
-          <div className="text-sm font-semibold text-gray-700">Vincitore ai rigori</div>
+          <div className="text-base font-semibold text-gray-700">Vincitore ai rigori</div>
           <label className="flex items-center space-x-2">
             <input
               type="checkbox"

@@ -1,80 +1,123 @@
 // netlify/functions/register.ts
-// Data: 18/08/2025 – Registrazione utente: crea pending_user e invia email di conferma
+// Data: 21/08/2025 (rev: dual-SMTP fallback notifications → support)
+// Scopo: Registrazione utente → salva in pending_users e manda mail all'admin
 
 import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
-import crypto from "crypto";
 import nodemailer from "nodemailer";
+import crypto from "crypto";
 
+// =========================
+// Supabase client (service)
+// =========================
 const supabase = createClient(
-  process.env.VITE_SUPABASE_URL!,
+  process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const transporter = nodemailer.createTransport({
+// =========================
+// SMTP Transporters
+// =========================
+const transporterNotifications = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT || "465"),
   secure: process.env.SMTP_SECURE === "true",
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: process.env.SMTP_USER_NOTIF,
+    pass: process.env.SMTP_PASS_NOTIF,
   },
 });
 
+const transporterSupport = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: parseInt(process.env.SMTP_PORT || "465"),
+  secure: process.env.SMTP_SECURE === "true",
+  auth: {
+    user: process.env.SMTP_USER_SUPPORT,
+    pass: process.env.SMTP_PASS_SUPPORT,
+  },
+});
+
+// =========================
+// Handler
+// =========================
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
-  let body: { email?: string; password?: string; username?: string };
+  let body: { email?: string; username?: string; password?: string; role?: string };
   try {
     body = JSON.parse(event.body || "{}");
   } catch {
     return { statusCode: 400, body: JSON.stringify({ error: "Invalid JSON body" }) };
   }
 
-  const { email, password, username } = body;
-  if (!email || !password || !username) {
+  const { email, username, password, role } = body;
+  if (!email || !password) {
     return { statusCode: 400, body: JSON.stringify({ error: "Missing required fields" }) };
   }
 
-  // crea utente in Supabase Auth (di default con ruolo user nei metadata)
-  const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: false,
-    user_metadata: { role: "user", username },
-  });
+  // =========================
+  // Inserimento in pending_users
+  // =========================
+  const confirmationToken = crypto.randomUUID();
 
-  if (authErr || !authUser.user) {
-    return { statusCode: 500, body: JSON.stringify({ error: "Error creating auth user", details: authErr?.message }) };
-  }
-
-  // crea pending_user con token di conferma
-  const token = crypto.randomUUID();
-  await supabase.from("pending_users").insert([
+  const { error: insertErr } = await supabase.from("pending_users").insert([
     {
       email,
       username,
-      confirmation_token: token,
+      password,
       approved: false,
       confirmed: false,
-      role: "user",
+      confirmation_token: confirmationToken,
     },
   ]);
 
-  // invia email di conferma
-  const confirmUrl = `https://montecarlo2013.it/api/confirm?token=${token}`;
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM,
-    to: email,
-    subject: "Conferma registrazione – Montecarlo 2013",
-    html: `
-      <p>Ciao ${username},</p>
-      <p>Grazie per esserti registrato. Conferma ora la tua email cliccando qui:</p>
-      <p><a href="${confirmUrl}">${confirmUrl}</a></p>
-    `,
-  });
+  if (insertErr) {
+    console.error("Errore insert pending_users:", insertErr);
+    return { statusCode: 500, body: JSON.stringify({ error: "Errore salvataggio utente" }) };
+  }
 
-  return { statusCode: 200, body: JSON.stringify({ success: true }) };
+  // =========================
+  // Email di notifica ADMIN con fallback
+  // =========================
+  const mailOptions = {
+    to: "marcomiressi@gmail.com", // 🔴 ADMIN
+    subject: "Nuovo utente in attesa di approvazione",
+    html: `
+      <p>Nuova registrazione ricevuta:</p>
+      <ul>
+        <li>Email: <b>${email}</b></li>
+        <li>Username: <b>${username || "-"}</b></li>
+        <li>Ruolo richiesto: <b>${role || "user"}</b></li>
+      </ul>
+      <p>Puoi approvare l'utente dal <a href="https://montecarlo2013.it/admin-panel">Pannello Admin</a></p>
+    `,
+  };
+
+  try {
+    await transporterNotifications.sendMail({
+      ...mailOptions,
+      from: process.env.SMTP_FROM_NOTIF,
+    });
+    console.log("Email admin inviata con notifications@");
+  } catch (errNotif) {
+    console.warn("Errore con notifications@, retry con support@ :", errNotif);
+    try {
+      await transporterSupport.sendMail({
+        ...mailOptions,
+        from: process.env.SMTP_FROM_SUPPORT,
+      });
+      console.log("Email admin inviata con support@");
+    } catch (errSupport) {
+      console.error("Errore invio mail admin anche con support@:", errSupport);
+      return { statusCode: 500, body: JSON.stringify({ error: "Errore invio mail admin (notif+support)" }) };
+    }
+  }
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ success: true }),
+  };
 };

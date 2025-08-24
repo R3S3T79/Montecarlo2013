@@ -250,120 +250,157 @@ export default function Step7_FaseGironi() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-4 space-y-6 print:p-0">
+  <div className="max-w-3xl mx-auto mt-2 px-2 space-y-6 print:p-0">
+    {Object.entries(classificaPerGirone).map(([girone, squadre]) => (
+      <div key={girone} className="space-y-4">
+        {/* Titolo Girone */}
+        <h3 className="text-lg font-semibold text-center text-white">
+          {girone}
+        </h3>
 
-      {Object.entries(classificaPerGirone).map(([girone, squadre]) => (
-        <div key={girone} className="space-y-4">
-          <h3 className="text-lg font-semibold text-center">{girone}</h3>
+        {/* Box Partite */}
+        {partite
+  .filter(m => m.girone === girone)
+  .sort((a, b) => a.match_number - b.match_number)
+  .map(m => (
+    <div
+      key={m.id}
+      className={`grid grid-cols-3 items-center bg-white/90 rounded p-2 mb-1 ${
+        canEdit ? "cursor-pointer hover:bg-gray-100" : ""
+      }`}
+      onClick={() => canEdit && navigate(`/modifica-partita-fasegironi/${m.id}`)}
+    >
+      {/* Casa - allineata a sinistra */}
+      <div className="text-left truncate">
+        {m.squadra_casa!.nome}
+      </div>
+      {/* Risultato - centrato orizzontalmente e verticalmente */}
+      <div className="text-center font-medium">
+        {m.giocata ? `${m.gol_casa} – ${m.gol_ospite}` : "VS"}
+      </div>
+      {/* Ospite - allineata a destra */}
+      <div className="text-right truncate">
+        {m.squadra_ospite!.nome}
+      </div>
+    </div>
+))}
 
-          {/* MATCH: più ombreggiate */}
-          {partite
-            .filter(m => m.girone === girone)
-            .sort((a, b) => a.match_number - b.match_number)
-            .map(m => (
-              <div
-                key={m.id}
-                className="grid grid-cols-3 items-center bg-gray-100 shadow rounded-lg p-2 mb-1 hover:bg-gray-200 cursor-pointer"
-                onClick={() => canEdit && navigate(`/modifica-partita-fasegironi/${m.id}`)}
-              >
-                <span className="text-sm truncate">{m.squadra_casa!.nome}</span>
-                {m.giocata ? (
-                  <span className="text-sm font-medium text-center">
-                    {m.gol_casa} – {m.gol_ospite}
-                  </span>
-                ) : (
-                  <span className="text-sm font-medium text-center text-gray-400">VS</span>
-                )}
-                <span className="text-sm text-right truncate">{m.squadra_ospite!.nome}</span>
-              </div>
-            ))}
-
-          {/* TABELLA PUNTI senza "Pos", con logo */}
-          <table className="w-full table-auto border-collapse text-center text-sm">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border px-3 py-1">Squadra</th>
-                <th className="border px-3 py-1">PG</th>
-                <th className="border px-3 py-1">V</th>
-                <th className="border px-3 py-1">N</th>
-                <th className="border px-3 py-1">P</th>
-                <th className="border px-3 py-1">GF</th>
-                <th className="border px-3 py-1">GS</th>
-                <th className="border px-3 py-1">DR</th>
-                <th className="border px-3 py-1">Pt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {squadre.map((r: any) => (
-                <tr key={r.id}>
-                  <td className="border px-3 py-1 text-left flex items-center space-x-2">
-                    {r.logo_url && (
-                      <img src={r.logo_url} alt={r.nome} className="w-5 h-5 rounded-full" />
-                    )}
-                    <span>{r.nome}</span>
-                  </td>
-                  <td className="border px-3 py-1">{r.PG}</td>
-                  <td className="border px-3 py-1">{r.V}</td>
-                  <td className="border px-3 py-1">{r.N}</td>
-                  <td className="border px-3 py-1">{r.P}</td>
-                  <td className="border px-3 py-1">{r.GF}</td>
-                  <td className="border px-3 py-1">{r.GS}</td>
-                  <td className="border px-3 py-1">{r.DR}</td>
-                  <td className="border px-3 py-1">{r.Pt}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
-
-      {/* CLASSIFICA GENERALE */}
-      <div className="pt-4">
-        <h3 className="text-xl font-semibold text-center mb-2">Classifica Generale</h3>
-        <table className="w-full table-auto border-collapse text-center text-sm">
+        {/* Tabella Classifica Girone */}
+        <table className="w-full border-collapse text-center text-sm bg-white/90 rounded">
+          <colgroup>
+            <col className="w-auto" /> {/* Squadra adatta al nome più lungo */}
+            <col className="w-12" />
+            <col className="w-12" />
+            <col className="w-12" />
+            <col className="w-12" />
+            <col className="w-12" />
+            <col className="w-12" />
+            <col className="w-12" />
+            <col className="w-12" />
+          </colgroup>
           <thead>
             <tr className="bg-gray-100">
-              <th className="border px-3 py-1">Pos</th>
-              <th className="border px-3 py-1">Squadra</th>
+              <th className="border px-3 py-1 text-left">Squadra</th>
+              <th className="border px-2 py-1">PG</th>
+              <th className="border px-2 py-1">V</th>
+              <th className="border px-2 py-1">N</th>
+              <th className="border px-2 py-1">P</th>
+              <th className="border px-2 py-1">GF</th>
+              <th className="border px-2 py-1">GS</th>
+              <th className="border px-2 py-1">DR</th>
+              <th className="border px-2 py-1">Pt</th>
             </tr>
           </thead>
           <tbody>
-            {classificaGenerale.map(item => (
-              <tr key={item.id}>
-                <td className="border px-3 py-1">{item.pos}</td>
-                <td className="border px-3 py-1 text-left flex items-center space-x-2">
-                  {item.logo_url && (
-                    <img src={item.logo_url} alt={item.nome} className="w-5 h-5 rounded-full" />
-                  )}
-                  <span>{item.nome}</span>
+            {squadre.map((r: any) => (
+              <tr key={r.id}>
+                <td className="border px-3 py-1 text-left">
+                  <div className="flex items-center space-x-2">
+                    {r.logo_url && (
+                      <img
+                        src={r.logo_url}
+                        alt={r.nome}
+                        className="w-5 h-5 rounded-full"
+                      />
+                    )}
+                    <span>{r.nome}</span>
+                  </div>
                 </td>
+                <td className="border px-2 py-1">{r.PG}</td>
+                <td className="border px-2 py-1">{r.V}</td>
+                <td className="border px-2 py-1">{r.N}</td>
+                <td className="border px-2 py-1">{r.P}</td>
+                <td className="border px-2 py-1">{r.GF}</td>
+                <td className="border px-2 py-1">{r.GS}</td>
+                <td className="border px-2 py-1">{r.DR}</td>
+                <td className="border px-2 py-1">{r.Pt}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+    ))}
 
-      {/* PULSANTI */}
-      <div className="flex justify-between print:hidden space-x-2">
-        <button
-          onClick={() => navigate(-1)}
-          className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
-        >
-          Indietro
-        </button>
-        <button
-          onClick={() => window.print()}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          Stampa
-        </button>
-        <button
-          onClick={() => navigate("/tornei")}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-        >
-          Salva ed Esci
-        </button>
-      </div>
+    {/* CLASSIFICA GENERALE */}
+    <div className="pt-4">
+      <h3 className="text-xl text-white font-semibold text-center mb-2">
+        Classifica Generale
+      </h3>
+      <table className="w-full table-auto border-collapse text-center text-sm bg-white/90 rounded">
+        <colgroup>
+          <col className="w-12" />
+          <col className="w-auto" />
+        </colgroup>
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="border px-3 py-1">Pos</th>
+            <th className="border px-3 py-1 text-left">Squadra</th>
+          </tr>
+        </thead>
+        <tbody>
+          {classificaGenerale.map(item => (
+            <tr key={item.id}>
+              <td className="border px-3 py-1">{item.pos}</td>
+              <td className="border px-3 py-1 text-left">
+                <div className="flex items-center space-x-2">
+                  {item.logo_url && (
+                    <img
+                      src={item.logo_url}
+                      alt={item.nome}
+                      className="w-5 h-5 rounded-full"
+                    />
+                  )}
+                  <span>{item.nome}</span>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
-  );
+
+    {/* PULSANTI */}
+    <div className="flex justify-between print:hidden space-x-2">
+      <button
+        onClick={() => navigate(-1)}
+        className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+      >
+        Indietro
+      </button>
+      <button
+        onClick={() => window.print()}
+        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+      >
+        Stampa
+      </button>
+      <button
+        onClick={() => navigate("/tornei")}
+        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+      >
+        Salva ed Esci
+      </button>
+    </div>
+  </div>
+);
+
 }

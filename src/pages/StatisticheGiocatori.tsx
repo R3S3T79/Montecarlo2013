@@ -141,8 +141,8 @@ export default function StatisticheGiocatori(): JSX.Element {
 
   return (
     <div className="min-h-screen">
-      <div className="container mx-auto px-4">
-        <div className="bg-white rounded-xl shadow-montecarlo p-6 space-y-6">
+      <div className="container mx-auto pt-2 px-2">
+        
           <select
             className="w-full border rounded-md px-3 py-2 text-sm"
             value={stagioneSelezionata}
@@ -156,7 +156,7 @@ export default function StatisticheGiocatori(): JSX.Element {
           </select>
 
           {/* Legenda */}
-          <div className="text-sm text-gray-600 flex space-x-6 px-2">
+          <div className="text-sm text-gray-600 flex space-x-6 pt-2 px-2 text-white">
             <span><strong>G</strong> = Gol</span>
             <span><strong>P</strong> = Presenze</span>
             <span><strong>M</strong> = Media Goal Fatti/Subiti</span>
@@ -166,8 +166,8 @@ export default function StatisticheGiocatori(): JSX.Element {
           {loading ? (
             <div className="text-center text-montecarlo-secondary">Caricamento...</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-white rounded-lg overflow-hidden">
+            <div className="overflow-x-auto mt-2">
+              <table className="min-w-full bg-white/90 rounded-lg overflow-hidden">
                 <thead className="bg-montecarlo-red-600 text-white">
                   <tr>
                     <th className="px-4 py-2 text-left cursor-pointer" onClick={() => sortData('giocatore')}>
@@ -191,7 +191,7 @@ export default function StatisticheGiocatori(): JSX.Element {
                   {sortedRows.map((st) => (
                     <tr
                       key={st.giocatore_uid}
-                      className="border-b last:border-0 hover:bg-gray-50 cursor-pointer"
+                      className="border-b border-red-500 last:border-0 hover:bg-gray-50 cursor-pointer"
                       onClick={() => navigate(`/giocatore/${st.giocatore_uid}`)}
                     >
                       <td className="px-4 py-2 flex items-center space-x-2">
@@ -230,6 +230,6 @@ export default function StatisticheGiocatori(): JSX.Element {
           )}
         </div>
       </div>
-    </div>
+    
   );
 }

@@ -1,5 +1,5 @@
 // src/pages/tornei/NuovoTorneo/Step8_FaseGironi.tsx
-// Data creazione chat: 29/07/2025
+// Data revisione: 24/08/2025 — Box trasparenti, titoli bianchi fuori dai box
 
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -38,26 +38,12 @@ export default function Step8_FaseGironi() {
     (authUser?.user_metadata?.role ?? authUser?.app_metadata?.role) as UserRole;
   const canEdit = role === UserRole.Admin || role === UserRole.Creator;
 
-  const [torneoNome, setTorneoNome] = useState<string>("");
   const [elimPhaseId, setElimPhaseId] = useState<string | null>(null);
   const [elimMatches, setElimMatches] = useState<PartitaRaw[]>([]);
   const [classifica, setClassifica] = useState<ClassificaEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 1) Carica nome torneo
-  useEffect(() => {
-    if (!torneoId) return;
-    supabase
-      .from("tornei")
-      .select("nome_torneo")
-      .eq("id", torneoId)
-      .single()
-      .then(({ data }) => {
-        if (data) setTorneoNome(data.nome_torneo);
-      });
-  }, [torneoId]);
-
-  // 2) Carica fase eliminazione
+  // 1) fase eliminazione
   useEffect(() => {
     if (!torneoId) return;
     supabase
@@ -71,7 +57,7 @@ export default function Step8_FaseGironi() {
       });
   }, [torneoId]);
 
-  // 3) Carica partite di eliminazione e calcola classifica
+  // 2) partite eliminazione
   useEffect(() => {
     if (!torneoId || !elimPhaseId) return;
     setLoading(true);
@@ -90,7 +76,7 @@ export default function Step8_FaseGironi() {
         const matches = data || [];
         setElimMatches(matches);
 
-        // costruisci classifica finale: posizioni 1-6 in base a match_number
+        // classifica finale in base al numero match
         const entries: ClassificaEntry[] = [];
         matches.forEach((m) => {
           if (!m.giocata || !m.squadra_casa || !m.squadra_ospite) return;
@@ -112,7 +98,7 @@ export default function Step8_FaseGironi() {
               perdente = casa;
             }
           }
-          const basePos = (m.match_number - 1) * 2 + 1; // 1,3,5
+          const basePos = (m.match_number - 1) * 2 + 1;
           entries.push({ squadra: vincitore, posizione: basePos });
           entries.push({ squadra: perdente, posizione: basePos + 1 });
         });
@@ -127,78 +113,93 @@ export default function Step8_FaseGironi() {
     return <p className="text-center py-6">Caricamento in corso…</p>;
   }
 
-  // etichette per i match
+  // etichette
   const labelMap: Record<number, string> = {
     1: "Finale 1°/2° Posto",
     2: "Finale 3°/4° Posto",
     3: "Finale 5°/6° Posto",
   };
 
-  // formatta il risultato con (Rig) accanto al vincitore
   const formatScore = (m: PartitaRaw) => {
     if (!m.giocata) return "VS";
     const score = `${m.gol_casa} – ${m.gol_ospite}`;
     if (m.gol_casa === m.gol_ospite && m.rigori_vincitore) {
-      // se casa ha vinto ai rigori
-      if (m.rigori_vincitore === m.squadra_casa?.id) {
-        return `(Rig) ${score}`;
-      }
-      // se ospite ha vinto ai rigori
-      if (m.rigori_vincitore === m.squadra_ospite?.id) {
-        return `${score} (Rig)`;
-      }
+      if (m.rigori_vincitore === m.squadra_casa?.id) return `(Rig) ${score}`;
+      if (m.rigori_vincitore === m.squadra_ospite?.id) return `${score} (Rig)`;
     }
     return score;
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-4 space-y-6 print:p-0">
+  <div className="max-w-3xl mx-auto mt-2 px-2 space-y-6 print:p-0">
+    {/* Scontri diretti */}
+    {elimMatches.map((m) => (
+      <div key={m.id} className="space-y-2">
+        <h3 className="text-lg font-semibold text-center text-white print:text-black">
+          {labelMap[m.match_number] || `Match ${m.match_number}`}
+        </h3>
 
-      {/* Scontri diretti */}
-      {elimMatches.map((m) => (
-        <div key={m.id} className="space-y-2">
-          <h3 className="text-lg font-semibold text-center">
-            {labelMap[m.match_number] || `Match ${m.match_number}`}
-          </h3>
-          <div
-            onClick={() =>
-              canEdit &&
-              navigate(`/modifica-partita-fasegironi/${m.id}`, {
-                state: { torneoId },
-              })
-            }
-            className={`grid grid-cols-3 items-center bg-gray-100 shadow-md rounded-lg p-3 mb-2 ${
-              canEdit ? "cursor-pointer hover:bg-gray-200" : ""
-            }`}
-          >
-            <span className="text-sm truncate">{m.squadra_casa?.nome}</span>
-            <span className="text-sm font-medium text-center">
-              {formatScore(m)}
-            </span>
-            <span className="text-sm text-right truncate">
-              {m.squadra_ospite?.nome}
-            </span>
+        <div
+          onClick={() =>
+            canEdit &&
+            navigate(`/modifica-partita-fasegironi/${m.id}`, {
+              state: { torneoId },
+            })
+          }
+          className={`grid grid-cols-3 items-center py-2 px-3 bg-white/85 rounded ${
+            canEdit ? "cursor-pointer hover:bg-gray-100" : ""
+          }`}
+        >
+          {/* Casa */}
+          <div className="flex items-center space-x-2 justify-start">
+            {m.squadra_casa?.logo_url && (
+              <img
+                src={m.squadra_casa.logo_url}
+                alt={m.squadra_casa.nome}
+                className="w-5 h-5 rounded-full"
+              />
+            )}
+            <span>{m.squadra_casa?.nome}</span>
+          </div>
+
+          {/* Risultato */}
+          <div className="text-center font-medium">
+            {formatScore(m)}
+          </div>
+
+          {/* Ospite */}
+          <div className="flex items-center space-x-2 justify-end">
+            <span>{m.squadra_ospite?.nome}</span>
+            {m.squadra_ospite?.logo_url && (
+              <img
+                src={m.squadra_ospite.logo_url}
+                alt={m.squadra_ospite.nome}
+                className="w-5 h-5 rounded-full"
+              />
+            )}
           </div>
         </div>
-      ))}
+      </div>
+    ))}
 
-      {/* Classifica Finale */}
-      <div className="pt-6">
-        <h3 className="text-xl font-semibold text-center mb-2">
-          Classifica Finale
-        </h3>
-        <table className="w-full table-auto border-collapse text-center text-sm">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="border px-3 py-1">Pos</th>
-              <th className="border px-3 py-1">Squadra</th>
-            </tr>
-          </thead>
-          <tbody>
-            {classifica.map((e) => (
-              <tr key={e.squadra.id}>
-                <td className="border px-3 py-1">{e.posizione}</td>
-                <td className="border px-3 py-1 flex items-center space-x-2">
+    {/* Classifica Finale */}
+    <div className="pt-6">
+      <h3 className="text-xl font-semibold text-center mb-2 text-white print:text-black">
+        Classifica Finale
+      </h3>
+      <table className="w-full table-auto border-collapse text-center text-sm bg-white/85 rounded">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="border px-3 py-1">Pos</th>
+            <th className="border px-3 py-1">Squadra</th>
+          </tr>
+        </thead>
+        <tbody>
+          {classifica.map((e) => (
+            <tr key={e.squadra.id}>
+              <td className="border px-3 py-1">{e.posizione}</td>
+              <td className="border px-3 py-1">
+                <div className="flex items-center space-x-2">
                   {e.squadra.logo_url && (
                     <img
                       src={e.squadra.logo_url}
@@ -207,39 +208,37 @@ export default function Step8_FaseGironi() {
                     />
                   )}
                   <span>{e.squadra.nome}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pulsanti */}
-      <div className="flex justify-between print:hidden space-x-2">
-        {/* Tutti vedono Esci */}
-        <button
-          onClick={() => navigate(-1)}
-          className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
-        >
-          Esci
-        </button>
-        {/* Tutti vedono Stampa */}
-        <button
-          onClick={() => window.print()}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          Stampa
-        </button>
-        {/* Solo Admin/Creator vedono Salva ed Esci */}
-        {canEdit && (
-          <button
-            onClick={() => navigate("/tornei")}
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-          >
-            Salva ed Esci
-          </button>
-        )}
-      </div>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
-  );
+
+    {/* Pulsanti */}
+    <div className="flex justify-between print:hidden space-x-2">
+      <button
+        onClick={() => navigate(-1)}
+        className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+      >
+        Esci
+      </button>
+      <button
+        onClick={() => window.print()}
+        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+      >
+        Stampa
+      </button>
+      {canEdit && (
+        <button
+          onClick={() => navigate("/tornei")}
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+        >
+          Salva ed Esci
+        </button>
+      )}
+    </div>
+  </div>
+);
 }

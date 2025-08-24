@@ -64,7 +64,7 @@ export default function DettaglioSquadra(): JSX.Element {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
+    <div className="max-w-3xl mx-auto px-2 pt-2 pb-2">
       {/* Back & Delete */}
       <div className="flex items-center justify-between mb-6">
         <button
@@ -97,11 +97,11 @@ export default function DettaglioSquadra(): JSX.Element {
             {squadra.nome.charAt(0)}
           </div>
         )}
-        <h1 className="text-3xl font-bold">{squadra.nome}</h1>
+        <h1 className="text-3xl font-bold text-white drop-shadow-lg">{squadra.nome}</h1>
       </div>
 
       {/* Dati Squadra */}
-      <div className="bg-white shadow rounded-lg p-6 space-y-4">
+      <div className="bg-white/90 shadow rounded-lg p-6 space-y-4">
         <div>
           <h2 className="font-semibold">Nome Completo</h2>
           <p className="text-gray-700">{squadra.nome_completo || '—'}</p>

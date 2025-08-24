@@ -183,7 +183,8 @@ export default function AdminPanel() {
   }
 
   return (
-    <div className="pt-20 px-6 max-w-4xl mx-auto">
+  <div className="pt-2 px-2"> {/* distanza dalla navbar */}
+    <div className="bg-white/95 rounded-xl shadow-montecarlo p-4 max-w-4xl mx-auto overflow-x-auto">
       <h2 className="text-2xl font-bold mb-4">Pannello Amministratore</h2>
 
       {/* Pulsante gestione notizie */}
@@ -197,74 +198,93 @@ export default function AdminPanel() {
         </Link>
       </div>
 
-      <h3 className="text-xl font-semibold mb-2">Utenti</h3>
-      <table className="w-full border">
-        <thead>
-          <tr className="bg-gray-100">
-            <th className="p-2">Utente</th>
-            <th className="p-2">Stato</th>
-            <th className="p-2">Data</th>
-            <th className="p-2">Azioni</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pendingUsers.map((u) => {
-            const availableRoles: UserRole[] = ["user", "creator", "admin"];
-            const roleButtons = availableRoles
-              .filter((r) => r !== u.role)
-              .map((r) => {
-                const Icon = r === "user" ? User : r === "creator" ? Shield : Crown;
-                const onClick = u.confirmed
-                  ? () => changeRole(u.email, r)
-                  : () => approveUser(u.email, r);
-                return (
-                  <button
-                    key={r}
-                    onClick={onClick}
-                    disabled={processing.has(u.email)}
-                    className="px-3 py-1 border rounded inline-flex items-center text-sm"
-                  >
-                    <Icon className="mr-1" size={14} />
-                    {r.charAt(0).toUpperCase() + r.slice(1)}
-                  </button>
-                );
-              });
+      {/* Nuovo: pulsante crea nuovo utente */}
+      <div className="mb-6">
+        <Link
+          to="/nuovo-utente"
+          className="px-4 py-2 bg-green-600 text-white rounded inline-flex items-center hover:bg-green-700"
+        >
+          <User className="mr-2" size={18} />
+          Crea Nuovo Utente
+        </Link>
+      </div>
 
-            return (
-              <tr key={u.id} className="hover:bg-gray-50">
-                <td className="p-2">
-                  <div className="font-medium">{u.username}</div>
-                  <div className="text-sm text-gray-600">{u.email}</div>
-                </td>
-                <td className="p-2">
-                  {u.confirmed ? (
-                    <span className="text-green-700 flex items-center">
-                      <CheckCircle className="mr-1" size={16} /> Confermato ({u.role})
-                    </span>
-                  ) : (
-                    <span className="text-yellow-700 flex items-center">
-                      <Clock className="mr-1" size={16} /> In attesa approvazione
-                    </span>
-                  )}
-                </td>
-                <td className="p-2 text-sm text-gray-600">{formatDate(u.created_at)}</td>
-                <td className="p-2 flex flex-wrap gap-2 items-center">
-                  {roleButtons}
-                  <button
-                    onClick={() => deleteUser(u.email)}
-                    disabled={processing.has(u.email)}
-                    className="px-3 py-1 border rounded inline-flex items-center text-sm text-red-700 hover:bg-red-50"
-                    title="Elimina utente"
-                  >
-                    <Trash2 className="mr-1" size={14} />
-                    Elimina
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <h3 className="text-xl font-semibold mb-2">Utenti</h3>
+      <div className="overflow-x-auto rounded-lg">
+        <table className="w-full border rounded-lg">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="p-2">Utente</th>
+              <th className="p-2">Stato</th>
+              <th className="p-2">Data</th>
+              <th className="p-2">Azioni</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pendingUsers.map((u) => {
+              const availableRoles: UserRole[] = ["user", "creator", "admin"];
+              const roleButtons = availableRoles
+                .filter((r) => r !== u.role)
+                .map((r) => {
+                  const Icon =
+                    r === "user" ? User : r === "creator" ? Shield : Crown;
+                  const onClick = u.confirmed
+                    ? () => changeRole(u.email, r)
+                    : () => approveUser(u.email, r);
+                  return (
+                    <button
+                      key={r}
+                      onClick={onClick}
+                      disabled={processing.has(u.email)}
+                      className="px-3 py-1 border rounded inline-flex items-center text-sm bg-white hover:bg-gray-50"
+                    >
+                      <Icon className="mr-1" size={14} />
+                      {r.charAt(0).toUpperCase() + r.slice(1)}
+                    </button>
+                  );
+                });
+
+              return (
+                <tr key={u.id} className="hover:bg-gray-50">
+                  <td className="p-2">
+                    <div className="font-medium">{u.username}</div>
+                    <div className="text-sm text-gray-600">{u.email}</div>
+                  </td>
+                  <td className="p-2">
+                    {u.confirmed ? (
+                      <span className="text-green-700 flex items-center">
+                        <CheckCircle className="mr-1" size={16} /> Confermato (
+                        {u.role})
+                      </span>
+                    ) : (
+                      <span className="text-yellow-700 flex items-center">
+                        <Clock className="mr-1" size={16} /> In attesa
+                        approvazione
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-2 text-sm text-gray-600">
+                    {formatDate(u.created_at)}
+                  </td>
+                  <td className="p-2 flex flex-wrap gap-2 items-center">
+                    {roleButtons}
+                    <button
+                      onClick={() => deleteUser(u.email)}
+                      disabled={processing.has(u.email)}
+                      className="px-3 py-1 border rounded inline-flex items-center text-sm text-red-700 hover:bg-red-50 bg-white"
+                      title="Elimina utente"
+                    >
+                      <Trash2 className="mr-1" size={14} />
+                      Elimina
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
-  );
+  </div>
+);
 }
