@@ -1,5 +1,5 @@
 // src/pages/RegisterPage.tsx
-// Data: 21/08/2025 (rev: sfondo immagine + overlay trasparente 90% + toggle mostra/nascondi password)
+// Data: 21/08/2025 (rev: scritta Montecarlo 2013 bianca con ombra sopra container)
 
 import React, { useState } from "react";
 
@@ -42,7 +42,7 @@ const RegisterPage: React.FC = () => {
 
   return (
     <div
-      className="flex items-center justify-center min-h-screen px-4"
+      className="flex flex-col items-center justify-center min-h-screen px-4"
       style={{
         backgroundImage: `url("/src/assets/sfondo.jpg")`,
         backgroundSize: "cover",
@@ -50,9 +50,18 @@ const RegisterPage: React.FC = () => {
         backgroundRepeat: "no-repeat",
       }}
     >
+      {/* Scritta sopra */}
+      <h1
+        className="text-3xl font-bold text-white mb-6"
+        style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.7)" }}
+      >
+        Montecarlo 2013
+      </h1>
+
+      {/* Box registrazione */}
       <div
         className="w-full max-w-md p-6 rounded-lg shadow-md"
-        style={{ backgroundColor: "rgba(255, 255, 255, 0.9)" }} // overlay trasparente 90%
+        style={{ backgroundColor: "rgba(255, 255, 255, 0.9)" }}
       >
         <h1 className="text-2xl font-bold mb-6 text-center">Registrazione</h1>
 
@@ -106,8 +115,6 @@ const RegisterPage: React.FC = () => {
                 onClick={() => setShowPassword((s) => !s)}
                 onMouseDown={(e) => e.preventDefault()}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-600 hover:text-gray-800 px-2 py-1"
-                aria-label={showPassword ? "Nascondi password" : "Mostra password"}
-                title={showPassword ? "Nascondi password" : "Mostra password"}
               >
                 {showPassword ? "Nascondi" : "Mostra"}
               </button>
