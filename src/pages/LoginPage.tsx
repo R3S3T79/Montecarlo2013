@@ -1,5 +1,5 @@
 // src/pages/Login.tsx
-// Data: 21/08/2025 (rev: flusso reset password OTP con redirect automatico a /update-password)
+// Data: 21/08/2025 (rev: sfondo immagine + overlay trasparente 90% + flusso reset password OTP con redirect automatico a /update-password)
 
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
@@ -74,10 +74,21 @@ export default function Login() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 px-4">
+    <div
+      className="flex items-center justify-center min-h-screen px-4"
+      style={{
+        backgroundImage: `url("/src/assets/sfondo.jpg")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }}
+    >
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-md bg-white p-8 rounded shadow"
+        className="w-full max-w-md p-8 rounded shadow"
+        style={{
+          backgroundColor: "rgba(255, 255, 255, 0.9)", // bianco con trasparenza 90%
+        }}
       >
         <h2 className="text-2xl font-bold mb-6 text-center">Accedi</h2>
 
