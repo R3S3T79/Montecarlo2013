@@ -1,5 +1,5 @@
 // src/pages/Login.tsx
-// Data: 21/08/2025 (rev: sfondo immagine + overlay trasparente 90% + flusso reset password OTP con redirect automatico a /update-password)
+// Data: 21/08/2025 (rev: scritta Montecarlo 2013 bianca con ombra sopra container)
 
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
@@ -62,10 +62,7 @@ export default function Login() {
 
       if (error) throw error;
 
-      // ✅ Mostra messaggio
       setResetMsg("Email di reset inviata! Controlla la tua casella di posta.");
-
-      // ✅ Porta direttamente l’utente alla pagina per inserire OTP + nuova password
       navigate("/update-password", { state: { email } });
     } catch (err: any) {
       console.error("Errore reset password:", err);
@@ -75,7 +72,7 @@ export default function Login() {
 
   return (
     <div
-      className="flex items-center justify-center min-h-screen px-4"
+      className="flex flex-col items-center justify-center min-h-screen px-4"
       style={{
         backgroundImage: `url("/src/assets/sfondo.jpg")`,
         backgroundSize: "cover",
@@ -83,18 +80,25 @@ export default function Login() {
         backgroundRepeat: "no-repeat",
       }}
     >
+      {/* Scritta sopra */}
+      <h1
+        className="text-3xl font-bold text-white mb-6"
+        style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.7)" }}
+      >
+        Montecarlo 2013
+      </h1>
+
+      {/* Box login */}
       <form
         onSubmit={handleSubmit}
         className="w-full max-w-md p-8 rounded shadow"
         style={{
-          backgroundColor: "rgba(255, 255, 255, 0.9)", // bianco con trasparenza 90%
+          backgroundColor: "rgba(255, 255, 255, 0.9)",
         }}
       >
         <h2 className="text-2xl font-bold mb-6 text-center">Accedi</h2>
 
-        {errorMsg && (
-          <div className="mb-4 text-red-600 text-sm">{errorMsg}</div>
-        )}
+        {errorMsg && <div className="mb-4 text-red-600 text-sm">{errorMsg}</div>}
         {resetMsg && (
           <div className="mb-4 text-green-600 text-sm">{resetMsg}</div>
         )}
@@ -133,8 +137,6 @@ export default function Login() {
               onClick={() => setShowPassword((s) => !s)}
               onMouseDown={(e) => e.preventDefault()}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-600 hover:text-gray-800 px-2 py-1"
-              aria-label={showPassword ? "Nascondi password" : "Mostra password"}
-              title={showPassword ? "Nascondi password" : "Mostra password"}
             >
               {showPassword ? "Nascondi" : "Mostra"}
             </button>
