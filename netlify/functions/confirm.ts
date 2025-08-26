@@ -1,5 +1,5 @@
 // netlify/functions/confirm.ts
-// Data: 21/08/2025 (rev: dual-SMTP fallback notifications → support)
+// Data: 21/08/2025 (rev: dual-SMTP fallback notifications → support + update pending_users.confirmed by uuid)
 // Conferma registrazione: sposta utente da pending a auth.users con password
 
 import { Handler } from "@netlify/functions";
@@ -48,7 +48,7 @@ export const handler: Handler = async (event) => {
   // 1. cerca utente pending
   const { data: pending, error: selErr } = await supabase
     .from("pending_users")
-    .select("email, username, role, password, confirmed")
+    .select("id, uuid, email, username, role, password, confirmed")
     .eq("confirmation_token", token)
     .single();
 
@@ -79,11 +79,11 @@ export const handler: Handler = async (event) => {
     };
   }
 
-  // 3. marca come confirmed in pending_users
+  // 3. marca come confirmed in pending_users usando uuid
   const { error: updatePendingError } = await supabase
     .from("pending_users")
     .update({ confirmed: true })
-    .eq("email", pending.email);
+    .eq("uuid", pending.uuid);
 
   if (updatePendingError) {
     console.error("Errore aggiornamento pending_users in confirm:", updatePendingError);
