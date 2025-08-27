@@ -1,5 +1,5 @@
 // netlify/functions/confirm.ts
-// Data: 21/08/2025 (rev: dual-SMTP fallback notifications → support)
+// Data: 21/08/2025 (rev: dual-SMTP fallback notifications → support + log aggiornamento confirmed)
 // Conferma registrazione: sposta utente da pending a auth.users con password
 
 import { Handler } from "@netlify/functions";
@@ -48,13 +48,16 @@ export const handler: Handler = async (event) => {
   // 1. cerca utente pending
   const { data: pending, error: selErr } = await supabase
     .from("pending_users")
-    .select("email, username, role, password, confirmed")
+    .select("id, uuid, email, username, role, password, confirmed")
     .eq("confirmation_token", token)
     .single();
 
   if (selErr || !pending) {
+    console.error("Token non valido o utente non trovato:", selErr);
     return { statusCode: 404, body: JSON.stringify({ error: "Invalid or expired token" }) };
   }
+
+  console.log("Pending user trovato:", pending);
 
   if (pending.confirmed) {
     return { statusCode: 400, body: JSON.stringify({ error: "User already confirmed" }) };
@@ -79,15 +82,21 @@ export const handler: Handler = async (event) => {
     };
   }
 
-  // 3. marca come confirmed in pending_users (via email)
-  const { error: updatePendingError } = await supabase
+  // 3. marca come confirmed in pending_users
+  console.log("Aggiornamento pending_users per email:", pending.email);
+  const { data: updated, error: updatePendingError } = await supabase
     .from("pending_users")
     .update({ confirmed: true })
-    .eq("email", pending.email);
+    .eq("email", pending.email)
+    .select();
 
   if (updatePendingError) {
     console.error("Errore aggiornamento pending_users in confirm:", updatePendingError);
     return { statusCode: 500, body: JSON.stringify({ error: "Errore aggiornamento pending_users" }) };
+  } else if (!updated || updated.length === 0) {
+    console.warn("⚠️ Nessun record aggiornato in pending_users con email:", pending.email);
+  } else {
+    console.log("✅ Record aggiornato in pending_users:", updated[0]);
   }
 
   // 4. notifica admin via email (con fallback)
