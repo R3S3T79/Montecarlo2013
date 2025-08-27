@@ -1,11 +1,15 @@
-// netlify/functions/confirm.ts
+// netlify/functions/register.ts
 // Data: 21/08/2025 (rev: dual-SMTP fallback notifications → support)
-// Conferma registrazione: sposta utente da pending a auth.users con password
+// Scopo: Registrazione utente → salva in pending_users e manda mail all'admin
 
 import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
+import crypto from "crypto";
 
+// =========================
+// Supabase client (service)
+// =========================
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -34,69 +38,61 @@ const transporterSupport = nodemailer.createTransport({
   },
 });
 
+// =========================
+// Handler
+// =========================
 export const handler: Handler = async (event) => {
-  if (event.httpMethod !== "GET") {
+  if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
-  const token = event.queryStringParameters?.token;
-  console.log("Confirmation token:", token);
-  if (!token) {
-    return { statusCode: 400, body: JSON.stringify({ error: "Missing confirmation token" }) };
+  let body: { email?: string; username?: string; password?: string; role?: string };
+  try {
+    body = JSON.parse(event.body || "{}");
+  } catch {
+    return { statusCode: 400, body: JSON.stringify({ error: "Invalid JSON body" }) };
   }
 
-  // 1. cerca utente pending
-  const { data: pending, error: selErr } = await supabase
-    .from("pending_users")
-    .select("email, username, role, password, confirmed")
-    .eq("confirmation_token", token)
-    .single();
-
-  if (selErr || !pending) {
-    return { statusCode: 404, body: JSON.stringify({ error: "Invalid or expired token" }) };
+  const { email, username, password, role } = body;
+  if (!email || !password) {
+    return { statusCode: 400, body: JSON.stringify({ error: "Missing required fields" }) };
   }
 
-  if (pending.confirmed) {
-    return { statusCode: 400, body: JSON.stringify({ error: "User already confirmed" }) };
-  }
+  // =========================
+  // Inserimento in pending_users
+  // =========================
+  const confirmationToken = crypto.randomUUID();
 
-  // 2. crea l'utente in Supabase Auth con password
-  const { error: createErr } = await supabase.auth.admin.createUser({
-    email: pending.email,
-    password: pending.password, // <-- fondamentale
-    email_confirm: true,
-    user_metadata: {
-      role: pending.role || "user",
-      username: pending.username || pending.email,
+  const { error: insertErr } = await supabase.from("pending_users").insert([
+    {
+      email,
+      username,
+      password,
+      approved: false,
+      confirmed: false,
+      confirmation_token: confirmationToken,
     },
-  });
+  ]);
 
-  if (createErr) {
-    console.error("Errore creazione utente in auth:", createErr);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: "Errore creazione utente in auth", details: createErr.message }),
-    };
+  if (insertErr) {
+    console.error("Errore insert pending_users:", insertErr);
+    return { statusCode: 500, body: JSON.stringify({ error: "Errore salvataggio utente" }) };
   }
 
-  // 3. marca come confirmed in pending_users (via email)
-  const { error: updatePendingError } = await supabase
-    .from("pending_users")
-    .update({ confirmed: true })
-    .eq("email", pending.email);
-
-  if (updatePendingError) {
-    console.error("Errore aggiornamento pending_users in confirm:", updatePendingError);
-    return { statusCode: 500, body: JSON.stringify({ error: "Errore aggiornamento pending_users" }) };
-  }
-
-  // 4. notifica admin via email (con fallback)
+  // =========================
+  // Email di notifica ADMIN con fallback
+  // =========================
   const mailOptions = {
     to: "marcomiressi@gmail.com", // 🔴 ADMIN
-    subject: "Utente confermato",
+    subject: "Nuovo utente in attesa di approvazione",
     html: `
-      <p>L'utente <b>${pending.username || pending.email}</b> (${pending.email}) ha completato la conferma della registrazione.</p>
-      <p>Ruolo: <b>${pending.role || "user"}</b></p>
+      <p>Nuova registrazione ricevuta:</p>
+      <ul>
+        <li>Email: <b>${email}</b></li>
+        <li>Username: <b>${username || "-"}</b></li>
+        <li>Ruolo richiesto: <b>${role || "user"}</b></li>
+      </ul>
+      <p>Puoi approvare l'utente dal <a href="https://montecarlo2013.it/admin-panel">Pannello Admin</a></p>
     `,
   };
 
@@ -105,7 +101,7 @@ export const handler: Handler = async (event) => {
       ...mailOptions,
       from: process.env.SMTP_FROM_NOTIF,
     });
-    console.log("Email conferma inviata con notifications@");
+    console.log("Email admin inviata con notifications@");
   } catch (errNotif) {
     console.warn("Errore con notifications@, retry con support@ :", errNotif);
     try {
@@ -113,15 +109,15 @@ export const handler: Handler = async (event) => {
         ...mailOptions,
         from: process.env.SMTP_FROM_SUPPORT,
       });
-      console.log("Email conferma inviata con support@");
+      console.log("Email admin inviata con support@");
     } catch (errSupport) {
-      console.error("Errore invio mail admin (notif+support):", errSupport);
+      console.error("Errore invio mail admin anche con support@:", errSupport);
       return { statusCode: 500, body: JSON.stringify({ error: "Errore invio mail admin (notif+support)" }) };
     }
   }
 
   return {
     statusCode: 200,
-    body: JSON.stringify({ success: true, message: "User confirmed and created in auth" }),
+    body: JSON.stringify({ success: true }),
   };
 };
