@@ -2,7 +2,7 @@
 // Data creazione file: 21/08/2025
 // Scopo: dopo il redirect del link di invito Supabase, verifica la sessione
 //        e sincronizza pending_users.confirmed = true chiamando la function
-//        Netlify /.netlify/functions/sync-pending-confirm
+//        Netlify /.netlify/functions/sync-confirm
 
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -14,24 +14,23 @@ export default function PostAuthSync(): JSX.Element {
 
   useEffect(() => {
     (async () => {
-      // 1) Recupera la sessione (dopo redeem dell’invito dovrebbe esistere)
+      // 1) Recupera la sessione
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData?.session?.access_token;
+      const userEmail = sessionData?.session?.user?.email;
 
-      if (!accessToken) {
+      if (!accessToken || !userEmail) {
         setMsg("Sessione non trovata. Accedi e riprova.");
-        // opzionale: rimanda al login
-        // setTimeout(() => navigate("/login"), 1200);
+        setTimeout(() => navigate("/login"), 1500);
         return;
       }
 
       try {
-        // 2) Chiama la function server per sincronizzare confirmed = true
-        const res = await fetch("/.netlify/functions/sync-pending-confirm", {
+        // 2) Chiama la function Netlify per aggiornare confirmed = true
+        const res = await fetch("/.netlify/functions/sync-confirm", {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: userEmail }),
         });
 
         if (!res.ok) {
@@ -44,8 +43,8 @@ export default function PostAuthSync(): JSX.Element {
         setMsg(`Errore rete: ${e?.message || e}`);
       }
 
-      // 3) Piccolo delay e rientro in home (o dove preferisci)
-      setTimeout(() => navigate("/"), 800);
+      // 3) Piccolo delay e redirect
+      setTimeout(() => navigate("/"), 1200);
     })();
   }, [navigate]);
 
