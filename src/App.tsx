@@ -14,7 +14,6 @@ import RegisterPage from "./pages/RegisterPage";
 import ConfirmPage from "./pages/ConfirmPage";
 import AuthCallback from "./pages/AuthCallback";
 import UserProfile from './pages/UserProfile';
-import PostAuthSync from "./pages/PostAuthSync";
 import UpdatePassword from "./pages/UpdatePassword";
 import ForgotPassword from "./pages/ForgotPassword";
 
@@ -186,7 +185,7 @@ export default function App() {
           <Route path="/admin-panel" element={<AdminPanel />} />
           <Route path="/admin-notizie" element={<AdminNotizie />} />
           <Route path="/nuovo-utente" element={<NuovoUtente />} /> {/* nuova */}
-          <Route path="/post-auth-sync" element={<PostAuthSync />} />
+         
           
 
 
@@ -199,6 +198,7 @@ export default function App() {
     </AuthProvider>
   );
 }
+
 
 
 
