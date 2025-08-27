@@ -1,5 +1,5 @@
 // netlify/functions/approve-user.ts
-// Data: 27/08/2025 (rev: flusso semplificato → approvazione = conferma + mail benvenuto)
+// Data: 27/08/2025 (rev: flusso semplificato → approvazione = conferma + mail benvenuto, link hardcoded)
 
 import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
@@ -98,7 +98,7 @@ export const handler: Handler = async (event) => {
     }
   }
 
-  // 4) Invia mail di benvenuto
+  // 4) Invia mail di benvenuto con link hardcoded
   const mailOptions = {
     to: email,
     subject: "Benvenuto in Montecarlo 2013",
@@ -107,7 +107,7 @@ export const handler: Handler = async (event) => {
       <p>Il tuo account è stato <b>approvato</b> con ruolo <b>${role}</b>.</p>
       <p>Ora puoi accedere alla piattaforma Montecarlo 2013 con la tua email e password.</p>
       <p>
-        <a href="${process.env.APP_URL || process.env.SITE_URL}/login"
+        <a href="https://montecarlo2013.it/login"
            style="display:inline-block;padding:10px 20px;
                   background:#004aad;color:#fff;
                   text-decoration:none;border-radius:5px;">
