@@ -79,7 +79,7 @@ export const handler: Handler = async (event) => {
     };
   }
 
-  // 3. marca come confirmed in pending_users
+  // 3. marca come confirmed in pending_users (via email)
   const { error: updatePendingError } = await supabase
     .from("pending_users")
     .update({ confirmed: true })
