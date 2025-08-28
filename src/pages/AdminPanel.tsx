@@ -276,7 +276,7 @@ export default function AdminPanel() {
                   });
 
                 return (
-                  <tr key={u.id} className="hover:bg-gray-50">
+                  <tr key={u.id} className="hover:bg-gray-50 border-b">
                     <td className="p-2">
                       <div className="font-medium">{u.username}</div>
                       <div className="text-sm text-gray-600">{u.email}</div>
@@ -328,3 +328,4 @@ export default function AdminPanel() {
     </div>
   );
 }
+
