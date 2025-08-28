@@ -200,7 +200,7 @@ export default function DettaglioPrePartita(): JSX.Element {
 
         {/* Container separato scontri precedenti */}
         {precedenti.length > 0 && (
-          <section className="mt-10 p-5 bg-white rounded-lg shadow-md">
+          <section className="mt-10 p-5 bg-white/90 rounded-lg shadow-md">
             <h3 className="text-base font-medium text-red-600 mb-4 text-center">
               Scontri precedenti
             </h3>
