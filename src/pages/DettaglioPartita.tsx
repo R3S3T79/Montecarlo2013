@@ -94,30 +94,22 @@ export default function DettaglioPartita() {
         return
       }
 
-      // 2️⃣ Recupero marcatori grezzi
-      const { data: marcatoriData, error: errMd } = await supabase
-        .from('marcatori')
-        .select('periodo, giocatore_uid')
-        .eq('partita_id', id)
+      // 2️⃣ Recupero marcatori dalla vista alias
+const { data: marcatoriData, error: errMd } = await supabase
+  .from('marcatori_alias')
+  .select('periodo, giocatore_stagione_id, giocatore_nome, giocatore_cognome')
+  .eq('partita_id', id)
 
-      if (errMd) console.error(errMd)
+if (errMd) console.error(errMd)
 
-      // 3️⃣ Recupero giocatori della stagione
-      const { data: giocatoriStagione, error: errGs } = await supabase
-        .from('giocatori_stagioni')
-        .select('giocatore_uid, nome, cognome')
-        .eq('stagione_id', pd.stagione_id)
-
-      if (errGs) console.error(errGs)
-
-      // 4️⃣ Merge lato client
-      const marcatori: MarcatoriEntry[] = (marcatoriData || []).map(m => {
-        const g = giocatoriStagione?.find(gs => gs.giocatore_uid === m.giocatore_uid)
-        return {
-          periodo: m.periodo,
-          giocatore: g ? { nome: g.nome, cognome: g.cognome } : { nome: '', cognome: '' }
-        }
-      })
+// 3️⃣ Merge lato client
+const marcatori: MarcatoriEntry[] = (marcatoriData || []).map(m => ({
+  periodo: m.periodo,
+  giocatore: { 
+    nome: m.giocatore_nome || '', 
+    cognome: m.giocatore_cognome || '' 
+  }
+}))
 
       setPartita({ ...(pd as any), marcatori })
       setLoading(false)
