@@ -25,15 +25,17 @@ export default function NuovaPartitaPage() {
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
-    stagione_id: '',
-    stato: 'DaGiocare',
-    data: '',
-    ora: '',
-    squadra_casa_id: '',
-    squadra_ospite_id: '',
-    campionato_torneo: 'Campionato',
-    luogo_torneo: ''
-  });
+  stagione_id: '',
+  stato: 'DaGiocare',
+  data: '',
+  ora: '',
+  squadra_casa_id: '',
+  squadra_ospite_id: '',
+  campionato_torneo: 'Campionato',
+  nome_torneo: '',   // 👈 giornata o nome torneo
+  luogo_torneo: ''   // 👈 solo per tornei
+});
+
 
   // carica squadre e stagioni
   useEffect(() => {
@@ -51,10 +53,10 @@ export default function NuovaPartitaPage() {
     }
     (async () => {
       const { data: gs, error } = await supabase
-  .from('v_giocatori_stagioni')
-  .select('giocatore_id,nome,cognome')
-  .eq('stagione_id', formData.stagione_id)
-  .order('cognome', { ascending: true });
+        .from('v_giocatori_stagioni')
+        .select('giocatore_id,nome,cognome')
+        .eq('stagione_id', formData.stagione_id)
+        .order('cognome', { ascending: true });
       if (error) {
         console.error('Errore caricamento giocatori per stagione:', error);
       } else {
@@ -68,20 +70,14 @@ export default function NuovaPartitaPage() {
   }, [formData.stagione_id]);
 
   // sposta Montecarlo in cima e ordina le altre in ordine alfabetico
-const squadreOrd = useMemo(() => {
-  const arr = [...squadre];
-  const idx = arr.findIndex(s => s.id === MONTE_ID);
+  const squadreOrd = useMemo(() => {
+    const arr = [...squadre];
+    const idx = arr.findIndex(s => s.id === MONTE_ID);
 
-  // estraggo Montecarlo
-  const monte = idx > -1 ? arr.splice(idx, 1)[0] : null;
-
-  // ordino alfabeticamente le altre
-  arr.sort((a, b) => a.nome.localeCompare(b.nome));
-
-  // reinserisco Montecarlo in cima
-  return monte ? [monte, ...arr] : arr;
-}, [squadre]);
-
+    const monte = idx > -1 ? arr.splice(idx, 1)[0] : null;
+    arr.sort((a, b) => a.nome.localeCompare(b.nome));
+    return monte ? [monte, ...arr] : arr;
+  }, [squadre]);
 
   // determino se Montecarlo è in casa
   const isMCcasa = formData.squadra_casa_id === MONTE_ID;
@@ -137,9 +133,7 @@ const squadreOrd = useMemo(() => {
         squadra_casa_id:   formData.squadra_casa_id,
         squadra_ospite_id: formData.squadra_ospite_id,
         campionato_torneo: formData.campionato_torneo.trim(),
-        luogo_torneo:      formData.campionato_torneo === 'Torneo'
-          ? formData.luogo_torneo
-          : null,
+        nome_torneo:       formData.nome_torneo || null,   // 👈 salva giornata o nome torneo
         data_ora:  dataOra,
         goal_a:    totCasa,
         goal_b:    totOsp,
@@ -193,8 +187,6 @@ const squadreOrd = useMemo(() => {
   return (
     <div className="min-h-screen">
       <div className="max-w-2xl mx-auto bg-white/85 rounded-2xl shadow-montecarlo p-8">
-        
-
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Data & Ora */}
           <div className="grid grid-cols-2 gap-4">
@@ -275,16 +267,52 @@ const squadreOrd = useMemo(() => {
             </select>
           </div>
 
-          {/* Luogo torneo */}
-          {formData.campionato_torneo === 'Torneo' && (
-            <input
-              type="text"
-              placeholder="Luogo (opzionale)"
-              className="w-full border rounded px-4 py-2"
-              value={formData.luogo_torneo}
-              onChange={e => setFormData({ ...formData, luogo_torneo: e.target.value })}
-            />
-          )}
+          {/* Campionato: giornata */}
+{formData.campionato_torneo === 'Campionato' && (
+  <input
+    type="text"
+    placeholder="Giornata (es. 5ª giornata)"
+    className="w-full border rounded px-4 py-2"
+    value={formData.nome_torneo}
+    onChange={e => setFormData({ ...formData, nome_torneo: e.target.value })}
+  />
+)}
+
+{/* Torneo: nome + luogo */}
+{formData.campionato_torneo === 'Torneo' && (
+  <div className="space-y-3">
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Nome torneo
+      </label>
+      <input
+        type="text"
+        placeholder="Inserisci il nome del torneo"
+        className="w-full border rounded px-4 py-2"
+        value={formData.nome_torneo}
+        onChange={e =>
+          setFormData({ ...formData, nome_torneo: e.target.value })
+        }
+      />
+    </div>
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Luogo torneo
+      </label>
+      <input
+        type="text"
+        placeholder="Inserisci il luogo del torneo"
+        className="w-full border rounded px-4 py-2"
+        value={formData.luogo_torneo}
+        onChange={e =>
+          setFormData({ ...formData, luogo_torneo: e.target.value })
+        }
+      />
+    </div>
+  </div>
+)}
+
+
 
           {/* Dettagli Giocata */}
           {formData.stato === 'Giocata' && (
