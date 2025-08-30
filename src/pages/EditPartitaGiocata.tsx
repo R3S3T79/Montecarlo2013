@@ -64,10 +64,12 @@ export default function EditPartitaGiocata() {
       let gsData: Giocatore[] = [];
       if (p?.stagione_id) {
         const { data: gs } = await supabase
-          .from("giocatori_stagioni")
-          .select("id,nome,cognome")
-          .eq("stagione_id", p.stagione_id)
-          .order("cognome", { ascending: true });
+  .from("giocatori_stagioni_view")
+  .select("id,nome,cognome")
+  .eq("stagione_id", p.stagione_id)
+  .order("cognome", { ascending: true })
+  .order("nome", { ascending: true });
+
         if (gs) {
           gsData = gs.map((g) => ({ id: g.id, nome: g.nome, cognome: g.cognome }));
           setGiocatoriStagione(gsData);
@@ -139,97 +141,157 @@ export default function EditPartitaGiocata() {
   const handleAnnulla = () => navigate(`/partita/${id}`);
 
   const handleSalva = async () => {
-    const totalA = goalCasa.reduce((a, b) => a + b, 0);
-    const totalB = goalOspite.reduce((a, b) => a + b, 0);
+  const totalA = goalCasa.reduce((a, b) => a + b, 0);
+  const totalB = goalOspite.reduce((a, b) => a + b, 0);
 
-    // Aggiorno partita
-    await supabase
-      .from("partite")
-      .update({
-        data_ora: new Date(`${data}T${ora}`),
-        squadra_casa_id: squadraCasa,
-        squadra_ospite_id: squadraOspite,
-        goal_a1: goalCasa[0],
-        goal_a2: goalCasa[1],
-        goal_a3: goalCasa[2],
-        goal_a4: goalCasa[3],
-        goal_b1: goalOspite[0],
-        goal_b2: goalOspite[1],
-        goal_b3: goalOspite[2],
-        goal_b4: goalOspite[3],
-        goal_a: totalA,
-        goal_b: totalB,
-      })
-      .eq("id", id);
+  // Aggiorno partita
+  await supabase
+    .from("partite")
+    .update({
+      data_ora: new Date(`${data}T${ora}`),
+      squadra_casa_id: squadraCasa,
+      squadra_ospite_id: squadraOspite,
+      goal_a1: goalCasa[0],
+      goal_a2: goalCasa[1],
+      goal_a3: goalCasa[2],
+      goal_a4: goalCasa[3],
+      goal_b1: goalOspite[0],
+      goal_b2: goalOspite[1],
+      goal_b3: goalOspite[2],
+      goal_b4: goalOspite[3],
+      goal_a: totalA,
+      goal_b: totalB,
+    })
+    .eq("id", id);
 
-    // Aggiorno marcatori
-    await supabase.from("marcatori").delete().eq("partita_id", id);
-    const nuoviMarc = marcatoriPerTempo.flatMap((lst, i) =>
-      lst.filter((g) => g).map((gid) => ({
-        partita_id: id!,
-        giocatore_stagione_id: gid,
-        periodo: i + 1,
-        stagione_id: stagioneId,
-      }))
-    );
-    if (nuoviMarc.length) await supabase.from("marcatori").insert(nuoviMarc);
+  // Aggiorno marcatori
+  await supabase.from("marcatori").delete().eq("partita_id", id);
+  const nuoviMarc = marcatoriPerTempo.flatMap((lst, i) =>
+    lst.filter((g) => g).map((gid) => ({
+      partita_id: id!,
+      giocatore_stagione_id: gid,
+      periodo: i + 1,
+      stagione_id: stagioneId,
+    }))
+  );
+  if (nuoviMarc.length) await supabase.from("marcatori").insert(nuoviMarc);
 
-    // Aggiorno presenze
-    await supabase.from("presenze").delete().eq("partita_id", id);
-    if (formazione.length) {
-      const nuovePres = formazione.map((gid) => ({
-        partita_id: id!,
-        giocatore_stagione_id: gid,
-        stagione_id: stagioneId,
-      }));
-      await supabase.from("presenze").insert(nuovePres);
+  // Aggiorno presenze
+  const { error: delErr } = await supabase
+    .from("presenze")
+    .delete()
+    .eq("partita_id", id)
+    .eq("stagione_id", stagioneId);
+
+  if (delErr) {
+    console.error("Errore DELETE presenze:", delErr.message);
+  } else {
+    console.log("Presenze eliminate correttamente per partita:", id);
+  }
+
+  if (formazione.length) {
+    const nuovePres = formazione.map((gid) => ({
+      partita_id: id!,
+      giocatore_stagione_id: gid,
+      stagione_id: stagioneId,
+    }));
+    const { error: insErr } = await supabase.from("presenze").insert(nuovePres);
+    if (insErr) {
+      console.error("Errore INSERT presenze:", insErr.message);
     }
+  }
 
-    navigate(`/partita/${id}`);
-  };
+  navigate(`/partita/${id}`);
+};
+
 
   return (
     <div className="min-h-screen pt-2 px-2 pb-6">
       <div className="min-h-screen p-4 sm:p-6 bg-white/70">
         
-        {/* Data, Ora e Formazione */}
-        <div className="grid grid-cols-1 sm:grid-cols-[120px_100px_auto] gap-4 mb-6 items-end">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Data</label>
-            <input
-              type="date"
-              value={data}
-              onChange={(e) => setData(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Ora</label>
-            <input
-              type="time"
-              value={ora}
-              onChange={(e) => setOra(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded text-sm"
-            />
-          </div>
-          <div className="flex justify-center sm:justify-end">
-            <button
-              type="button"
-              onClick={toggleForm}
-              className="border border-gray-300 bg-white hover:bg-gray-50 px-4 py-2 rounded text-sm w-full sm:w-auto"
-            >
-              Formazione
-            </button>
-          </div>
-        </div>
+        {/* Data, Ora e Squadre */}
+<div className="grid grid-cols-1 sm:grid-cols-[120px_100px_auto_auto] gap-4 mb-6 items-end">
+  <div>
+    <label className="block text-sm font-medium text-gray-700">Data</label>
+    <input
+      type="date"
+      value={data}
+      onChange={(e) => setData(e.target.value)}
+      className="w-full p-2 border border-gray-300 rounded text-sm"
+    />
+  </div>
+  <div>
+    <label className="block text-sm font-medium text-gray-700">Ora</label>
+    <input
+      type="time"
+      value={ora}
+      onChange={(e) => setOra(e.target.value)}
+      className="w-full p-2 border border-gray-300 rounded text-sm"
+    />
+  </div>
+  <div>
+    <label className="block text-sm font-medium text-gray-700">Squadra Casa</label>
+    <select
+      value={squadraCasa}
+      onChange={(e) => setSquadraCasa(e.target.value)}
+      className="w-full p-2 border border-gray-300 rounded text-sm"
+    >
+      {squadre.map((s) => (
+        <option key={s.id} value={s.id}>
+          {s.nome}
+        </option>
+      ))}
+    </select>
+  </div>
+  <div>
+    <label className="block text-sm font-medium text-gray-700">Squadra Ospite</label>
+    <select
+      value={squadraOspite}
+      onChange={(e) => setSquadraOspite(e.target.value)}
+      className="w-full p-2 border border-gray-300 rounded text-sm"
+    >
+      {squadre.map((s) => (
+        <option key={s.id} value={s.id}>
+          {s.nome}
+        </option>
+      ))}
+    </select>
+  </div>
+  <div className="flex justify-center sm:justify-end">
+    <button
+      type="button"
+      onClick={toggleForm}
+      className="bg-gradient-to-br from-[#d61f1f] to-[#f45e5e] text-white hover:opacity-90 px-4 py-2 rounded text-sm w-full sm:w-auto"
+    >
+      Formazione
+    </button>
+  </div>
+</div>
+
 
         {/* Box Formazione */}
         {showFormazione && (
           <div className="mb-6 bg-white border border-gray-200 rounded-lg p-4 space-y-2">
             <div className="flex justify-between items-center mb-2">
-              <h3 className="font-semibold text-gray-800">Formazione schierata</h3>
-              <button onClick={toggleForm} className="text-gray-500 hover:text-gray-700">Chiudi</button>
-            </div>
+  <h3 className="font-semibold text-gray-800">Formazione schierata</h3>
+  <div className="flex items-center space-x-2">
+    <label className="text-sm text-gray-600 flex items-center">
+      <input
+        type="checkbox"
+        checked={formazione.length === giocatoriStagione.length}
+        onChange={(e) => {
+          if (e.target.checked) {
+            setFormazione(giocatoriStagione.map((g) => g.id));
+          } else {
+            setFormazione([]);
+          }
+        }}
+      />
+      <span className="ml-1">Tutti</span>
+    </label>
+    <button onClick={toggleForm} className="text-gray-500 hover:text-gray-700">Chiudi</button>
+  </div>
+</div>
             <div className="max-h-48 overflow-auto space-y-1">
               {giocatoriStagione.map((g) => (
                 <label key={g.id} className="flex items-center space-x-2 text-sm text-gray-800">
