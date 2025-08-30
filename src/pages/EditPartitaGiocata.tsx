@@ -270,48 +270,61 @@ export default function EditPartitaGiocata() {
 
 
         {/* Box Formazione */}
-        {showFormazione && (
-          <div className="mb-6 bg-white border border-gray-200 rounded-lg p-4 space-y-2">
-            <div className="flex justify-between items-center mb-2">
-  <h3 className="font-semibold text-gray-800">Formazione schierata</h3>
-  <div className="flex items-center space-x-2">
-    <label className="text-sm text-gray-600 flex items-center">
-      <input
-        type="checkbox"
-        checked={formazione.length === giocatoriStagione.length}
-        onChange={(e) => {
-          if (e.target.checked) {
-            setFormazione(giocatoriStagione.map((g) => g.id));
-          } else {
-            setFormazione([]);
-          }
-        }}
-      />
-      <span className="ml-1">Tutti</span>
-    </label>
-    <button onClick={toggleForm} className="text-gray-500 hover:text-gray-700">Chiudi</button>
+{showFormazione && (
+  <div className="mb-6 bg-white border border-gray-200 rounded-lg p-4 space-y-2">
+    <div className="flex justify-between items-center mb-3">
+      <h3 className="font-semibold text-gray-800">Formazione schierata</h3>
+      <div className="flex items-center space-x-3">
+        {/* Seleziona tutti / deseleziona tutti */}
+        <label className="text-sm text-gray-600 flex items-center">
+          <input
+            type="checkbox"
+            checked={formazione.length === giocatoriStagione.length}
+            onChange={(e) => {
+              if (e.target.checked) {
+                setFormazione(giocatoriStagione.map((g) => g.id));
+              } else {
+                setFormazione([]);
+              }
+            }}
+            className="w-5 h-5 accent-rose-500 mr-2 shrink-0"
+          />
+          <span>Tutti</span>
+        </label>
+        <button
+          onClick={toggleForm}
+          className="text-gray-500 hover:text-gray-700"
+        >
+          Chiudi
+        </button>
+      </div>
+    </div>
+
+    {/* Lista giocatori */}
+    <div className="max-h-60 overflow-auto space-y-2">
+      {giocatoriStagione.map((g) => (
+        <label
+          key={g.id}
+          className="flex items-center space-x-3 text-lg py-1"
+        >
+          <input
+            type="checkbox"
+            checked={formazione.includes(g.id)}
+            onChange={(e) => {
+              const sel = e.target.checked;
+              setFormazione((prev) =>
+                sel ? [...prev, g.id] : prev.filter((x) => x !== g.id)
+              );
+            }}
+            className="w-6 h-6 accent-rose-500 mr-2 shrink-0"
+          />
+          <span>{g.cognome} {g.nome}</span>
+        </label>
+      ))}
+    </div>
   </div>
-</div>
-            <div className="max-h-48 overflow-auto space-y-1">
-              {giocatoriStagione.map((g) => (
-                <label key={g.id} className="flex items-center space-x-3 text-lg py-2">
-  <input
-    type="checkbox"
-    checked={formazione.includes(g.id)}
-    onChange={(e) => {
-      const sel = e.target.checked;
-      setFormazione((prev) =>
-        sel ? [...prev, g.id] : prev.filter((x) => x !== g.id)
-      );
-    }}
-    className="w-6 h-6 scale-125 accent-rose-500 shrink-0"
-  />
-  <span>{g.cognome} {g.nome}</span>
-</label>
-              ))}
-            </div>
-          </div>
-        )}
+)}
+
 
         {/* Tempi e Marcatori */}
         {[0, 1, 2, 3].map((t) => (
