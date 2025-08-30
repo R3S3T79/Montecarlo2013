@@ -294,19 +294,20 @@ export default function EditPartitaGiocata() {
 </div>
             <div className="max-h-48 overflow-auto space-y-1">
               {giocatoriStagione.map((g) => (
-                <label key={g.id} className="flex items-center space-x-2 text-sm text-gray-800">
-                  <input
-                    type="checkbox"
-                    checked={formazione.includes(g.id)}
-                    onChange={(e) => {
-                      const sel = e.target.checked;
-                      setFormazione((prev) =>
-                        sel ? [...prev, g.id] : prev.filter((x) => x !== g.id)
-                      );
-                    }}
-                  />
-                  <span>{g.cognome} {g.nome}</span>
-                </label>
+                <label key={g.id} className="flex items-center space-x-3 text-lg py-2">
+  <input
+    type="checkbox"
+    checked={formazione.includes(g.id)}
+    onChange={(e) => {
+      const sel = e.target.checked;
+      setFormazione((prev) =>
+        sel ? [...prev, g.id] : prev.filter((x) => x !== g.id)
+      );
+    }}
+    className="w-6 h-6 scale-125 accent-rose-500 shrink-0"
+  />
+  <span>{g.cognome} {g.nome}</span>
+</label>
               ))}
             </div>
           </div>
