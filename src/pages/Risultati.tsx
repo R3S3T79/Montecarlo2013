@@ -66,14 +66,15 @@ export default function Risultati() {
     try {
       setLoadingData(true);
       let q = supabase
-        .from("partite")
-        .select(
-          `
-            *,
-            casa:squadra_casa_id(nome),
-            ospite:squadra_ospite_id(nome)
-          `
-        )
+  .from("partite")
+  .select(
+    `
+      *,
+      casa:squadra_casa_id(nome),
+      ospite:squadra_ospite_id(nome),
+      nome_torneo
+    `
+  )
         .eq("stato", "Giocata")
         .order("data_ora", { ascending: false });
 
@@ -133,7 +134,7 @@ export default function Risultati() {
           className="w-full border-2 border-montecarlo-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
         />
 
-        {/* Dropdown Stagione e Competizioni */}
+                {/* Dropdown Stagione e Competizioni */}
         <div className="flex gap-2">
           <select
             value={stagioneSelezionata}
@@ -182,11 +183,26 @@ export default function Risultati() {
                 onClick={() => navigate(`/partita/${p.id}`)}
                 className="bg-white/90 rounded-lg shadow-montecarlo hover:shadow-montecarlo-lg cursor-pointer transition-transform hover:scale-[1.02] border-l-4 border-montecarlo-secondary"
               >
-                <div className="bg-gradient-montecarlo text-white px-4 py-2 rounded-t-lg">
-                  <div className="text-sm font-medium text-center">
-                    {formatData(p.data_ora)}
-                  </div>
-                </div>
+                {/* Testata: data a sinistra, competizione a destra */}
+                <div className="bg-gradient-montecarlo text-white px-4 py-2 rounded-t-lg grid grid-cols-3 items-center">
+  {/* Data a sinistra */}
+  <span className="text-xs sm:text-sm font-medium text-left">
+    {formatData(p.data_ora)}
+  </span>
+
+  {/* Competizione centrata */}
+  <span className="text-sm font-semibold text-center">
+    {p.campionato_torneo}
+  </span>
+
+  {/* Nome torneo a destra */}
+  <span className="text-xs sm:text-sm font-medium text-right">
+    {p.campionato_torneo === "Torneo" && p.nome_torneo ? p.nome_torneo : ""}
+  </span>
+</div>
+
+
+                {/* Corpo: squadre e risultato */}
                 <div className="p-4 grid grid-cols-[2fr_auto_2fr] items-center gap-4">
                   <span className="text-montecarlo-secondary font-semibold text-right">
                     {p.casa.nome}
