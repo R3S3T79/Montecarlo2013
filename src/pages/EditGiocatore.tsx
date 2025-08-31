@@ -1,5 +1,5 @@
 // src/pages/EditGiocatore.tsx
-// Data creazione chat: 14/08/2025
+// Data creazione chat: 14/08/2025 (rev: fix campi nome/cognome da v_giocatori_completo)
 
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -15,8 +15,8 @@ interface GiocatoreView {
   giocatore_uid: string;
   stagione_id: string;
   stagione_nome: string;
-  giocatore_nome: string;
-  giocatore_cognome: string;
+  nome: string;             // 🔹 corretto
+  cognome: string;          // 🔹 corretto
   data_nascita: string | null;
   ruolo: string | null;
   numero_cartellino: number | null;
@@ -73,8 +73,8 @@ export default function EditGiocatore() {
       }
 
       const latest = data[0];
-      setNome(latest.giocatore_nome);
-      setCognome(latest.giocatore_cognome);
+      setNome(latest.nome);
+      setCognome(latest.cognome);
       setDataNascita(latest.data_nascita || '');
       setRuolo(latest.ruolo || '');
       setNumeroCartellino(latest.numero_cartellino ?? '');
@@ -150,7 +150,6 @@ export default function EditGiocatore() {
       }
 
       // Creo associazioni stagioni con ruolo
-      // ✅ SCRIVO ANCHE nome/cognome in giocatori_stagioni per evitare NULL
       const records = stagioniSelezionate.map(stagId => ({
         giocatore_uid: newGiocatoreUid,
         stagione_id: stagId,
@@ -187,12 +186,7 @@ export default function EditGiocatore() {
         return;
       }
 
-      // ✅ Aggiornamento DIFFERENZIALE delle stagioni:
-      // - UPDATE per le stagioni già presenti (ruolo/nome/cognome)
-      // - INSERT solo per le nuove stagioni
-      // - NIENTE DELETE (gli ID esistenti restano stabili)
-
-      // 1) Update stagioni già presenti tra quelle selezionate
+      // Update stagioni già presenti
       const { error: updErr } = await supabase
         .from('giocatori_stagioni')
         .update({
@@ -209,7 +203,7 @@ export default function EditGiocatore() {
         return;
       }
 
-      // 2) Inserisci solo le stagioni mancanti
+      // Inserisci solo stagioni mancanti
       const { data: esistenti, error: exErr } = await supabase
         .from('giocatori_stagioni')
         .select('stagione_id')
@@ -279,13 +273,18 @@ export default function EditGiocatore() {
       />
 
       {/* Ruolo */}
-      <label className="block font-medium">Ruolo</label>
-      <input
-        type="text"
-        value={ruolo}
-        onChange={e => setRuolo(e.target.value)}
-        className="w-full border px-3 py-2 rounded mb-3"
-      />
+<label className="block font-medium">Ruolo</label>
+<select
+  value={ruolo}
+  onChange={e => setRuolo(e.target.value)}
+  className="w-full border px-3 py-2 rounded mb-3"
+>
+  <option value="">-- Seleziona ruolo --</option>
+  <option value="Portiere">Portiere</option>
+  <option value="Difensore">Difensore</option>
+  <option value="Centrocampista">Centrocampista</option>
+  <option value="Attaccante">Attaccante</option>
+</select>
 
       {/* Numero cartellino */}
       <label className="block font-medium">Numero Cartellino</label>
@@ -311,9 +310,9 @@ export default function EditGiocatore() {
           className="hidden"
         />
         <label className="bg-green-600 text-white px-4 py-2 rounded cursor-pointer flex items-center justify-center">
-  <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-  Carica File
-</label>
+          <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+          Carica File
+        </label>
         {fotoUrl && <img src={fotoUrl} alt="anteprima" className="w-16 h-16 rounded-full" />}
       </div>
 
@@ -334,13 +333,13 @@ export default function EditGiocatore() {
 
       {/* Azioni */}
       <div className="flex justify-between">
-  <button onClick={handleAnnulla} className="bg-gray-400 text-white px-4 py-2 rounded">
-    Annulla
-  </button>
-  <button onClick={handleSubmit} className="bg-red-600 text-white px-4 py-2 rounded">
-    {isNew ? 'Crea' : 'Aggiorna'}
-  </button>
-</div>
+        <button onClick={handleAnnulla} className="bg-gray-400 text-white px-4 py-2 rounded">
+          Annulla
+        </button>
+        <button onClick={handleSubmit} className="bg-red-600 text-white px-4 py-2 rounded">
+          {isNew ? 'Crea' : 'Aggiorna'}
+        </button>
+      </div>
     </div>
   );
 }
