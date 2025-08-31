@@ -1,5 +1,5 @@
 // src/pages/DettaglioGiocatore.tsx
-// Data creazione chat: 14/08/2025 (rev: ricezione stagione da navigate state)
+// Data creazione chat: 14/08/2025 (rev: aggiunto campo Goal Subiti per portieri)
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -21,6 +21,7 @@ interface Giocatore {
 interface StatisticheGiocatore {
   goalTotali: number;
   presenzeTotali: number;
+  goalSubiti?: number;
 }
 
 interface Stagione {
@@ -38,6 +39,7 @@ export default function DettaglioGiocatore() {
   const [statistiche, setStatistiche] = useState<StatisticheGiocatore>({
     goalTotali: 0,
     presenzeTotali: 0,
+    goalSubiti: 0,
   });
   const [stagioniDisponibili, setStagioniDisponibili] = useState<Stagione[]>([]);
   const [stagioneSelezionata, setStagioneSelezionata] = useState<string>('');
@@ -69,7 +71,7 @@ export default function DettaglioGiocatore() {
   const fetchStatistiche = async (giocatoreUid: string, stagioneId: string) => {
     const { data } = await supabase
       .from('v_stat_giocatore_stagione')
-      .select('goal_totali, presenze_totali')
+      .select('goal_totali, presenze_totali, goal_subiti')
       .eq('giocatore_uid', giocatoreUid)
       .eq('stagione_id', stagioneId)
       .maybeSingle();
@@ -78,9 +80,10 @@ export default function DettaglioGiocatore() {
       setStatistiche({
         goalTotali: data.goal_totali || 0,
         presenzeTotali: data.presenze_totali || 0,
+        goalSubiti: data.goal_subiti || 0,
       });
     } else {
-      setStatistiche({ goalTotali: 0, presenzeTotali: 0 });
+      setStatistiche({ goalTotali: 0, presenzeTotali: 0, goalSubiti: 0 });
     }
   };
 
@@ -206,20 +209,35 @@ export default function DettaglioGiocatore() {
           </h1>
 
           <div className="flex space-x-8 mb-6">
+            {/* Goal fatti */}
             <div className="text-center">
               <div className="text-2xl font-bold text-montecarlo-accent">{statistiche.goalTotali}</div>
               <div className="text-sm text-black">Goal</div>
             </div>
+
+            {/* Presenze */}
             <div className="text-center">
               <div className="text-2xl font-bold text-montecarlo-gold-600">{statistiche.presenzeTotali}</div>
               <div className="text-sm text-black">Presenze</div>
             </div>
-            {statistiche.presenzeTotali > 0 && (
+
+            {/* Media Goal solo se NON portiere */}
+            {statistiche.presenzeTotali > 0 && giocatore.ruolo !== "Portiere" && (
               <div className="text-center">
                 <div className="text-2xl font-bold text-montecarlo-green-600">
                   {(statistiche.goalTotali / statistiche.presenzeTotali).toFixed(2)}
                 </div>
                 <div className="text-sm text-black">Media Goal</div>
+              </div>
+            )}
+
+            {/* Goal Subiti solo se Portiere */}
+            {giocatore.ruolo === "Portiere" && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-montecarlo-red-600">
+                  {statistiche.goalSubiti}
+                </div>
+                <div className="text-sm text-black">Goal Subiti</div>
               </div>
             )}
           </div>
