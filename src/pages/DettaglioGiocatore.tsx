@@ -1,5 +1,5 @@
 // src/pages/DettaglioGiocatore.tsx
-// Data creazione chat: 14/08/2025
+// Data creazione chat: 14/08/2025 (rev: fix campi nome/cognome)
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -11,8 +11,8 @@ interface Giocatore {
   giocatore_stagione_id: string;
   giocatore_uid: string;
   stagione_id: string;
-  giocatore_nome: string;
-  giocatore_cognome: string;
+  nome: string;
+  cognome: string;
   ruolo: string | null;
   foto_url: string | null;
   data_nascita: string | null;
@@ -176,7 +176,6 @@ export default function DettaglioGiocatore() {
       <div className="container mx-auto pt-2 px-2 py-6">
         {stagioniDisponibili.length > 0 && (
           <div className="mb-4">
-            
             <select
               value={stagioneSelezionata}
               onChange={(e) => setStagioneSelezionata(e.target.value)}
@@ -196,17 +195,17 @@ export default function DettaglioGiocatore() {
             {giocatore.foto_url ? (
               <img
                 src={giocatore.foto_url}
-                alt={`${giocatore.giocatore_cognome} ${giocatore.giocatore_nome}`}
+                alt={`${giocatore.cognome} ${giocatore.nome}`}
                 className="w-full h-full object-cover"
               />
             ) : (
               <div className="w-full h-full bg-montecarlo-secondary text-white flex items-center justify-center text-4xl font-bold">
-                {giocatore.giocatore_cognome[0]}
+                {giocatore.cognome[0]}
               </div>
             )}
           </div>
           <h1 className="text-2xl font-bold text-montecarlo-secondary mb-4">
-            {giocatore.giocatore_cognome} {giocatore.giocatore_nome}
+            {giocatore.cognome} {giocatore.nome}
           </h1>
 
           <div className="flex space-x-8 mb-6">
