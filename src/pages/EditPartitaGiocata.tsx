@@ -1,5 +1,5 @@
 // src/pages/EditPartitaGiocata.tsx
-// Data creazione chat: 2025-08-03 (rev: aggiunti campi competizione + nome_torneo)
+// Data creazione chat: 2025-08-03 (rev: reinserito pulsante Formazione e box selezione)
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -9,6 +9,7 @@ interface Giocatore {
   id: string;
   nome: string;
   cognome: string;
+  ruolo?: string | null;
 }
 
 export default function EditPartitaGiocata() {
@@ -25,10 +26,12 @@ export default function EditPartitaGiocata() {
   const [goalCasa, setGoalCasa] = useState<number[]>([0, 0, 0, 0]);
   const [goalOspite, setGoalOspite] = useState<number[]>([0, 0, 0, 0]);
   const [marcatoriPerTempo, setMarcatoriPerTempo] = useState<string[][]>([[], [], [], []]);
+  const [portieriPerTempo, setPortieriPerTempo] = useState<string[][]>([[], [], [], []]);
   const [giocatoriStagione, setGiocatoriStagione] = useState<Giocatore[]>([]);
+  const [portieriStagione, setPortieriStagione] = useState<Giocatore[]>([]);
   const [showFormazione, setShowFormazione] = useState(false);
 
-  const [tipoCompetizione, setTipoCompetizione] = useState<string>(""); // Campionato/Torneo/Amichevole
+  const [tipoCompetizione, setTipoCompetizione] = useState<string>("");
   const [nomeTorneo, setNomeTorneo] = useState<string>("");
 
   const getNomeSquadra = (sid: string) =>
@@ -40,7 +43,6 @@ export default function EditPartitaGiocata() {
     async function fetchData() {
       if (!id) return;
 
-      // Partita
       const { data: p } = await supabase.from("partite").select("*").eq("id", id).single();
       if (p) {
         setStagioneId(p.stagione_id);
@@ -51,12 +53,10 @@ export default function EditPartitaGiocata() {
         setSquadraOspite(p.squadra_ospite_id);
         setGoalCasa([p.goal_a1, p.goal_a2, p.goal_a3, p.goal_a4]);
         setGoalOspite([p.goal_b1, p.goal_b2, p.goal_b3, p.goal_b4]);
-
         setTipoCompetizione(p.campionato_torneo || "");
         setNomeTorneo(p.nome_torneo || "");
       }
 
-      // Squadre (Montecarlo prima, poi ordine alfabetico)
       const { data: sq } = await supabase.from("squadre").select("id,nome");
       if (sq) {
         const mc = sq.find((x) => x.nome.toLowerCase() === "montecarlo");
@@ -66,23 +66,26 @@ export default function EditPartitaGiocata() {
         setSquadre(mc ? [mc, ...others] : sq);
       }
 
-      // Giocatori della stagione (ordinati per cognome)
       let gsData: Giocatore[] = [];
       if (p?.stagione_id) {
         const { data: gs } = await supabase
           .from("giocatori_stagioni_view")
-          .select("id,nome,cognome")
+          .select("id,nome,cognome,ruolo")
           .eq("stagione_id", p.stagione_id)
           .order("cognome", { ascending: true })
           .order("nome", { ascending: true });
 
         if (gs) {
-          gsData = gs.map((g) => ({ id: g.id, nome: g.nome, cognome: g.cognome }));
+          gsData = gs.map((g) => ({
+            id: g.id,
+            nome: g.nome,
+            cognome: g.cognome,
+            ruolo: g.ruolo,
+          }));
           setGiocatoriStagione(gsData);
         }
       }
 
-      // Formazione
       const { data: pr } = await supabase
         .from("presenze")
         .select("giocatore_stagione_id")
@@ -93,23 +96,33 @@ export default function EditPartitaGiocata() {
         setFormazione(gsData.map((g) => g.id));
       }
 
-      // Marcatori
       const { data: md } = await supabase
         .from("marcatori")
-        .select("periodo, giocatore_stagione_id")
+        .select("periodo, giocatore_stagione_id, portiere_subisce_id")
         .eq("partita_id", id);
       if (md) {
-        const arr: string[][] = [[], [], [], []];
+        const marcArr: string[][] = [[], [], [], []];
+        const portArr: string[][] = [[], [], [], []];
         md.forEach((m) => {
           if (m.periodo >= 1 && m.periodo <= 4) {
-            arr[m.periodo - 1].push(m.giocatore_stagione_id);
+            if (m.giocatore_stagione_id) marcArr[m.periodo - 1].push(m.giocatore_stagione_id);
+            if (m.portiere_subisce_id) portArr[m.periodo - 1].push(m.portiere_subisce_id);
           }
         });
-        setMarcatoriPerTempo(arr);
+        setMarcatoriPerTempo(marcArr);
+        setPortieriPerTempo(portArr);
       }
     }
     fetchData();
   }, [id]);
+
+  useEffect(() => {
+    setPortieriStagione(
+      giocatoriStagione.filter(
+        (g) => g.ruolo?.toLowerCase() === "portiere" && formazione.includes(g.id)
+      )
+    );
+  }, [giocatoriStagione, formazione]);
 
   const toggleForm = () => setShowFormazione((v) => !v);
 
@@ -125,8 +138,16 @@ export default function EditPartitaGiocata() {
       setGoalOspite(go);
     }
     const sid = lato === "casa" ? squadraCasa : squadraOspite;
+
     if (isMontecarlo(sid)) {
       setMarcatoriPerTempo((prev) => {
+        const up = prev.map((arr) => [...arr]);
+        up[t] = up[t].slice(0, v);
+        while (up[t].length < v) up[t].push("");
+        return up;
+      });
+    } else {
+      setPortieriPerTempo((prev) => {
         const up = prev.map((arr) => [...arr]);
         up[t] = up[t].slice(0, v);
         while (up[t].length < v) up[t].push("");
@@ -170,12 +191,12 @@ export default function EditPartitaGiocata() {
       })
       .eq("id", id);
 
-    // Aggiorno marcatori
     await supabase.from("marcatori").delete().eq("partita_id", id);
 
     const nuoviMarc: any[] = [];
-    for (let i = 0; i < marcatoriPerTempo.length; i++) {
+    for (let i = 0; i < 4; i++) {
       const periodo = i + 1;
+
       for (const gid of marcatoriPerTempo[i]) {
         if (!gid) continue;
         const { data: info } = await supabase
@@ -192,6 +213,21 @@ export default function EditPartitaGiocata() {
           periodo,
           stagione_id: stagioneId,
           squadra_segnante_id: squadraSegnante,
+          portiere_subisce_id: null,
+        });
+      }
+
+      for (const pid of portieriPerTempo[i]) {
+        if (!pid) continue;
+        const squadraSegnante = !isMontecarlo(squadraCasa) ? squadraCasa : squadraOspite;
+        nuoviMarc.push({
+          partita_id: id!,
+          giocatore_stagione_id: null,
+          giocatore_uid: null,
+          periodo,
+          stagione_id: stagioneId,
+          squadra_segnante_id: squadraSegnante,
+          portiere_subisce_id: pid,
         });
       }
     }
@@ -215,32 +251,32 @@ export default function EditPartitaGiocata() {
   return (
     <div className="min-h-screen pt-2 px-2 pb-6">
       <div className="min-h-screen p-4 sm:p-6 bg-white/70">
-        {/* Data, Ora, Squadre, Competizione */}
-        <div className="grid grid-cols-1 sm:grid-cols-[120px_100px_auto_auto] gap-4 mb-6 items-end">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Data</label>
-            {/* Data e Ora nella stessa riga */}
-<div className="grid grid-cols-2 sm:grid-cols-[150px_100px] gap-4 mb-4 items-end">
-  <div>
-    <label className="block text-xs font-medium text-gray-700">Data</label>
-    <input
-      type="date"
-      value={data}
-      onChange={(e) => setData(e.target.value)}
-      className="w-full p-1.5 border border-gray-300 rounded text-sm"
-    />
-  </div>
-  <div>
-    <label className="block text-xs font-medium text-gray-700">Ora</label>
-    <input
-      type="time"
-      value={ora}
-      onChange={(e) => setOra(e.target.value)}
-      className="w-full p-1.5 border border-gray-300 rounded text-sm"
-    />
-  </div>
-</div>
 
+        {/* Data e Ora compatti */}
+        <div className="grid grid-cols-2 sm:grid-cols-[150px_100px] gap-4 mb-4 items-end">
+          <div>
+            <label className="block text-xs font-medium text-gray-700">Data</label>
+            <input
+              type="date"
+              value={data}
+              onChange={(e) => setData(e.target.value)}
+              className="w-full p-1.5 border border-gray-300 rounded text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700">Ora</label>
+            <input
+              type="time"
+              value={ora}
+              onChange={(e) => setOra(e.target.value)}
+              className="w-full p-1.5 border border-gray-300 rounded text-sm"
+            />
+          </div>
+        </div>
+
+        {/* Squadre */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <div>
             <label className="block text-sm font-medium text-gray-700">Squadra Casa</label>
             <select
               value={squadraCasa}
@@ -248,9 +284,7 @@ export default function EditPartitaGiocata() {
               className="w-full p-2 border border-gray-300 rounded text-sm"
             >
               {squadre.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nome}
-                </option>
+                <option key={s.id} value={s.id}>{s.nome}</option>
               ))}
             </select>
           </div>
@@ -262,15 +296,13 @@ export default function EditPartitaGiocata() {
               className="w-full p-2 border border-gray-300 rounded text-sm"
             >
               {squadre.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nome}
-                </option>
+                <option key={s.id} value={s.id}>{s.nome}</option>
               ))}
             </select>
           </div>
         </div>
 
-        {/* Tipo competizione + nome torneo */}
+        {/* Competizione */}
         <div className="grid grid-cols-1 sm:grid-cols-[200px_auto] gap-4 mb-6 items-end">
           <div>
             <label className="block text-sm font-medium text-gray-700">Competizione</label>
@@ -298,7 +330,7 @@ export default function EditPartitaGiocata() {
           )}
         </div>
 
-        {/* Formazione toggle */}
+        {/* Pulsante Formazione */}
         <div className="flex justify-center sm:justify-end mb-6">
           <button
             type="button"
@@ -309,7 +341,7 @@ export default function EditPartitaGiocata() {
           </button>
         </div>
 
-        {/* Formazione box */}
+        {/* Box Formazione */}
         {showFormazione && (
           <div className="mb-6 bg-white border border-gray-200 rounded-lg p-4 space-y-2">
             <div className="flex justify-between items-center mb-3">
@@ -330,7 +362,10 @@ export default function EditPartitaGiocata() {
                   />
                   <span>Tutti</span>
                 </label>
-                <button onClick={toggleForm} className="text-gray-500 hover:text-gray-700">
+                <button
+                  onClick={toggleForm}
+                  className="text-gray-500 hover:text-gray-700"
+                >
                   Chiudi
                 </button>
               </div>
@@ -338,7 +373,10 @@ export default function EditPartitaGiocata() {
 
             <div className="max-h-60 overflow-auto space-y-2">
               {giocatoriStagione.map((g) => (
-                <label key={g.id} className="flex items-center space-x-3 text-lg py-1">
+                <label
+                  key={g.id}
+                  className="flex items-center space-x-3 text-lg py-1"
+                >
                   <input
                     type="checkbox"
                     checked={formazione.includes(g.id)}
@@ -350,16 +388,14 @@ export default function EditPartitaGiocata() {
                     }}
                     className="w-6 h-6 accent-rose-500 mr-2 shrink-0"
                   />
-                  <span>
-                    {g.cognome} {g.nome}
-                  </span>
+                  <span>{g.cognome} {g.nome}</span>
                 </label>
               ))}
             </div>
           </div>
         )}
 
-        {/* Tempi e marcatori */}
+        {/* Tempi */}
         {[0, 1, 2, 3].map((t) => (
           <div key={t} className="bg-gray-50 p-4 rounded mb-4 border border-gray-200">
             <h3 className="font-semibold text-gray-800 mb-2">{t + 1}° Tempo</h3>
@@ -386,12 +422,30 @@ export default function EditPartitaGiocata() {
                   <option value="">-- Seleziona marcatore --</option>
                   {giocatoriStagione
                     .filter((g) => formazione.includes(g.id))
-                    .sort((a, b) => a.cognome.localeCompare(b.cognome))
                     .map((pl) => (
-                      <option key={pl.id} value={pl.id}>
-                        {pl.cognome} {pl.nome}
-                      </option>
+                      <option key={pl.id} value={pl.id}>{pl.cognome} {pl.nome}</option>
                     ))}
+                </select>
+              ))}
+            {!isMontecarlo(squadraCasa) &&
+              portieriPerTempo[t].map((pid, i) => (
+                <select
+                  key={i}
+                  value={pid}
+                  onChange={(e) => {
+                    const gid = e.target.value;
+                    setPortieriPerTempo((prev) => {
+                      const up = prev.map((arr) => [...arr]);
+                      up[t][i] = gid;
+                      return up;
+                    });
+                  }}
+                  className="w-full sm:w-60 mb-2 p-2 border border-gray-300 rounded text-sm"
+                >
+                  <option value="">-- Seleziona portiere --</option>
+                  {portieriStagione.map((pl) => (
+                    <option key={pl.id} value={pl.id}>{pl.cognome} {pl.nome}</option>
+                  ))}
                 </select>
               ))}
 
@@ -417,12 +471,30 @@ export default function EditPartitaGiocata() {
                   <option value="">-- Seleziona marcatore --</option>
                   {giocatoriStagione
                     .filter((g) => formazione.includes(g.id))
-                    .sort((a, b) => a.cognome.localeCompare(b.cognome))
                     .map((pl) => (
-                      <option key={pl.id} value={pl.id}>
-                        {pl.cognome} {pl.nome}
-                      </option>
+                      <option key={pl.id} value={pl.id}>{pl.cognome} {pl.nome}</option>
                     ))}
+                </select>
+              ))}
+            {!isMontecarlo(squadraOspite) &&
+              portieriPerTempo[t].map((pid, i) => (
+                <select
+                  key={i}
+                  value={pid}
+                  onChange={(e) => {
+                    const gid = e.target.value;
+                    setPortieriPerTempo((prev) => {
+                      const up = prev.map((arr) => [...arr]);
+                      up[t][i] = gid;
+                      return up;
+                    });
+                  }}
+                  className="w-full sm:w-60 mb-2 p-2 border border-gray-300 rounded text-sm"
+                >
+                  <option value="">-- Seleziona portiere --</option>
+                  {portieriStagione.map((pl) => (
+                    <option key={pl.id} value={pl.id}>{pl.cognome} {pl.nome}</option>
+                  ))}
                 </select>
               ))}
           </div>
