@@ -1,11 +1,10 @@
 // src/pages/DettaglioGiocatore.tsx
-// Data creazione chat: 14/08/2025 (rev: fix campi nome/cognome)
+// Data creazione chat: 14/08/2025 (rev: ricezione stagione da navigate state)
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { UserRole } from '../lib/roles';
 
 interface Giocatore {
   giocatore_stagione_id: string;
@@ -33,6 +32,7 @@ export default function DettaglioGiocatore() {
   const { user, loading: authLoading } = useAuth();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation() as { state?: { stagioneId?: string } };
 
   const [giocatore, setGiocatore] = useState<Giocatore | null>(null);
   const [statistiche, setStatistiche] = useState<StatisticheGiocatore>({
@@ -43,26 +43,20 @@ export default function DettaglioGiocatore() {
   const [stagioneSelezionata, setStagioneSelezionata] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
-  // Eliminazione giocatore: collegata al cestino navbar
+  // Eliminazione giocatore
   const handleElimina = async () => {
     if (!id) return;
     if (!window.confirm('Sei sicuro di voler eliminare questo giocatore e tutti i suoi dati?')) return;
 
-    const { error } = await supabase
-      .from('giocatori')
-      .delete()
-      .eq('id', id);
-
+    const { error } = await supabase.from('giocatori').delete().eq('id', id);
     if (error) {
       console.error('Errore eliminazione:', error);
       alert("Errore durante l'eliminazione.");
       return;
     }
-
     navigate('/rosa');
   };
 
-  // Rendo disponibile la funzione al layout/nav per il cestino
   useEffect(() => {
     (window as any).__deleteCurrent = handleElimina;
     return () => {
@@ -92,7 +86,6 @@ export default function DettaglioGiocatore() {
 
   const fetchGiocatore = async (stagioneId: string) => {
     if (!id) return;
-
     const { data: recordStagione } = await supabase
       .from('v_giocatori_completo')
       .select('*')
@@ -115,7 +108,7 @@ export default function DettaglioGiocatore() {
       try {
         const { data: tutteStagioni } = await supabase
           .from('v_giocatori_completo')
-          .select('stagione_id,stagione_nome')
+          .select('stagione_id, stagione_nome')
           .eq('giocatore_uid', id)
           .order('stagione_nome', { ascending: true });
 
@@ -127,7 +120,11 @@ export default function DettaglioGiocatore() {
             return acc;
           }, []);
           setStagioniDisponibili(stagioniUniche);
-          if (stagioniUniche.length > 0) {
+
+          // 🔹 priorità: stagione passata da navigate → ultima stagione disponibile
+          if (location.state?.stagioneId && stagioniUniche.find(s => s.id === location.state.stagioneId)) {
+            setStagioneSelezionata(location.state.stagioneId);
+          } else if (stagioniUniche.length > 0) {
             setStagioneSelezionata(stagioniUniche[stagioniUniche.length - 1].id);
           }
         }
@@ -138,7 +135,7 @@ export default function DettaglioGiocatore() {
       }
     };
     init();
-  }, [id]);
+  }, [id, location.state]);
 
   useEffect(() => {
     if (stagioneSelezionata) {
