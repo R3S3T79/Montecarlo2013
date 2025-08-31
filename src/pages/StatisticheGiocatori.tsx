@@ -65,9 +65,10 @@ export default function StatisticheGiocatori(): JSX.Element {
       setLoading(true);
       try {
         const { data, error } = await supabase
-          .from('v_stat_giocatore_stagione')
-          .select('giocatore_uid, giocatore_nome, giocatore_cognome, foto_url, ruolo, presenze_totali, goal_totali, goal_subiti, media_voti')
-          .eq('stagione_id', stagioneSelezionata);
+  .from('v_stat_giocatore_stagione')
+  .select('giocatore_uid, nome, cognome, foto_url, ruolo, presenze_totali, goal_totali, goal_subiti, media_voti')
+  .eq('stagione_id', stagioneSelezionata);
+
 
         if (error || !data) {
           setRows([]);
@@ -87,17 +88,18 @@ export default function StatisticheGiocatori(): JSX.Element {
             }
 
             return {
-              giocatore_uid: r.giocatore_uid,
-              giocatore_nome: r.giocatore_nome,
-              giocatore_cognome: r.giocatore_cognome,
-              foto_url: r.foto_url,
-              ruolo: r.ruolo,
-              presenze,
-              gol,
-              subiti,
-              media,
-              media_voti: r.media_voti ?? 0,
-            };
+  giocatore_uid: r.giocatore_uid,
+  giocatore_nome: r.nome,
+  giocatore_cognome: r.cognome,
+  foto_url: r.foto_url,
+  ruolo: r.ruolo,
+  presenze,
+  gol,
+  subiti,
+  media,
+  media_voti: r.media_voti ?? 0,
+};
+
           });
           setRows(mapped);
         }
