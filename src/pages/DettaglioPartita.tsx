@@ -1,5 +1,5 @@
 // src/pages/DettaglioPartita.tsx
-// Data creazione chat: 2025-08-03
+// Data creazione chat: 2025-08-03 (rev: fix esclusione gol avversari senza marcatore)
 
 import React, { useEffect, useState, useRef } from 'react'
 import html2canvas from 'html2canvas'
@@ -95,21 +95,23 @@ export default function DettaglioPartita() {
       }
 
       // 2️⃣ Recupero marcatori dalla vista alias
-const { data: marcatoriData, error: errMd } = await supabase
-  .from('marcatori_alias')
-  .select('periodo, giocatore_stagione_id, giocatore_nome, giocatore_cognome')
-  .eq('partita_id', id)
+      const { data: marcatoriData, error: errMd } = await supabase
+        .from('marcatori_alias')
+        .select('periodo, giocatore_stagione_id, giocatore_nome, giocatore_cognome')
+        .eq('partita_id', id)
 
-if (errMd) console.error(errMd)
+      if (errMd) console.error(errMd)
 
-// 3️⃣ Merge lato client
-const marcatori: MarcatoriEntry[] = (marcatoriData || []).map(m => ({
-  periodo: m.periodo,
-  giocatore: { 
-    nome: m.giocatore_nome || '', 
-    cognome: m.giocatore_cognome || '' 
-  }
-}))
+      // 3️⃣ Merge lato client con filtro per escludere gol senza marcatore
+      const marcatori: MarcatoriEntry[] = (marcatoriData || [])
+        .filter(m => m.giocatore_nome || m.giocatore_cognome) // ✅ escludi record senza marcatore
+        .map(m => ({
+          periodo: m.periodo,
+          giocatore: { 
+            nome: m.giocatore_nome || '', 
+            cognome: m.giocatore_cognome || '' 
+          }
+        }))
 
       setPartita({ ...(pd as any), marcatori })
       setLoading(false)
