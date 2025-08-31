@@ -165,16 +165,53 @@ export default function EditPartitaGiocata() {
     .eq("id", id);
 
   // Aggiorno marcatori
-  await supabase.from("marcatori").delete().eq("partita_id", id);
-  const nuoviMarc = marcatoriPerTempo.flatMap((lst, i) =>
-    lst.filter((g) => g).map((gid) => ({
+await supabase.from("marcatori").delete().eq("partita_id", id);
+
+// Prepara array di nuovi marcatori
+const nuoviMarc: any[] = [];
+
+for (let i = 0; i < marcatoriPerTempo.length; i++) {
+  const periodo = i + 1;
+  for (const gid of marcatoriPerTempo[i]) {
+    if (!gid) continue;
+
+    // recupero info dal giocatore_stagione
+    const { data: info, error: infoErr } = await supabase
+      .from("giocatori_stagioni_view")
+      .select("giocatore_uid")
+      .eq("id", gid)
+      .single();
+
+    if (infoErr || !info) {
+      console.error("Errore recupero giocatore_uid:", infoErr?.message);
+      continue;
+    }
+
+    // squadra che segna = Montecarlo o avversaria
+    const squadraSegnante = isMontecarlo(squadraCasa)
+      ? squadraCasa
+      : squadraOspite;
+
+    nuoviMarc.push({
       partita_id: id!,
       giocatore_stagione_id: gid,
-      periodo: i + 1,
+      giocatore_uid: info.giocatore_uid,
+      periodo,
       stagione_id: stagioneId,
-    }))
-  );
-  if (nuoviMarc.length) await supabase.from("marcatori").insert(nuoviMarc);
+      squadra_segnante_id: squadraSegnante,
+    });
+  }
+}
+
+// Inserisco
+if (nuoviMarc.length) {
+  const { error: marcErr } = await supabase.from("marcatori").insert(nuoviMarc);
+  if (marcErr) {
+    console.error("Errore inserimento marcatori:", marcErr.message);
+    alert("Errore inserimento marcatori: " + marcErr.message);
+  }
+}
+
 
   // Aggiorno presenze
   const { error: delErr } = await supabase
