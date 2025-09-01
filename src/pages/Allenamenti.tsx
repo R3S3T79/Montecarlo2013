@@ -105,8 +105,8 @@ export default function Allenamenti(): JSX.Element {
   return (
   <div className="min-h-screen px-2 pb-2">
     {rows.length === 0 ? (
-      <div className="text-center text-gray-500 italic">
-        Nessun giocatore trovato per la stagione attuale.
+      <div className="text-center text-white italic">
+        Nessun giocatore trovato per la stagione attuale, Aggiungi nuovo Allenamento.
       </div>
     ) : (
       <div className="w-full">
