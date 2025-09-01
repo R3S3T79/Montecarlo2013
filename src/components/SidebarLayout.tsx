@@ -439,13 +439,14 @@ export default function SidebarLayout(): JSX.Element {
           {[...group1, ...group2, ...group3, ...group4].map((link) => (
             <React.Fragment key={link.to}>
               <NavLink
-                to={link.to}
-                className={({ isActive }) =>
-                  `block p-2 rounded ${isActive ? 'bg-white text-gray-800' : 'hover:bg-white/20'}`
-                }
-              >
-                {link.label}
-              </NavLink>
+  to={link.to}
+  onClick={() => setDrawerOpen(false)}   // ✅ forza chiusura anche se stessa pagina
+  className={({ isActive }) =>
+    `block p-2 rounded ${isActive ? 'bg-white text-gray-800' : 'hover:bg-white/20'}`
+  }
+>
+  {link.label}
+</NavLink>
 
               {link.to === '/' && <hr className="border-t border-white/20 my-2" />}
               {link.to === '/prossima-partita' && <hr className="border-t border-white/20 my-2" />}
