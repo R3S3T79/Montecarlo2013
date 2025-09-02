@@ -188,116 +188,116 @@ export default function HomePage(): JSX.Element {
   }, [marqueeItems]);
 
   // --------------------------------
-  // COMPLEANNI — solo stagione attuale
-  // --------------------------------
-  const [nextBirthday, setNextBirthday] = useState<NextBirthdayInfo | null>(null);
-  const [nowTick, setNowTick] = useState<Date>(new Date());
+// COMPLEANNI — solo stagione attuale
+// --------------------------------
+const [nextBirthday, setNextBirthday] = useState<NextBirthdayInfo | null>(null);
+const [nowTick, setNowTick] = useState<Date>(new Date());
 
-  useEffect(() => {
-    const t = setInterval(() => setNowTick(new Date()), 30_000);
-    return () => clearInterval(t);
-  }, []);
+useEffect(() => {
+  const t = setInterval(() => setNowTick(new Date()), 30_000);
+  return () => clearInterval(t);
+}, []);
 
-  useEffect(() => {
-    let mounted = true;
+useEffect(() => {
+  let mounted = true;
 
-    const loadPlayersBirth = async () => {
-      // 1) prendo stagione corrente (ultima inserita)
-let stagioneCorrente: Stagione | null = null;
-{
-  const { data: last, error: e2 } = await supabase
-    .from("stagioni")
-    .select("id, created_at")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const loadPlayersBirth = async () => {
+    // 1) prendo stagione corrente (ultima inserita)
+    let stagioneCorrente: Stagione | null = null;
+    {
+      const { data: last, error: e2 } = await supabase
+        .from("stagioni")
+        .select("id, created_at")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-  if (e2) {
-    console.warn("[HomePage] stagioni last warn:", e2.message);
-  }
-
-  if (last?.id) {
-    stagioneCorrente = last as Stagione;
-  }
-}
-
-if (!stagioneCorrente?.id) {
-  console.warn("[HomePage] nessuna stagione trovata, fallback: nessun compleanno");
-  if (mounted) setNextBirthday(null);
-  return;
-}
-
-// 2) prendo direttamente i giocatori della stagione dalla view completa
-const { data, error } = await supabase
-  .from("v_giocatori_completo")
-  .select("giocatore_uid, nome, cognome, data_nascita, foto_url")
-  .eq("stagione_id", stagioneCorrente.id)
-  .not("data_nascita", "is", null);
-
-if (error) {
-  console.error("[HomePage] Errore caricamento compleanni:", error.message);
-  if (mounted) setNextBirthday(null);
-  return;
-}
-
-const rows = (data || []) as GiocatoreView[];
-
-const today = new Date();
-const y = today.getFullYear();
-
-let bestDate: Date | null = null;
-let playersForBest: NextBirthdayInfo["players"] = [];
-
-
-      // set per evitare duplicati (uid o nome+cognome)
-      const seen = new Set<string>();
-
-      for (const r of rows) {
-        if (!r.data_nascita) continue;
-
-        const key = r.giocatore_uid || `${r.giocatore_nome}|${r.giocatore_cognome}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-
-        const d = new Date(r.data_nascita);
-        const month = d.getMonth();
-        const day = d.getDate();
-
-        let next = new Date(y, month, day, 0, 0, 0, 0);
-        if (isPastDayMonth(today, next)) next = new Date(y + 1, month, day, 0, 0, 0, 0);
-
-        const plInfo = {
-          uid: r.giocatore_uid,
-          nome: (r.giocatore_nome || "").trim(),
-          cognome: (r.giocatore_cognome || "").trim(),
-          foto_url: r.foto_url || null,
-        };
-
-        if (!bestDate || next.getTime() < bestDate.getTime()) {
-          bestDate = next;
-          playersForBest = [plInfo];
-        } else if (bestDate && sameDayMonth(next, bestDate)) {
-          playersForBest.push(plInfo);
-        }
+      if (e2) {
+        console.warn("[HomePage] stagioni last warn:", e2.message);
       }
 
-      if (mounted) {
-        if (bestDate) {
-          setNextBirthday({
-            date: bestDate,
-            players: sortPlayers(playersForBest),
-          });
-        } else {
-          setNextBirthday(null);
-        }
+      if (last?.id) {
+        stagioneCorrente = last as Stagione;
       }
-    };
+    }
 
-    loadPlayersBirth();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    if (!stagioneCorrente?.id) {
+      console.warn("[HomePage] nessuna stagione trovata, fallback: nessun compleanno");
+      if (mounted) setNextBirthday(null);
+      return;
+    }
+
+    // 2) prendo direttamente i giocatori della stagione dalla view completa
+    const { data, error } = await supabase
+      .from("v_giocatori_completo")
+      .select("giocatore_uid, nome, cognome, data_nascita, foto_url")
+      .eq("stagione_id", stagioneCorrente.id)
+      .not("data_nascita", "is", null);
+
+    if (error) {
+      console.error("[HomePage] Errore caricamento compleanni:", error.message);
+      if (mounted) setNextBirthday(null);
+      return;
+    }
+
+    const rows = (data || []) as GiocatoreView[];
+
+    const today = new Date();
+    const y = today.getFullYear();
+
+    let bestDate: Date | null = null;
+    let playersForBest: NextBirthdayInfo["players"] = [];
+
+    // set per evitare duplicati (uid o nome+cognome)
+    const seen = new Set<string>();
+
+    for (const r of rows) {
+      if (!r.data_nascita) continue;
+
+      const key = r.giocatore_uid || `${r.nome}|${r.cognome}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const d = new Date(r.data_nascita);
+      const month = d.getMonth();
+      const day = d.getDate();
+
+      let next = new Date(y, month, day, 0, 0, 0, 0);
+      if (isPastDayMonth(today, next)) next = new Date(y + 1, month, day, 0, 0, 0, 0);
+
+      const plInfo = {
+        uid: r.giocatore_uid,
+        nome: (r.nome || "").trim(),
+        cognome: (r.cognome || "").trim(),
+        foto_url: r.foto_url || null,
+      };
+
+      if (!bestDate || next.getTime() < bestDate.getTime()) {
+        bestDate = next;
+        playersForBest = [plInfo];
+      } else if (bestDate && sameDayMonth(next, bestDate)) {
+        playersForBest.push(plInfo);
+      }
+    }
+
+    if (mounted) {
+      if (bestDate) {
+        setNextBirthday({
+          date: bestDate,
+          players: sortPlayers(playersForBest),
+        });
+      } else {
+        setNextBirthday(null);
+      }
+    }
+  };
+
+  loadPlayersBirth();
+  return () => {
+    mounted = false;
+  };
+}, []);
+
   // --------------------------------
   // PROSSIMO IMPEGNO — Query + Live
   // --------------------------------
