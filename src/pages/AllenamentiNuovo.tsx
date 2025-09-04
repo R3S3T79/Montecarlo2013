@@ -72,10 +72,10 @@ export default function AllenamentiNuovo(): JSX.Element {
       setLoading(true);
 
       const { data: gsData, error: gsError } = await supabase
-        .from('v_giocatori_stagioni')
-        .select('giocatore_id, nome, cognome')
-        .eq('stagione_id', selectedSeasonId)
-        .order('cognome', { ascending: true });
+  .from('giocatori_stagioni_view')
+  .select('giocatore_uid, nome, cognome')
+  .eq('stagione_id', selectedSeasonId)
+  .order('cognome', { ascending: true });
 
       if (gsError || !gsData) {
         console.error('Errore fetch v_giocatori_stagioni:', gsError);
@@ -86,10 +86,10 @@ export default function AllenamentiNuovo(): JSX.Element {
       }
 
       const list = gsData.map(r => ({
-        id: r.giocatore_id,
-        nome: r.nome,
-        cognome: r.cognome
-      }));
+  id: r.giocatore_uid,   // qui usi il giocatore_uid
+  nome: r.nome,
+  cognome: r.cognome
+}));
       setPlayers(list);
 
       const initSel: Record<string, boolean> = {};
