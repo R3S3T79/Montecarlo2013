@@ -1,12 +1,13 @@
 // src/pages/AllenamentiGiocatore.tsx
-// Data creazione chat: 2025-08-01
+// Data creazione chat: 2025-08-01 (rev: fix view giocatori_stagioni_view)
 
 import React, { useEffect, useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import { UserRole } from '../lib/roles';
-// In cima al file:
+
+// Chart.js
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -19,7 +20,6 @@ import {
 import { Bar } from "react-chartjs-2";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
-
 
 interface StatisticheAllenamento {
   totale: number;
@@ -70,16 +70,16 @@ export default function AllenamentiGiocatore(): JSX.Element {
         return;
       }
 
-      // 2) Recupera nome/cognome e record stagione-giocatore dalla VIEW
+      // 2) Recupera nome/cognome e record stagione-giocatore dalla VIEW corretta
       const { data: gs, error: gsErr } = await supabase
-        .from('v_giocatori_stagioni')
-        .select('id, giocatore_id, nome, cognome')
-        .eq('giocatore_id', playerId)   // id reale giocatore
+        .from('giocatori_stagioni_view')
+        .select('id, giocatore_uid, nome, cognome')
+        .eq('giocatore_uid', playerId)   // id reale giocatore
         .eq('stagione_id', stag.id)
         .single();
 
       if (gsErr || !gs) {
-        console.error('Record v_giocatori_stagioni non trovato:', gsErr);
+        console.error('Record giocatori_stagioni_view non trovato:', gsErr);
         setLoading(false);
         return;
       }
@@ -88,7 +88,6 @@ export default function AllenamentiGiocatore(): JSX.Element {
       setPlayerName(`${gs.cognome} ${gs.nome}`);
 
       // 3) Recupera tutti gli allenamenti del giocatore per la stagione corrente
-      //    NB: nella tabella allenamenti la FK è "giocatore_uid"
       const { data: allen, error: allenErr } = await supabase
         .from('allenamenti')
         .select('data_allenamento, presente')
@@ -161,84 +160,80 @@ export default function AllenamentiGiocatore(): JSX.Element {
   }
 
   return (
-    
-      <div className="max-w-3xl mx-auto space-y-6">
-        {/* Nome Giocatore */}
-        <h1 className="text-3xl font-bold text-center text-white mb-6">
-          {playerName}
-        </h1>
+    <div className="max-w-3xl mx-auto space-y-6">
+      {/* Nome Giocatore */}
+      <h1 className="text-3xl font-bold text-center text-white mb-6">
+        {playerName}
+      </h1>
 
-        {/* Riquadro unico con Totale / Presenze / Assenze affiancati */}
-<div className="bg-white/90 p-6 rounded-lg shadow">
-  <div className="flex flex-row justify-around text-center">
-    <div>
-      <div className="text-sm text-gray-500">Totale</div>
-      <div className="text-2xl font-semibold">{stats.totale}</div>
-    </div>
-    <div>
-      <div className="text-sm text-gray-500">Presenze</div>
-      <div className="text-2xl font-semibold text-green-600">{stats.presenze}</div>
-    </div>
-    <div>
-      <div className="text-sm text-gray-500">Assenze</div>
-      <div className="text-2xl font-semibold text-red-600">{stats.assenze}</div>
-    </div>
-  </div>
-</div>
-
-        {/* Statistiche Settimana e Mese */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-white/90 p-6 rounded-lg shadow">
-            <div className="text-sm text-gray-500">Ultima Settimana</div>
-            <div className="flex justify-between mt-2">
-              <span>Presenze: {stats.ultimaSettimana.presenze}</span>
-              <span>Assenze: {stats.ultimaSettimana.assenze}</span>
-            </div>
+      {/* Riquadro unico con Totale / Presenze / Assenze affiancati */}
+      <div className="bg-white/90 p-6 rounded-lg shadow">
+        <div className="flex flex-row justify-around text-center">
+          <div>
+            <div className="text-sm text-gray-500">Totale</div>
+            <div className="text-2xl font-semibold">{stats.totale}</div>
           </div>
-          <div className="bg-white/90 p-6 rounded-lg shadow">
-            <div className="text-sm text-gray-500">Ultimo Mese</div>
-            <div className="flex justify-between mt-2">
-              <span>Presenze: {stats.ultimoMese.presenze}</span>
-              <span>Assenze: {stats.ultimoMese.assenze}</span>
-            </div>
+          <div>
+            <div className="text-sm text-gray-500">Presenze</div>
+            <div className="text-2xl font-semibold text-green-600">{stats.presenze}</div>
+          </div>
+          <div>
+            <div className="text-sm text-gray-500">Assenze</div>
+            <div className="text-2xl font-semibold text-red-600">{stats.assenze}</div>
           </div>
         </div>
-
-        {/* Grafico presenze/assenze */}
-<div className="bg-white/90 p-6 rounded-lg shadow">
-  <h2 className="text-center font-semibold mb-4">Presenze vs Assenze</h2>
-  <Bar
-    data={{
-      labels: ["Allenamenti"],
-      datasets: [
-        {
-          label: "Presenze",
-          data: [stats.presenze],
-          backgroundColor: "rgba(34,197,94,0.8)", // verde
-        },
-        {
-          label: "Assenze",
-          data: [stats.assenze],
-          backgroundColor: "rgba(239,68,68,0.8)", // rosso
-        },
-      ],
-    }}
-    options={{
-      responsive: true,
-      plugins: {
-        legend: { position: "top" as const },
-        title: { display: false },
-      },
-      scales: {
-        x: { stacked: true },
-        y: { stacked: true, beginAtZero: true },
-      },
-    }}
-  />
-</div>
-
-
       </div>
-    
+
+      {/* Statistiche Settimana e Mese */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white/90 p-6 rounded-lg shadow">
+          <div className="text-sm text-gray-500">Ultima Settimana</div>
+          <div className="flex justify-between mt-2">
+            <span>Presenze: {stats.ultimaSettimana.presenze}</span>
+            <span>Assenze: {stats.ultimaSettimana.assenze}</span>
+          </div>
+        </div>
+        <div className="bg-white/90 p-6 rounded-lg shadow">
+          <div className="text-sm text-gray-500">Ultimo Mese</div>
+          <div className="flex justify-between mt-2">
+            <span>Presenze: {stats.ultimoMese.presenze}</span>
+            <span>Assenze: {stats.ultimoMese.assenze}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Grafico presenze/assenze */}
+      <div className="bg-white/90 p-6 rounded-lg shadow">
+        <h2 className="text-center font-semibold mb-4">Presenze vs Assenze</h2>
+        <Bar
+          data={{
+            labels: ["Allenamenti"],
+            datasets: [
+              {
+                label: "Presenze",
+                data: [stats.presenze],
+                backgroundColor: "rgba(34,197,94,0.8)", // verde
+              },
+              {
+                label: "Assenze",
+                data: [stats.assenze],
+                backgroundColor: "rgba(239,68,68,0.8)", // rosso
+              },
+            ],
+          }}
+          options={{
+            responsive: true,
+            plugins: {
+              legend: { position: "top" as const },
+              title: { display: false },
+            },
+            scales: {
+              x: { stacked: true },
+              y: { stacked: true, beginAtZero: true },
+            },
+          }}
+        />
+      </div>
+    </div>
   );
 }
