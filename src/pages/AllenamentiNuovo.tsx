@@ -160,7 +160,7 @@ export default function AllenamentiNuovo(): JSX.Element {
             const isPresente = selections[p.id];
             return (
               <li key={p.id} className="flex items-center justify-between py-3 px-2">
-                <span className="text-lg text-gray-900">
+                <span className="text-xl font-bold text-gray-900">
                   {p.cognome} {p.nome}
                 </span>
                 <div className="flex flex-col space-y-2 pr-2">
