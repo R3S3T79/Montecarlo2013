@@ -131,7 +131,8 @@ export default function AllenamentiNuovo(): JSX.Element {
       <div className="max-w-2xl mx-auto bg-white/60 rounded-lg shadow p-6">
         {/* Selettore giorno, data e stagione */}
         <div className="mb-6 text-center">
-          <div className="inline-flex items-center space-x-4">
+          <div className="flex flex-col md:flex-row items-center md:space-x-4 space-y-3 md:space-y-0">
+
             <span className="text-lg text-gray-800 font-semibold">{selectedDayName}</span>
             <input
               type="date"
