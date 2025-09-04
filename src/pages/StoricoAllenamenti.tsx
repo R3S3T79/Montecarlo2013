@@ -1,5 +1,5 @@
 // src/pages/StoricoAllenamenti.tsx
-// Data creazione chat: 2025-08-01  
+// Data creazione chat: 2025-08-01 (rev: fix query allenamenti + view corretta)
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
@@ -8,8 +8,8 @@ import { supabase } from '../lib/supabaseClient';
 import { UserRole } from '../lib/roles';
 
 interface PlayerRecord {
-  record_id: string;    // PK di giocatori_stagioni (id della view riga stagione-giocatore)
-  giocatore_id: string; // vero ID del giocatore (giocatori.id)
+  record_id: string;    // PK della view giocatori_stagioni_view
+  giocatore_id: string; // vero ID del giocatore
   nome: string;
   cognome: string;
   presente: boolean;
@@ -41,6 +41,7 @@ export default function StoricoAllenamenti(): JSX.Element {
         .from('allenamenti')
         .select('data_allenamento')
         .order('data_allenamento', { ascending: false });
+
       if (!error && data) {
         const uniq = Array.from(
           new Set(data.map(r => r.data_allenamento.slice(0, 10)))
@@ -58,51 +59,42 @@ export default function StoricoAllenamenti(): JSX.Element {
     (async () => {
       setLoadingPlayers(true);
 
-      // 1) Trova la stagione che include la selectedDate (per usare la view correttamente)
-      const { data: stagione, error: errSt } = await supabase
-        .from('stagioni')
-        .select('id, data_inizio, data_fine')
-        .lte('data_inizio', selectedDate)
-        .gte('data_fine', selectedDate)
-        .single();
-
-      if (errSt || !stagione) {
-        console.error('Stagione non trovata per la data selezionata:', errSt);
-        setPlayers([]);
-        setLoadingPlayers(false);
-        return;
-      }
-
-      // 2) Leggi gli allenamenti del giorno (NB: colonna corretta: giocatore_uid)
+      // 1) Recupera allenamenti del giorno
       const { data: allens, error: errA } = await supabase
         .from('allenamenti')
-        .select('giocatore_uid, presente')
-        .gte('data_allenamento', `${selectedDate}T00:00:00`)
-        .lte('data_allenamento', `${selectedDate}T23:59:59`);
+        .select('giocatore_uid, presente, stagione_id')
+        .eq('data_allenamento', selectedDate);
 
-      if (errA || !allens) {
-        console.error('Errore fetch allenamenti:', errA);
+      if (errA || !allens || allens.length === 0) {
+        console.error('Errore o nessun allenamento:', errA);
         setPlayers([]);
         setLoadingPlayers(false);
         return;
       }
 
-      const giocatoreUids = Array.from(new Set(allens.map(a => a.giocatore_uid))).filter(Boolean) as string[];
+      // 2) Lista giocatori unici
+      const giocatoreUids = allens
+        .map(a => a.giocatore_uid)
+        .filter((id): id is string => Boolean(id));
+
       if (giocatoreUids.length === 0) {
         setPlayers([]);
         setLoadingPlayers(false);
         return;
       }
 
-      // 3) Recupera nome/cognome e record_id stagione dalla view (filtrando per stagione e giocatori)
+      // 3) Stagione associata (prendo dalla prima riga, tutte le righe hanno stesso stagione_id)
+      const stagioneId = allens[0].stagione_id;
+
+      // 4) Recupera anagrafiche dalla view corretta
       const { data: gs, error: errGs } = await supabase
-        .from('v_giocatori_stagioni')
-        .select('id, giocatore_id, nome, cognome')
-        .eq('stagione_id', stagione.id)
-        .in('giocatore_id', giocatoreUids);
+        .from('giocatori_stagioni_view')
+        .select('id, giocatore_uid, nome, cognome')
+        .eq('stagione_id', stagioneId)
+        .in('giocatore_uid', giocatoreUids);
 
       if (errGs || !gs) {
-        console.error('Errore fetch v_giocatori_stagioni:', errGs);
+        console.error('Errore fetch giocatori_stagioni_view:', errGs);
         setPlayers([]);
         setLoadingPlayers(false);
         return;
@@ -110,19 +102,19 @@ export default function StoricoAllenamenti(): JSX.Element {
 
       gs.sort((a, b) => (a.cognome ?? '').localeCompare(b.cognome ?? ''));
 
-      // 4) Mappa presenze per giocatore_uid
+      // 5) Mappa presenze
       const presenceMap = allens.reduce<Record<string, boolean>>((acc, cur) => {
         if (cur.giocatore_uid) acc[cur.giocatore_uid] = !!cur.presente;
         return acc;
       }, {});
 
       setPlayers(
-        gs.map((r: any) => ({
-          record_id: r.id,               // id riga stagione-giocatore (dalla view)
-          giocatore_id: r.giocatore_id,  // vero id giocatore
+        gs.map(r => ({
+          record_id: r.id,
+          giocatore_id: r.giocatore_uid,
           nome: r.nome,
           cognome: r.cognome,
-          presente: presenceMap[r.giocatore_id] ?? false,
+          presente: presenceMap[r.giocatore_uid] ?? false,
         }))
       );
       setLoadingPlayers(false);
@@ -165,12 +157,12 @@ export default function StoricoAllenamenti(): JSX.Element {
                   {p.cognome} {p.nome}
                 </span>
                 <span
-  className={`px-2 py-1 rounded bg-white/80 ${
-    p.presente ? "text-green-600" : "text-red-600"
-  } font-semibold`}
->
-  {p.presente ? "Presente" : "Assente"}
-</span>
+                  className={`px-2 py-1 rounded bg-white/80 ${
+                    p.presente ? 'text-green-600' : 'text-red-600'
+                  } font-semibold`}
+                >
+                  {p.presente ? 'Presente' : 'Assente'}
+                </span>
               </li>
             ))}
           </ul>
@@ -210,8 +202,7 @@ export default function StoricoAllenamenti(): JSX.Element {
                       await supabase
                         .from('allenamenti')
                         .delete()
-                        .gte('data_allenamento', `${date}T00:00:00`)
-                        .lte('data_allenamento', `${date}T23:59:59`);
+                        .eq('data_allenamento', date);
                       setDates(dates.filter(d => d !== date));
                     }
                   }}
