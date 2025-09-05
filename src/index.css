@@ -156,21 +156,28 @@ html, body, #root {
   vertical-align: top;
 }
 
-/* ==== Lista convocati ==== */
-.convocati-list {
-  margin-top: 1rem;
-  text-align: left;
-}
-
 .convocati-list li {
   margin: 2px 0;
   font-size: 13pt;
 }
 
-.convocati-list li.line-through {
-  text-decoration: line-through;
-  text-decoration-thickness: 2px;
+.convocati-list li span {
+  position: relative;
+  display: inline-block; /* così la larghezza segue solo il testo */
 }
+
+.convocati-list li.line-through span::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 85%;              /* invece di 50% */
+  transform: translateY(-50%); /* mantiene centrato */
+  height: 2px;
+  background: black;
+}
+
+
 
 /* ==== Competizione centrata in pagina ==== */
 .competizione-box {
