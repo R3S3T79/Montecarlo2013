@@ -229,13 +229,13 @@ export default function Convocazioni() {
 </td>
 
 </tr>
-          <tr>
+
   {/* Prima cella a sx */}
-<td colSpan={1}>
-  <span className="font-bold">RITROVO</span>
-  <span className="campo-compilato campo-lungo">{ritrovoLuogo}</span>
-</td>
 <tr>
+  <td colSpan={2}>
+    <span className="font-bold">RITROVO</span>
+    <span className="campo-compilato campo-lungo">{ritrovoLuogo}</span>
+  </td>
   <td>
     <span className="font-bold">ORA</span>
     <span className="campo-compilato campo-corto">{oraRitrovo}</span>
