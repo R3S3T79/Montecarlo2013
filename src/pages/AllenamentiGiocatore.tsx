@@ -1,170 +1,239 @@
-// src/pages/Allenamenti.tsx
-// Data creazione chat: 2025-08-03 (rev: fix view giocatori_stagioni_view)
+// src/pages/AllenamentiGiocatore.tsx
+// Data creazione chat: 2025-08-01 (rev: fix view giocatori_stagioni_view)
 
 import React, { useEffect, useState } from 'react';
+import { useParams, Navigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
-import { useNavigate } from 'react-router-dom';
+import { UserRole } from '../lib/roles';
 
-interface GiocatorePresenza {
-  record_id: string;
-  giocatore_uid: string;
-  nome: string | null;
-  cognome: string | null;
-  totaleAll: number;
+// Chart.js
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+} from "chart.js";
+import { Bar } from "react-chartjs-2";
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+
+interface StatisticheAllenamento {
+  totale: number;
   presenze: number;
   assenze: number;
+  ultimaSettimana: { presenze: number; assenze: number };
+  ultimoMese: { presenze: number; assenze: number };
 }
 
-export default function Allenamenti(): JSX.Element {
-  const [rows, setRows] = useState<GiocatorePresenza[]>([]);
+export default function AllenamentiGiocatore(): JSX.Element {
+  const { user, loading: authLoading } = useAuth();
+  const role =
+    (user?.user_metadata?.role as UserRole) ||
+    (user?.app_metadata?.role as UserRole) ||
+    UserRole.Authenticated;
+
+  if (!authLoading && role !== UserRole.Admin && role !== UserRole.Creator) {
+    return <Navigate to="/" replace />;
+  }
+
+  // ATTENZIONE: qui l'ID che arriva dall'URL è l'id REALE del giocatore (giocatori.id)
+  const { id: playerId } = useParams<{ id: string }>();
+  if (!playerId) {
+    return <Navigate to="/allenamenti" replace />;
+  }
+
+  const [playerName, setPlayerName] = useState<string>('');
+  const [recordId, setRecordId] = useState<string>(''); // id riga stagione-giocatore (view)
+  const [stats, setStats] = useState<StatisticheAllenamento | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      const oggi = new Date().toISOString().split('T')[0];
 
-      // Recupera stagione attiva
-      const { data: stagione } = await supabase
+      // 1) Individua la stagione attiva OGGI
+      const oggi = new Date().toISOString().slice(0, 10);
+      const { data: stag, error: stagErr } = await supabase
         .from('stagioni')
         .select('id')
         .lte('data_inizio', oggi)
         .gte('data_fine', oggi)
         .single();
 
-      if (!stagione) {
-        setRows([]);
+      if (stagErr || !stag) {
+        console.error('Nessuna stagione attiva:', stagErr);
         setLoading(false);
         return;
       }
 
-      // Query dalla view corretta con nome/cognome già inclusi
-      const { data: gs } = await supabase
+      // 2) Recupera nome/cognome e record stagione-giocatore dalla VIEW corretta
+      const { data: gs, error: gsErr } = await supabase
         .from('giocatori_stagioni_view')
         .select('id, giocatore_uid, nome, cognome')
-        .eq('stagione_id', stagione.id);
+        .eq('giocatore_uid', playerId)   // id reale giocatore
+        .eq('stagione_id', stag.id)
+        .single();
 
-      if (!gs || gs.length === 0) {
-        setRows([]);
+      if (gsErr || !gs) {
+        console.error('Record giocatori_stagioni_view non trovato:', gsErr);
         setLoading(false);
         return;
       }
 
-      // Ordinamento lato client: cognome, poi nome
-      const gsSorted = [...gs].sort((a: any, b: any) => {
-        const ac = (a.cognome ?? '').localeCompare(b.cognome ?? '');
-        if (ac !== 0) return ac;
-        return (a.nome ?? '').localeCompare(b.nome ?? '');
-      });
+      setRecordId(gs.id);
+      setPlayerName(`${gs.cognome} ${gs.nome}`);
 
-      const giocatoreUids = gsSorted.map((r: any) => r.giocatore_uid);
+      // 3) Recupera tutti gli allenamenti del giocatore per la stagione corrente
+      const { data: allen, error: allenErr } = await supabase
+        .from('allenamenti')
+        .select('data_allenamento, presente')
+        .eq('giocatore_uid', playerId)
+        .eq('stagione_id', stag.id);
 
-      // Evita 400: non chiamare .in(...) con lista vuota
-      let allen: { giocatore_uid: string; presente: boolean | null }[] = [];
-      if (giocatoreUids.length > 0) {
-        const { data: allenData } = await supabase
-          .from('allenamenti')
-          .select('giocatore_uid, presente')
-          .in('giocatore_uid', giocatoreUids)
-          .eq('stagione_id', stagione.id);
-        allen = allenData ?? [];
+      if (allenErr || !allen) {
+        console.error('Errore fetch allenamenti:', allenErr);
+        setLoading(false);
+        return;
       }
 
-      // Conta presenze/assenze
-      const counts: Record<string, { totale: number; presenze: number }> = {};
-      giocatoreUids.forEach(id => (counts[id] = { totale: 0, presenze: 0 }));
-      allen.forEach(a => {
-        const c = counts[a.giocatore_uid];
-        if (!c) return;
-        c.totale += 1;
-        if (a.presente) c.presenze += 1;
+      // 4) Calcolo statistiche
+      const now = new Date();
+      const weekAgo = new Date(now);
+      weekAgo.setDate(now.getDate() - 7);
+      const monthAgo = new Date(now);
+      monthAgo.setMonth(now.getMonth() - 1);
+
+      let totale = 0,
+        presenze = 0,
+        assenze = 0;
+      let presSett = 0,
+        assSett = 0,
+        presMese = 0,
+        assMese = 0;
+
+      allen.forEach((a) => {
+        // data_allenamento è di tipo DATE: parsiamolo in modo sicuro (YYYY-MM-DD)
+        const d = new Date(`${a.data_allenamento}T00:00:00`);
+
+        totale++;
+        if (a.presente) presenze++; else assenze++;
+
+        if (d >= weekAgo) {
+          a.presente ? presSett++ : assSett++;
+        }
+        if (d >= monthAgo) {
+          a.presente ? presMese++ : assMese++;
+        }
       });
 
-      // Risultato finale
-      const result: GiocatorePresenza[] = gsSorted.map((r: any) => ({
-        record_id: r.id,
-        giocatore_uid: r.giocatore_uid,
-        nome: r.nome ?? null,
-        cognome: r.cognome ?? null,
-        totaleAll: counts[r.giocatore_uid]?.totale ?? 0,
-        presenze: counts[r.giocatore_uid]?.presenze ?? 0,
-        assenze:
-          (counts[r.giocatore_uid]?.totale ?? 0) -
-          (counts[r.giocatore_uid]?.presenze ?? 0),
-      }));
-
-      setRows(result);
+      setStats({
+        totale,
+        presenze,
+        assenze,
+        ultimaSettimana: { presenze: presSett, assenze: assSett },
+        ultimoMese: { presenze: presMese, assenze: assMese },
+      });
       setLoading(false);
     }
-    fetchData();
-  }, []);
 
-  if (loading) {
+    fetchData();
+  }, [playerId]);
+
+  if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#6B7280] to-[#bfb9b9]">
-        <div className="text-white text-lg">Caricamento…</div>
+      <div className="min-h-screen flex items-center justify-center text-white">
+        Caricamento…
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white">
+        Errore nel caricamento delle statistiche.
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen px-2 pb-2">
-      {rows.length === 0 ? (
-        <div className="text-center text-white italic">
-          Nessun giocatore trovato per la stagione attuale, Aggiungi nuovo Allenamento.
-        </div>
-      ) : (
-        <div className="w-full">
-          <div className="overflow-x-auto">
-            <table
-              className="table-auto w-full border-separate"
-              style={{ borderSpacing: 0 }}
-            >
-              <thead className="bg-gradient-to-br from-[#d61f1f]/90 to-[#f45e5e]/90">
-                <tr>
-                  <th className="px-4 py-3 text-left text-white uppercase">
-                    Giocatore
-                  </th>
-                  <th className="px-4 py-3 text-center text-white uppercase">
-                    All.
-                  </th>
-                  <th className="px-4 py-3 text-center text-white uppercase">
-                    Pres.
-                  </th>
-                  <th className="px-4 py-3 text-center text-white uppercase">
-                    Ass.
-                  </th>
-                </tr>
-              </thead>
+    <div className="max-w-3xl mx-auto space-y-6">
+      {/* Nome Giocatore */}
+      <h1 className="text-3xl font-bold text-center text-white mb-6">
+        {playerName}
+      </h1>
 
-              <tbody>
-                {rows.map((r, idx) => {
-                  // 🎯 riga semitrasparente (alternata)
-                  const rowBg = idx % 2 === 0 ? 'bg-white/90' : 'bg-white/85';
-                  const rowHover = 'hover:bg-white/80';
-                  const cell = `px-4 py-2 text-gray-900 border-b border-white/30 ${rowBg} ${rowHover}`;
-
-                  return (
-                    <tr
-                      key={r.record_id}
-                      onClick={() => navigate(`/allenamenti/${r.giocatore_uid}`)}
-                      className="cursor-pointer transition-colors duration-200"
-                    >
-                      <td className={cell}>
-                        {r.cognome} {r.nome}
-                      </td>
-                      <td className={`${cell} text-center`}>{r.totaleAll}</td>
-                      <td className={`${cell} text-center`}>{r.presenze}</td>
-                      <td className={`${cell} text-center`}>{r.assenze}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      {/* Riquadro unico con Totale / Presenze / Assenze affiancati */}
+      <div className="bg-white/90 p-6 rounded-lg shadow">
+        <div className="flex flex-row justify-around text-center">
+          <div>
+            <div className="text-sm text-gray-500">Totale</div>
+            <div className="text-2xl font-semibold">{stats.totale}</div>
+          </div>
+          <div>
+            <div className="text-sm text-gray-500">Presenze</div>
+            <div className="text-2xl font-semibold text-green-600">{stats.presenze}</div>
+          </div>
+          <div>
+            <div className="text-sm text-gray-500">Assenze</div>
+            <div className="text-2xl font-semibold text-red-600">{stats.assenze}</div>
           </div>
         </div>
-      )}
+      </div>
+
+      {/* Statistiche Settimana e Mese */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white/90 p-6 rounded-lg shadow">
+          <div className="text-sm text-gray-500">Ultima Settimana</div>
+          <div className="flex justify-between mt-2">
+            <span>Presenze: {stats.ultimaSettimana.presenze}</span>
+            <span>Assenze: {stats.ultimaSettimana.assenze}</span>
+          </div>
+        </div>
+        <div className="bg-white/90 p-6 rounded-lg shadow">
+          <div className="text-sm text-gray-500">Ultimo Mese</div>
+          <div className="flex justify-between mt-2">
+            <span>Presenze: {stats.ultimoMese.presenze}</span>
+            <span>Assenze: {stats.ultimoMese.assenze}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Grafico presenze/assenze */}
+      <div className="bg-white/90 p-6 rounded-lg shadow">
+        <h2 className="text-center font-semibold mb-4">Presenze vs Assenze</h2>
+        <Bar
+          data={{
+            labels: ["Allenamenti"],
+            datasets: [
+              {
+                label: "Presenze",
+                data: [stats.presenze],
+                backgroundColor: "rgba(34,197,94,0.8)", // verde
+              },
+              {
+                label: "Assenze",
+                data: [stats.assenze],
+                backgroundColor: "rgba(239,68,68,0.8)", // rosso
+              },
+            ],
+          }}
+          options={{
+            responsive: true,
+            plugins: {
+              legend: { position: "top" as const },
+              title: { display: false },
+            },
+            scales: {
+              x: { stacked: true },
+              y: { stacked: true, beginAtZero: true },
+            },
+          }}
+        />
+      </div>
     </div>
   );
 }
