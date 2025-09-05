@@ -13,21 +13,24 @@ html, body, #root {
 
 /* ===== Sfondo solo a schermo ===== */
 @media screen {
-  #convocazione {
-    position: absolute;
-    left: -9999px; /* fuori dallo schermo, ma presente nel DOM */
+  html, body, #root { 
+    min-height: 100%; 
   }
-}
 
   body {
     background: url("/Sfondo.png") no-repeat center center fixed !important;
     background-size: cover !important;
   }
 
-  /* Nasconde il foglio convocazione a schermo */
+  /* Foglio convocazione: fuori dallo schermo ma presente nel DOM */
   #convocazione {
-    display: none;
+    position: absolute;
+    left: -9999px;
+    top: -9999px;
+    display: block; /* deve rimanere visibile per html2canvas */
   }
+}
+
 
 
 /* ---- Stampa ---- */
