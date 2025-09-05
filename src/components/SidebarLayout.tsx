@@ -145,10 +145,11 @@ const canCreator = role === UserRole.Creator;
     { to: '/galleria', label: 'Galleria' },
   ];
   const group4 = [
-  ...(canAdmin ? [{ to: '/allenamenti', label: 'Allenamenti' }] : []),
+  ...(canAdmin || canCreator ? [{ to: '/allenamenti', label: 'Allenamenti' }] : []),
   ...(canAdmin || canCreator ? [{ to: '/convocazioni', label: 'Convocazioni' }] : []),
   ...(canCreator ? [{ to: '/admin-panel', label: 'Pannello Admin' }] : []),
 ];
+
   
 
 
@@ -489,3 +490,4 @@ const canCreator = role === UserRole.Creator;
     </div>
   );
 }
+
