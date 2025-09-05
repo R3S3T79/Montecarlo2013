@@ -28,7 +28,7 @@ export default function Convocazioni() {
   const [oraRitrovo, setOraRitrovo] = useState("");
   const [convocati, setConvocati] = useState<Record<string, boolean>>({});
 
-  const allenatore = "Cesaretti Andrea";
+  const allenatore = "Cesaretti Stefano";
   const collaboratore = "Mazzoni Cristiano";
   const accompagnatori = ["Cervetti Marco", "Marotta Simone", "Miressi Marco"].sort();
 
@@ -108,29 +108,30 @@ export default function Convocazioni() {
   };
 
   const handleShareWhatsapp = async () => {
-    const node = document.getElementById("convocazione");
-    if (node) {
-      try {
-        const canvas = await html2canvas(node, { scale: 2 });
-        const dataUrl = canvas.toDataURL("image/png");
+  const node = document.getElementById("convocazione");
+  if (node) {
+    try {
+      const canvas = await html2canvas(node, { scale: 2, backgroundColor: "#ffffff" });
+      const dataUrl = canvas.toDataURL("image/png");
 
-        const blob = await (await fetch(dataUrl)).blob();
-        const file = new File([blob], "convocazione.png", { type: "image/png" });
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], "convocazione.png", { type: "image/png" });
 
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            title: "Convocazione Montecarlo 2013",
-            text: "Ecco la convocazione della prossima partita ⚽",
-            files: [file],
-          });
-        } else {
-          alert("Condivisione diretta non supportata. Salva e invia manualmente su WhatsApp.");
-        }
-      } catch (err) {
-        console.error("Errore screenshot:", err);
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: "Convocazione Montecarlo 2013",
+          text: "Ecco la convocazione della prossima partita ⚽",
+          files: [file],
+        });
+      } else {
+        alert("Condivisione diretta non supportata. Salva e invia manualmente su WhatsApp.");
       }
+    } catch (err) {
+      console.error("Errore screenshot:", err);
     }
-  };
+  }
+};
+
 
   return (
     <div className="p-6">
