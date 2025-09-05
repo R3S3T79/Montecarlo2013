@@ -146,8 +146,11 @@ export default function SidebarLayout(): JSX.Element {
   ];
   const group4 = [
     ...(canAdmin ? [{ to: '/allenamenti', label: 'Allenamenti' }] : []),
+    ...(canAdmin || canCreator ? [{ to: '/convocazioni', label: 'Convocazioni' }] : []), // ← AGGIUNTA
     ...(canCreator ? [{ to: '/admin-panel', label: 'Pannello Admin' }] : []),
   ];
+  
+
 
   // Titolo dinamico — sulla home: "Ciao {username da user_profiles}"
   let pageTitle = '';
@@ -452,6 +455,7 @@ export default function SidebarLayout(): JSX.Element {
               {link.to === '/prossima-partita' && <hr className="border-t border-white/20 my-2" />}
               {link.to === '/squadre' && <hr className="border-t border-white/20 my-2" />}
               {link.to === '/statistiche/giocatori' && <hr className="border-t border-white/20 my-2" />}
+              {link.to === '/galleria' && <hr className="border-t border-white/20 my-2" />}
             </React.Fragment>
           ))}
 
