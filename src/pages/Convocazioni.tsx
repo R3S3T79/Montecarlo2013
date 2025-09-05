@@ -247,7 +247,7 @@ export default function Convocazioni() {
           <ul className="mt-3">
             {giocatori.map((g) => (
               <li key={g.id} className={convocati[g.id] ? "" : "line-through"}>
-                {g.cognome.toUpperCase()} {g.nome}
+  <span>{g.cognome.toUpperCase()} {g.nome}</span>
               </li>
             ))}
           </ul>
