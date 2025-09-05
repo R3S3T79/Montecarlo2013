@@ -268,10 +268,13 @@ export default function Convocazioni() {
   <div><strong>ACCOMPAGNATORI:</strong> {accompagnatori.join(", ")}</div>
 </div>
 
-{/* Footer */}
-<div className="convocazioni-footer">
-  ASSOCIAZIONE SPORTIVA DILETTANTISTICA MONTECARLO <br />
-  Via Provinciale di Montecarlo, 32 – 55015 Montecarlo (LU) <br />
-  P.I. e C.F.: 02091460465 – Mail asdmontecarlo@gmail.com – Matricola LND 947185
-</div>
-
+        {/* Footer */}
+        <div className="convocazioni-footer">
+          ASSOCIAZIONE SPORTIVA DILETTANTISTICA MONTECARLO <br />
+          Via Provinciale di Montecarlo, 32 – 55015 Montecarlo (LU) <br />
+          P.I. e C.F.: 02091460465 – Mail asdmontecarlo@gmail.com – Matricola LND 947185
+        </div>
+      </div>  
+    </div>    
+  );
+}
