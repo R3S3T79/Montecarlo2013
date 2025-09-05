@@ -214,64 +214,64 @@ export default function Convocazioni() {
           <tbody>
             <tr>
   <td>
-    <span className="font-bold">PARTITA VS.</span>
-    <span className="ml-4">{squadraAvversaria}</span>
-  </td>
-  <td>
-    <span className="font-bold">DATA</span>
-    <span className="ml-4">{formattaData(data)}</span>
-  </td>
-  <td>
-    <span className="font-bold">ORA</span>
-    <span className="ml-4">{oraPartita}</span>
-  </td>
+  <span className="font-bold">PARTITA VS.</span>
+  <span className="campo-compilato campo-medio">{squadraAvversaria}</span>
+</td>
+
+<td>
+  <span className="font-bold">DATA</span>
+  <span className="campo-compilato campo-corto">{formattaData(data)}</span>
+</td>
+
+<td>
+  <span className="font-bold">ORA</span>
+  <span className="campo-compilato campo-corto">{oraPartita}</span>
+</td>
+
 </tr>
           <tr>
   {/* Prima cella a sx */}
-  <td colSpan={1} className="text-left">
+<td colSpan={1}>
   <span className="font-bold">RITROVO</span>
-  <span className="ml-4">{ritrovoLuogo}</span>
+  <span className="campo-compilato campo-lungo">{ritrovoLuogo}</span>
 </td>
-
-<td className="text-left">
-  <span className="font-bold">ORA</span>
-  <span className="ml-4">{oraRitrovo}</span>
-</td>
+<tr>
+  <td>
+    <span className="font-bold">ORA</span>
+    <span className="campo-compilato campo-corto">{oraRitrovo}</span>
+  </td>
 </tr>
-          </tbody>
-        </table>
+</tbody>
+</table>
 
-        {/* Convocati */}
-        <div className="convocati-list">
-          <strong>CONVOCATI:</strong>
-          <ul className="mt-3">
-            {giocatori.map((g) => (
-              <li key={g.id} className={convocati[g.id] ? "" : "line-through"}>
-  <span>{g.cognome.toUpperCase()} {g.nome}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+{/* Convocati */}
+<div className="convocati-list">
+  <strong>CONVOCATI:</strong>
+  <ul className="mt-3">
+    {giocatori.map((g) => (
+      <li key={g.id} className={convocati[g.id] ? "" : "line-through"}>
+        <span>{g.cognome.toUpperCase()} {g.nome}</span>
+      </li>
+    ))}
+  </ul>
+</div>
 
-        <div className="competizione-box mt-2 export-only text-center">
+<div className="competizione-box mt-2 export-only text-center">
   <div className="font-bold">{competizione}</div>
   <div className="mt-4">{nomeTorneo}</div>
 </div>
 
-        {/* Staff */}
-        <div className="convocazioni-section">
-          <div><strong>ALLENATORE:</strong> {allenatore}</div>
-          <div><strong>COLLABORATORE:</strong> {collaboratore}</div>
-          <div><strong>ACCOMPAGNATORI:</strong> {accompagnatori.join(", ")}</div>
-        </div>
+{/* Staff */}
+<div className="convocazioni-section">
+  <div><strong>ALLENATORE:</strong> {allenatore}</div>
+  <div><strong>COLLABORATORE:</strong> {collaboratore}</div>
+  <div><strong>ACCOMPAGNATORI:</strong> {accompagnatori.join(", ")}</div>
+</div>
 
-        {/* Footer */}
-        <div className="convocazioni-footer">
-          ASSOCIAZIONE SPORTIVA DILETTANTISTICA MONTECARLO <br />
-          Via Provinciale di Montecarlo, 32 – 55015 Montecarlo (LU) <br />
-          P.I. e C.F.: 02091460465 – Mail asdmontecarlo@gmail.com – Matricola LND 947185
-        </div>
-      </div>
-    </div>
-  );
-}
+{/* Footer */}
+<div className="convocazioni-footer">
+  ASSOCIAZIONE SPORTIVA DILETTANTISTICA MONTECARLO <br />
+  Via Provinciale di Montecarlo, 32 – 55015 Montecarlo (LU) <br />
+  P.I. e C.F.: 02091460465 – Mail asdmontecarlo@gmail.com – Matricola LND 947185
+</div>
+
