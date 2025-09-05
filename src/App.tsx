@@ -86,7 +86,7 @@ import EditSquadra from "./pages/EditSquadra";
 import AdminPanel from "./pages/AdminPanel";
 import AdminNotizie from "./pages/AdminNotizie"; // <--- aggiungi import
 import NuovoUtente from "./pages/NuovoUtente"; // nuova pagina
-
+import Convocazioni from "./pages/Convocazioni";
 
 
 // fallback
@@ -185,12 +185,10 @@ export default function App() {
           <Route path="/admin-panel" element={<AdminPanel />} />
           <Route path="/admin-notizie" element={<AdminNotizie />} />
           <Route path="/nuovo-utente" element={<NuovoUtente />} /> {/* nuova */}
+          <Route path="/convocazioni" element={<Convocazioni />} />
+
          
-          
-
-
-
-
+        
           {/* Fallback */}
           <Route path="*" element={<NotFoundPage />} />
         </Route>
@@ -198,7 +196,6 @@ export default function App() {
     </AuthProvider>
   );
 }
-
 
 
 
