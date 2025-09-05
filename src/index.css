@@ -13,9 +13,11 @@ html, body, #root {
 
 /* ===== Sfondo solo a schermo ===== */
 @media screen {
-  html, body, #root { 
-    min-height: 100%; 
+  #convocazione {
+    position: absolute;
+    left: -9999px; /* fuori dallo schermo, ma presente nel DOM */
   }
+}
 
   body {
     background: url("/Sfondo.png") no-repeat center center fixed !important;
@@ -26,7 +28,7 @@ html, body, #root {
   #convocazione {
     display: none;
   }
-}
+
 
 /* ---- Stampa ---- */
 @page {
