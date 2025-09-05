@@ -124,8 +124,8 @@ export default function SidebarLayout(): JSX.Element {
     (user?.app_metadata?.role as UserRole) ||
     UserRole.Authenticated;
 
- const isAdmin = role === UserRole.Admin;
-const isCreator = role === UserRole.Creator;
+ const canAdmin = role === UserRole.Admin;
+const canCreator = role === UserRole.Creator;
 
   // Gruppi link — PRIMA voce: "Home"
   const group1 = [
@@ -145,9 +145,9 @@ const isCreator = role === UserRole.Creator;
     { to: '/galleria', label: 'Galleria' },
   ];
   const group4 = [
-  ...(isAdmin ? [{ to: '/allenamenti', label: 'Allenamenti' }] : []),
-  ...(isAdmin || isCreator ? [{ to: '/convocazioni', label: 'Convocazioni' }] : []),
-  ...(isCreator ? [{ to: '/admin-panel', label: 'Pannello Admin' }] : []),
+  ...(canAdmin ? [{ to: '/allenamenti', label: 'Allenamenti' }] : []),
+  ...(canAdmin || canCreator ? [{ to: '/convocazioni', label: 'Convocazioni' }] : []),
+  ...(canCreator ? [{ to: '/admin-panel', label: 'Pannello Admin' }] : []),
 ];
   
 
