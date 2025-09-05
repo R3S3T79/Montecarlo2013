@@ -1,211 +1,170 @@
-// src/pages/AllenamentiNuovo.tsx
-// Data creazione chat: 2025-08-10
+// src/pages/Allenamenti.tsx
+// Data creazione chat: 2025-08-03 (rev: fix view giocatori_stagioni_view)
 
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Navigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { UserRole } from '../lib/roles';
+import { useNavigate } from 'react-router-dom';
 
-interface Giocatore {
-  id: string;      // sarà l'id reale del giocatore
-  nome: string;
-  cognome: string;
+interface GiocatorePresenza {
+  record_id: string;
+  giocatore_uid: string;
+  nome: string | null;
+  cognome: string | null;
+  totaleAll: number;
+  presenze: number;
+  assenze: number;
 }
 
-interface Stagione {
-  id: string;
-  nome: string;
-  data_inizio: string;
-  data_fine: string;
-}
-
-export default function AllenamentiNuovo(): JSX.Element {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const dateParam = searchParams.get('data');
-  const today = new Date().toISOString().slice(0, 10);
-  const [date, setDate] = useState<string>(dateParam ?? today);
-
-  const role =
-    (user?.user_metadata?.role as UserRole) ||
-    (user?.app_metadata?.role as UserRole) ||
-    UserRole.Authenticated;
-  if (role !== UserRole.Admin && role !== UserRole.Creator) {
-    return <Navigate to="/" replace />;
-  }
-
-  const [players, setPlayers] = useState<Giocatore[]>([]);
-  const [selections, setSelections] = useState<Record<string, boolean>>({});
+export default function Allenamenti(): JSX.Element {
+  const [rows, setRows] = useState<GiocatorePresenza[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-
-  const [seasons, setSeasons] = useState<Stagione[]>([]);
-  const [selectedSeasonId, setSelectedSeasonId] = useState<string>("");
-
-  const weekdays = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
-  const selectedDayName = weekdays[new Date(date).getDay()];
+  const navigate = useNavigate();
 
   useEffect(() => {
-    (async () => {
-      const { data, error } = await supabase
-        .from('stagioni')
-        .select('id, nome, data_inizio, data_fine')
-        .order('data_inizio', { ascending: false });
-
-      if (error || !data) {
-        console.error('Errore caricamento stagioni:', error);
-        return;
-      }
-
-      setSeasons(data);
-
-      const oggi = new Date().toISOString().split('T')[0];
-      const attiva = data.find(s => s.data_inizio <= oggi && s.data_fine >= oggi);
-      setSelectedSeasonId(attiva ? attiva.id : data[0]?.id ?? "");
-    })();
-  }, []);
-
-  useEffect(() => {
-    async function load() {
-      if (!selectedSeasonId) return;
+    async function fetchData() {
       setLoading(true);
+      const oggi = new Date().toISOString().split('T')[0];
 
-      const { data: gsData, error: gsError } = await supabase
-  .from('giocatori_stagioni_view')
-  .select('giocatore_uid, nome, cognome')
-  .eq('stagione_id', selectedSeasonId)
-  .order('cognome', { ascending: true });
+      // Recupera stagione attiva
+      const { data: stagione } = await supabase
+        .from('stagioni')
+        .select('id')
+        .lte('data_inizio', oggi)
+        .gte('data_fine', oggi)
+        .single();
 
-      if (gsError || !gsData) {
-        console.error('Errore fetch v_giocatori_stagioni:', gsError);
-        setPlayers([]);
-        setSelections({});
+      if (!stagione) {
+        setRows([]);
         setLoading(false);
         return;
       }
 
-      const list = gsData.map(r => ({
-  id: r.giocatore_uid,   // qui usi il giocatore_uid
-  nome: r.nome,
-  cognome: r.cognome
-}));
-      setPlayers(list);
+      // Query dalla view corretta con nome/cognome già inclusi
+      const { data: gs } = await supabase
+        .from('giocatori_stagioni_view')
+        .select('id, giocatore_uid, nome, cognome')
+        .eq('stagione_id', stagione.id);
 
-      const initSel: Record<string, boolean> = {};
-      list.forEach(p => { initSel[p.id] = false });
+      if (!gs || gs.length === 0) {
+        setRows([]);
+        setLoading(false);
+        return;
+      }
 
-      setSelections(initSel);
+      // Ordinamento lato client: cognome, poi nome
+      const gsSorted = [...gs].sort((a: any, b: any) => {
+        const ac = (a.cognome ?? '').localeCompare(b.cognome ?? '');
+        if (ac !== 0) return ac;
+        return (a.nome ?? '').localeCompare(b.nome ?? '');
+      });
+
+      const giocatoreUids = gsSorted.map((r: any) => r.giocatore_uid);
+
+      // Evita 400: non chiamare .in(...) con lista vuota
+      let allen: { giocatore_uid: string; presente: boolean | null }[] = [];
+      if (giocatoreUids.length > 0) {
+        const { data: allenData } = await supabase
+          .from('allenamenti')
+          .select('giocatore_uid, presente')
+          .in('giocatore_uid', giocatoreUids)
+          .eq('stagione_id', stagione.id);
+        allen = allenData ?? [];
+      }
+
+      // Conta presenze/assenze
+      const counts: Record<string, { totale: number; presenze: number }> = {};
+      giocatoreUids.forEach(id => (counts[id] = { totale: 0, presenze: 0 }));
+      allen.forEach(a => {
+        const c = counts[a.giocatore_uid];
+        if (!c) return;
+        c.totale += 1;
+        if (a.presente) c.presenze += 1;
+      });
+
+      // Risultato finale
+      const result: GiocatorePresenza[] = gsSorted.map((r: any) => ({
+        record_id: r.id,
+        giocatore_uid: r.giocatore_uid,
+        nome: r.nome ?? null,
+        cognome: r.cognome ?? null,
+        totaleAll: counts[r.giocatore_uid]?.totale ?? 0,
+        presenze: counts[r.giocatore_uid]?.presenze ?? 0,
+        assenze:
+          (counts[r.giocatore_uid]?.totale ?? 0) -
+          (counts[r.giocatore_uid]?.presenze ?? 0),
+      }));
+
+      setRows(result);
       setLoading(false);
     }
-    load();
-  }, [selectedSeasonId]);
-
-  const togglePresenza = (id: string, presente: boolean) => {
-    setSelections(prev => ({ ...prev, [id]: presente }));
-  };
-
-  const handleSave = async () => {
-    const records = players.map(p => ({
-      giocatore_uid: p.id,
-      data_allenamento: date,
-      presente: selections[p.id] === true,
-      stagione_id: selectedSeasonId
-    }));
-
-    const { error } = await supabase.from('allenamenti').insert(records);
-    if (error) {
-      console.error('Salvataggio fallito', error);
-      alert('Errore durante il salvataggio.');
-    } else {
-      navigate('/allenamenti');
-    }
-  };
+    fetchData();
+  }, []);
 
   if (loading) {
-    return <div className="min-h-screen">Caricamento…</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#6B7280] to-[#bfb9b9]">
+        <div className="text-white text-lg">Caricamento…</div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen px-2 py-4">
-      <div className="max-w-2xl mx-auto bg-white/60 rounded-lg shadow p-6">
-        {/* Selettore giorno, data e stagione */}
-        <div className="mb-6 text-center">
-          <div className="flex flex-col md:flex-row items-center md:space-x-4 space-y-3 md:space-y-0">
-
-            <span className="text-lg text-gray-800 font-semibold">{selectedDayName}</span>
-            <input
-              type="date"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-              className="rounded-md bg-white border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-            />
-            <select
-              value={selectedSeasonId}
-              onChange={e => setSelectedSeasonId(e.target.value)}
-              className="rounded-md bg-white border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+    <div className="min-h-screen px-2 pb-2">
+      {rows.length === 0 ? (
+        <div className="text-center text-white italic">
+          Nessun giocatore trovato per la stagione attuale, Aggiungi nuovo Allenamento.
+        </div>
+      ) : (
+        <div className="w-full">
+          <div className="overflow-x-auto">
+            <table
+              className="table-auto w-full border-separate"
+              style={{ borderSpacing: 0 }}
             >
-              {seasons.map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.nome}
-                </option>
-              ))}
-            </select>
+              <thead className="bg-gradient-to-br from-[#d61f1f]/90 to-[#f45e5e]/90">
+                <tr>
+                  <th className="px-4 py-3 text-left text-white uppercase">
+                    Giocatore
+                  </th>
+                  <th className="px-4 py-3 text-center text-white uppercase">
+                    All.
+                  </th>
+                  <th className="px-4 py-3 text-center text-white uppercase">
+                    Pres.
+                  </th>
+                  <th className="px-4 py-3 text-center text-white uppercase">
+                    Ass.
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {rows.map((r, idx) => {
+                  // 🎯 riga semitrasparente (alternata)
+                  const rowBg = idx % 2 === 0 ? 'bg-white/90' : 'bg-white/85';
+                  const rowHover = 'hover:bg-white/80';
+                  const cell = `px-4 py-2 text-gray-900 border-b border-white/30 ${rowBg} ${rowHover}`;
+
+                  return (
+                    <tr
+                      key={r.record_id}
+                      onClick={() => navigate(`/allenamenti/${r.giocatore_uid}`)}
+                      className="cursor-pointer transition-colors duration-200"
+                    >
+                      <td className={cell}>
+                        {r.cognome} {r.nome}
+                      </td>
+                      <td className={`${cell} text-center`}>{r.totaleAll}</td>
+                      <td className={`${cell} text-center`}>{r.presenze}</td>
+                      <td className={`${cell} text-center`}>{r.assenze}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
-
-        {/* Lista giocatori con divisori rossi */}
-        <ul className="divide-y divide-red-400 mb-6">
-          {players.map(p => {
-            const isPresente = selections[p.id];
-            return (
-              <li key={p.id} className="flex items-center justify-between py-3 px-2">
-                <span className="text-xl font-bold text-gray-900">
-                  {p.cognome} {p.nome}
-                </span>
-                <div className="flex flex-col space-y-2 pr-2">
-                  <button
-                    onClick={() => togglePresenza(p.id, true)}
-                    className={`px-4 py-1 rounded ${
-                      isPresente
-                        ? 'bg-green-600 text-white'
-                        : 'bg-green-200 text-green-800'
-                    }`}
-                  >
-                    Presente
-                  </button>
-                  <button
-                    onClick={() => togglePresenza(p.id, false)}
-                    className={`px-4 py-1 rounded ${
-                      !isPresente
-                        ? 'bg-red-600 text-white'
-                        : 'bg-red-200 text-red-800'
-                    }`}
-                  >
-                    Assente
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-
-        {/* Azioni */}
-        <div className="flex justify-center space-x-6">
-          <button
-            onClick={() => navigate(-1)}
-            className="px-6 py-2 border border-gray-400 rounded-lg text-gray-700 hover:bg-gray-100 transition"
-          >
-            Annulla
-          </button>
-          <button
-            onClick={handleSave}
-            className="px-6 py-2 bg-red-600 text-white rounded-lg hover:opacity-90 transition"
-          >
-            Salva
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
