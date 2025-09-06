@@ -31,8 +31,6 @@ html, body, #root {
   }
 }
 
-
-
 /* ---- Stampa ---- */
 @page {
   size: auto;
@@ -92,6 +90,12 @@ html, body, #root {
   /* Mostra convocazione SOLO in stampa/export */
   #convocazione {
     display: flex;
+  }
+
+  /* Nascondi plugin Facebook in stampa */
+  .fb-page, #fb-root {
+    display: none !important;
+    visibility: hidden !important;
   }
 }
 
@@ -191,8 +195,6 @@ html, body, #root {
 .campo-corto  { min-width: 80px; }
 .campo-medio  { min-width: 120px; }
 .campo-lungo  { min-width: 150px; }
-
-
 
 /* ==== Competizione centrata in pagina ==== */
 .competizione-box {
