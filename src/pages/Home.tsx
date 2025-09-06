@@ -445,6 +445,13 @@ useEffect(() => {
   return () => supabase.removeChannel(ch2);
 }, [match?.id]);
 
+// ✅ nuovo effetto per il plugin Facebook
+useEffect(() => {
+  if ((window as any).FB) {
+    (window as any).FB.XFBML.parse();
+  }
+}, []);
+
 // normalizzazione marcatore con nome e cognome
 const normalizeMarcatore = (row: any): Marcatore => ({
   id: String(row.id),
@@ -1050,7 +1057,7 @@ fbIframe: { width: "100%", height: "100%", border: "none" },
     fontWeight: 700,
   },
 
-    // Struttura LIVE personalizzata
+  // Struttura LIVE personalizzata
   teamsLiveRow: {
     display: "flex",
     flexDirection: "column", // <-- verticale invece che affiancate
@@ -1109,13 +1116,6 @@ fbIframe: { width: "100%", height: "100%", border: "none" },
     textDecoration: "none",
   },
 };
-
-// Forza parsing Facebook Page Plugin dopo il mount
-useEffect(() => {
-  if ((window as any).FB) {
-    (window as any).FB.XFBML.parse();
-  }
-}, []);
 
 // Animazioni CSS (marquee + blink)
 const styleEl = document.getElementById("home-inline-anim");
