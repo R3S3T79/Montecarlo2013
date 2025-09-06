@@ -801,28 +801,23 @@ const fbPluginSrc = useMemo(() => {
         )}
       </section>
 
-      {/* FACEBOOK – senza intestazione */}
-      <section style={styles.card}>
-        {fbPluginSrc ? (
-          <div style={styles.fbWrap}>
-            <iframe
-              title="Pagina Facebook Montecarlo"
-              style={styles.fbIframe}
-              src={fbPluginSrc}
-              scrolling="no"
-              allow="encrypted-media; clipboard-write; picture-in-picture; web-share"
-            />
-          </div>
-        ) : (
-          <div style={styles.fbWrap}>
-            <iframe
-              title="Montecarlo Calcio Facebook (ricerca)"
-              style={styles.fbIframe}
-              src={SEARCH_URL}
-            />
-          </div>
-        )}
-      </section>
+      {/* FACEBOOK – plugin ufficiale */}
+<section style={styles.card}>
+  <div style={styles.fbWrap}>
+    <div
+      className="fb-page"
+      data-href="https://www.facebook.com/Montecarlo2013"
+      data-tabs="timeline"
+      data-width="500"
+      data-height="600"
+      data-small-header="false"
+      data-adapt-container-width="true"
+      data-hide-cover="false"
+      data-show-facepile="true"
+    ></div>
+  </div>
+</section>
+
     </div>
   );
 }
