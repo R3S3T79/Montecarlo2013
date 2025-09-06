@@ -270,7 +270,7 @@ const canCreator = role === UserRole.Creator;
 </div>
 
         {/* --- TUTTI I PULSANTI ADMIN/CREATOR INVARIATI --- */}
-        {matchCalendario && canAdmin && (
+        {matchCalendario && (canAdmin || canCreator) && (
           <button
             onClick={() => navigate('/nuova-partita')}
             aria-label="Nuova Partita"
@@ -280,7 +280,7 @@ const canCreator = role === UserRole.Creator;
           </button>
         )}
 
-        {matchRosa && canAdmin && (
+        {matchRosa && (canAdmin || canCreator) && (
           <button
             onClick={() => navigate('/aggiungi-giocatore')}
             aria-label="Aggiungi Giocatore"
@@ -290,7 +290,7 @@ const canCreator = role === UserRole.Creator;
           </button>
         )}
 
-        {matchTeamList && canAdmin && (
+        {matchTeamList && (canAdmin || canCreator) && (
           <button
             onClick={() => navigate('/squadre/nuova')}
             aria-label="Nuova Squadra"
@@ -300,7 +300,7 @@ const canCreator = role === UserRole.Creator;
           </button>
         )}
 
-        {matchAllenamenti && canAdmin && (
+        {matchAllenamenti && (canAdmin || canCreator) && (
           <>
             <button
               onClick={() => navigate('/allenamenti/nuovo')}
@@ -319,7 +319,7 @@ const canCreator = role === UserRole.Creator;
           </>
         )}
 
-        {matchTornei && canAdmin && (
+        {matchTornei && (canAdmin || canCreator) && (
           <button
             onClick={() => navigate('/tornei/nuovo/step1')}
             aria-label="Nuovo Torneo"
@@ -329,7 +329,7 @@ const canCreator = role === UserRole.Creator;
           </button>
         )}
 
-        {matchTeamDetail && canAdmin && (
+        {matchTeamDetail && (canAdmin || canCreator) && (
           <>
             <button
               onClick={() => navigate(`/squadre/${matchTeamDetail.params.id}/edit`)}
@@ -348,7 +348,7 @@ const canCreator = role === UserRole.Creator;
           </>
         )}
 
-        {matchPlayer && canAdmin && (
+        {matchPlayer && (canAdmin || canCreator) && (
           <>
             <button
               onClick={() => navigate(`/edit-giocatore/${matchPlayer.params.id}`)}
@@ -367,7 +367,7 @@ const canCreator = role === UserRole.Creator;
           </>
         )}
 
-        {matchPre && canAdmin && (
+        {matchPre && (canAdmin || canCreator) && (
           <>
             <button
               onClick={() => navigate(`/partita/${matchPre.params.id}/edit`)}
@@ -386,7 +386,7 @@ const canCreator = role === UserRole.Creator;
           </>
         )}
 
-        {matchDetail && canAdmin && (
+        {matchDetail && (canAdmin || canCreator) && (
           <>
             <button
               onClick={() => navigate(`/modifica-partita-giocata/${matchDetail.params.id}`)}
@@ -490,4 +490,3 @@ const canCreator = role === UserRole.Creator;
     </div>
   );
 }
-
