@@ -100,7 +100,8 @@ export default function StatisticheSquadra() {
             ospite:squadra_ospite_id(nome)
           `)
           .eq('stato', 'Giocata')
-          .eq('stagione_id', stagioneSelezionata);
+          .eq('stagione_id', stagioneSelezionata)
+          .neq('campionato_torneo', 'Allenamento');
 
         const { data: partite, error } = await query;
 

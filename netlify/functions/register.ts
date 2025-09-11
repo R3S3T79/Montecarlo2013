@@ -1,11 +1,10 @@
 // netlify/functions/register.ts
-// Data: 21/08/2025 (rev: dual-SMTP fallback notifications → support)
+// Data: 27/08/2025 (rev: flusso semplificato → niente più link, solo notifica admin)
 // Scopo: Registrazione utente → salva in pending_users e manda mail all'admin
 
 import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
-import crypto from "crypto";
 
 // =========================
 // Supabase client (service)
@@ -61,8 +60,6 @@ export const handler: Handler = async (event) => {
   // =========================
   // Inserimento in pending_users
   // =========================
-  const confirmationToken = crypto.randomUUID();
-
   const { error: insertErr } = await supabase.from("pending_users").insert([
     {
       email,
@@ -70,7 +67,6 @@ export const handler: Handler = async (event) => {
       password,
       approved: false,
       confirmed: false,
-      confirmation_token: confirmationToken,
     },
   ]);
 

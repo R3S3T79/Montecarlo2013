@@ -68,7 +68,7 @@ export default function VotazioniPartita(): JSX.Element {
           // 3) Anagrafiche dalla vista stagionale (nome, cognome, foto, ruolo)
           // NB: gsv contiene i dati per stagione → filtriamo per stagione e per elenco uid
           const { data: gsv, error: gsvErr } = await supabase
-            .from('giocatori_stagioni_view')
+            .from('v_stat_giocatore_stagione')
             .select('giocatore_uid, nome, cognome, foto_url')
             .eq('stagione_id', p?.stagione_id)
             .in('giocatore_uid', ids)

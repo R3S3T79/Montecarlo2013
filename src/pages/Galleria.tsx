@@ -1,5 +1,5 @@
 // src/pages/Galleria.tsx
-// Data creazione: 18/08/2025 (multi-upload + fotocamera + delete + zoom)
+// Data creazione: 18/08/2025 (rev: UI migliorata – barra upload in container trasparente + X rossa per eliminare)
 
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
@@ -23,8 +23,8 @@ export default function Galleria(): JSX.Element {
   const [titolo, setTitolo] = useState("");
   const [media, setMedia] = useState<Media[]>([]);
   const [loading, setLoading] = useState(false);
-  const [uploadIndex, setUploadIndex] = useState(0);      // indice file corrente
-  const [uploadProgress, setUploadProgress] = useState(0); // percent del file corrente
+  const [uploadIndex, setUploadIndex] = useState(0);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [zoomItem, setZoomItem] = useState<Media | null>(null);
 
@@ -184,11 +184,7 @@ export default function Galleria(): JSX.Element {
 
   // ======= DELETE =======
   const deleteMedia = async (item: Media) => {
-    const ok = window.confirm(
-      canAdmin
-        ? "Eliminare questo elemento dalla galleria? (permesso admin/creator)"
-        : "Eliminare questo elemento dalla galleria?"
-    );
+    const ok = window.confirm("Eliminare questo elemento dalla galleria?");
     if (!ok) return;
 
     const { error } = await supabase
@@ -197,11 +193,7 @@ export default function Galleria(): JSX.Element {
       .eq("id", item.id);
 
     if (error) {
-      // Nota: perché gli Admin/Creator possano eliminare TUTTO,
-      // occorre una policy RLS aggiuntiva lato DB.
-      alert(
-        "Eliminazione non autorizzata. Verifica le policy RLS per consentire delete agli Admin/Creator."
-      );
+      alert("Eliminazione non autorizzata. Verifica le policy RLS.");
       console.error(error);
       return;
     }
@@ -223,15 +215,17 @@ export default function Galleria(): JSX.Element {
   // ======= RENDER =======
   return (
     <div className="min-h-screen mt-2 px-2 pb-6">
-      <h1 style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span role="img" aria-label="camera">
-          
-        </span>{" "}
-       
-      </h1>
-
-      {/* Form upload (UI migliorata + fotocamera + MULTIPLO) */}
-      <div style={{ marginBottom: 20 }}>
+      {/* Barra Upload in container trasparente */}
+      <div
+        style={{
+          background: "rgba(255,255,255,0.9)",
+          border: "1px solid #ddd",
+          borderRadius: 12,
+          padding: 16,
+          marginBottom: 24,
+          boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+        }}
+      >
         {/* Inputs nascosti */}
         <input
           id="pick-file"
@@ -270,7 +264,7 @@ export default function Galleria(): JSX.Element {
 
           <input
             type="text"
-            placeholder="Titolo (opzionale per tutti; se vuoto uso il nome file)"
+            placeholder="Titolo (opzionale)"
             value={titolo}
             onChange={(e) => setTitolo(e.target.value)}
             style={inputStyle}
@@ -341,7 +335,6 @@ export default function Galleria(): JSX.Element {
                 border: "1px solid #ddd",
                 borderRadius: 8,
                 padding: 10,
-                textAlign: "center",
                 background: "rgba(255,255,255,0.85)",
               }}
             >
@@ -366,31 +359,41 @@ export default function Galleria(): JSX.Element {
                 )}
               </div>
 
-              <div style={{ marginTop: 8, fontSize: 14 }}>
-                {m.titolo || ""}
-              </div>
-
-              {canDelete && (
-                <div style={{ marginTop: 8 }}>
+              {/* Titolo + X eliminazione */}
+              <div
+                style={{
+                  marginTop: 8,
+                  fontSize: 14,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <span>{m.titolo || ""}</span>
+                {canDelete && (
                   <button
                     onClick={() => deleteMedia(m)}
                     style={{
-                      ...btnStyle,
-                      background: "#fff0f0",
-                      borderColor: "#fca5a5",
-                      color: "#b91c1c",
-                      fontWeight: 700,
+                      background: "transparent",
+                      border: "none",
+                      color: "#dc2626",
+                      fontSize: 18,
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      lineHeight: 1,
                     }}
-                    title={
-                      canAdmin
-                        ? "Elimina (admin/creator: può eliminare tutto)"
-                        : "Elimina (solo i tuoi)"
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = "rgba(220,38,38,0.1)")
                     }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background = "transparent")
+                    }
+                    title="Elimina"
                   >
-                    🗑️ Elimina
+                    ×
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           );
         })}

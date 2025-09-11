@@ -1,8 +1,9 @@
 {
   "name": "Montecarlo2013",
   "short_name": "Montecarlo",
-  "start_url": ".",
-  "display": "fullscreen",
+  "description": "App ufficiale Montecarlo 2013",
+  "start_url": "/",
+  "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#004aad",
   "orientation": "portrait",
@@ -16,7 +17,12 @@
       "src": "/icon_512x512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
-

@@ -1,5 +1,5 @@
 // src/pages/RosaGiocatori.tsx
-// Data creazione chat: 2025-08-14
+// Data creazione chat: 2025-08-14 (rev: passaggio stagione a DettaglioGiocatore)
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
@@ -64,7 +64,7 @@ export default function RosaGiocatori(): JSX.Element {
       setLoading(true);
       try {
         const { data, error } = await supabase
-          .from('giocatori_stagioni_view')
+          .from('v_stat_giocatore_stagione')
           .select('giocatore_uid, nome, cognome, ruolo, foto_url')
           .eq('stagione_id', stagioneSelezionata)
           .order('cognome', { ascending: true });
@@ -113,7 +113,11 @@ export default function RosaGiocatori(): JSX.Element {
             {giocatori.map((g) => (
               <div
                 key={g.giocatore_uid}
-                onClick={() => navigate(`/giocatore/${g.giocatore_uid}`)}
+                onClick={() =>
+                  navigate(`/giocatore/${g.giocatore_uid}`, {
+                    state: { stagioneId: stagioneSelezionata } // 🔹 passaggio stagione
+                  })
+                }
                 className="bg-white/90 rounded-lg shadow p-4 cursor-pointer hover:shadow-lg transition"
               >
                 <div className="flex items-center space-x-3">
@@ -136,7 +140,6 @@ export default function RosaGiocatori(): JSX.Element {
                     </h3>
                     {g.ruolo && (
                       <p className="text-sm text-gray-800">{g.ruolo}</p>
-
                     )}
                   </div>
                 </div>

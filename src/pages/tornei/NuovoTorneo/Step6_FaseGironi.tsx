@@ -285,7 +285,7 @@ export default function Step6_FaseGironi() {
   };
 
   if (authLoading || loading) {
-    return <p className="text-center py-6">Caricamento in corso…</p>;
+    return <p className="text-center text-white py-6">Caricamento in corso…</p>;
   }
 
   return (

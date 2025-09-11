@@ -6,6 +6,7 @@ import { Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import SidebarLayout from "./components/SidebarLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import ScrollToTop from "./components/ScrollToTop";
 
 
 // pagine pubbliche
@@ -14,7 +15,6 @@ import RegisterPage from "./pages/RegisterPage";
 import ConfirmPage from "./pages/ConfirmPage";
 import AuthCallback from "./pages/AuthCallback";
 import UserProfile from './pages/UserProfile';
-import PostAuthSync from "./pages/PostAuthSync";
 import UpdatePassword from "./pages/UpdatePassword";
 import ForgotPassword from "./pages/ForgotPassword";
 
@@ -87,7 +87,7 @@ import EditSquadra from "./pages/EditSquadra";
 import AdminPanel from "./pages/AdminPanel";
 import AdminNotizie from "./pages/AdminNotizie"; // <--- aggiungi import
 import NuovoUtente from "./pages/NuovoUtente"; // nuova pagina
-
+import Convocazioni from "./pages/Convocazioni";
 
 
 // fallback
@@ -97,6 +97,9 @@ import NotFoundPage from "./pages/NotFoundPage";
 export default function App() {
   return (
     <AuthProvider>
+      {/* Scroll sempre attivo */}
+      <ScrollToTop />
+
       <Routes>
         {/* Rotte pubbliche */}
         <Route path="/login" element={<LoginPage />} />
@@ -186,12 +189,10 @@ export default function App() {
           <Route path="/admin-panel" element={<AdminPanel />} />
           <Route path="/admin-notizie" element={<AdminNotizie />} />
           <Route path="/nuovo-utente" element={<NuovoUtente />} /> {/* nuova */}
-          <Route path="/post-auth-sync" element={<PostAuthSync />} />
-          
+          <Route path="/convocazioni" element={<Convocazioni />} />
 
-
-
-
+         
+        
           {/* Fallback */}
           <Route path="*" element={<NotFoundPage />} />
         </Route>

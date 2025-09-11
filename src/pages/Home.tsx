@@ -188,134 +188,116 @@ export default function HomePage(): JSX.Element {
   }, [marqueeItems]);
 
   // --------------------------------
-  // COMPLEANNI — solo stagione attuale
-  // --------------------------------
-  const [nextBirthday, setNextBirthday] = useState<NextBirthdayInfo | null>(null);
-  const [nowTick, setNowTick] = useState<Date>(new Date());
+// COMPLEANNI — solo stagione attuale
+// --------------------------------
+const [nextBirthday, setNextBirthday] = useState<NextBirthdayInfo | null>(null);
+const [nowTick, setNowTick] = useState<Date>(new Date());
 
-  useEffect(() => {
-    const t = setInterval(() => setNowTick(new Date()), 30_000);
-    return () => clearInterval(t);
-  }, []);
+useEffect(() => {
+  const t = setInterval(() => setNowTick(new Date()), 30_000);
+  return () => clearInterval(t);
+}, []);
 
-  useEffect(() => {
-    let mounted = true;
+useEffect(() => {
+  let mounted = true;
 
-    const loadPlayersBirth = async () => {
-      // 1) prendo stagione corrente (ultima inserita)
-      let stagioneCorrente: Stagione | null = null;
-      {
-        const { data: last, error: e2 } = await supabase
-          .from("stagioni")
-          .select("id, created_at")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+  const loadPlayersBirth = async () => {
+    // 1) prendo stagione corrente (ultima inserita)
+    let stagioneCorrente: Stagione | null = null;
+    {
+      const { data: last, error: e2 } = await supabase
+        .from("stagioni")
+        .select("id, created_at")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-        if (e2) {
-          console.warn("[HomePage] stagioni last warn:", e2.message);
-        }
-
-        if (last?.id) {
-          stagioneCorrente = last as Stagione;
-        }
+      if (e2) {
+        console.warn("[HomePage] stagioni last warn:", e2.message);
       }
 
-      if (!stagioneCorrente?.id) {
-        console.warn("[HomePage] nessuna stagione trovata, fallback: nessun compleanno");
-        if (mounted) setNextBirthday(null);
-        return;
+      if (last?.id) {
+        stagioneCorrente = last as Stagione;
       }
+    }
 
-      // 2) elenco uid dei giocatori della stagione
-      const { data: gs, error: egs } = await supabase
-        .from("giocatori_stagioni")
-        .select("giocatore_uid,nome,cognome")
-        .eq("stagione_id", stagioneCorrente.id);
+    if (!stagioneCorrente?.id) {
+      console.warn("[HomePage] nessuna stagione trovata, fallback: nessun compleanno");
+      if (mounted) setNextBirthday(null);
+      return;
+    }
 
-      if (egs) {
-        console.error("[HomePage] Errore giocatori_stagioni:", egs.message);
-        if (mounted) setNextBirthday(null);
-        return;
+    // 2) prendo direttamente i giocatori della stagione dalla view completa
+    const { data, error } = await supabase
+      .from("v_giocatori_completo")
+      .select("giocatore_uid, nome, cognome, data_nascita, foto_url")
+      .eq("stagione_id", stagioneCorrente.id)
+      .not("data_nascita", "is", null);
+
+    if (error) {
+      console.error("[HomePage] Errore caricamento compleanni:", error.message);
+      if (mounted) setNextBirthday(null);
+      return;
+    }
+
+    const rows = (data || []) as GiocatoreView[];
+
+    const today = new Date();
+    const y = today.getFullYear();
+
+    let bestDate: Date | null = null;
+    let playersForBest: NextBirthdayInfo["players"] = [];
+
+    // set per evitare duplicati (uid o nome+cognome)
+    const seen = new Set<string>();
+
+    for (const r of rows) {
+      if (!r.data_nascita) continue;
+
+      const key = r.giocatore_uid || `${r.nome}|${r.cognome}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const d = new Date(r.data_nascita);
+      const month = d.getMonth();
+      const day = d.getDate();
+
+      let next = new Date(y, month, day, 0, 0, 0, 0);
+      if (isPastDayMonth(today, next)) next = new Date(y + 1, month, day, 0, 0, 0, 0);
+
+      const plInfo = {
+        uid: r.giocatore_uid,
+        nome: (r.nome || "").trim(),
+        cognome: (r.cognome || "").trim(),
+        foto_url: r.foto_url || null,
+      };
+
+      if (!bestDate || next.getTime() < bestDate.getTime()) {
+        bestDate = next;
+        playersForBest = [plInfo];
+      } else if (bestDate && sameDayMonth(next, bestDate)) {
+        playersForBest.push(plInfo);
       }
+    }
 
-      const seasonUids = new Set<string>((gs || []).map((r: any) => String(r.giocatore_uid)));
-      if (!seasonUids.size) {
-        if (mounted) setNextBirthday(null);
-        return;
+    if (mounted) {
+      if (bestDate) {
+        setNextBirthday({
+          date: bestDate,
+          players: sortPlayers(playersForBest),
+        });
+      } else {
+        setNextBirthday(null);
       }
+    }
+  };
 
-      // 3) prendo solo quei giocatori dalla view completa (serve data_nascita)
-      const { data, error } = await supabase
-        .from("v_giocatori_completo")
-        .select("giocatore_uid,giocatore_nome,giocatore_cognome,data_nascita,foto_url")
-        .not("data_nascita", "is", null);
+  loadPlayersBirth();
+  return () => {
+    mounted = false;
+  };
+}, []);
 
-      if (error) {
-        console.error("[HomePage] Errore caricamento compleanni:", error.message);
-        if (mounted) setNextBirthday(null);
-        return;
-      }
-
-      const rows = ((data || []) as GiocatoreView[]).filter((r) =>
-        seasonUids.has(String(r.giocatore_uid))
-      );
-
-      const today = new Date();
-      const y = today.getFullYear();
-
-      let bestDate: Date | null = null;
-      let playersForBest: NextBirthdayInfo["players"] = [];
-
-      // set per evitare duplicati (uid o nome+cognome)
-      const seen = new Set<string>();
-
-      for (const r of rows) {
-        if (!r.data_nascita) continue;
-
-        const key = r.giocatore_uid || `${r.giocatore_nome}|${r.giocatore_cognome}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-
-        const d = new Date(r.data_nascita);
-        const month = d.getMonth();
-        const day = d.getDate();
-
-        let next = new Date(y, month, day, 0, 0, 0, 0);
-        if (isPastDayMonth(today, next)) next = new Date(y + 1, month, day, 0, 0, 0, 0);
-
-        const plInfo = {
-          uid: r.giocatore_uid,
-          nome: (r.giocatore_nome || "").trim(),
-          cognome: (r.giocatore_cognome || "").trim(),
-          foto_url: r.foto_url || null,
-        };
-
-        if (!bestDate || next.getTime() < bestDate.getTime()) {
-          bestDate = next;
-          playersForBest = [plInfo];
-        } else if (bestDate && sameDayMonth(next, bestDate)) {
-          playersForBest.push(plInfo);
-        }
-      }
-
-      if (mounted) {
-        if (bestDate) {
-          setNextBirthday({
-            date: bestDate,
-            players: sortPlayers(playersForBest),
-          });
-        } else {
-          setNextBirthday(null);
-        }
-      }
-    };
-
-    loadPlayersBirth();
-    return () => {
-      mounted = false;
-    };
-  }, []);
   // --------------------------------
   // PROSSIMO IMPEGNO — Query + Live
   // --------------------------------
@@ -463,6 +445,13 @@ useEffect(() => {
   return () => supabase.removeChannel(ch2);
 }, [match?.id]);
 
+// ✅ nuovo effetto per il plugin Facebook
+useEffect(() => {
+  if ((window as any).FB) {
+    (window as any).FB.XFBML.parse();
+  }
+}, []);
+
 // normalizzazione marcatore con nome e cognome
 const normalizeMarcatore = (row: any): Marcatore => ({
   id: String(row.id),
@@ -506,16 +495,17 @@ const fbPluginSrc = useMemo(() => {
   const params = new URLSearchParams({
     href: PAGE_URL,
     tabs: "timeline",
-    width: "500",
+    width: "100%",                // ⬅️ responsive
     height: "560",
     small_header: "true",
-    adapt_container_width: "true",
+    adapt_container_width: "true", // ⬅️ lascia attivo
     hide_cover: "true",
     show_facepile: "false",
     appId: "",
   });
   return `${base}?${params.toString()}`;
 }, []);
+
 
   // --------------------------------
   // RENDER
@@ -648,198 +638,220 @@ const fbPluginSrc = useMemo(() => {
       </section>
 
       {/* PROSSIMO IMPEGNO */}
-      <section style={styles.card}>
-        {loadingMatch ? (
-          <div style={styles.liveHint}>Caricamento…</div>
-        ) : !match ? (
-          <div style={styles.liveHint}>
-            Nessuna partita imminente. <Link to="/calendario">Vai al calendario</Link>
-          </div>
-        ) : (
-          <div style={styles.fixtureBox}>
-            {/* Meta centrati */}
-            <div style={styles.fixtureMetaCentered}>
-              <div style={styles.badgeWrap}>
-                <span style={styles.badge}>
-                  {capitalizeSafe((match.campionato_torneo || "").trim())}
-                </span>
-                {isLive && isTodayMatch && (
-                  <span style={styles.livePillInline}>LIVE</span>
+<section style={styles.card}>
+  {loadingMatch ? (
+    <div style={styles.liveHint}>Caricamento…</div>
+  ) : !match ? (
+    <div style={styles.liveHint}>
+      Nessuna partita imminente. <Link to="/calendario">Vai al calendario</Link>
+    </div>
+  ) : (
+    <div style={styles.fixtureBox}>
+      {/* Meta centrati */}
+      <div style={styles.fixtureMetaCentered}>
+        <div style={styles.badgeWrap}>
+          <span style={styles.badge}>
+            {capitalizeSafe((match.campionato_torneo || "").trim())}
+          </span>
+          {isLive && isTodayMatch && (
+            <span style={styles.livePillInline}>LIVE</span>
+          )}
+        </div>
+        <span style={styles.fixtureDate}>
+          {formatItalianDateTime(new Date(match.data_ora))}
+        </span>
+      </div>
+
+      {isLive ? (
+        <>
+         {/* Struttura Live */}
+          <div style={styles.teamsLiveRow}>
+            {/* Squadra Casa */}
+            <div style={styles.teamLiveCol}>
+              <div style={styles.teamLiveHead}>
+                {match.squadra_casa?.logo_url && (
+                  <img
+                    src={match.squadra_casa.logo_url}
+                    alt={match.squadra_casa?.nome || "Casa"}
+                    style={styles.teamLogo}
+                  />
                 )}
+                <div style={styles.teamName}>{match.squadra_casa?.nome || "Casa"}</div>
+                <span style={styles.liveScoreBlink}>{match.goal_a}</span>
               </div>
-              <span style={styles.fixtureDate}>
-                {formatItalianDateTime(new Date(match.data_ora))}
-              </span>
+
+              {mcSide === "casa" ? (
+                <div style={styles.scorersWrapper}>
+                  {Object.entries(marcatoriByPeriodo).map(([periodo, lista]) => (
+                    <div key={periodo}>
+                      <strong>{periodo}° Tempo</strong>
+                      {lista.length ? (
+                        <ul style={styles.scorersUl}>
+                          {lista.map((m) => (
+                            <li key={m.id} style={styles.scorerItem}>
+                              {renderNomeMarcatore(m)}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div style={styles.scorersListMuted}>—</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={styles.perTimeRow}>
+                  <div>1T: {perTimeCasa[0]}</div>
+                  <div>2T: {perTimeCasa[1]}</div>
+                  <div>3T: {perTimeCasa[2]}</div>
+                  <div>4T: {perTimeCasa[3]}</div>
+                </div>
+              )}
             </div>
 
-            {isLive ? (
-              <>
-                {/* Struttura Live */}
-                <div style={styles.teamsLiveRow}>
-                  {/* Squadra Casa */}
-                  <div style={styles.teamLiveCol}>
-                    <div style={styles.teamLiveHead}>
-                      {match.squadra_casa?.logo_url && (
-                        <img
-                          src={match.squadra_casa.logo_url}
-                          alt={match.squadra_casa?.nome || "Casa"}
-                          style={styles.teamLogo}
-                        />
-                      )}
-                      <div style={styles.teamName}>{match.squadra_casa?.nome || "Casa"}</div>
-                      <span style={styles.liveScoreBlink}>{match.goal_a}</span>
-                    </div>
-
-                    {mcSide === "casa" ? (
-                      <div style={styles.scorersWrapper}>
-                        {Object.entries(marcatoriByPeriodo).map(([periodo, lista]) => (
-                          <div key={periodo}>
-                            <strong>{periodo}° Tempo</strong>
-                            {lista.length ? (
-                              <ul style={styles.scorersUl}>
-                                {lista.map((m) => (
-                                  <li key={m.id} style={styles.scorerItem}>
-                                    {renderNomeMarcatore(m)}
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <div style={styles.scorersListMuted}>—</div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={styles.perTimeRow}>
-                        <div>1T: {perTimeCasa[0]}</div>
-                        <div>2T: {perTimeCasa[1]}</div>
-                        <div>3T: {perTimeCasa[2]}</div>
-                        <div>4T: {perTimeCasa[3]}</div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Squadra Ospite */}
-                  <div style={styles.teamLiveCol}>
-                    <div style={styles.teamLiveHead}>
-                      {match.squadra_ospite?.logo_url && (
-                        <img
-                          src={match.squadra_ospite.logo_url}
-                          alt={match.squadra_ospite?.nome || "Ospite"}
-                          style={styles.teamLogo}
-                        />
-                      )}
-                      <div style={styles.teamName}>{match.squadra_ospite?.nome || "Ospite"}</div>
-                      <span style={styles.liveScoreBlink}>{match.goal_b}</span>
-                    </div>
-
-                    {mcSide === "ospite" ? (
-                      <div style={styles.scorersWrapper}>
-                        {Object.entries(marcatoriByPeriodo).map(([periodo, lista]) => (
-                          <div key={periodo}>
-                            <strong>{periodo}° Tempo</strong>
-                            {lista.length ? (
-                              <ul style={styles.scorersUl}>
-                                {lista.map((m) => (
-                                  <li key={m.id} style={styles.scorerItem}>
-                                    {renderNomeMarcatore(m)}
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <div style={styles.scorersListMuted}>—</div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={styles.perTimeRow}>
-                        <div>1T: {perTimeOspite[0]}</div>
-                        <div>2T: {perTimeOspite[1]}</div>
-                        <div>3T: {perTimeOspite[2]}</div>
-                        <div>4T: {perTimeOspite[3]}</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div style={styles.actions}>
-                  <Link to="/prossima-partita" style={styles.linkBtn}>
-                    Partita in Diretta
-                  </Link>
-                </div>
-              </>
-            ) : (
-              /* Struttura normale se non è in corso */
-              <>
-                <div style={styles.teamsRow}>
-                  <div style={styles.teamCol}>
-                    <div style={styles.teamHead}>
-                      {match.squadra_casa?.logo_url && (
-                        <img
-                          src={match.squadra_casa.logo_url}
-                          alt={match.squadra_casa?.nome || "Casa"}
-                          style={styles.teamLogo}
-                        />
-                      )}
-                      <div style={styles.teamName}>{match.squadra_casa?.nome || "Casa"}</div>
-                    </div>
-                  </div>
-
-                  <div style={styles.vs}>vs</div>
-
-                  <div style={styles.teamCol}>
-                    <div style={styles.teamHead}>
-                      {match.squadra_ospite?.logo_url && (
-                        <img
-                          src={match.squadra_ospite.logo_url}
-                          alt={match.squadra_ospite?.nome || "Ospite"}
-                          style={styles.teamLogo}
-                        />
-                      )}
-                      <div style={styles.teamName}>{match.squadra_ospite?.nome || "Ospite"}</div>
-                    </div>
-                  </div>
-                </div>
-
-                {isTodayMatch ? (
-                  <div style={styles.liveHint}>
-                    La partita è oggi. In attesa del calcio d’inizio…{" "}
-                    <Link to="/prossima-partita">Vai a ProssimaPartita</Link>
-                  </div>
-                ) : (
-                  <div style={styles.liveHint}>
-                    <Link to="/calendario">Vai al calendario</Link>
-                  </div>
+            {/* Squadra Ospite */}
+            <div style={styles.teamLiveCol}>
+              <div style={styles.teamLiveHead}>
+                {match.squadra_ospite?.logo_url && (
+                  <img
+                    src={match.squadra_ospite.logo_url}
+                    alt={match.squadra_ospite?.nome || "Ospite"}
+                    style={styles.teamLogo}
+                  />
                 )}
-              </>
-            )}
-          </div>
-        )}
-      </section>
+                <div style={styles.teamName}>{match.squadra_ospite?.nome || "Ospite"}</div>
+                <span style={styles.liveScoreBlink}>{match.goal_b}</span>
+              </div>
 
-      {/* FACEBOOK – senza intestazione */}
-      <section style={styles.card}>
-        {fbPluginSrc ? (
-          <div style={styles.fbWrap}>
-            <iframe
-              title="Pagina Facebook Montecarlo"
-              style={styles.fbIframe}
-              src={fbPluginSrc}
-              scrolling="no"
-              allow="encrypted-media; clipboard-write; picture-in-picture; web-share"
-            />
+              {mcSide === "ospite" ? (
+                <div style={styles.scorersWrapper}>
+                  {Object.entries(marcatoriByPeriodo).map(([periodo, lista]) => (
+                    <div key={periodo}>
+                      <strong>{periodo}° Tempo</strong>
+                      {lista.length ? (
+                        <ul style={styles.scorersUl}>
+                          {lista.map((m) => (
+                            <li key={m.id} style={styles.scorerItem}>
+                              {renderNomeMarcatore(m)}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div style={styles.scorersListMuted}>—</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={styles.perTimeRow}>
+                  <div>1T: {perTimeOspite[0]}</div>
+                  <div>2T: {perTimeOspite[1]}</div>
+                  <div>3T: {perTimeOspite[2]}</div>
+                  <div>4T: {perTimeOspite[3]}</div>
+                </div>
+              )}
+            </div>
           </div>
-        ) : (
-          <div style={styles.fbWrap}>
-            <iframe
-              title="Montecarlo Calcio Facebook (ricerca)"
-              style={styles.fbIframe}
-              src={SEARCH_URL}
-            />
+
+          <div style={styles.actions}>
+            <Link to="/prossima-partita" style={styles.linkBtn}>
+              Partita in Diretta
+            </Link>
           </div>
-        )}
-      </section>
+        </>
+      ) : (
+        /* Struttura normale se non è in corso */
+        <>
+          <div style={styles.teamsRowColumn}>
+            {/* Squadra Casa */}
+            <div style={{ ...styles.teamSide, justifyContent: "flex-start" }}>
+              {match.squadra_casa?.logo_url && (
+                <img
+                  src={match.squadra_casa.logo_url}
+                  alt={match.squadra_casa?.nome || "Casa"}
+                  style={styles.teamLogo}
+                />
+              )}
+              <div style={{ ...styles.teamName, textAlign: "left" }}>
+                {match.squadra_casa?.nome || "Casa"}
+              </div>
+            </div>
+
+            {/* VS centrato */}
+            <div style={styles.vsCentered}>VS</div>
+
+            {/* Squadra Ospite */}
+            <div style={{ ...styles.teamSide, justifyContent: "flex-end" }}>
+              <div style={{ ...styles.teamName, textAlign: "right" }}>
+                {match.squadra_ospite?.nome || "Ospite"}
+              </div>
+              {match.squadra_ospite?.logo_url && (
+                <img
+                  src={match.squadra_ospite.logo_url}
+                  alt={match.squadra_ospite?.nome || "Ospite"}
+                  style={styles.teamLogo}
+                />
+              )}
+            </div>
+          </div>
+
+          {isTodayMatch ? (
+            <div style={styles.liveHint}>
+              La partita è oggi. In attesa del calcio d’inizio…{" "}
+              <Link to="/prossima-partita">Vai a ProssimaPartita</Link>
+            </div>
+          ) : (
+            <div style={styles.liveHint}>
+              <Link to="/calendario">Vai al calendario</Link>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* MAPPA CAMPO SQUADRA DI CASA */}
+      {match?.squadra_casa && (
+        <div style={{ marginTop: 12 }}>
+          <iframe
+            title="Mappa campo squadra di casa"
+            src={
+              match.squadra_casa.mappa_url
+                ? match.squadra_casa.mappa_url
+                : `https://www.google.com/maps?q=${encodeURIComponent(
+                    match.squadra_casa.nome_stadio ||
+                    match.squadra_casa.indirizzo ||
+                    match.squadra_casa.nome ||
+                    ""
+                  )}&output=embed`
+            }
+            width="100%"
+            height="250"
+            style={{ border: 0, borderRadius: 8 }}
+            loading="lazy"
+            allowFullScreen
+          ></iframe>
+        </div>
+      )}
+    </div>
+  )}
+</section>
+
+      {/* FACEBOOK – plugin ufficiale */}
+<section style={styles.card}>
+  <div style={styles.fbWrap}>
+    <div
+      className="fb-page"
+      data-href="https://www.facebook.com/sansalvatore.calcio"
+      data-tabs="timeline"
+      data-width="500"
+      data-height="600"
+      data-small-header="false"
+      data-adapt-container-width="true"
+      data-hide-cover="false"
+      data-show-facepile="true"
+    ></div>
+  </div>
+</section>
+
     </div>
   );
 }
@@ -913,6 +925,25 @@ birthdayPhoto: {
   border: "2px solid #eee",
 },
 
+teamsRowColumn: {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: 10,
+  marginTop: 6,
+},
+teamSide: {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  width: "100%",
+},
+vsCentered: {
+  fontSize: 16,
+  fontWeight: 700,
+  opacity: 0.8,
+  textAlign: "center",
+},
 
   // HERO
   header: {
@@ -1000,8 +1031,8 @@ birthdayPhoto: {
   playerNameMuted: { fontSize: 14, opacity: 0.8 },
 
   // Facebook (senza intestazione)
-  fbWrap: { width: "100%", height: 600, overflow: "hidden", borderRadius: 8 },
-  fbIframe: { width: "100%", height: "100%", border: "none" },
+  fbWrap: { width: "100%", height: 600, borderRadius: 8 }, // tolto overflow:hidden
+fbIframe: { width: "100%", height: "100%", border: "none" },
 
   // Prossimo Impegno
   fixtureBox: {},

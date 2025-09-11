@@ -1,3 +1,6 @@
+// src/pages/RegisterPage.tsx
+// Data: 21/08/2025 (rev: scritta Montecarlo 2013 bianca con ombra sopra container)
+
 import React, { useState } from "react";
 
 const RegisterPage: React.FC = () => {
@@ -6,7 +9,7 @@ const RegisterPage: React.FC = () => {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<{ text: string; type: "error" | "success" } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false); // <-- aggiunta: toggle mostra/nascondi
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +29,10 @@ const RegisterPage: React.FC = () => {
         throw new Error(data.error || "Errore durante la registrazione");
       }
 
-      setMessage({ text: "✅ Attendi l'approvazione, riceverai una Email di verifica", type: "success" });
+      setMessage({
+        text: "✅ Attendi l'approvazione, riceverai una Email di verifica",
+        type: "success",
+      });
     } catch (err: any) {
       setMessage({ text: err.message, type: "error" });
     }
@@ -35,69 +41,95 @@ const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-md mx-auto mt-12 p-6 bg-white rounded-lg shadow-md">
-      <h1 className="text-2xl font-bold mb-6 text-center">Registrazione</h1>
+    <div
+      className="flex flex-col items-center justify-center min-h-screen px-4"
+      style={{
+        backgroundImage: `url("/src/assets/sfondo.jpg")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }}
+    >
+      {/* Scritta sopra */}
+      <h1
+        className="text-3xl font-bold text-white mb-6"
+        style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.7)" }}
+      >
+        Montecarlo 2013
+      </h1>
 
-      {message && (
-        <div className={`mb-4 p-3 rounded ${message.type === "error" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}`}>
-          {message.text}
-        </div>
-      )}
+      {/* Box registrazione */}
+      <div
+        className="w-full max-w-md p-6 rounded-lg shadow-md"
+        style={{ backgroundColor: "rgba(255, 255, 255, 0.9)" }}
+      >
+        <h1 className="text-2xl font-bold mb-6 text-center">Registrazione</h1>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block mb-1 font-medium">Email</label>
-          <input
-            type="email"
-            className="w-full border px-3 py-2 rounded"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </div>
+        {message && (
+          <div
+            className={`mb-4 p-3 rounded ${
+              message.type === "error"
+                ? "bg-red-100 text-red-800"
+                : "bg-green-100 text-green-800"
+            }`}
+          >
+            {message.text}
+          </div>
+        )}
 
-        <div>
-          <label className="block mb-1 font-medium">Username</label>
-          <input
-            type="text"
-            className="w-full border px-3 py-2 rounded"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-        </div>
-
-        <div>
-          <label className="block mb-1 font-medium">Password</label>
-          <div className="relative">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block mb-1 font-medium">Email</label>
             <input
-              type={showPassword ? "text" : "password"} // <-- aggiunta: tipo dinamico
-              className="w-full border px-3 py-2 rounded pr-20"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              type="email"
+              className="w-full border px-3 py-2 rounded"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword((s) => !s)} // <-- aggiunta: toggle
-              onMouseDown={(e) => e.preventDefault()}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-600 hover:text-gray-800 px-2 py-1"
-              aria-label={showPassword ? "Nascondi password" : "Mostra password"}
-              title={showPassword ? "Nascondi password" : "Mostra password"}
-            >
-              {showPassword ? "Nascondi" : "Mostra"}
-            </button>
           </div>
-        </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition"
-        >
-          {loading ? "Invio..." : "Registrati"}
-        </button>
-      </form>
+          <div>
+            <label className="block mb-1 font-medium">Username</label>
+            <input
+              type="text"
+              className="w-full border px-3 py-2 rounded"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1 font-medium">Password</label>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                className="w-full border px-3 py-2 rounded pr-20"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((s) => !s)}
+                onMouseDown={(e) => e.preventDefault()}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-600 hover:text-gray-800 px-2 py-1"
+              >
+                {showPassword ? "Nascondi" : "Mostra"}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition"
+          >
+            {loading ? "Invio..." : "Registrati"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 };

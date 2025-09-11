@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabaseClient';
 
 interface Squadra { id: string; nome: string; }
 interface Stagione { id: string; nome: string; }
-interface Giocatore { id: string; nome: string; cognome: string; }
+interface Giocatore { id: string; nome: string; cognome: string; ruolo?: string | null; }
 
 export default function NuovaPartitaPage() {
   const navigate = useNavigate();
@@ -21,7 +21,9 @@ export default function NuovaPartitaPage() {
   const [goalMC, setGoalMC] = useState([0, 0, 0, 0]);
   const [goalAvv, setGoalAvv] = useState([0, 0, 0, 0]);
   const [marcatori, setMarcatori] = useState<{ [tempo: number]: (string | null)[] }>({});
+  const [portieri, setPortieri] = useState<{ [tempo: number]: (string | null)[] }>({});
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showFormazione, setShowFormazione] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -32,7 +34,8 @@ export default function NuovaPartitaPage() {
     squadra_casa_id: '',
     squadra_ospite_id: '',
     campionato_torneo: 'Campionato',
-    luogo_torneo: ''
+    nome_torneo: '',   // 👈 giornata o nome torneo
+    luogo_torneo: ''   // 👈 solo per tornei
   });
 
   // carica squadre e stagioni
@@ -51,37 +54,31 @@ export default function NuovaPartitaPage() {
     }
     (async () => {
       const { data: gs, error } = await supabase
-  .from('v_giocatori_stagioni')
-  .select('giocatore_id,nome,cognome')
+  .from('v_giocatori_completo')
+  .select('giocatore_stagione_id, nome, cognome, ruolo')
   .eq('stagione_id', formData.stagione_id)
   .order('cognome', { ascending: true });
-      if (error) {
-        console.error('Errore caricamento giocatori per stagione:', error);
-      } else {
-        setGiocatori(gs.map(r => ({
-          id: r.giocatore_id,
-          nome: r.nome,
-          cognome: r.cognome
-        })));
-      }
+
+if (!error && gs) {
+  setGiocatori(gs.map(r => ({
+    id: r.giocatore_stagione_id,
+    nome: r.nome,
+    cognome: r.cognome,
+    ruolo: r.ruolo
+  })));
+}
     })();
   }, [formData.stagione_id]);
 
   // sposta Montecarlo in cima e ordina le altre in ordine alfabetico
-const squadreOrd = useMemo(() => {
-  const arr = [...squadre];
-  const idx = arr.findIndex(s => s.id === MONTE_ID);
+  const squadreOrd = useMemo(() => {
+    const arr = [...squadre];
+    const idx = arr.findIndex(s => s.id === MONTE_ID);
 
-  // estraggo Montecarlo
-  const monte = idx > -1 ? arr.splice(idx, 1)[0] : null;
-
-  // ordino alfabeticamente le altre
-  arr.sort((a, b) => a.nome.localeCompare(b.nome));
-
-  // reinserisco Montecarlo in cima
-  return monte ? [monte, ...arr] : arr;
-}, [squadre]);
-
+    const monte = idx > -1 ? arr.splice(idx, 1)[0] : null;
+    arr.sort((a, b) => a.nome.localeCompare(b.nome));
+    return monte ? [monte, ...arr] : arr;
+  }, [squadre]);
 
   // determino se Montecarlo è in casa
   const isMCcasa = formData.squadra_casa_id === MONTE_ID;
@@ -104,6 +101,7 @@ const squadreOrd = useMemo(() => {
   const handleGoal = (tempo: number, who: 'MC' | 'AVV', up: boolean) => {
     const change = (arr: number[]) =>
       arr.map((v, i) => (i === tempo ? Math.max(0, v + (up ? 1 : -1)) : v));
+
     if (who === 'MC') {
       setGoalMC(change);
       setMarcatori(prev => {
@@ -113,9 +111,13 @@ const squadreOrd = useMemo(() => {
       });
     } else {
       setGoalAvv(change);
+      setPortieri(prev => {
+        const lst = [...(prev[tempo + 1] || [])];
+        up ? lst.push(null) : lst.pop();
+        return { ...prev, [tempo + 1]: lst };
+      });
     }
   };
-
   // invio form
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,9 +139,8 @@ const squadreOrd = useMemo(() => {
         squadra_casa_id:   formData.squadra_casa_id,
         squadra_ospite_id: formData.squadra_ospite_id,
         campionato_torneo: formData.campionato_torneo.trim(),
-        luogo_torneo:      formData.campionato_torneo === 'Torneo'
-          ? formData.luogo_torneo
-          : null,
+        nome_torneo:       formData.nome_torneo || null,
+        luogo_torneo:      formData.luogo_torneo || null,
         data_ora:  dataOra,
         goal_a:    totCasa,
         goal_b:    totOsp,
@@ -163,26 +164,41 @@ const squadreOrd = useMemo(() => {
     if (formData.stato === 'Giocata') {
       // presenze
       const pres = formazione.map(pid => ({
-        partita_id:   partita.id,
-        giocatore_id: pid
+        partita_id: partita.id,
+        giocatore_stagione_id: pid,
+        stagione_id: formData.stagione_id
       }));
       if (pres.length) {
-        await supabase
-          .from('presenze')
-          .upsert(pres, { onConflict: ['partita_id', 'giocatore_id'] });
+        await supabase.from('presenze').insert(pres);
       }
-      // marcatori
+
+      // marcatori Montecarlo
       const marc = Object.entries(marcatori).flatMap(([tempo, lst]) =>
-        lst
-          .filter(Boolean)
-          .map(pid => ({
-            partita_id:   partita.id,
-            giocatore_id: pid!,
-            periodo:      +tempo
-          }))
+        lst.filter(Boolean).map(pid => ({
+          partita_id: partita.id,
+          giocatore_stagione_id: pid!,
+          periodo: +tempo,
+          stagione_id: formData.stagione_id,
+          squadra_segnante_id: MONTE_ID
+        }))
       );
-      if (marc.length) {
-        await supabase.from('marcatori').insert(marc);
+
+      // portieri subiscono
+      const subs = Object.entries(portieri).flatMap(([tempo, lst]) =>
+        lst.filter(Boolean).map(pid => ({
+          partita_id: partita.id,
+          periodo: +tempo,
+          stagione_id: formData.stagione_id,
+          squadra_segnante_id: isMCcasa
+            ? formData.squadra_ospite_id
+            : formData.squadra_casa_id,
+          portiere_subisce_id: pid
+        }))
+      );
+
+      const toInsert = [...marc, ...subs];
+      if (toInsert.length) {
+        await supabase.from('marcatori').insert(toInsert);
       }
     }
 
@@ -190,11 +206,13 @@ const squadreOrd = useMemo(() => {
     navigate('/calendario');
   };
 
+  const portieriInFormazione = giocatori.filter(
+    g => g.ruolo?.toLowerCase() === 'portiere' && formazione.includes(g.id)
+  );
+
   return (
     <div className="min-h-screen">
       <div className="max-w-2xl mx-auto bg-white/85 rounded-2xl shadow-montecarlo p-8">
-        
-
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Data & Ora */}
           <div className="grid grid-cols-2 gap-4">
@@ -264,26 +282,89 @@ const squadreOrd = useMemo(() => {
               <option value="Giocata">Giocata</option>
             </select>
             <select
-              required
-              className="w-full border rounded px-4 py-2"
-              value={formData.campionato_torneo}
-              onChange={e => setFormData({ ...formData, campionato_torneo: e.target.value })}
-            >
-              <option value="Campionato">Campionato</option>
-              <option value="Torneo">Torneo</option>
-              <option value="Amichevole">Amichevole</option>
-            </select>
+  required
+  className="w-full border rounded px-4 py-2"
+  value={formData.campionato_torneo}
+  onChange={e => setFormData({ ...formData, campionato_torneo: e.target.value })}
+>
+  <option value="Campionato">Campionato</option>
+  <option value="Torneo">Torneo</option>
+  <option value="Amichevole">Amichevole</option>
+  <option value="Allenamento">Allenamento</option> {/* ✅ nuova opzione */}
+</select>
+
           </div>
 
-          {/* Luogo torneo */}
-          {formData.campionato_torneo === 'Torneo' && (
+          {/* Campionato: giornata */}
+          {formData.campionato_torneo === 'Campionato' && (
             <input
               type="text"
-              placeholder="Luogo (opzionale)"
+              placeholder="Giornata (es. 5ª giornata)"
               className="w-full border rounded px-4 py-2"
-              value={formData.luogo_torneo}
-              onChange={e => setFormData({ ...formData, luogo_torneo: e.target.value })}
+              value={formData.nome_torneo}
+              onChange={e => setFormData({ ...formData, nome_torneo: e.target.value })}
             />
+          )}
+
+          {/* Torneo: nome + luogo */}
+          {formData.campionato_torneo === 'Torneo' && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nome torneo
+                </label>
+                <input
+                  type="text"
+                  placeholder="Inserisci il nome del torneo"
+                  className="w-full border rounded px-4 py-2"
+                  value={formData.nome_torneo}
+                  onChange={e => setFormData({ ...formData, nome_torneo: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Luogo torneo
+                </label>
+                <input
+                  type="text"
+                  placeholder="Inserisci il luogo del torneo"
+                  className="w-full border rounded px-4 py-2"
+                  value={formData.luogo_torneo}
+                  onChange={e => setFormData({ ...formData, luogo_torneo: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Formazione */}
+          {formData.stato === 'Giocata' && (
+            <button
+              type="button"
+              onClick={() => setShowFormazione(v => !v)}
+              className="w-full py-2 border rounded bg-gray-100 hover:bg-gray-200"
+            >
+              {showFormazione ? 'Nascondi Formazione' : 'Formazione'}
+            </button>
+          )}
+          {showFormazione && (
+            <div className="max-h-48 overflow-auto border p-2 rounded">
+              {giocatori.map(g => (
+                <label key={g.id} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={formazione.includes(g.id)}
+                    onChange={e =>
+                      setFormazione(prev =>
+                        e.target.checked
+                          ? [...prev, g.id]
+                          : prev.filter(x => x !== g.id)
+                      )
+                    }
+                  />
+                  <span>{g.cognome} {g.nome} ({g.ruolo})</span>
+                </label>
+              ))}
+            </div>
           )}
 
           {/* Dettagli Giocata */}
@@ -299,32 +380,6 @@ const squadreOrd = useMemo(() => {
 
               {showAdvanced && (
                 <div className="space-y-4">
-                  <h3 className="text-xl font-semibold text-montecarlo-secondary">
-                    Formazione {MC_NAME}
-                  </h3>
-
-                  {/* Lista giocatori */}
-                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-auto border p-2 rounded">
-                    {giocatori.map(g => (
-                      <label key={g.id} className="inline-flex items-center">
-                        <input
-                          type="checkbox"
-                          className="mr-2"
-                          checked={formazione.includes(g.id)}
-                          onChange={e =>
-                            setFormazione(f =>
-                              e.target.checked
-                                ? [...f, g.id]
-                                : f.filter(x => x !== g.id)
-                            )
-                          }
-                        />
-                        {g.cognome} {g.nome}
-                      </label>
-                    ))}
-                  </div>
-
-                  {/* Goal e marcatori per ogni tempo */}
                   <div className="grid grid-cols-2 gap-6">
                     {[0, 1, 2, 3].map(t => (
                       <div key={t}>
@@ -376,6 +431,27 @@ const squadreOrd = useMemo(() => {
                                 ))}
                             </select>
                           ))}
+                          {!isMCcasa && (portieri[t + 1] || []).map((pid, i) => (
+                            <select
+                              key={i}
+                              className="w-full border rounded px-2 py-1 mb-2"
+                              value={pid || ''}
+                              onChange={e =>
+                                setPortieri(m => {
+                                  const lst = [...(m[t + 1] || [])];
+                                  lst[i] = e.target.value || null;
+                                  return { ...m, [t + 1]: lst };
+                                })
+                              }
+                            >
+                              <option value="">-- Portiere subisce --</option>
+                              {portieriInFormazione.map(p => (
+                                <option key={p.id} value={p.id}>
+                                  {p.cognome} {p.nome}
+                                </option>
+                              ))}
+                            </select>
+                          ))}
                         </div>
 
                         {/* OSPITE */}
@@ -421,6 +497,27 @@ const squadreOrd = useMemo(() => {
                                   {g.cognome} {g.nome}
                                 </option>
                               ))}
+                          </select>
+                        ))}
+                        {isMCcasa && (portieri[t + 1] || []).map((pid, i) => (
+                          <select
+                            key={i}
+                            className="w-full border rounded px-2 py-1 mb-2"
+                            value={pid || ''}
+                            onChange={e =>
+                              setPortieri(m => {
+                                const lst = [...(m[t + 1] || [])];
+                                lst[i] = e.target.value || null;
+                                return { ...m, [t + 1]: lst };
+                              })
+                            }
+                          >
+                            <option value="">-- Portiere subisce --</option>
+                            {portieriInFormazione.map(p => (
+                              <option key={p.id} value={p.id}>
+                                {p.cognome} {p.nome}
+                              </option>
+                            ))}
                           </select>
                         ))}
                       </div>

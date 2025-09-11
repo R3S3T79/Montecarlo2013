@@ -1,18 +1,17 @@
 // src/pages/DettaglioGiocatore.tsx
-// Data creazione chat: 14/08/2025
+// Data creazione chat: 14/08/2025 (rev: aggiunto campo Goal Subiti per portieri)
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { UserRole } from '../lib/roles';
 
 interface Giocatore {
   giocatore_stagione_id: string;
   giocatore_uid: string;
   stagione_id: string;
-  giocatore_nome: string;
-  giocatore_cognome: string;
+  nome: string;
+  cognome: string;
   ruolo: string | null;
   foto_url: string | null;
   data_nascita: string | null;
@@ -22,6 +21,7 @@ interface Giocatore {
 interface StatisticheGiocatore {
   goalTotali: number;
   presenzeTotali: number;
+  goalSubiti?: number;
 }
 
 interface Stagione {
@@ -33,36 +33,32 @@ export default function DettaglioGiocatore() {
   const { user, loading: authLoading } = useAuth();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation() as { state?: { stagioneId?: string } };
 
   const [giocatore, setGiocatore] = useState<Giocatore | null>(null);
   const [statistiche, setStatistiche] = useState<StatisticheGiocatore>({
     goalTotali: 0,
     presenzeTotali: 0,
+    goalSubiti: 0,
   });
   const [stagioniDisponibili, setStagioniDisponibili] = useState<Stagione[]>([]);
   const [stagioneSelezionata, setStagioneSelezionata] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
-  // Eliminazione giocatore: collegata al cestino navbar
+  // Eliminazione giocatore
   const handleElimina = async () => {
     if (!id) return;
     if (!window.confirm('Sei sicuro di voler eliminare questo giocatore e tutti i suoi dati?')) return;
 
-    const { error } = await supabase
-      .from('giocatori')
-      .delete()
-      .eq('id', id);
-
+    const { error } = await supabase.from('giocatori').delete().eq('id', id);
     if (error) {
       console.error('Errore eliminazione:', error);
       alert("Errore durante l'eliminazione.");
       return;
     }
-
     navigate('/rosa');
   };
 
-  // Rendo disponibile la funzione al layout/nav per il cestino
   useEffect(() => {
     (window as any).__deleteCurrent = handleElimina;
     return () => {
@@ -75,7 +71,7 @@ export default function DettaglioGiocatore() {
   const fetchStatistiche = async (giocatoreUid: string, stagioneId: string) => {
     const { data } = await supabase
       .from('v_stat_giocatore_stagione')
-      .select('goal_totali, presenze_totali')
+      .select('goal_totali, presenze_totali, goal_subiti')
       .eq('giocatore_uid', giocatoreUid)
       .eq('stagione_id', stagioneId)
       .maybeSingle();
@@ -84,15 +80,15 @@ export default function DettaglioGiocatore() {
       setStatistiche({
         goalTotali: data.goal_totali || 0,
         presenzeTotali: data.presenze_totali || 0,
+        goalSubiti: data.goal_subiti || 0,
       });
     } else {
-      setStatistiche({ goalTotali: 0, presenzeTotali: 0 });
+      setStatistiche({ goalTotali: 0, presenzeTotali: 0, goalSubiti: 0 });
     }
   };
 
   const fetchGiocatore = async (stagioneId: string) => {
     if (!id) return;
-
     const { data: recordStagione } = await supabase
       .from('v_giocatori_completo')
       .select('*')
@@ -115,7 +111,7 @@ export default function DettaglioGiocatore() {
       try {
         const { data: tutteStagioni } = await supabase
           .from('v_giocatori_completo')
-          .select('stagione_id,stagione_nome')
+          .select('stagione_id, stagione_nome')
           .eq('giocatore_uid', id)
           .order('stagione_nome', { ascending: true });
 
@@ -127,7 +123,11 @@ export default function DettaglioGiocatore() {
             return acc;
           }, []);
           setStagioniDisponibili(stagioniUniche);
-          if (stagioniUniche.length > 0) {
+
+          // 🔹 priorità: stagione passata da navigate → ultima stagione disponibile
+          if (location.state?.stagioneId && stagioniUniche.find(s => s.id === location.state.stagioneId)) {
+            setStagioneSelezionata(location.state.stagioneId);
+          } else if (stagioniUniche.length > 0) {
             setStagioneSelezionata(stagioniUniche[stagioniUniche.length - 1].id);
           }
         }
@@ -138,7 +138,7 @@ export default function DettaglioGiocatore() {
       }
     };
     init();
-  }, [id]);
+  }, [id, location.state]);
 
   useEffect(() => {
     if (stagioneSelezionata) {
@@ -176,7 +176,6 @@ export default function DettaglioGiocatore() {
       <div className="container mx-auto pt-2 px-2 py-6">
         {stagioniDisponibili.length > 0 && (
           <div className="mb-4">
-            
             <select
               value={stagioneSelezionata}
               onChange={(e) => setStagioneSelezionata(e.target.value)}
@@ -196,34 +195,49 @@ export default function DettaglioGiocatore() {
             {giocatore.foto_url ? (
               <img
                 src={giocatore.foto_url}
-                alt={`${giocatore.giocatore_cognome} ${giocatore.giocatore_nome}`}
+                alt={`${giocatore.cognome} ${giocatore.nome}`}
                 className="w-full h-full object-cover"
               />
             ) : (
               <div className="w-full h-full bg-montecarlo-secondary text-white flex items-center justify-center text-4xl font-bold">
-                {giocatore.giocatore_cognome[0]}
+                {giocatore.cognome[0]}
               </div>
             )}
           </div>
           <h1 className="text-2xl font-bold text-montecarlo-secondary mb-4">
-            {giocatore.giocatore_cognome} {giocatore.giocatore_nome}
+            {giocatore.cognome} {giocatore.nome}
           </h1>
 
           <div className="flex space-x-8 mb-6">
+            {/* Goal fatti */}
             <div className="text-center">
               <div className="text-2xl font-bold text-montecarlo-accent">{statistiche.goalTotali}</div>
               <div className="text-sm text-black">Goal</div>
             </div>
+
+            {/* Presenze */}
             <div className="text-center">
               <div className="text-2xl font-bold text-montecarlo-gold-600">{statistiche.presenzeTotali}</div>
               <div className="text-sm text-black">Presenze</div>
             </div>
-            {statistiche.presenzeTotali > 0 && (
+
+            {/* Media Goal solo se NON portiere */}
+            {statistiche.presenzeTotali > 0 && giocatore.ruolo !== "Portiere" && (
               <div className="text-center">
                 <div className="text-2xl font-bold text-montecarlo-green-600">
                   {(statistiche.goalTotali / statistiche.presenzeTotali).toFixed(2)}
                 </div>
                 <div className="text-sm text-black">Media Goal</div>
+              </div>
+            )}
+
+            {/* Goal Subiti solo se Portiere */}
+            {giocatore.ruolo === "Portiere" && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-montecarlo-red-600">
+                  {statistiche.goalSubiti}
+                </div>
+                <div className="text-sm text-black">Goal Subiti</div>
               </div>
             )}
           </div>

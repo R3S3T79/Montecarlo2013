@@ -11,7 +11,7 @@ html, body, #root {
   margin: 0;
 }
 
-/* ===== Sfondo solo a schermo (non in stampa) ===== */
+/* ===== Sfondo solo a schermo ===== */
 @media screen {
   html, body, #root { 
     min-height: 100%; 
@@ -21,10 +21,17 @@ html, body, #root {
     background: url("/Sfondo.png") no-repeat center center fixed !important;
     background-size: cover !important;
   }
+
+  /* Foglio convocazione: fuori dallo schermo ma presente nel DOM */
+  #convocazione {
+    position: absolute;
+    left: -9999px;
+    top: -9999px;
+    display: block; /* deve rimanere visibile per html2canvas */
+  }
 }
 
 /* ---- Stampa ---- */
-/* Non impostiamo size:A4 per NON bloccare lo scaling del browser */
 @page {
   size: auto;
   margin: 12mm;
@@ -79,8 +86,153 @@ html, body, #root {
   table { width: 100%; border-collapse: collapse; }
   thead { display: table-header-group; }
   tr, td, th { break-inside: avoid; page-break-inside: avoid; }
+
+  /* Mostra convocazione SOLO in stampa/export */
+  #convocazione {
+    display: flex;
+  }
+
+  /* Nascondi plugin Facebook in stampa */
+  .fb-page, #fb-root {
+    display: none !important;
+    visibility: hidden !important;
+  }
 }
 
-/* Celle “nome squadra” con logo + testo troncato */
-.td-team { display:flex; align-items:center; gap:.5rem; min-width:0; }
-.td-team .name { display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* ==== Contenitore convocazione formato A4 ==== */
+#convocazione {
+  width: 794px;
+  height: 1123px;
+  margin: 0 auto;
+  background: #ffffff;
+  padding: 30px 40px;
+  box-sizing: border-box;
+  flex-direction: column;
+  position: relative;
+}
+
+/* ==== Header con loghi ==== */
+.convocazioni-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr; /* 3 colonne uguali */
+  align-items: end;
+  margin-bottom: 2rem;
+}
+
+.logo-montecarlo {
+  height: 130px;              
+  object-fit: contain;
+  justify-self: center;       
+  grid-column: 2;             
+}
+
+.logo-genoa-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-self: end;     
+  grid-column: 3;        
+  margin-right: 140px;   
+}
+
+.logo-genoa-wrapper .logo-genoa {
+  height: 60px;               
+  object-fit: contain;
+}
+
+.logo-genoa-wrapper div {
+  margin-top: 6px;
+  font-size: 8pt;             
+  font-weight: bold;
+}
+
+/* ==== Tabella dati partita / ritrovo ==== */
+.tabella-dati {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11pt;
+  margin-bottom: 1rem;
+}
+
+.tabella-dati td {
+  border: none;              
+  padding: 4px 8px;
+  vertical-align: top;
+}
+
+.convocati-list li {
+  margin: 2px 0;
+  font-size: 13pt;
+}
+
+.convocati-list li span {
+  position: relative;
+  display: inline-block; /* così la larghezza segue solo il testo */
+}
+
+.convocati-list li.line-through span::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 90%;              /* invece di 50% */
+  transform: translateY(-50%); /* mantiene centrato */
+  height: 4px;
+  background: black;
+}
+
+/* Campi compilati (per squadra, luogo, ora ecc.) */
+.campo-compilato {
+  display: inline-block;
+  border-bottom: 1px solid black;
+  padding: 0 4px;
+  padding-bottom: 6px;
+  margin-left: 7px;
+  text-align: left;
+  width: auto;         
+  min-width: unset;    
+  padding-right: 20px; /* <-- margine extra per scrivere a mano */
+}
+
+/* Varianti per lunghezze diverse */
+.campo-corto  { min-width: 80px; }
+.campo-medio  { min-width: 120px; }
+.campo-lungo  { min-width: 150px; }
+
+/* ==== Competizione centrata in pagina ==== */
+.competizione-box {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;   /* <-- da right a center */
+  font-size: 14pt;
+}
+
+/* ==== Staff & Footer ==== */
+.convocazioni-section {
+  margin-top: 2rem;
+  font-size: 13pt;
+}
+
+.convocazioni-footer {
+  margin-top: auto;
+  font-size: 10pt;
+  text-align: center;
+  padding-top: 2rem;
+}
+
+/* Celle “nome squadra” con logo + testo troncato (altre pagine) */
+.td-team { 
+  display:flex; 
+  align-items:center; 
+  gap:.5rem; 
+  min-width:0; 
+}
+.td-team .name { 
+  display:block; 
+  min-width:0; 
+  overflow:hidden; 
+  text-overflow:ellipsis; 
+  white-space:nowrap; 
+}

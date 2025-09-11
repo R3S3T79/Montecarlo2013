@@ -209,7 +209,17 @@ const giocatoreId = inserted.id;
           <input type="text" placeholder="Nome" value={nome} onChange={e => setNome(e.target.value)} className="w-full border rounded-lg px-3 py-2" />
           <input type="text" placeholder="Cognome" value={cognome} onChange={e => setCognome(e.target.value)} className="w-full border rounded-lg px-3 py-2" />
           <input type="date" value={dataNascita} onChange={e => setDataNascita(e.target.value)} className="w-full border rounded-lg px-3 py-2" />
-          <input type="text" placeholder="Ruolo" value={ruolo} onChange={e => setRuolo(e.target.value)} className="w-full border rounded-lg px-3 py-2" />
+          <select
+  value={ruolo}
+  onChange={e => setRuolo(e.target.value)}
+  className="w-full border rounded-lg px-3 py-2 bg-white"
+>
+  <option value="">-- Seleziona ruolo --</option>
+  <option value="Portiere">Portiere</option>
+  <option value="Difensore">Difensore</option>
+  <option value="Centrocampista">Centrocampista</option>
+  <option value="Attaccante">Attaccante</option>
+</select>
           <input type="number" placeholder="Numero Cartellino" value={numeroCartellino} onChange={e => setNumeroCartellino(e.target.value)} className="w-full border rounded-lg px-3 py-2" />
 
           {/* Selezione stagioni */}

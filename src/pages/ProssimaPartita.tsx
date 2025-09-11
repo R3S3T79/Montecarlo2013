@@ -622,14 +622,15 @@ useEffect(() => {
           {/* Scontri precedenti */}
           {precedenti.length > 0 && (
             <div className="bg-white/90 rounded-xl shadow-montecarlo p-6">
-              <h3 className="text-lg font-bold mb-4">Scontri precedenti</h3>
-              <ul className="space-y-3">
+              <h3 className="text-lg font-bold mb-2 text-center">Scontri precedenti</h3>
+               <hr className="border-t border-gray-300 mb-4" />
+              <ul className="space-y-3 text-center">
                 {precedenti.map((p) => (
                   <li key={p.id} className="text-sm text-gray-700">
                     <div className="font-semibold">{formatData(p.data_ora)}</div>
                     <div>
-                      {p.casa.nome} {p.goal_a} - {p.goal_b} {p.ospite.nome}
-                    </div>
+  {p.casa.nome} <span className="font-bold">{p.goal_a} - {p.goal_b}</span> {p.ospite.nome}
+</div>
                   </li>
                 ))}
               </ul>

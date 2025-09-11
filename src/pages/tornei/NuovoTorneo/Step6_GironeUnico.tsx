@@ -187,7 +187,7 @@ export default function Step6_GironeUnico() {
 
   const handleSaveAndExit = () => navigate("/tornei");
 
-  if (loading) return <p className="text-center py-6">Caricamento in corso…</p>;
+  if (loading) return <p className="text-center text-white py-6">Caricamento in corso…</p>;
 
   return (
     <div className="max-w-3xl mx-auto m-2 mt-2 p-2 print:p-0 space-y-6">

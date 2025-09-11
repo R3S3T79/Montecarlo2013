@@ -614,7 +614,7 @@ if (t) setTimerState(t);
   // =====================
   // Altre azioni di pagina
   // =====================
-  const avviaInCorso = async () => {
+    const avviaInCorso = async () => {
     if (!partita) return;
     await supabase.from("partite").update({ stato: "InCorso" }).eq("id", partita.id);
     setPartita({ ...partita, stato: "InCorso" });
@@ -625,6 +625,14 @@ if (t) setTimerState(t);
     await supabase.from("partite").update({ stato: "Giocata" }).eq("id", partita.id);
     navigate("/risultati");
   };
+
+  const salvaStatoConferma = async () => {
+    if (!window.confirm("Sei sicuro di voler salvare e chiudere la partita come 'Giocata'?")) {
+      return;
+    }
+    await salvaStato();
+  };
+
 
   // =====================
   // RENDER
@@ -807,11 +815,11 @@ if (t) setTimerState(t);
 
             {/* Salva stato */}
             <button
-              onClick={salvaStato}
-              className="w-full bg-montecarlo-secondary text-white py-2 rounded-lg mt-4"
-            >
-              Salva
-            </button>
+  onClick={salvaStatoConferma}
+  className="w-full bg-montecarlo-secondary text-white py-2 rounded-lg mt-4"
+>
+  Salva
+</button>
           </div>
         </div>
       </div>

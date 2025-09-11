@@ -124,8 +124,8 @@ export default function SidebarLayout(): JSX.Element {
     (user?.app_metadata?.role as UserRole) ||
     UserRole.Authenticated;
 
-  const canCreator = role === UserRole.Creator;
-  const canAdmin = role === UserRole.Admin || role === UserRole.Creator;
+ const canAdmin = role === UserRole.Admin;
+const canCreator = role === UserRole.Creator;
 
   // Gruppi link — PRIMA voce: "Home"
   const group1 = [
@@ -145,9 +145,13 @@ export default function SidebarLayout(): JSX.Element {
     { to: '/galleria', label: 'Galleria' },
   ];
   const group4 = [
-    ...(canAdmin ? [{ to: '/allenamenti', label: 'Allenamenti' }] : []),
-    ...(canCreator ? [{ to: '/admin-panel', label: 'Pannello Admin' }] : []),
-  ];
+  ...(canAdmin || canCreator ? [{ to: '/allenamenti', label: 'Allenamenti' }] : []),
+  ...(canAdmin || canCreator ? [{ to: '/convocazioni', label: 'Convocazioni' }] : []),
+  ...(canCreator ? [{ to: '/admin-panel', label: 'Pannello Admin' }] : []),
+];
+
+  
+
 
   // Titolo dinamico — sulla home: "Ciao {username da user_profiles}"
   let pageTitle = '';
@@ -266,7 +270,7 @@ export default function SidebarLayout(): JSX.Element {
 </div>
 
         {/* --- TUTTI I PULSANTI ADMIN/CREATOR INVARIATI --- */}
-        {matchCalendario && canAdmin && (
+        {matchCalendario && (canAdmin || canCreator) && (
           <button
             onClick={() => navigate('/nuova-partita')}
             aria-label="Nuova Partita"
@@ -276,7 +280,7 @@ export default function SidebarLayout(): JSX.Element {
           </button>
         )}
 
-        {matchRosa && canAdmin && (
+        {matchRosa && (canAdmin || canCreator) && (
           <button
             onClick={() => navigate('/aggiungi-giocatore')}
             aria-label="Aggiungi Giocatore"
@@ -286,7 +290,7 @@ export default function SidebarLayout(): JSX.Element {
           </button>
         )}
 
-        {matchTeamList && canAdmin && (
+        {matchTeamList && (canAdmin || canCreator) && (
           <button
             onClick={() => navigate('/squadre/nuova')}
             aria-label="Nuova Squadra"
@@ -296,7 +300,7 @@ export default function SidebarLayout(): JSX.Element {
           </button>
         )}
 
-        {matchAllenamenti && canAdmin && (
+        {matchAllenamenti && (canAdmin || canCreator) && (
           <>
             <button
               onClick={() => navigate('/allenamenti/nuovo')}
@@ -315,7 +319,7 @@ export default function SidebarLayout(): JSX.Element {
           </>
         )}
 
-        {matchTornei && canAdmin && (
+        {matchTornei && (canAdmin || canCreator) && (
           <button
             onClick={() => navigate('/tornei/nuovo/step1')}
             aria-label="Nuovo Torneo"
@@ -325,7 +329,7 @@ export default function SidebarLayout(): JSX.Element {
           </button>
         )}
 
-        {matchTeamDetail && canAdmin && (
+        {matchTeamDetail && (canAdmin || canCreator) && (
           <>
             <button
               onClick={() => navigate(`/squadre/${matchTeamDetail.params.id}/edit`)}
@@ -344,7 +348,7 @@ export default function SidebarLayout(): JSX.Element {
           </>
         )}
 
-        {matchPlayer && canAdmin && (
+        {matchPlayer && (canAdmin || canCreator) && (
           <>
             <button
               onClick={() => navigate(`/edit-giocatore/${matchPlayer.params.id}`)}
@@ -363,7 +367,7 @@ export default function SidebarLayout(): JSX.Element {
           </>
         )}
 
-        {matchPre && canAdmin && (
+        {matchPre && (canAdmin || canCreator) && (
           <>
             <button
               onClick={() => navigate(`/partita/${matchPre.params.id}/edit`)}
@@ -382,7 +386,7 @@ export default function SidebarLayout(): JSX.Element {
           </>
         )}
 
-        {matchDetail && canAdmin && (
+        {matchDetail && (canAdmin || canCreator) && (
           <>
             <button
               onClick={() => navigate(`/modifica-partita-giocata/${matchDetail.params.id}`)}
@@ -439,18 +443,20 @@ export default function SidebarLayout(): JSX.Element {
           {[...group1, ...group2, ...group3, ...group4].map((link) => (
             <React.Fragment key={link.to}>
               <NavLink
-                to={link.to}
-                className={({ isActive }) =>
-                  `block p-2 rounded ${isActive ? 'bg-white text-gray-800' : 'hover:bg-white/20'}`
-                }
-              >
-                {link.label}
-              </NavLink>
+  to={link.to}
+  onClick={() => setDrawerOpen(false)}   // ✅ forza chiusura anche se stessa pagina
+  className={({ isActive }) =>
+    `block p-2 rounded ${isActive ? 'bg-white text-gray-800' : 'hover:bg-white/20'}`
+  }
+>
+  {link.label}
+</NavLink>
 
               {link.to === '/' && <hr className="border-t border-white/20 my-2" />}
               {link.to === '/prossima-partita' && <hr className="border-t border-white/20 my-2" />}
               {link.to === '/squadre' && <hr className="border-t border-white/20 my-2" />}
               {link.to === '/statistiche/giocatori' && <hr className="border-t border-white/20 my-2" />}
+              {link.to === '/galleria' && <hr className="border-t border-white/20 my-2" />}
             </React.Fragment>
           ))}
 
