@@ -1,5 +1,5 @@
 // src/pages/StatisticheGiocatori.tsx
-// Data creazione chat: 18/08/2025 (rev: adattato a v_stat_giocatore_stagione)
+// Data creazione chat: 18/08/2025 (rev: aggiunto filtro per Ruolo)
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -30,6 +30,7 @@ export default function StatisticheGiocatori(): JSX.Element {
 
   const [stagioni, setStagioni] = useState<Stagione[]>([]);
   const [stagioneSelezionata, setStagioneSelezionata] = useState<string>('');
+  const [ruoloSelezionato, setRuoloSelezionato] = useState<string>(''); // 🔹 nuovo stato
   const [loading, setLoading] = useState(false);
 
   const [rows, setRows] = useState<Statistica[]>([]);
@@ -66,7 +67,7 @@ export default function StatisticheGiocatori(): JSX.Element {
       try {
         const { data, error } = await supabase
           .from('v_stat_giocatore_stagione')
-          .select('giocatore_uid, giocatore_nome, giocatore_cognome, foto_url, ruolo, presenze_totali, goal_totali, goal_subiti, media_voti')
+          .select('giocatore_uid, nome, cognome, foto_url, ruolo, presenze_totali, goal_totali, goal_subiti, media_voti')
           .eq('stagione_id', stagioneSelezionata);
 
         if (error || !data) {
@@ -88,8 +89,8 @@ export default function StatisticheGiocatori(): JSX.Element {
 
             return {
               giocatore_uid: r.giocatore_uid,
-              giocatore_nome: r.giocatore_nome,
-              giocatore_cognome: r.giocatore_cognome,
+              giocatore_nome: r.nome,
+              giocatore_cognome: r.cognome,
               foto_url: r.foto_url,
               ruolo: r.ruolo,
               presenze,
@@ -117,8 +118,14 @@ export default function StatisticheGiocatori(): JSX.Element {
     }
   };
 
+  // 🔹 Applichiamo filtro per ruolo
+  const filteredRows = useMemo(() => {
+    if (!ruoloSelezionato) return rows;
+    return rows.filter((r) => r.ruolo?.toLowerCase() === ruoloSelezionato.toLowerCase());
+  }, [rows, ruoloSelezionato]);
+
   const sortedRows = useMemo(() => {
-    const out = [...rows];
+    const out = [...filteredRows];
     out.sort((a, b) => {
       let cmp = 0;
       if (sortField === 'giocatore') {
@@ -126,7 +133,9 @@ export default function StatisticheGiocatori(): JSX.Element {
         const bn = `${b.giocatore_cognome ?? ''} ${b.giocatore_nome ?? ''}`.trim();
         cmp = an.localeCompare(bn);
       } else if (sortField === 'gol') {
-        cmp = a.gol - b.gol;
+        const av = a.ruolo?.toLowerCase() === 'portiere' ? a.subiti : a.gol;
+        const bv = b.ruolo?.toLowerCase() === 'portiere' ? b.subiti : b.gol;
+        cmp = av - bv;
       } else if (sortField === 'presenze') {
         cmp = a.presenze - b.presenze;
       } else if (sortField === 'media') {
@@ -137,14 +146,15 @@ export default function StatisticheGiocatori(): JSX.Element {
       return sortOrder === 'asc' ? cmp : -cmp;
     });
     return out;
-  }, [rows, sortField, sortOrder]);
+  }, [filteredRows, sortField, sortOrder]);
 
   return (
     <div className="min-h-screen">
       <div className="container mx-auto pt-2 px-2">
-        
+        {/* 🔹 Filtri Stagione + Ruolo */}
+        <div className="flex gap-2 mb-2">
           <select
-            className="w-full border rounded-md px-3 py-2 text-sm"
+            className="flex-1 border rounded-md px-3 py-2 text-sm"
             value={stagioneSelezionata}
             onChange={(e) => setStagioneSelezionata(e.target.value)}
           >
@@ -155,81 +165,98 @@ export default function StatisticheGiocatori(): JSX.Element {
             ))}
           </select>
 
-          {/* Legenda */}
-          <div className="text-sm text-gray-600 flex space-x-6 pt-2 px-2 text-white">
-            <span><strong>G</strong> = Gol</span>
-            <span><strong>P</strong> = Presenze</span>
-            <span><strong>M</strong> = Media Goal Fatti/Subiti</span>
-            <span><strong>M.V</strong> = Media Voti</span>
-          </div>
-
-          {loading ? (
-            <div className="text-center text-montecarlo-secondary">Caricamento...</div>
-          ) : (
-            <div className="overflow-x-auto mt-2">
-              <table className="min-w-full bg-white/90 rounded-lg overflow-hidden">
-                <thead className="bg-montecarlo-red-600 text-white">
-                  <tr>
-                    <th className="px-4 py-2 text-left cursor-pointer" onClick={() => sortData('giocatore')}>
-                      Giocatore
-                    </th>
-                    <th className="px-4 py-2 text-center cursor-pointer" onClick={() => sortData('gol')}>
-                      G
-                    </th>
-                    <th className="px-4 py-2 text-center cursor-pointer" onClick={() => sortData('presenze')}>
-                      P
-                    </th>
-                    <th className="px-4 py-2 text-center cursor-pointer" onClick={() => sortData('media')}>
-                      M
-                    </th>
-                    <th className="px-4 py-2 text-center cursor-pointer" onClick={() => sortData('media_voti')}>
-                      M.V
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedRows.map((st) => (
-                    <tr
-                      key={st.giocatore_uid}
-                      className="border-b border-red-500 last:border-0 hover:bg-gray-50 cursor-pointer"
-                      onClick={() => navigate(`/giocatore/${st.giocatore_uid}`)}
-                    >
-                      <td className="px-4 py-2 flex items-center space-x-2">
-                        {st.foto_url ? (
-                          <img
-                            src={st.foto_url}
-                            alt="foto"
-                            className="w-8 h-8 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs text-white">
-                            ?
-                          </div>
-                        )}
-                        <div className="flex flex-col">
-                          <span>{st.giocatore_cognome}</span>
-                          <span>{st.giocatore_nome}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 text-center">{st.gol}</td>
-                      <td className="px-4 py-2 text-center">{st.presenze}</td>
-                      <td className="px-4 py-2 text-center">{st.media.toFixed(2)}</td>
-                      <td className="px-4 py-2 text-center">{st.media_voti.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                  {sortedRows.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-6 text-center text-montecarlo-neutral">
-                        Nessun dato disponibile
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <select
+  className="flex-1 border rounded-md px-3 py-2 text-sm"
+  value={ruoloSelezionato}
+  onChange={(e) => setRuoloSelezionato(e.target.value)}
+>
+  <option value="">Tutti i ruoli</option>
+  <option value="Portiere">Portiere</option>
+  <option value="Difensore">Difensore</option>
+  <option value="Centrocampista">Centrocampista</option>
+  <option value="Attaccante">Attaccante</option>
+</select>
         </div>
+
+        {/* Legenda */}
+        <div className="text-sm text-gray-600 flex space-x-6 pt-2 px-2 text-white">
+          <span><strong>G</strong> = Gol (o Gol Subiti per i portieri)</span>
+          <span><strong>P</strong> = Presenze</span>
+          <span><strong>M</strong> = Media Goal Fatti/Subiti</span>
+          <span><strong>M.V</strong> = Media Voti</span>
+        </div>
+
+        {loading ? (
+          <div className="text-center text-montecarlo-secondary">Caricamento...</div>
+        ) : (
+          <div className="overflow-x-auto mt-2">
+            <table className="min-w-full bg-white/90 rounded-lg overflow-hidden">
+              <thead className="bg-montecarlo-red-600 text-white">
+                <tr>
+                  <th className="px-4 py-2 text-left cursor-pointer" onClick={() => sortData('giocatore')}>
+                    Giocatore
+                  </th>
+                  <th className="px-4 py-2 text-center cursor-pointer" onClick={() => sortData('gol')}>
+                    G
+                  </th>
+                  <th className="px-4 py-2 text-center cursor-pointer" onClick={() => sortData('presenze')}>
+                    P
+                  </th>
+                  <th className="px-4 py-2 text-center cursor-pointer" onClick={() => sortData('media')}>
+                    M
+                  </th>
+                  <th className="px-4 py-2 text-center cursor-pointer" onClick={() => sortData('media_voti')}>
+                    M.V
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedRows.map((st) => (
+                  <tr
+                    key={st.giocatore_uid}
+                    className="border-b border-red-500 last:border-0 hover:bg-gray-50 cursor-pointer"
+                    onClick={() => navigate(`/giocatore/${st.giocatore_uid}`)}
+                  >
+                    <td className="px-4 py-2 flex items-center space-x-2">
+                      {st.foto_url ? (
+                        <img
+                          src={st.foto_url}
+                          alt="foto"
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs text-white">
+                          ?
+                        </div>
+                      )}
+                      <div className="flex flex-col">
+                        <span>{st.giocatore_cognome}</span>
+                        <span>{st.giocatore_nome}</span>
+                      </div>
+                    </td>
+
+                    {/* Goal = goal fatti per i giocatori, goal subiti per i portieri */}
+                    <td className="px-4 py-2 text-center">
+                      {st.ruolo?.toLowerCase() === 'portiere' ? st.subiti : st.gol}
+                    </td>
+
+                    <td className="px-4 py-2 text-center">{st.presenze}</td>
+                    <td className="px-4 py-2 text-center">{st.media.toFixed(2)}</td>
+                    <td className="px-4 py-2 text-center">{st.media_voti.toFixed(2)}</td>
+                  </tr>
+                ))}
+                {sortedRows.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-6 text-center text-montecarlo-neutral">
+                      Nessun dato disponibile
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-    
+    </div>
   );
 }

@@ -72,10 +72,10 @@ export default function AllenamentiNuovo(): JSX.Element {
       setLoading(true);
 
       const { data: gsData, error: gsError } = await supabase
-        .from('v_giocatori_stagioni')
-        .select('giocatore_id, nome, cognome')
-        .eq('stagione_id', selectedSeasonId)
-        .order('cognome', { ascending: true });
+  .from('giocatori_stagioni_view')
+  .select('giocatore_uid, nome, cognome')
+  .eq('stagione_id', selectedSeasonId)
+  .order('cognome', { ascending: true });
 
       if (gsError || !gsData) {
         console.error('Errore fetch v_giocatori_stagioni:', gsError);
@@ -86,10 +86,10 @@ export default function AllenamentiNuovo(): JSX.Element {
       }
 
       const list = gsData.map(r => ({
-        id: r.giocatore_id,
-        nome: r.nome,
-        cognome: r.cognome
-      }));
+  id: r.giocatore_uid,   // qui usi il giocatore_uid
+  nome: r.nome,
+  cognome: r.cognome
+}));
       setPlayers(list);
 
       const initSel: Record<string, boolean> = {};
@@ -131,7 +131,8 @@ export default function AllenamentiNuovo(): JSX.Element {
       <div className="max-w-2xl mx-auto bg-white/60 rounded-lg shadow p-6">
         {/* Selettore giorno, data e stagione */}
         <div className="mb-6 text-center">
-          <div className="inline-flex items-center space-x-4">
+          <div className="flex flex-col md:flex-row items-center md:space-x-4 space-y-3 md:space-y-0">
+
             <span className="text-lg text-gray-800 font-semibold">{selectedDayName}</span>
             <input
               type="date"
@@ -159,7 +160,7 @@ export default function AllenamentiNuovo(): JSX.Element {
             const isPresente = selections[p.id];
             return (
               <li key={p.id} className="flex items-center justify-between py-3 px-2">
-                <span className="text-lg text-gray-900">
+                <span className="text-xl font-bold text-gray-900">
                   {p.cognome} {p.nome}
                 </span>
                 <div className="flex flex-col space-y-2 pr-2">

@@ -110,7 +110,7 @@ export default function Step8_FaseGironi() {
   }, [torneoId, elimPhaseId]);
 
   if (authLoading || loading) {
-    return <p className="text-center py-6">Caricamento in corso…</p>;
+    return <p className="text-center text-white py-6">Caricamento in corso…</p>;
   }
 
   // etichette

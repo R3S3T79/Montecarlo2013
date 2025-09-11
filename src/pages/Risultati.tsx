@@ -1,5 +1,5 @@
 // src/pages/Risultati.tsx
-// Data creazione chat: 2025-08-01
+// Data creazione chat: 2025-08-01 (rev: layout testata 2 righe + giorno maiuscolo)
 
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
@@ -23,8 +23,8 @@ export default function Risultati() {
 
   const [partite, setPartite] = useState<PartitaWithTeams[]>([]);
   const [stagioni, setStagioni] = useState<Stagione[]>([]);
-  const [stagioneSelezionata, setStagioneSelezionata] = useState<string>(""); // 🔹 default vuoto
-  const [tipoCompetizione, setTipoCompetizione] = useState<string>(""); // 🔹 default vuoto = Tutti
+  const [stagioneSelezionata, setStagioneSelezionata] = useState<string>("");
+  const [tipoCompetizione, setTipoCompetizione] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +50,6 @@ export default function Risultati() {
           setError(stagErr.message);
         } else {
           setStagioni(stagData || []);
-          // 🔹 rimosso auto-set della stagione più recente
         }
       })();
     }
@@ -69,10 +68,11 @@ export default function Risultati() {
         .from("partite")
         .select(
           `
-            *,
-            casa:squadra_casa_id(nome),
-            ospite:squadra_ospite_id(nome)
-          `
+          *,
+          casa:squadra_casa_id(nome),
+          ospite:squadra_ospite_id(nome),
+          nome_torneo
+        `
         )
         .eq("stato", "Giocata")
         .order("data_ora", { ascending: false });
@@ -96,12 +96,17 @@ export default function Risultati() {
     }
   };
 
+  // giorno con iniziale maiuscola
+  const formatGiorno = (d: string) => {
+    const giorno = new Date(d).toLocaleDateString("it-IT", { weekday: "long" });
+    return giorno.charAt(0).toUpperCase() + giorno.slice(1);
+  };
+
   const formatData = (d: string) =>
     new Date(d).toLocaleDateString("it-IT", {
-      weekday: "long",
       day: "2-digit",
       month: "2-digit",
-      year: "2-digit"
+      year: "numeric"
     });
 
   const filteredPartite = partite.filter(({ casa, ospite }) => {
@@ -114,94 +119,115 @@ export default function Risultati() {
 
   if (loading || loadingData) {
     return (
-       <div className="container mx-auto px-2">
+      <div className="container mx-auto px-2">
         <span>Caricamento…</span>
       </div>
     );
   }
 
   return (
-   <div className="container mx-auto px-2">
-    <div className="relative mb-4 mt-2">
-      <div className="bg-white rounded-xl shadow-montecarlo p-2 space-y-2 bg-white/90 rounded-lg">
-        {/* Input di ricerca */}
-        <input
-          type="text"
-          placeholder="Cerca Nome Squadra"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full border-2 border-montecarlo-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
-        />
+    <div className="container mx-auto px-2">
+      <div className="relative mb-4 mt-2">
+        <div className="bg-white rounded-xl shadow-montecarlo p-2 space-y-2 bg-white/90 rounded-lg">
+          {/* Input di ricerca */}
+          <input
+            type="text"
+            placeholder="Cerca Nome Squadra"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full border-2 border-montecarlo-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
+          />
 
-        {/* Dropdown Stagione e Competizioni */}
-        <div className="flex gap-2">
-          <select
-            value={stagioneSelezionata}
-            onChange={(e) => setStagioneSelezionata(e.target.value)}
-            className="flex-1 border-2 border-montecarlo-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
-          >
-            <option value="">Stagione</option>
-            {stagioni.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nome}
-              </option>
-            ))}
-          </select>
+          {/* Dropdown Stagione e Competizioni */}
+          <div className="flex gap-2">
+            <select
+              value={stagioneSelezionata}
+              onChange={(e) => setStagioneSelezionata(e.target.value)}
+              className="flex-1 border-2 border-montecarlo-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
+            >
+              <option value="">Stagione</option>
+              {stagioni.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nome}
+                </option>
+              ))}
+            </select>
 
-          <select
-            value={tipoCompetizione}
-            onChange={(e) => setTipoCompetizione(e.target.value)}
-            className="flex-1 border-2 border-montecarlo-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
-          >
-            <option value="">Tutti</option>
-            <option value="Campionato">Campionato</option>
-            <option value="Torneo">Torneo</option>
-            <option value="Amichevole">Amichevole</option>
-          </select>
+            <select
+              value={tipoCompetizione}
+              onChange={(e) => setTipoCompetizione(e.target.value)}
+              className="flex-1 border-2 border-montecarlo-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
+            >
+              <option value="">Tutti</option>
+              <option value="Campionato">Campionato</option>
+              <option value="Torneo">Torneo</option>
+              <option value="Amichevole">Amichevole</option>
+            </select>
+          </div>
         </div>
       </div>
-    </div>
 
-        {error && (
-          <div className="bg-montecarlo-red-50 border-montecarlo-red-200 rounded-lg p-4 text-montecarlo-red-800">
-            {error}
-          </div>
-        )}
+      {error && (
+        <div className="bg-montecarlo-red-50 border-montecarlo-red-200 rounded-lg p-4 text-montecarlo-red-800">
+          {error}
+        </div>
+      )}
 
-        {!error && filteredPartite.length === 0 && (
-          <div className="bg-white rounded-lg shadow-montecarlo p-8 text-center">
-            {searchTerm ? "Nessuna partita trovata" : "Nessuna partita giocata"}
-          </div>
-        )}
+      {!error && filteredPartite.length === 0 && (
+        <div className="bg-white rounded-lg shadow-montecarlo p-8 text-center">
+          {searchTerm ? "Nessuna partita trovata" : "Nessuna partita giocata"}
+        </div>
+      )}
 
-        {!error && filteredPartite.length > 0 && (
-          <div className="space-y-3">
-            {filteredPartite.map((p) => (
-              <div
-                key={p.id}
-                onClick={() => navigate(`/partita/${p.id}`)}
-                className="bg-white/90 rounded-lg shadow-montecarlo hover:shadow-montecarlo-lg cursor-pointer transition-transform hover:scale-[1.02] border-l-4 border-montecarlo-secondary"
-              >
-                <div className="bg-gradient-montecarlo text-white px-4 py-2 rounded-t-lg">
-                  <div className="text-sm font-medium text-center">
-                    {formatData(p.data_ora)}
+      {!error && filteredPartite.length > 0 && (
+        <div className="space-y-3">
+          {filteredPartite.map((p) => (
+            <div
+              key={p.id}
+              onClick={() => navigate(`/partita/${p.id}`)}
+              className="bg-white/90 rounded-lg shadow-montecarlo hover:shadow-montecarlo-lg cursor-pointer transition-transform hover:scale-[1.02] border-l-4 border-montecarlo-secondary"
+            >
+              {/* Testata: 2 righe, sx giorno+data, dx competizione+nome_torneo */}
+              <div className="bg-gradient-montecarlo text-white px-4 py-2 rounded-t-lg">
+                <div className="flex justify-between">
+                  {/* Colonna sinistra */}
+                  <div className="flex flex-col text-left">
+                    <span className="text-sm sm:text-base font-bold">
+                      {formatGiorno(p.data_ora)}
+                    </span>
+                    <span className="text-sm sm:text-base font-semibold">
+                      {formatData(p.data_ora)}
+                    </span>
+                  </div>
+
+                  {/* Colonna destra */}
+                  <div className="flex flex-col text-right">
+                    <span className="text-sm sm:text-base font-bold">
+                      {p.campionato_torneo}
+                    </span>
+                    <span className="text-sm sm:text-base font-semibold">
+                      {p.nome_torneo || ""}
+                    </span>
                   </div>
                 </div>
-                <div className="p-4 grid grid-cols-[2fr_auto_2fr] items-center gap-4">
-                  <span className="text-montecarlo-secondary font-semibold text-right">
-                    {p.casa.nome}
-                  </span>
-                  <span className="text-montecarlo-secondary font-bold text-lg">
-                    {p.goal_a} - {p.goal_b}
-                  </span>
-                  <span className="text-montecarlo-secondary font-semibold">
-                    {p.ospite.nome}
-                  </span>
-                </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+
+              {/* Corpo: squadre e risultato */}
+              <div className="p-4 grid grid-cols-[2fr_auto_2fr] items-center gap-4">
+                <span className="text-montecarlo-secondary font-semibold text-right">
+                  {p.casa.nome}
+                </span>
+                <span className="text-montecarlo-secondary font-bold text-lg">
+                  {p.goal_a} - {p.goal_b}
+                </span>
+                <span className="text-montecarlo-secondary font-semibold">
+                  {p.ospite.nome}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

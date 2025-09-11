@@ -208,17 +208,19 @@ export default function EditPartitaPage() {
           </select>
 
           <select
-            value={formData.campionato_torneo}
-            onChange={e =>
-              setFormData({ ...formData, campionato_torneo: e.target.value })
-            }
-            className="w-full border border-montecarlo-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-montecarlo-accent"
-            required
-          >
-            <option value="Campionato">Campionato</option>
-            <option value="Torneo">Torneo</option>
-            <option value="Amichevole">Amichevole</option>
-          </select>
+  value={formData.campionato_torneo}
+  onChange={e =>
+    setFormData({ ...formData, campionato_torneo: e.target.value })
+  }
+  className="w-full border border-montecarlo-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-montecarlo-accent"
+  required
+>
+  <option value="Campionato">Campionato</option>
+  <option value="Torneo">Torneo</option>
+  <option value="Amichevole">Amichevole</option>
+  <option value="Allenamento">Allenamento</option> {/* ✅ nuovo valore */}
+</select>
+
 
           <input
             type="text"

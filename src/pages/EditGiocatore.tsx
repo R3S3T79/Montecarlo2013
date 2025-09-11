@@ -1,5 +1,5 @@
 // src/pages/EditGiocatore.tsx
-// Data creazione chat: 14/08/2025
+// Data creazione chat: 14/08/2025 (rev: fix campi nome/cognome da v_giocatori_completo + gestione delete stagioni)
 
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -15,8 +15,8 @@ interface GiocatoreView {
   giocatore_uid: string;
   stagione_id: string;
   stagione_nome: string;
-  giocatore_nome: string;
-  giocatore_cognome: string;
+  nome: string;
+  cognome: string;
   data_nascita: string | null;
   ruolo: string | null;
   numero_cartellino: number | null;
@@ -73,8 +73,8 @@ export default function EditGiocatore() {
       }
 
       const latest = data[0];
-      setNome(latest.giocatore_nome);
-      setCognome(latest.giocatore_cognome);
+      setNome(latest.nome);
+      setCognome(latest.cognome);
       setDataNascita(latest.data_nascita || '');
       setRuolo(latest.ruolo || '');
       setNumeroCartellino(latest.numero_cartellino ?? '');
@@ -122,10 +122,12 @@ export default function EditGiocatore() {
 
       if (uploadError) {
         console.error('Errore upload immagine:', uploadError);
-        alert('Impossibile caricare l\'immagine.');
+        alert("Impossibile caricare l'immagine.");
         return;
       }
-      const { data: pu } = supabase.storage.from('giocatori').getPublicUrl(fileName);
+      const { data: pu } = supabase.storage
+        .from('giocatori')
+        .getPublicUrl(fileName);
       finalFotoUrl = pu.publicUrl;
     }
 
@@ -134,14 +136,17 @@ export default function EditGiocatore() {
       const newGiocatoreUid = crypto.randomUUID();
       const { error: insertPlayerErr } = await supabase
         .from('giocatori')
-        .insert([{
-          id: newGiocatoreUid,
-          nome: nome.trim(),
-          cognome: cognome.trim(),
-          foto_url: finalFotoUrl,
-          data_nascita: dataNascita || null,
-          numero_cartellino: numeroCartellino === '' ? null : Number(numeroCartellino)
-        }]);
+        .insert([
+          {
+            id: newGiocatoreUid,
+            nome: nome.trim(),
+            cognome: cognome.trim(),
+            foto_url: finalFotoUrl,
+            data_nascita: dataNascita || null,
+            numero_cartellino:
+              numeroCartellino === '' ? null : Number(numeroCartellino),
+          },
+        ]);
 
       if (insertPlayerErr) {
         console.error('Errore creazione giocatore:', insertPlayerErr);
@@ -150,13 +155,12 @@ export default function EditGiocatore() {
       }
 
       // Creo associazioni stagioni con ruolo
-      // ✅ SCRIVO ANCHE nome/cognome in giocatori_stagioni per evitare NULL
       const records = stagioniSelezionate.map(stagId => ({
         giocatore_uid: newGiocatoreUid,
         stagione_id: stagId,
         ruolo: ruolo || null,
         nome: nome.trim(),
-        cognome: cognome.trim()
+        cognome: cognome.trim(),
       }));
       const { error: insertStagErr } = await supabase
         .from('giocatori_stagioni')
@@ -167,7 +171,6 @@ export default function EditGiocatore() {
         alert('Errore durante la creazione.');
         return;
       }
-
     } else {
       // Aggiorno giocatore
       const { error: updatePlayerErr } = await supabase
@@ -177,39 +180,35 @@ export default function EditGiocatore() {
           cognome: cognome.trim(),
           foto_url: finalFotoUrl,
           data_nascita: dataNascita || null,
-          numero_cartellino: numeroCartellino === '' ? null : Number(numeroCartellino)
+          numero_cartellino:
+            numeroCartellino === '' ? null : Number(numeroCartellino),
         })
         .eq('id', id);
 
       if (updatePlayerErr) {
         console.error('Errore aggiornamento giocatore:', updatePlayerErr);
-        alert('Errore durante l\'aggiornamento.');
+        alert("Errore durante l'aggiornamento.");
         return;
       }
 
-      // ✅ Aggiornamento DIFFERENZIALE delle stagioni:
-      // - UPDATE per le stagioni già presenti (ruolo/nome/cognome)
-      // - INSERT solo per le nuove stagioni
-      // - NIENTE DELETE (gli ID esistenti restano stabili)
-
-      // 1) Update stagioni già presenti tra quelle selezionate
+      // Update stagioni già selezionate
       const { error: updErr } = await supabase
         .from('giocatori_stagioni')
         .update({
           ruolo: ruolo || null,
           nome: nome.trim(),
-          cognome: cognome.trim()
+          cognome: cognome.trim(),
         })
         .eq('giocatore_uid', id)
         .in('stagione_id', stagioniSelezionate);
 
       if (updErr) {
         console.error('Errore update stagioni esistenti:', updErr);
-        alert('Errore durante l\'aggiornamento delle stagioni.');
+        alert("Errore durante l'aggiornamento delle stagioni.");
         return;
       }
 
-      // 2) Inserisci solo le stagioni mancanti
+      // Leggi stagioni esistenti
       const { data: esistenti, error: exErr } = await supabase
         .from('giocatori_stagioni')
         .select('stagione_id')
@@ -221,16 +220,28 @@ export default function EditGiocatore() {
         return;
       }
 
-      const setEsistenti = new Set((esistenti || []).map(r => r.stagione_id));
-      const daInserire = stagioniSelezionate.filter(sid => !setEsistenti.has(sid));
+      const setEsistenti = new Set(
+        (esistenti || []).map(r => r.stagione_id)
+      );
 
+      // Stagioni da inserire
+      const daInserire = stagioniSelezionate.filter(
+        sid => !setEsistenti.has(sid)
+      );
+
+      // Stagioni da rimuovere
+      const daRimuovere = (esistenti || [])
+        .map(r => r.stagione_id)
+        .filter(sid => !stagioniSelezionate.includes(sid));
+
+      // Inserisci stagioni nuove
       if (daInserire.length > 0) {
         const nuovi = daInserire.map(stagId => ({
           giocatore_uid: id!,
           stagione_id: stagId,
           ruolo: ruolo || null,
           nome: nome.trim(),
-          cognome: cognome.trim()
+          cognome: cognome.trim(),
         }));
         const { error: insErr } = await supabase
           .from('giocatori_stagioni')
@@ -238,7 +249,22 @@ export default function EditGiocatore() {
 
         if (insErr) {
           console.error('Errore insert nuove stagioni:', insErr);
-          alert('Errore durante l\'inserimento delle nuove stagioni.');
+          alert("Errore durante l'inserimento delle nuove stagioni.");
+          return;
+        }
+      }
+
+      // Elimina stagioni tolte
+      if (daRimuovere.length > 0) {
+        const { error: delErr } = await supabase
+          .from('giocatori_stagioni')
+          .delete()
+          .eq('giocatore_uid', id)
+          .in('stagione_id', daRimuovere);
+
+        if (delErr) {
+          console.error('Errore delete stagioni tolte:', delErr);
+          alert('Errore durante la rimozione delle stagioni.');
           return;
         }
       }
@@ -250,7 +276,7 @@ export default function EditGiocatore() {
   const handleAnnulla = () => navigate('/rosa');
 
   return (
-    <div className="bg-white/90 max-w-md mx-auto bg-white p-6 rounded-lg shadow-md">
+    <div className="bg-white/90 max-w-md mx-auto p-6 rounded-lg shadow-md">
       {/* Nome */}
       <label className="block font-medium">Nome</label>
       <input
@@ -280,26 +306,38 @@ export default function EditGiocatore() {
 
       {/* Ruolo */}
       <label className="block font-medium">Ruolo</label>
-      <input
-        type="text"
+      <select
         value={ruolo}
         onChange={e => setRuolo(e.target.value)}
         className="w-full border px-3 py-2 rounded mb-3"
-      />
+      >
+        <option value="">-- Seleziona ruolo --</option>
+        <option value="Portiere">Portiere</option>
+        <option value="Difensore">Difensore</option>
+        <option value="Centrocampista">Centrocampista</option>
+        <option value="Attaccante">Attaccante</option>
+      </select>
 
       {/* Numero cartellino */}
       <label className="block font-medium">Numero Cartellino</label>
       <input
         type="number"
         value={numeroCartellino}
-        onChange={e => setNumeroCartellino(e.target.value === '' ? '' : Number(e.target.value))}
+        onChange={e =>
+          setNumeroCartellino(
+            e.target.value === '' ? '' : Number(e.target.value)
+          )
+        }
         className="w-full border px-3 py-2 rounded mb-3"
       />
 
       {/* Foto */}
       <label className="block font-medium mb-1">Foto Giocatore</label>
       <div className="flex gap-2 mb-4">
-        <button onClick={handleScattaFoto} className="bg-blue-600 text-white px-4 py-2 rounded">
+        <button
+          onClick={handleScattaFoto}
+          className="bg-blue-600 text-white px-4 py-2 rounded"
+        >
           Scatta Foto
         </button>
         <input
@@ -311,10 +349,21 @@ export default function EditGiocatore() {
           className="hidden"
         />
         <label className="bg-green-600 text-white px-4 py-2 rounded cursor-pointer flex items-center justify-center">
-  <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-  Carica File
-</label>
-        {fotoUrl && <img src={fotoUrl} alt="anteprima" className="w-16 h-16 rounded-full" />}
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          Carica File
+        </label>
+        {fotoUrl && (
+          <img
+            src={fotoUrl}
+            alt="anteprima"
+            className="w-16 h-16 rounded-full"
+          />
+        )}
       </div>
 
       {/* Stagioni */}
@@ -334,13 +383,19 @@ export default function EditGiocatore() {
 
       {/* Azioni */}
       <div className="flex justify-between">
-  <button onClick={handleAnnulla} className="bg-gray-400 text-white px-4 py-2 rounded">
-    Annulla
-  </button>
-  <button onClick={handleSubmit} className="bg-red-600 text-white px-4 py-2 rounded">
-    {isNew ? 'Crea' : 'Aggiorna'}
-  </button>
-</div>
+        <button
+          onClick={handleAnnulla}
+          className="bg-gray-400 text-white px-4 py-2 rounded"
+        >
+          Annulla
+        </button>
+        <button
+          onClick={handleSubmit}
+          className="bg-red-600 text-white px-4 py-2 rounded"
+        >
+          {isNew ? 'Crea' : 'Aggiorna'}
+        </button>
+      </div>
     </div>
   );
 }
