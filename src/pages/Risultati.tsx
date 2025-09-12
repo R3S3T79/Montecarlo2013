@@ -162,6 +162,8 @@ export default function Risultati() {
               <option value="Campionato">Campionato</option>
               <option value="Torneo">Torneo</option>
               <option value="Amichevole">Amichevole</option>
+                <option value="Allenamento">Allenamento</option>
+
             </select>
           </div>
         </div>
