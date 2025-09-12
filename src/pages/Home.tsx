@@ -319,15 +319,6 @@ useEffect(() => {
 
     let next: PartitaLite | null = null;
 
-    useEffect(() => {
-  let mounted = true;
-  let ch: any = null; // canale realtime
-
-  const loadNextMatch = async () => {
-    setLoadingMatch(true);
-
-    let next: PartitaLite | null = null;
-
     // 1) provo a prendere la partita InCorso
     const { data: inCorso, error: errInCorso } = await supabase
       .from("partite")
@@ -408,8 +399,6 @@ useEffect(() => {
     if (ch) supabase.removeChannel(ch);
   };
 }, []);
-
-
 
   // carico i marcatori direttamente dalla view marcatori_alias
   useEffect(() => {
