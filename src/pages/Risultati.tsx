@@ -1,9 +1,9 @@
 // src/pages/Risultati.tsx
-// Data creazione chat: 2025-08-01 (rev: layout testata 2 righe + giorno maiuscolo)
+// Data creazione chat: 2025-08-01 (rev: layout testata 2 righe + giorno maiuscolo + sticky filtro + scroll restore fix + anchor restore)
 
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import type { Partita } from "../types/database";
 
@@ -20,6 +20,7 @@ interface Stagione {
 export default function Risultati() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [partite, setPartite] = useState<PartitaWithTeams[]>([]);
   const [stagioni, setStagioni] = useState<Stagione[]>([]);
@@ -96,6 +97,34 @@ export default function Risultati() {
     }
   };
 
+  // ✅ Ripristina posizione: prima prova con ancora (card), altrimenti con scrollY — solo dopo caricamento partite
+  useEffect(() => {
+    if (!loadingData) {
+      const anchor = sessionStorage.getItem("risultati-anchor");
+      if (anchor) {
+        // aspetta il paint per sicurezza
+        requestAnimationFrame(() => {
+          const el = document.getElementById(`p-${anchor}`);
+          if (el) {
+            el.scrollIntoView({ block: "start" });
+          }
+        });
+      } else {
+        const savedScroll = sessionStorage.getItem("risultati-scroll");
+        if (savedScroll) {
+          window.scrollTo(0, parseInt(savedScroll, 10));
+        }
+      }
+    }
+  }, [loadingData]);
+
+  // ✅ Salva scroll quando si lascia la pagina
+  useEffect(() => {
+    return () => {
+      sessionStorage.setItem("risultati-scroll", window.scrollY.toString());
+    };
+  }, [location]);
+
   // giorno con iniziale maiuscola
   const formatGiorno = (d: string) => {
     const giorno = new Date(d).toLocaleDateString("it-IT", { weekday: "long" });
@@ -127,8 +156,9 @@ export default function Risultati() {
 
   return (
     <div className="container mx-auto px-2">
-      <div className="relative mb-4 mt-2">
-        <div className="bg-white rounded-xl shadow-montecarlo p-2 space-y-2 bg-white/90 rounded-lg">
+      {/* ✅ Box filtro sticky */}
+      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm mb-4 mt-2">
+        <div className="rounded-xl shadow-montecarlo p-2 space-y-2">
           {/* Input di ricerca */}
           <input
             type="text"
@@ -162,6 +192,7 @@ export default function Risultati() {
               <option value="Campionato">Campionato</option>
               <option value="Torneo">Torneo</option>
               <option value="Amichevole">Amichevole</option>
+              <option value="Allenamento">Allenamento</option>
             </select>
           </div>
         </div>
@@ -184,7 +215,12 @@ export default function Risultati() {
           {filteredPartite.map((p) => (
             <div
               key={p.id}
-              onClick={() => navigate(`/partita/${p.id}`)}
+              id={`p-${p.id}`}
+              style={{ scrollMarginTop: "100px" }}
+              onClick={() => {
+                sessionStorage.setItem("risultati-anchor", p.id as string);
+                navigate(`/partita/${p.id}`);
+              }}
               className="bg-white/90 rounded-lg shadow-montecarlo hover:shadow-montecarlo-lg cursor-pointer transition-transform hover:scale-[1.02] border-l-4 border-montecarlo-secondary"
             >
               {/* Testata: 2 righe, sx giorno+data, dx competizione+nome_torneo */}

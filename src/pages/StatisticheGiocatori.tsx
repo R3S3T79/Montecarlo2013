@@ -1,5 +1,5 @@
 // src/pages/StatisticheGiocatori.tsx
-// Data creazione chat: 18/08/2025 (rev: aggiunto filtro per Ruolo)
+// Data creazione chat: 18/08/2025 (rev: doppia colonna Media Voti Utenti + Mister)
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -22,7 +22,8 @@ interface Statistica {
   gol: number;
   subiti: number;
   media: number;
-  media_voti: number;
+  media_voti_utenti: number;
+  media_voti_mister: number;
 }
 
 export default function StatisticheGiocatori(): JSX.Element {
@@ -30,12 +31,14 @@ export default function StatisticheGiocatori(): JSX.Element {
 
   const [stagioni, setStagioni] = useState<Stagione[]>([]);
   const [stagioneSelezionata, setStagioneSelezionata] = useState<string>('');
-  const [ruoloSelezionato, setRuoloSelezionato] = useState<string>(''); // 🔹 nuovo stato
+  const [ruoloSelezionato, setRuoloSelezionato] = useState<string>(''); // 🔹 filtro per ruolo
   const [loading, setLoading] = useState(false);
 
   const [rows, setRows] = useState<Statistica[]>([]);
 
-  const [sortField, setSortField] = useState<'giocatore' | 'gol' | 'presenze' | 'media' | 'media_voti'>('giocatore');
+  const [sortField, setSortField] = useState<
+    'giocatore' | 'gol' | 'presenze' | 'media' | 'media_voti_utenti' | 'media_voti_mister'
+  >('giocatore');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Carica stagioni
@@ -55,7 +58,7 @@ export default function StatisticheGiocatori(): JSX.Element {
     })();
   }, []);
 
-  // Carica statistiche dalla vista unica
+  // Carica statistiche + medie voti utenti/mister
   useEffect(() => {
     if (!stagioneSelezionata) {
       setRows([]);
@@ -65,43 +68,70 @@ export default function StatisticheGiocatori(): JSX.Element {
     (async () => {
       setLoading(true);
       try {
+        // 1) Statistiche base
         const { data, error } = await supabase
           .from('v_stat_giocatore_stagione')
-          .select('giocatore_uid, nome, cognome, foto_url, ruolo, presenze_totali, goal_totali, goal_subiti, media_voti')
+          .select('giocatore_uid, nome, cognome, foto_url, ruolo, presenze_totali, goal_totali, goal_subiti')
           .eq('stagione_id', stagioneSelezionata);
 
         if (error || !data) {
           setRows([]);
-        } else {
-          const mapped: Statistica[] = data.map((r: any) => {
-            const presenze = r.presenze_totali ?? 0;
-            const gol = r.goal_totali ?? 0;
-            const subiti = r.goal_subiti ?? 0;
-            let media = 0;
-
-            if (presenze > 0) {
-              if (r.ruolo?.toLowerCase() === 'portiere') {
-                media = parseFloat((subiti / presenze).toFixed(2));
-              } else {
-                media = parseFloat((gol / presenze).toFixed(2));
-              }
-            }
-
-            return {
-              giocatore_uid: r.giocatore_uid,
-              giocatore_nome: r.nome,
-              giocatore_cognome: r.cognome,
-              foto_url: r.foto_url,
-              ruolo: r.ruolo,
-              presenze,
-              gol,
-              subiti,
-              media,
-              media_voti: r.media_voti ?? 0,
-            };
-          });
-          setRows(mapped);
+          setLoading(false);
+          return;
         }
+
+        // 2) Medie voti utenti + mister
+        const { data: voti, error: vErr } = await supabase
+          .from('voti_giocatori_dettaglio')
+          .select('giocatore_id, role, media_voto')
+          .eq('stagione_id', stagioneSelezionata);
+
+        const medieMap: Record<string, { utenti: number; mister: number }> = {};
+
+        if (!vErr && voti) {
+          voti.forEach((v: any) => {
+            if (!medieMap[v.giocatore_id]) {
+              medieMap[v.giocatore_id] = { utenti: 0, mister: 0 };
+            }
+            if (v.role === 'mister') {
+              medieMap[v.giocatore_id].mister = Number(v.media_voto) || 0;
+            } else {
+              medieMap[v.giocatore_id].utenti = Number(v.media_voto) || 0;
+            }
+          });
+        }
+
+        // 3) Mappiamo dati finali
+        const mapped: Statistica[] = data.map((r: any) => {
+          const presenze = r.presenze_totali ?? 0;
+          const gol = r.goal_totali ?? 0;
+          const subiti = r.goal_subiti ?? 0;
+          let media = 0;
+
+          if (presenze > 0) {
+            if (r.ruolo?.toLowerCase() === 'portiere') {
+              media = parseFloat((subiti / presenze).toFixed(2));
+            } else {
+              media = parseFloat((gol / presenze).toFixed(2));
+            }
+          }
+
+          return {
+            giocatore_uid: r.giocatore_uid,
+            giocatore_nome: r.nome,
+            giocatore_cognome: r.cognome,
+            foto_url: r.foto_url,
+            ruolo: r.ruolo,
+            presenze,
+            gol,
+            subiti,
+            media,
+            media_voti_utenti: medieMap[r.giocatore_uid]?.utenti ?? 0,
+            media_voti_mister: medieMap[r.giocatore_uid]?.mister ?? 0,
+          };
+        });
+
+        setRows(mapped);
       } finally {
         setLoading(false);
       }
@@ -109,7 +139,9 @@ export default function StatisticheGiocatori(): JSX.Element {
   }, [stagioneSelezionata]);
 
   // Ordinamento
-  const sortData = (field: 'giocatore' | 'gol' | 'presenze' | 'media' | 'media_voti') => {
+  const sortData = (
+    field: 'giocatore' | 'gol' | 'presenze' | 'media' | 'media_voti_utenti' | 'media_voti_mister'
+  ) => {
     if (sortField === field) {
       setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -118,7 +150,7 @@ export default function StatisticheGiocatori(): JSX.Element {
     }
   };
 
-  // 🔹 Applichiamo filtro per ruolo
+  // 🔹 Filtro ruolo
   const filteredRows = useMemo(() => {
     if (!ruoloSelezionato) return rows;
     return rows.filter((r) => r.ruolo?.toLowerCase() === ruoloSelezionato.toLowerCase());
@@ -140,8 +172,10 @@ export default function StatisticheGiocatori(): JSX.Element {
         cmp = a.presenze - b.presenze;
       } else if (sortField === 'media') {
         cmp = a.media - b.media;
+      } else if (sortField === 'media_voti_utenti') {
+        cmp = a.media_voti_utenti - b.media_voti_utenti;
       } else {
-        cmp = a.media_voti - b.media_voti;
+        cmp = a.media_voti_mister - b.media_voti_mister;
       }
       return sortOrder === 'asc' ? cmp : -cmp;
     });
@@ -166,25 +200,27 @@ export default function StatisticheGiocatori(): JSX.Element {
           </select>
 
           <select
-  className="flex-1 border rounded-md px-3 py-2 text-sm"
-  value={ruoloSelezionato}
-  onChange={(e) => setRuoloSelezionato(e.target.value)}
->
-  <option value="">Tutti i ruoli</option>
-  <option value="Portiere">Portiere</option>
-  <option value="Difensore">Difensore</option>
-  <option value="Centrocampista">Centrocampista</option>
-  <option value="Attaccante">Attaccante</option>
-</select>
+            className="flex-1 border rounded-md px-3 py-2 text-sm"
+            value={ruoloSelezionato}
+            onChange={(e) => setRuoloSelezionato(e.target.value)}
+          >
+            <option value="">Tutti i ruoli</option>
+            <option value="Portiere">Portiere</option>
+            <option value="Difensore">Difensore</option>
+            <option value="Centrocampista">Centrocampista</option>
+            <option value="Attaccante">Attaccante</option>
+          </select>
         </div>
 
         {/* Legenda */}
-        <div className="text-sm text-gray-600 flex space-x-6 pt-2 px-2 text-white">
-          <span><strong>G</strong> = Gol (o Gol Subiti per i portieri)</span>
-          <span><strong>P</strong> = Presenze</span>
-          <span><strong>M</strong> = Media Goal Fatti/Subiti</span>
-          <span><strong>M.V</strong> = Media Voti</span>
-        </div>
+<div className="grid grid-cols-2 gap-y-1 gap-x-4 text-sm text-gray-600 pt-2 px-2 text-white">
+  <div><strong>G</strong> = Fatti/Subiti</div>
+  <div><strong>M.V.U</strong> = Media Utenti</div>
+  <div><strong>P</strong> = Presenze</div>
+  <div><strong>M.V.A</strong> = Media Allenatore</div>
+  <div className="col-span-2"><strong>M</strong> = Media Goal fatti/subiti</div>
+</div>
+
 
         {loading ? (
           <div className="text-center text-montecarlo-secondary">Caricamento...</div>
@@ -193,20 +229,23 @@ export default function StatisticheGiocatori(): JSX.Element {
             <table className="min-w-full bg-white/90 rounded-lg overflow-hidden">
               <thead className="bg-montecarlo-red-600 text-white">
                 <tr>
-                  <th className="px-4 py-2 text-left cursor-pointer" onClick={() => sortData('giocatore')}>
+                  <th className="px-10 py-2 text-left cursor-pointer" onClick={() => sortData('giocatore')}>
                     Giocatore
                   </th>
-                  <th className="px-4 py-2 text-center cursor-pointer" onClick={() => sortData('gol')}>
+                  <th className="px-3 py-2 text-center cursor-pointer" onClick={() => sortData('gol')}>
                     G
                   </th>
-                  <th className="px-4 py-2 text-center cursor-pointer" onClick={() => sortData('presenze')}>
+                  <th className="px-3 py-2 text-center cursor-pointer" onClick={() => sortData('presenze')}>
                     P
                   </th>
-                  <th className="px-4 py-2 text-center cursor-pointer" onClick={() => sortData('media')}>
+                  <th className="px-3 py-2 text-center cursor-pointer" onClick={() => sortData('media')}>
                     M
                   </th>
-                  <th className="px-4 py-2 text-center cursor-pointer" onClick={() => sortData('media_voti')}>
-                    M.V
+                  <th className="px-3 py-2 text-center cursor-pointer" onClick={() => sortData('media_voti_utenti')}>
+                    M.V.U
+                  </th>
+                  <th className="px-3 py-2 text-center cursor-pointer" onClick={() => sortData('media_voti_mister')}>
+                    M.V.A
                   </th>
                 </tr>
               </thead>
@@ -235,19 +274,20 @@ export default function StatisticheGiocatori(): JSX.Element {
                       </div>
                     </td>
 
-                    {/* Goal = goal fatti per i giocatori, goal subiti per i portieri */}
+                    {/* Goal/Subiti */}
                     <td className="px-4 py-2 text-center">
                       {st.ruolo?.toLowerCase() === 'portiere' ? st.subiti : st.gol}
                     </td>
 
                     <td className="px-4 py-2 text-center">{st.presenze}</td>
                     <td className="px-4 py-2 text-center">{st.media.toFixed(2)}</td>
-                    <td className="px-4 py-2 text-center">{st.media_voti.toFixed(2)}</td>
+                    <td className="px-4 py-2 text-center">{st.media_voti_utenti.toFixed(2)}</td>
+                    <td className="px-4 py-2 text-center">{st.media_voti_mister.toFixed(2)}</td>
                   </tr>
                 ))}
                 {sortedRows.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-montecarlo-neutral">
+                    <td colSpan={6} className="px-4 py-6 text-center text-montecarlo-neutral">
                       Nessun dato disponibile
                     </td>
                   </tr>

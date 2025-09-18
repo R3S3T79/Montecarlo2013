@@ -137,14 +137,13 @@ useEffect(() => {
 
     // 2) Altrimenti prendo la prossima DA GIOCARE con data_ora >= adesso
     if (!nextData) {
-      const nowIso = new Date().toISOString();
       const { data: future } = await supabase
-        .from("partite")
-        .select(commonSelect)
-        .eq("stato", "DaGiocare")
-        .gte("data_ora", nowIso)
-        .order("data_ora", { ascending: true })
-        .limit(1);
+  .from("partite")
+  .select(commonSelect)
+  .eq("stato", "DaGiocare")
+  .order("data_ora", { ascending: true })
+  .limit(1);
+
       if (future && future.length) nextData = future;
     }
 

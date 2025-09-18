@@ -4,6 +4,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
+import WeatherWidget from "../components/WeatherWidget";
 
 // ========================
 // Tipi
@@ -37,6 +38,9 @@ type SquadraLite = {
   id?: string;
   nome: string | null;
   logo_url: string | null;
+  mappa_url?: string | null;
+  nome_stadio?: string | null;
+  indirizzo?: string | null;
 };
 
 type PartitaLite = {
@@ -311,75 +315,94 @@ useEffect(() => {
   const [perTimeOspite, setPerTimeOspite] = useState<number[]>([0, 0, 0, 0]);
 
   useEffect(() => {
-    let mounted = true;
+  let mounted = true;
+  let ch: any = null;
 
-    const loadNextMatch = async () => {
-      setLoadingMatch(true);
-      const nowIso = new Date().toISOString();
+  const loadNextMatch = async () => {
+    setLoadingMatch(true);
 
-      const { data, error } = await supabase
+    let next: PartitaLite | null = null;
+
+    // 1) provo a prendere la partita InCorso
+    const { data: inCorso, error: errInCorso } = await supabase
+      .from("partite")
+      .select(`
+        id, data_ora, stato, campionato_torneo, squadra_casa_id, squadra_ospite_id, stagione_id,
+        goal_a, goal_b, goal_a1, goal_a2, goal_a3, goal_a4,
+        goal_b1, goal_b2, goal_b3, goal_b4,
+        squadra_casa:squadre!partite_squadra_casa_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo),
+squadra_ospite:squadre!partite_squadra_ospite_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo)
+      `)
+      .eq("stato", "InCorso")
+      .order("data_ora", { ascending: true })
+      .limit(1);
+
+    if (errInCorso) {
+      console.error("[HomePage] Errore partita InCorso:", errInCorso.message);
+    }
+
+    if (inCorso && inCorso.length) {
+      next = inCorso[0] as PartitaLite;
+    } else {
+      // 2) se non ci sono InCorso, prendo la prossima DaGiocare
+      const { data: future, error: errFuture } = await supabase
         .from("partite")
         .select(`
-    id, data_ora, stato, campionato_torneo, squadra_casa_id, squadra_ospite_id, stagione_id,
-    goal_a, goal_b, goal_a1, goal_a2, goal_a3, goal_a4,
-    goal_b1, goal_b2, goal_b3, goal_b4,
-    squadra_casa:squadre!partite_squadra_casa_id_fkey(id,nome,logo_url),
-    squadra_ospite:squadre!partite_squadra_ospite_id_fkey(id,nome,logo_url)
-  `)
-        .or("stato.eq.InCorso,stato.eq.DaGiocare")
-        .order("stato", { ascending: true })
+          id, data_ora, stato, campionato_torneo, squadra_casa_id, squadra_ospite_id, stagione_id,
+          goal_a, goal_b, goal_a1, goal_a2, goal_a3, goal_a4,
+          goal_b1, goal_b2, goal_b3, goal_b4,
+          squadra_casa:squadre!partite_squadra_casa_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo),
+squadra_ospite:squadre!partite_squadra_ospite_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo)
+        `)
+        .eq("stato", "DaGiocare")
         .order("data_ora", { ascending: true })
         .limit(1);
 
-      if (!mounted) return;
-
-      if (error) {
-        console.error("[HomePage] Errore prossima partita:", error.message);
-        setMatch(null);
-        setLoadingMatch(false);
-        return;
+      if (errFuture) {
+        console.error("[HomePage] Errore partita DaGiocare:", errFuture.message);
       }
 
-      const next = (data?.[0] as PartitaLite) || null;
-
-      if (next) {
-        setMatch(next);
-        setPerTimeCasa([next.goal_a1, next.goal_a2, next.goal_a3, next.goal_a4]);
-        setPerTimeOspite([next.goal_b1, next.goal_b2, next.goal_b3, next.goal_b4]);
-      } else {
-        setMatch(null);
+      if (future && future.length) {
+        next = future[0] as PartitaLite;
       }
-      setLoadingMatch(false);
+    }
 
-      // Sottoscrizione realtime
-      if (next) {
-        const ch = supabase
-          .channel(`partita-${next.id}`)
-          .on(
-            "postgres_changes",
-            { event: "UPDATE", schema: "public", table: "partite", filter: `id=eq.${next.id}` },
-            ({ new: upd }) => {
-              setMatch((prev) =>
-                prev && prev.id === upd.id ? { ...prev, ...upd } : prev
-              );
-              setPerTimeCasa([upd.goal_a1, upd.goal_a2, upd.goal_a3, upd.goal_a4]);
-              setPerTimeOspite([upd.goal_b1, upd.goal_b2, upd.goal_b3, upd.goal_b4]);
-            }
-          )
-          .subscribe();
+    if (!mounted) return;
 
-        return () => {
-          supabase.removeChannel(ch);
-        };
-      }
-    };
+    if (next) {
+      setMatch(next);
+      setPerTimeCasa([next.goal_a1, next.goal_a2, next.goal_a3, next.goal_a4]);
+      setPerTimeOspite([next.goal_b1, next.goal_b2, next.goal_b3, next.goal_b4]);
 
-    const cleanup = loadNextMatch();
-    return () => {
-      mounted = false;
-      if (cleanup && typeof cleanup === "function") cleanup();
-    };
-  }, []);
+      // 3) attivo sottoscrizione realtime su questa partita
+      ch = supabase
+        .channel(`partita-${next.id}`)
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "partite", filter: `id=eq.${next.id}` },
+          ({ new: upd }) => {
+            setMatch((prev) =>
+              prev && prev.id === upd.id ? { ...prev, ...upd } : prev
+            );
+            setPerTimeCasa([upd.goal_a1, upd.goal_a2, upd.goal_a3, upd.goal_a4]);
+            setPerTimeOspite([upd.goal_b1, upd.goal_b2, upd.goal_b3, upd.goal_b4]);
+          }
+        )
+        .subscribe();
+    } else {
+      setMatch(null);
+    }
+
+    setLoadingMatch(false);
+  };
+
+  loadNextMatch();
+
+  return () => {
+    mounted = false;
+    if (ch) supabase.removeChannel(ch);
+  };
+}, []);
 
   // carico i marcatori direttamente dalla view marcatori_alias
   useEffect(() => {
@@ -834,6 +857,8 @@ const fbPluginSrc = useMemo(() => {
     </div>
   )}
 </section>
+{/* METEO PREVISTO */}
+<WeatherWidget />
 
       {/* FACEBOOK – plugin ufficiale */}
 <section style={styles.card}>

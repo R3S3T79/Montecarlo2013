@@ -13,6 +13,7 @@ import { Menu, PlusCircle, Trash2, Edit2, Camera } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import { UserRole } from '../lib/roles';
+import { Star } from "lucide-react";
 // (presente nei tuoi import originali)
 import Step3_GuNumeroSquadre from '../pages/tornei/NuovoTorneo/Step3_GuNumeroSquadre';
 
@@ -246,16 +247,22 @@ const canCreator = role === UserRole.Creator;
           <Menu size={24} />
         </button>
 
-        {/* Stella solo su dettaglio partita */}
-        {matchDetail && (
-          <button
-            onClick={() => navigate(`/partita/${matchDetail.params.id}/votazioni`)}
-            aria-label="Vota Giocatori"
-            className="mr-3 hover:scale-110 transition"
-          >
-            ⭐
-          </button>
-        )}
+ {/* Stelle su dettaglio partita */}
+{matchDetail && (
+  <>
+    {/* Stella dorata piena */}
+    <button
+      onClick={() => navigate(`/partita/${matchDetail.params.id}/votazioni`)}
+      aria-label="Vota Giocatori"
+      className="mr-3 hover:scale-110 transition"
+    >
+      <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+    </button>
+  </>
+)}
+
+
+
 
         {/* Titolo pagina */}
         <div className="flex-1 flex justify-center items-center relative">
