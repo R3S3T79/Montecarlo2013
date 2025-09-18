@@ -113,12 +113,17 @@ export default function Step8_FaseGironi() {
     return <p className="text-center text-white py-6">Caricamento in corso…</p>;
   }
 
-  // etichette
-  const labelMap: Record<number, string> = {
-    1: "Finale 1°/2° Posto",
-    2: "Finale 3°/4° Posto",
-    3: "Finale 5°/6° Posto",
-  };
+  // genera etichette dinamiche in base al numero di match
+const labelMap: Record<number, string> = {};
+elimMatches.forEach((m, idx) => {
+  const start = idx * 2 + 1;
+  const end = start + 1;
+  if (start === 1) {
+    labelMap[m.match_number] = `Finale ${start}°/${end}° Posto`;
+  } else {
+    labelMap[m.match_number] = `Finale ${start}°/${end}° Posto`;
+  }
+});
 
   const formatScore = (m: PartitaRaw) => {
     if (!m.giocata) return "VS";

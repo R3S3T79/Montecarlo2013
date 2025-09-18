@@ -362,19 +362,20 @@ export default function Convocazioni() {
         </div>
 
         <div className="competizione-box mt-2 export-only text-center">
-  <div className="font-bold">{competizione}</div>
-  <div className="mt-4">{nomeTorneo}</div>
+  <div className="font-bold text-xl uppercase">{competizione}</div>
+  <div className="mt-4 text-lg uppercase">{nomeTorneo}</div>
 
   {competizione === "Torneo" && squadreAvversarie.length > 1 && (
     <div className="mt-2 text-sm">
       <ul className="list-none space-y-1">
         {squadreAvversarie.map((sq, i) => (
-          <li key={i}>{sq}</li>
+          <li key={i} className="uppercase">{sq}</li>
         ))}
       </ul>
     </div>
   )}
 </div>
+
 
         {/* Staff */}
         <div className="convocazioni-section">

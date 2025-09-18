@@ -170,119 +170,127 @@ export default function Step6_FaseGironi() {
     });
   };
 
-  // ✅ Fix: gli utenti "user" possono avanzare solo navigando (senza modifiche)
-  const handleNextPhase = async () => {
-    if (!torneoId) return;
+  // ✅ Funzione aggiornata con logica dinamica
+const handleNextPhase = async () => {
+  if (!torneoId) return;
 
-    // READ-ONLY: nessuna scrittura, solo decide dove andare
-    if (!canEdit) {
-      // se esiste una fase eliminazione registrata → step8, altrimenti step7
-      const { data: elim, error: elimErr } = await supabase
-        .from("fasi_torneo")
-        .select("id")
-        .eq("torneo_id", torneoId)
-        .eq("tipo_fase", "eliminazione")
-        .maybeSingle();
-
-      if (!elimErr && elim?.id) {
-        navigate(`/tornei/nuovo/step8-fasegironi/${torneoId}`);
-      } else {
-        navigate(`/tornei/nuovo/step7-fasegironi/${torneoId}`, {
-          state: { formulaType: "gironi" as const },
-        });
-      }
-      return;
-    }
-
-    // EDITOR/ADMIN: logica esistente
-    setSavingFormula(true);
-
-    const { data: existing } = await supabase
+  // READ-ONLY: nessuna scrittura, solo decide dove andare
+  if (!canEdit) {
+    const { data: elim, error: elimErr } = await supabase
       .from("fasi_torneo")
       .select("id")
       .eq("torneo_id", torneoId)
       .eq("tipo_fase", "eliminazione")
       .maybeSingle();
 
-    let elimPhaseId: string;
-    const payload = {
-      torneo_id: torneoId,
-      tipo_fase: "eliminazione",
-      formula_tipo: formulaType,
-    };
-
-    if (existing?.id) {
-      await supabase.from("fasi_torneo").update(payload).eq("id", existing.id);
-      elimPhaseId = existing.id;
-    } else {
-      const { data: ins } = await supabase
-        .from("fasi_torneo")
-        .insert(payload)
-        .select("id")
-        .single();
-      elimPhaseId = ins!.id;
-    }
-
-    if (formulaType === "eliminazione") {
-      const byGroup: Record<string, { id: string; pts: number }[]> = {};
-      partite.forEach((m) => {
-        const gir = m.girone;
-        byGroup[gir] = byGroup[gir] || [];
-        const cid = m.squadra_casa?.id;
-        const oid = m.squadra_ospite?.id;
-        [cid, oid].forEach((id) => {
-          if (!id) return;
-          if (!byGroup[gir].some((x) => x.id === id)) byGroup[gir].push({ id, pts: 0 });
-        });
-        if (!m.giocata || !cid || !oid) return;
-        if (m.gol_casa! > m.gol_ospite!) byGroup[gir].find(x => x.id === cid)!.pts += 3;
-        else if (m.gol_ospite! > m.gol_casa!) byGroup[gir].find(x => x.id === oid)!.pts += 3;
-        else if (m.rigori_vincitore) byGroup[gir].find(x => x.id === m.rigori_vincitore)!.pts += 3;
-        else {
-          byGroup[gir].find(x => x.id === cid)!.pts += 1;
-          byGroup[gir].find(x => x.id === oid)!.pts += 1;
-        }
-      });
-
-      const groups = Object.values(byGroup);
-      if (groups.length < 2 || !groups[0]?.length || !groups[1]?.length) {
-        alert("Gironi incompleti per generare gli scontri diretti.");
-        setSavingFormula(false);
-        return;
-      }
-
-      const topA = [...groups[0]].sort((a, b) => b.pts - a.pts).slice(0, 3);
-      const topB = [...groups[1]].sort((a, b) => b.pts - a.pts).slice(0, 3);
-      const pairCount = Math.min(topA.length, topB.length);
-      if (pairCount === 0) {
-        alert("Nessuna squadra qualificata.");
-        setSavingFormula(false);
-        return;
-      }
-
-      const toInsert = Array.from({ length: pairCount }, (_, i) => ({
-        torneo_id: torneoId,
-        fase_id: elimPhaseId,
-        girone: "eliminazione",
-        match_number: i + 1,
-        squadra_casa: topA[i].id,
-        squadra_ospite: topB[i].id,
-      }));
-      await supabase.from("tornei_fasegironi").upsert(toInsert, {
-        onConflict: "torneo_id,fase_id,girone,match_number",
-        ignoreDuplicates: true,
-      });
-
-      setSavingFormula(false);
+    if (!elimErr && elim?.id) {
       navigate(`/tornei/nuovo/step8-fasegironi/${torneoId}`);
+    } else {
+      navigate(`/tornei/nuovo/step7-fasegironi/${torneoId}`, {
+        state: { formulaType: "gironi" as const },
+      });
+    }
+    return;
+  }
+
+  // EDITOR/ADMIN: logica esistente
+  setSavingFormula(true);
+
+  const { data: existing } = await supabase
+    .from("fasi_torneo")
+    .select("id")
+    .eq("torneo_id", torneoId)
+    .eq("tipo_fase", "eliminazione")
+    .maybeSingle();
+
+  let elimPhaseId: string;
+  const payload = {
+    torneo_id: torneoId,
+    tipo_fase: "eliminazione",
+    formula_tipo: formulaType,
+  };
+
+  if (existing?.id) {
+    await supabase.from("fasi_torneo").update(payload).eq("id", existing.id);
+    elimPhaseId = existing.id;
+  } else {
+    const { data: ins } = await supabase
+      .from("fasi_torneo")
+      .insert(payload)
+      .select("id")
+      .single();
+    elimPhaseId = ins!.id;
+  }
+
+  // 🔑 Creazione match eliminazione dinamica
+  if (formulaType === "eliminazione") {
+    const byGroup: Record<string, { id: string; pts: number }[]> = {};
+
+    // raccolta squadre e punti
+    partite.forEach((m) => {
+      const gir = m.girone;
+      byGroup[gir] = byGroup[gir] || [];
+      const cid = m.squadra_casa?.id;
+      const oid = m.squadra_ospite?.id;
+      [cid, oid].forEach((id) => {
+        if (!id) return;
+        if (!byGroup[gir].some((x) => x.id === id)) byGroup[gir].push({ id, pts: 0 });
+      });
+      if (!m.giocata || !cid || !oid) return;
+      if (m.gol_casa! > m.gol_ospite!) byGroup[gir].find(x => x.id === cid)!.pts += 3;
+      else if (m.gol_ospite! > m.gol_casa!) byGroup[gir].find(x => x.id === oid)!.pts += 3;
+      else if (m.rigori_vincitore) byGroup[gir].find(x => x.id === m.rigori_vincitore)!.pts += 3;
+      else {
+        byGroup[gir].find(x => x.id === cid)!.pts += 1;
+        byGroup[gir].find(x => x.id === oid)!.pts += 1;
+      }
+    });
+
+    const groups = Object.values(byGroup);
+    if (groups.length < 2 || !groups[0]?.length || !groups[1]?.length) {
+      alert("Gironi incompleti per generare gli scontri diretti.");
+      setSavingFormula(false);
       return;
     }
 
-    setSavingFormula(false);
-    navigate(`/tornei/nuovo/step7-fasegironi/${torneoId}`, {
-      state: { formulaType },
+    // 🔥 Dinamico: prendo TUTTE le squadre dei gironi (non solo le prime 3)
+    const topA = [...groups[0]].sort((a, b) => b.pts - a.pts);
+    const topB = [...groups[1]].sort((a, b) => b.pts - a.pts);
+
+    // creo coppie in base al numero più piccolo
+    const pairCount = Math.min(topA.length, topB.length);
+    if (pairCount === 0) {
+      alert("Nessuna squadra qualificata.");
+      setSavingFormula(false);
+      return;
+    }
+
+    // costruisco i match in automatico
+    const toInsert = Array.from({ length: pairCount }, (_, i) => ({
+      torneo_id: torneoId,
+      fase_id: elimPhaseId,
+      girone: "eliminazione",
+      match_number: i + 1,
+      squadra_casa: topA[i].id,
+      squadra_ospite: topB[i].id,
+    }));
+
+    await supabase.from("tornei_fasegironi").upsert(toInsert, {
+      onConflict: "torneo_id,fase_id,girone,match_number",
+      ignoreDuplicates: true,
     });
-  };
+
+    setSavingFormula(false);
+    navigate(`/tornei/nuovo/step8-fasegironi/${torneoId}`);
+    return;
+  }
+
+  setSavingFormula(false);
+  navigate(`/tornei/nuovo/step7-fasegironi/${torneoId}`, {
+    state: { formulaType },
+  });
+};
+
 
   if (authLoading || loading) {
     return <p className="text-center text-white py-6">Caricamento in corso…</p>;
