@@ -305,7 +305,7 @@ export default function Convocazioni() {
       <div id="convocazione" className="bg-white font-serif text-[14pt] p-6">
         {/* Header loghi */}
         <div className="convocazioni-header">
-          <img src="/Montecarlos.png" alt="logo Montecarlo" className="logo-montecarlo" />
+          <img src="/montecarlo.png" alt="logo Montecarlo" className="logo-montecarlo" />
           <div className="logo-genoa-wrapper text-center">
             <img src="/genoa.png" alt="logo Genoa" className="logo-genoa" />
             <div>SCUOLA CALCIO AFFILIATA</div>
@@ -317,7 +317,7 @@ export default function Convocazioni() {
           <tbody>
             <tr>
               <td>
-  <span className="font-bold">PARTITA VS.</span>
+  <span>PARTITA VS.</span>
   <span className="campo-compilato campo-medio">
     {competizione === "Torneo" && squadreAvversarie.length > 1
       ? "—" // mostriamo solo un trattino se più squadre
@@ -325,21 +325,21 @@ export default function Convocazioni() {
   </span>
 </td>
               <td>
-                <span className="font-bold">DATA</span>
-                <span className="campo-compilato campo-corto">{formattaData(data)}</span>
-              </td>
+  <span>DATA</span>
+  <span className="campo-compilato campo-corto">{formattaData(data)}</span>
+</td>
               <td>
-                <span className="font-bold">ORA</span>
+                <span>ORA</span>
                 <span className="campo-compilato campo-corto">{oraPartita}</span>
               </td>
             </tr>
             <tr>
               <td>
-                <span className="font-bold">RITROVO</span>
+                <span>RITROVO</span>
                 <span className="campo-compilato campo-lungo">{ritrovoLuogo}</span>
               </td>
               <td>
-                <span className="font-bold">ORA RITROVO</span>
+                <span>ORA RITROVO</span>
                 <span className="campo-compilato campo-corto">{oraRitrovo}</span>
               </td>
               <td></td>
@@ -378,17 +378,17 @@ export default function Convocazioni() {
 
 
         {/* Staff */}
-        <div className="convocazioni-section">
-          <div>
-            <strong>ALLENATORE:</strong> {allenatore}
-          </div>
-          <div>
-            <strong>COLLABORATORE:</strong> {collaboratore}
-          </div>
-          <div>
-            <strong>ACCOMPAGNATORI:</strong> {accompagnatori.join(", ")}
-          </div>
-        </div>
+<div className="convocazioni-section">
+  <div>
+    <span>ALLENATORE:</span> {allenatore}
+  </div>
+  <div>
+    <span>COLLABORATORE:</span> {collaboratore}
+  </div>
+  <div>
+    <span>ACCOMPAGNATORI:</span> {accompagnatori.join(", ")}
+  </div>
+</div>
 
         {/* Footer */}
         <div className="convocazioni-footer">
