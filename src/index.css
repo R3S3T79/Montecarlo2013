@@ -109,6 +109,7 @@ html, body, #root {
   box-sizing: border-box;
   flex-direction: column;
   position: relative;
+  text-transform: uppercase;  /* <--- TUTTO MAIUSCOLO */
 }
 
 /* ==== Header con loghi ==== */
@@ -136,14 +137,16 @@ html, body, #root {
 }
 
 .logo-genoa-wrapper .logo-genoa {
-  height: 60px;               
+  height: 80px;               
   object-fit: contain;
 }
 
 .logo-genoa-wrapper div {
   margin-top: 6px;
-  font-size: 8pt;             
+  font-size: 7pt;        /* leggermente più piccolo */
   font-weight: bold;
+  color: red;            /* rosso */
+  white-space: nowrap;   /* sempre su una riga */
 }
 
 /* ==== Tabella dati partita / ritrovo ==== */
@@ -160,28 +163,37 @@ html, body, #root {
   vertical-align: top;
 }
 
-.convocati-list li {
-  margin: 2px 0;
+/* ==== Convocati ==== */
+.convocati-list ul {
+  padding: 0;
+  margin: 12px 0 0 0; /* 6px sopra, 0 ai lati e sotto */
+}
+
+
+.convocati-list ul li {
+  margin: 0 0 2px 0;  /* 6px sotto ogni nome */
+  line-height: 1.3;   /* più respiro verticale */
   font-size: 13pt;
+  list-style: none;
 }
 
-.convocati-list li span {
+.convocati-list ul li span {
   position: relative;
-  display: inline-block; /* così la larghezza segue solo il testo */
+  display: inline-block;
 }
 
-.convocati-list li.line-through span::after {
+.convocati-list ul li.line-through span::after {
   content: "";
   position: absolute;
   left: 0;
   right: 0;
-  top: 90%;              /* invece di 50% */
-  transform: translateY(-50%); /* mantiene centrato */
-  height: 4px;
+  top: 85%;                 /* centrato meglio */
+  transform: translateY(-50%);
+  height: 4px;              /* riga più sottile */
   background: black;
 }
 
-/* Campi compilati (per squadra, luogo, ora ecc.) */
+/* ==== Campi compilati (per squadra, luogo, ora ecc.) ==== */
 .campo-compilato {
   display: inline-block;
   border-bottom: 1px solid black;
@@ -191,7 +203,7 @@ html, body, #root {
   text-align: left;
   width: auto;         
   min-width: unset;    
-  padding-right: 20px; /* <-- margine extra per scrivere a mano */
+  padding-right: 20px; /* margine extra per scrivere a mano */
 }
 
 /* Varianti per lunghezze diverse */
@@ -202,17 +214,24 @@ html, body, #root {
 /* ==== Competizione centrata in pagina ==== */
 .competizione-box {
   position: absolute;
-  left: 50%;
+  left: 70%;
   top: 50%;
   transform: translate(-50%, -50%);
-  text-align: center;   /* <-- da right a center */
+  text-align: center;   
   font-size: 14pt;
 }
+
+
 
 /* ==== Staff & Footer ==== */
 .convocazioni-section {
   margin-top: 2rem;
   font-size: 13pt;
+}
+
+.convocazioni-section > div {
+  margin-bottom: 16px;  /* spazio minimo tra righe staff */
+  line-height: 1.1;
 }
 
 .convocazioni-footer {
