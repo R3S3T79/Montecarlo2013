@@ -86,20 +86,34 @@ export default function StatisticheGiocatori(): JSX.Element {
           .select('giocatore_id, role, media_voto')
           .eq('stagione_id', stagioneSelezionata);
 
-        const medieMap: Record<string, { utenti: number; mister: number }> = {};
+        // raccogliamo tutti i voti per giocatore/ruolo
+const raccolta: Record<string, { utenti: number[]; mister: number[] }> = {};
 
-        if (!vErr && voti) {
-          voti.forEach((v: any) => {
-            if (!medieMap[v.giocatore_id]) {
-              medieMap[v.giocatore_id] = { utenti: 0, mister: 0 };
-            }
-            if (v.role === 'mister') {
-              medieMap[v.giocatore_id].mister = Number(v.media_voto) || 0;
-            } else {
-              medieMap[v.giocatore_id].utenti = Number(v.media_voto) || 0;
-            }
-          });
-        }
+if (!vErr && voti) {
+  voti.forEach((v: any) => {
+    if (!raccolta[v.giocatore_id]) {
+      raccolta[v.giocatore_id] = { utenti: [], mister: [] };
+    }
+    if (v.role === 'mister') {
+      raccolta[v.giocatore_id].mister.push(Number(v.media_voto));
+    } else {
+      raccolta[v.giocatore_id].utenti.push(Number(v.media_voto));
+    }
+  });
+}
+
+// calcoliamo le medie vere
+const medieMap: Record<string, { utenti: number; mister: number }> = {};
+Object.entries(raccolta).forEach(([gid, obj]) => {
+  const mediaUtenti = obj.utenti.length
+    ? obj.utenti.reduce((a, b) => a + b, 0) / obj.utenti.length
+    : 0;
+  const mediaMister = obj.mister.length
+    ? obj.mister.reduce((a, b) => a + b, 0) / obj.mister.length
+    : 0;
+  medieMap[gid] = { utenti: mediaUtenti, mister: mediaMister };
+});
+
 
         // 3) Mappiamo dati finali
         const mapped: Statistica[] = data.map((r: any) => {
