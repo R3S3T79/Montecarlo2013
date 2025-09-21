@@ -67,40 +67,41 @@ export default function EditFaseGironiPartita() {
   const isDraw = scoreCasa === scoreOspite;
 
   const handleSaveAll = async () => {
-    if (!partita || !matchId) return;
-    setSaving(true);
-    const updates = {
-      gol_casa: scoreCasa,
-      gol_ospite: scoreOspite,
-      rigori_vincitore: isDraw ? rigoriVincitore : null,
-      data_match: dataOra ? new Date(dataOra).toISOString() : null,
-      giocata: true,              // ← sempre true
-      updated_at: new Date().toISOString(),
-    };
-    const { error } = await supabase
-      .from('tornei_fasegironi')
-      .update(updates)
-      .eq('id', matchId);
-    setSaving(false);
-    if (error) alert('Errore salvataggio: ' + error.message);
-    else navigate(-1);
+  if (!partita || !matchId) return;
+  setSaving(true);
+  const updates = {
+    gol_casa: scoreCasa,
+    gol_ospite: scoreOspite,
+    rigori_vincitore: isDraw ? rigoriVincitore : null,
+    data_match: dataOra || null,   // 🔑 salva diretto, senza new Date
+    giocata: true,
+    updated_at: new Date().toISOString(),
   };
+  const { error } = await supabase
+    .from('tornei_fasegironi')
+    .update(updates)
+    .eq('id', matchId);
+  setSaving(false);
+  if (error) alert('Errore salvataggio: ' + error.message);
+  else navigate(-1);
+};
 
-  const handleSaveDateOnly = async () => {
-    if (!partita || !matchId) return;
-    setSaving(true);
-    const { error } = await supabase
-      .from('tornei_fasegironi')
-      .update({
-        data_match: dataOra ? new Date(dataOra).toISOString() : null,
-        giocata: true,            // ← sempre true
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', matchId);
-    setSaving(false);
-    if (error) alert('Errore salvataggio data: ' + error.message);
-    else navigate(-1);
-  };
+const handleSaveDateOnly = async () => {
+  if (!partita || !matchId) return;
+  setSaving(true);
+  const { error } = await supabase
+    .from('tornei_fasegironi')
+    .update({
+      data_match: dataOra || null,  // 🔑 idem qui
+      giocata: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', matchId);
+  setSaving(false);
+  if (error) alert('Errore salvataggio data: ' + error.message);
+  else navigate(-1);
+};
+
 
   if (loading) return <p className="text-center py-6">Caricamento…</p>;
   if (!partita) {

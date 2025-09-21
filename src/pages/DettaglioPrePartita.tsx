@@ -260,15 +260,13 @@ export default function DettaglioPrePartita(): JSX.Element {
                       <div className="flex justify-center items-center gap-2 text-base text-gray-800 font-medium">
                         <span>{p.squadra_casa}</span>
                         <span>
-                          {(p.goal_montecarlo_1 || 0) +
-                            (p.goal_montecarlo_2 || 0) +
-                            (p.goal_montecarlo_3 || 0) +
-                            (p.goal_montecarlo_4 || 0)}
-                          -
-                          {(p.goal_avversaria_1 || 0) +
-                            (p.goal_avversaria_2 || 0) +
-                            (p.goal_avversaria_3 || 0) +
-                            (p.goal_avversaria_4 || 0)}
+                          <span>
+  {(p.squadra_casa === 'Montecarlo' ? p.goal_montecarlo_tot : p.goal_avversaria_tot) ?? 0}
+  -
+  {(p.squadra_ospite === 'Montecarlo' ? p.goal_montecarlo_tot : p.goal_avversaria_tot) ?? 0}
+</span>
+
+
                         </span>
                         <span>{p.squadra_ospite}</span>
                       </div>

@@ -204,21 +204,19 @@ export default function VotazioniPartita(): JSX.Element {
   };
 
   const onSalva = async () => {
-    if (!partitaId || !user) return;
-    if (!tuttiVotati) {
-      setErrore("Devi votare tutti i convocati (voto 4–10).");
-      return;
-    }
+    
     setErrore(null);
     setSalvando(true);
 
     try {
-      const payload = convocati.map((g) => ({
-        partita_id: partitaId,
-        giocatore_id: g.giocatore_uid,
-        user_id: user.id,
-        voto: voti[g.giocatore_uid],
-      }));
+      const payload = convocati
+  .filter((g) => typeof voti[g.giocatore_uid] === "number")
+  .map((g) => ({
+    partita_id: partitaId,
+    giocatore_id: g.giocatore_uid,
+    user_id: user.id,
+    voto: voti[g.giocatore_uid]!,
+  }));
 
       const { error } = await supabase.from("voti_giocatori").upsert(payload, {
         onConflict: "partita_id,giocatore_id,user_id",
@@ -348,7 +346,7 @@ export default function VotazioniPartita(): JSX.Element {
               </button>
               <button
                 onClick={onSalva}
-                disabled={salvando || votoDisabilitato || !tuttiVotati}
+                disabled={salvando || votoDisabilitato}
                 className={`px-4 py-2 rounded text-white text-sm font-semibold ${
                   salvando || votoDisabilitato || !tuttiVotati
                     ? "bg-gray-400 cursor-not-allowed"

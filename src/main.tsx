@@ -17,11 +17,12 @@ ReactDOM.createRoot(
 
 // ===============================
 // Registrazione Service Worker
+// Solo in produzione
 // ===============================
-if ("serviceWorker" in navigator) {
+if (import.meta.env.MODE === "production" && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/service-worker.js")
+      .register("/sw.js") // il tuo file sta in public/sw.js
       .then(() => console.log("✅ Service Worker registrato"))
       .catch((err) => console.error("❌ Errore registrazione SW:", err));
   });

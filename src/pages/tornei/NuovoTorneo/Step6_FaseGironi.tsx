@@ -86,29 +86,44 @@ export default function Step6_FaseGironi() {
       });
   }, [torneoId]);
 
-  // 3) partite
-  useEffect(() => {
-    if (!torneoId || !groupPhaseId) return;
-    setLoading(true);
-    supabase
-      .from<Partita>("tornei_fasegironi")
-      .select(`
-        id,girone,match_number,
-        gol_casa,gol_ospite,rigori_vincitore,
-        data_match,giocata,
-        squadra_casa(id,nome,logo_url),
-        squadra_ospite(id,nome,logo_url)
-      `)
-      .eq("torneo_id", torneoId)
-      .eq("fase_id", groupPhaseId)
-      .order("girone", { ascending: true })
-      .order("match_number", { ascending: true })
-      .then(({ data, error }) => {
-        if (error) console.error("Errore fetch partite:", error);
-        else setPartite(data || []);
-        setLoading(false);
-      });
-  }, [torneoId, groupPhaseId]);
+  // 3) partite con fix orario locale
+useEffect(() => {
+  if (!torneoId || !groupPhaseId) return;
+  setLoading(true);
+  supabase
+    .from<Partita>("tornei_fasegironi")
+    .select(`
+      id,girone,match_number,
+      gol_casa,gol_ospite,rigori_vincitore,
+      data_match,giocata,
+      squadra_casa(id,nome,logo_url),
+      squadra_ospite(id,nome,logo_url)
+    `)
+    .eq("torneo_id", torneoId)
+    .eq("fase_id", groupPhaseId)
+    .order("girone", { ascending: true })
+    .order("data_match", { ascending: true })
+    .then(({ data, error }) => {
+      if (error) {
+        console.error("Errore fetch partite:", error);
+      } else {
+        const adjusted = (data || []).map((m) => {
+          return m.data_match
+            ? {
+                ...m,
+                // 🔑 Converto in Europe/Rome locale
+                data_match: new Date(m.data_match).toLocaleString("sv-SE", {
+                  timeZone: "Europe/Rome",
+                }),
+              }
+            : m;
+        });
+        setPartite(adjusted);
+      }
+      setLoading(false);
+    });
+}, [torneoId, groupPhaseId]);
+
 
   // raggruppo per girone
   const partitePerGirone = useMemo(() => {
@@ -170,7 +185,7 @@ export default function Step6_FaseGironi() {
     });
   };
 
-  // ✅ Funzione aggiornata con logica dinamica
+  // ✅ Funzione aggiornata con cancellazione e rigenerazione accoppiamenti
 const handleNextPhase = async () => {
   if (!torneoId) return;
 
@@ -193,9 +208,9 @@ const handleNextPhase = async () => {
     return;
   }
 
-  // EDITOR/ADMIN: logica esistente
   setSavingFormula(true);
 
+  // cerca o crea fase eliminazione
   const { data: existing } = await supabase
     .from("fasi_torneo")
     .select("id")
@@ -222,7 +237,7 @@ const handleNextPhase = async () => {
     elimPhaseId = ins!.id;
   }
 
-  // 🔑 Creazione match eliminazione dinamica
+  // 🔑 Se la formula è eliminazione → rigenera gli accoppiamenti
   if (formulaType === "eliminazione") {
     const byGroup: Record<string, { id: string; pts: number }[]> = {};
 
@@ -253,11 +268,10 @@ const handleNextPhase = async () => {
       return;
     }
 
-    // 🔥 Dinamico: prendo TUTTE le squadre dei gironi (non solo le prime 3)
+    // ordino i gruppi
     const topA = [...groups[0]].sort((a, b) => b.pts - a.pts);
     const topB = [...groups[1]].sort((a, b) => b.pts - a.pts);
 
-    // creo coppie in base al numero più piccolo
     const pairCount = Math.min(topA.length, topB.length);
     if (pairCount === 0) {
       alert("Nessuna squadra qualificata.");
@@ -265,7 +279,15 @@ const handleNextPhase = async () => {
       return;
     }
 
-    // costruisco i match in automatico
+    // 🔥 elimina accoppiamenti vecchi
+    await supabase
+      .from("tornei_fasegironi")
+      .delete()
+      .eq("torneo_id", torneoId)
+      .eq("fase_id", elimPhaseId)
+      .eq("girone", "eliminazione");
+
+    // costruisci i nuovi match
     const toInsert = Array.from({ length: pairCount }, (_, i) => ({
       torneo_id: torneoId,
       fase_id: elimPhaseId,
@@ -275,10 +297,7 @@ const handleNextPhase = async () => {
       squadra_ospite: topB[i].id,
     }));
 
-    await supabase.from("tornei_fasegironi").upsert(toInsert, {
-      onConflict: "torneo_id,fase_id,girone,match_number",
-      ignoreDuplicates: true,
-    });
+    await supabase.from("tornei_fasegironi").insert(toInsert);
 
     setSavingFormula(false);
     navigate(`/tornei/nuovo/step8-fasegironi/${torneoId}`);
@@ -290,6 +309,7 @@ const handleNextPhase = async () => {
     state: { formulaType },
   });
 };
+
 
 
   if (authLoading || loading) {
