@@ -80,26 +80,25 @@ export default function StatisticheGiocatori(): JSX.Element {
           return;
         }
 
-        // 2) Medie voti utenti + mister
-        const { data: voti, error: vErr } = await supabase
-          .from('voti_giocatori_dettaglio')
-          .select('giocatore_id, role, media_voto')
-          .eq('stagione_id', stagioneSelezionata);
+        // 2) Medie voti utenti + mister (media stagionale già calcolata nella vista)
+const { data: voti, error: vErr } = await supabase
+  .from('voti_giocatori_media')
+  .select('giocatore_uid, media_voto_utenti, media_voto_mister')
+  .eq('stagione_id', stagioneSelezionata);
 
-        const medieMap: Record<string, { utenti: number; mister: number }> = {};
+const medieMap: Record<string, { utenti: number; mister: number }> = {};
 
-        if (!vErr && voti) {
-          voti.forEach((v: any) => {
-            if (!medieMap[v.giocatore_id]) {
-              medieMap[v.giocatore_id] = { utenti: 0, mister: 0 };
-            }
-            if (v.role === 'mister') {
-              medieMap[v.giocatore_id].mister = Number(v.media_voto) || 0;
-            } else {
-              medieMap[v.giocatore_id].utenti = Number(v.media_voto) || 0;
-            }
-          });
-        }
+if (!vErr && voti) {
+  voti.forEach((v: any) => {
+    medieMap[v.giocatore_uid] = {
+      utenti: v.media_voto_utenti !== null ? Number(v.media_voto_utenti) : 0,
+      mister: v.media_voto_mister !== null ? Number(v.media_voto_mister) : 0,
+    };
+  });
+}
+
+
+
 
         // 3) Mappiamo dati finali
         const mapped: Statistica[] = data.map((r: any) => {

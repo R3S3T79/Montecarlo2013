@@ -1,5 +1,5 @@
 // src/pages/DettaglioGiocatore.tsx
-// Data creazione chat: 14/08/2025 (rev: aggiunto campo Goal Subiti per portieri)
+// Data creazione chat: 14/08/2025 (rev: aggiunto campo Goal Subiti per portieri + medie voti utenti/mister)
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -22,6 +22,8 @@ interface StatisticheGiocatore {
   goalTotali: number;
   presenzeTotali: number;
   goalSubiti?: number;
+  mediaVotoUtenti?: number;
+  mediaVotoMister?: number;
 }
 
 interface Stagione {
@@ -40,6 +42,8 @@ export default function DettaglioGiocatore() {
     goalTotali: 0,
     presenzeTotali: 0,
     goalSubiti: 0,
+    mediaVotoUtenti: 0,
+    mediaVotoMister: 0,
   });
   const [stagioniDisponibili, setStagioniDisponibili] = useState<Stagione[]>([]);
   const [stagioneSelezionata, setStagioneSelezionata] = useState<string>('');
@@ -69,22 +73,29 @@ export default function DettaglioGiocatore() {
   }, [id]);
 
   const fetchStatistiche = async (giocatoreUid: string, stagioneId: string) => {
-    const { data } = await supabase
+    // Statistiche base
+    const { data: stats } = await supabase
       .from('v_stat_giocatore_stagione')
       .select('goal_totali, presenze_totali, goal_subiti')
       .eq('giocatore_uid', giocatoreUid)
       .eq('stagione_id', stagioneId)
       .maybeSingle();
 
-    if (data) {
-      setStatistiche({
-        goalTotali: data.goal_totali || 0,
-        presenzeTotali: data.presenze_totali || 0,
-        goalSubiti: data.goal_subiti || 0,
-      });
-    } else {
-      setStatistiche({ goalTotali: 0, presenzeTotali: 0, goalSubiti: 0 });
-    }
+    // Medie voti utenti/mister
+    const { data: voti } = await supabase
+      .from('voti_giocatori_media')
+      .select('media_voto_utenti, media_voto_mister')
+      .eq('giocatore_uid', giocatoreUid)
+      .eq('stagione_id', stagioneId)
+      .maybeSingle();
+
+    setStatistiche({
+      goalTotali: stats?.goal_totali || 0,
+      presenzeTotali: stats?.presenze_totali || 0,
+      goalSubiti: stats?.goal_subiti || 0,
+      mediaVotoUtenti: voti?.media_voto_utenti || 0,
+      mediaVotoMister: voti?.media_voto_mister || 0,
+    });
   };
 
   const fetchGiocatore = async (stagioneId: string) => {
@@ -240,6 +251,23 @@ export default function DettaglioGiocatore() {
                 <div className="text-sm text-black">Goal Subiti</div>
               </div>
             )}
+          </div>
+
+          {/* 🔹 Medie Voti Utenti + Mister */}
+          <div className="flex space-x-8 mb-6">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-500">
+                {statistiche.mediaVotoUtenti?.toFixed(2) ?? "0.00"}
+              </div>
+              <div className="text-sm text-black">Media Voti Utenti</div>
+            </div>
+
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-500">
+                {statistiche.mediaVotoMister?.toFixed(2) ?? "0.00"}
+              </div>
+              <div className="text-sm text-black">Media Voti Mister</div>
+            </div>
           </div>
 
           <div className="w-full max-w-md space-y-4">
