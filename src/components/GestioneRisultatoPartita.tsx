@@ -1,8 +1,10 @@
+// src/components/GestioneRisultatoPartita.tsx
+// Data creazione: 18/08/2025 (rev: aggiunta gestione goal subiti portieri + squadra_segnante_id)
+
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import TimerCircolare from "./TimerCircolare";
-import { Repeat } from "lucide-react";
 
 interface TimerState {
   partita_id: string;
@@ -25,18 +27,8 @@ export default function GestioneRisultatoPartita() {
     { id: string; nome: string | null; cognome: string | null; ruolo?: string | null; giocatore_uid?: string }[]
   >([]);
   const [convocati, setConvocati] = useState<string[]>([]);
-  const [inCampo, setInCampo] = useState<string[]>([]);   // giocatori titolari in campo
-  const [titolari, setTitolari] = useState<string[]>([]);
 
   const [formazioneAperta, setFormazioneAperta] = useState(false);
-  const [sostituzioniAperte, setSostituzioniAperte] = useState(false);
-  const [sostituzioneAttiva, setSostituzioneAttiva] = useState<string | null>(null);
-
-  // minuti giocati: intervalli entrata/uscita
-  const [minutiDettaglio, setMinutiDettaglio] = useState<
-    Record<string, { entrata_min: number; uscita_min: number | null }[]>
-  >({});
-
   const [goalCasa, setGoalCasa] = useState([0, 0, 0, 0]);
   const [goalOspite, setGoalOspite] = useState([0, 0, 0, 0]);
   const [tempo, setTempo] = useState<number | null>(null);
@@ -58,72 +50,10 @@ export default function GestioneRisultatoPartita() {
   const [timerState, setTimerState] = useState<TimerState | null>(null);
   const [elapsed, setElapsed] = useState(0);
 
-  // =====================
-// FUNZIONI MINUTI
-// =====================
-const caricaMinutiGiocati = async () => {
-  if (!partita) return;
-  const { data, error } = await supabase
-    .from("minuti_giocati")
-    .select("giocatore_stagione_id, entrata_min, uscita_min")
-    .eq("partita_id", partita.id);
+  const totale = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
 
-  if (!error && data) {
-    const map: Record<string, { entrata_min: number; uscita_min: number | null }[]> = {};
-    data.forEach((row) => {
-      if (!map[row.giocatore_stagione_id]) map[row.giocatore_stagione_id] = [];
-      map[row.giocatore_stagione_id].push({
-        entrata_min: row.entrata_min,
-        uscita_min: row.uscita_min,
-      });
-    });
-    setMinutiDettaglio(map);
-  }
-};
-
-// Legge i giocatori con uscita_min NULL = attualmente in campo
-const caricaSchierati = async () => {
-  if (!partita) return;
-  const { data, error } = await supabase
-    .from("minuti_giocati")
-    .select("giocatore_stagione_id, entrata_min")
-    .eq("partita_id", partita.id)
-    .is("uscita_min", null)
-    .order("entrata_min", { ascending: true });
-
-  if (!error) {
-    setInCampo((data || []).map((r) => r.giocatore_stagione_id));
-  }
-};
-
-// Formatta minuti + secondi giocati per un giocatore
-const formatTempoGiocato = (gId: string) => {
-  if (!partita) return "0:00";
-
-  const intervalli = minutiDettaglio[gId] || [];
-  const nowMin = elapsed / 60000;
-
-  let totaleSec = 0;
-  intervalli.forEach((iv) => {
-    const start = iv.entrata_min ?? 0;
-    const end = iv.uscita_min ?? nowMin;
-    totaleSec += (end - start) * 60;
-  });
-
-  const min = Math.floor(totaleSec / 60);
-  const sec = Math.floor(totaleSec % 60);
-  return `${min}:${sec.toString().padStart(2, "0")}`;
-};
-
-// =====================
-// UPDATE MINUTI IN LIVE
-// =====================
-useEffect(() => {
-  if (!partita) return;
-  caricaMinutiGiocati();
-  caricaSchierati();
-}, [elapsed]);
-
+  const isMontecarlo = (teamId?: string, teamName?: string) =>
+    teamId === MONTECARLO_ID || (teamName || "").toLowerCase().includes("montecarlo");
 
   // =====================
   // FETCH DATI INIZIALI + REALTIME
@@ -749,302 +679,150 @@ if (t) setTimerState(t);
               Formazione
             </button>
 
-            {/* Pulsante apertura sostituzioni */}
-<button
-  onClick={() => setSostituzioniAperte(true)}
-  className="bg-gradient-montecarlo text-white px-6 py-2 rounded-lg w-full hover:scale-105 transition"
->
-  Sostituzioni
-</button>
-
-
             {/* Modal Formazione */}
-{formazioneAperta && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white p-6 rounded-lg shadow-montecarlo max-w-md w-full mx-2 space-y-4">
-      <h2 className="text-center text-lg font-semibold">Seleziona Convocati e Formazione Iniziale</h2>
-      <div className="max-h-64 overflow-y-auto">
-        {giocatori.map((g) => (
-          <div key={g.id} className="flex items-center justify-between py-1">
-            <span>
-              {(g.cognome || "").trim()} {(g.nome || "").trim()}
-            </span>
-            <div className="flex gap-3">
-              {/* Convocato */}
-              <label className="flex items-center gap-1">
-                <input
-                  type="checkbox"
-                  checked={convocati.includes(g.id)}
-                  onChange={() =>
-                    setConvocati((prev) =>
-                      prev.includes(g.id)
-                        ? prev.filter((x) => x !== g.id)
-                        : [...prev, g.id]
-                    )
-                  }
-                />
-                Conv
-              </label>
-              {/* Titolare */}
-              <label className="flex items-center gap-1">
-                <input
-                  type="checkbox"
-                  checked={titolari.includes(g.id)}
-                  disabled={!convocati.includes(g.id)} // può essere titolare solo se convocato
-                  onChange={() =>
-                    setTitolari((prev) =>
-                      prev.includes(g.id)
-                        ? prev.filter((x) => x !== g.id)
-                        : [...prev, g.id]
-                    )
-                  }
-                />
-                Tit
-              </label>
+            {formazioneAperta && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white p-6 rounded-lg shadow-montecarlo max-w-md w-full mx-2 space-y-4">
+                  <h2 className="text-center text-lg font-semibold">Seleziona Formazione</h2>
+                  <div className="max-h-64 overflow-y-auto">
+                    {giocatori.map((g) => (
+                      <label key={g.id} className="flex items-center gap-2 py-1">
+                        <input
+                          type="checkbox"
+                          checked={convocati.includes(g.id)}
+                          onChange={() =>
+                            setConvocati((prev) =>
+                              prev.includes(g.id) ? prev.filter((x) => x !== g.id) : [...prev, g.id]
+                            )
+                          }
+                        />
+                        {(g.cognome || "").trim()} {(g.nome || "").trim()} {g.ruolo ? `(${g.ruolo})` : ""}
+                      </label>
+                    ))}
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!partita) return;
+                      await supabase.from("presenze").delete().eq("partita_id", id);
+                      const rows = convocati.map((gid) => {
+                        const g = giocatori.find((x) => x.id === gid);
+                        return {
+                          partita_id: id,
+                          giocatore_stagione_id: gid,
+                          stagione_id: partita.stagione_id,
+                          nome: (g?.nome || "").trim(),
+                          cognome: (g?.cognome || "").trim(),
+                        };
+                      });
+                      if (rows.length > 0) await supabase.from("presenze").insert(rows);
+                      setFormazioneAperta(false);
+                    }}
+                    className="w-full bg-montecarlo-secondary text-white py-2 rounded-lg"
+                  >
+                    Salva
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Bottoni tempi + parziali */}
+            <div className="flex justify-center space-x-4">
+              {[1, 2, 3, 4].map((t) => (
+                <div key={t} className="flex flex-col items-center">
+                  <button
+                    onClick={() => setTempo(t)}
+                    className={`px-7 py-2 rounded-full font-medium ${
+                      tempo === t
+                        ? "bg-montecarlo-secondary text-white"
+                        : "bg-montecarlo-gray-50 text-gray-900 hover:bg-montecarlo-gray-100"
+                    }`}
+                  >
+                    {t}T
+                  </button>
+                  <span className="text-sm text-gray-900 mt-1">
+                    {goalCasa[t - 1]} – {goalOspite[t - 1]}
+                  </span>
+                </div>
+              ))}
             </div>
-          </div>
-        ))}
-      </div>
 
-      <button
-        onClick={async () => {
-          if (!partita) return;
+            {/* Sezione gestione goal */}
+            {tempo && (
+              <div className="space-y-6">
+                {/* Squadra Casa */}
+                <div>
+                  <div className="flex items-center justify-between p-4 bg-montecarlo-red-50 rounded-lg border border-montecarlo-red-200">
+                    <div className="flex items-center space-x-4">
+                      {squadraCasa?.logo_url ? (
+                        <img
+                          src={squadraCasa.logo_url}
+                          alt={`${squadraCasa?.nome || "Casa"} logo`}
+                          className="w-12 h-12 rounded-full border-2 border-montecarlo-accent"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-montecarlo-secondary rounded-full flex items-center justify-center text-white font-bold">
+                          {squadraCasa?.nome?.charAt(0)}
+                        </div>
+                      )}
+                      <span className="text-lg font-bold text-montecarlo-secondary">
+                        {squadraCasa?.nome} ({totale(goalCasa)})
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button onClick={() => decrementa("casa")} className="text-3xl">−</button>
+                      <span className="text-lg font-bold">{goalCasa[tempo - 1]}</span>
+                      <button onClick={() => incrementa("casa")} className="text-3xl">+</button>
+                    </div>
+                  </div>
+                  {/* SOTTO MONTECARLO: marcatori ; SOTTO NON-MC: portieri subiti */}
+                  {isMontecarlo(squadraCasa?.id, squadraCasa?.nome)
+                    ? renderMarcatori(squadraCasa?.id)
+                    : renderPortieriSubiti(squadraCasa?.id)}
+                </div>
 
-          // reset presenze e minuti_giocati
-          await supabase.from("presenze").delete().eq("partita_id", id);
-          await supabase.from("minuti_giocati").delete().eq("partita_id", id);
+                {/* Squadra Ospite */}
+                <div>
+                  <div className="flex items-center justify-between p-4 bg-montecarlo-gray-50 rounded-lg border border-montecarlo-gray-200">
+                    <div className="flex items-center space-x-4">
+                      {squadraOspite?.logo_url ? (
+                        <img
+                          src={squadraOspite.logo_url}
+                          alt={`${squadraOspite?.nome || "Ospite"} logo`}
+                          className="w-12 h-12 rounded-full border-2 border-montecarlo-accent"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-montecarlo-secondary rounded-full flex items-center justify-center text-white font-bold">
+                          {squadraOspite?.nome?.charAt(0)}
+                        </div>
+                      )}
+                      <span className="text-lg font-bold text-montecarlo-secondary">
+                        {squadraOspite?.nome} ({totale(goalOspite)})
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button onClick={() => decrementa("ospite")} className="text-3xl">−</button>
+                      <span className="text-lg font-bold">{goalOspite[tempo - 1]}</span>
+                      <button onClick={() => incrementa("ospite")} className="text-3xl">+</button>
+                    </div>
+                  </div>
+                  {/* SOTTO MONTECARLO: marcatori ; SOTTO NON-MC: portieri subiti */}
+                  {isMontecarlo(squadraOspite?.id, squadraOspite?.nome)
+                    ? renderMarcatori(squadraOspite?.id)
+                    : renderPortieriSubiti(squadraOspite?.id)}
+                </div>
+              </div>
+            )}
 
-          // inserisci convocati in presenze
-          const rows = convocati.map((gid) => {
-            const g = giocatori.find((x) => x.id === gid);
-            return {
-              partita_id: id,
-              giocatore_stagione_id: gid,
-              stagione_id: partita.stagione_id,
-              nome: (g?.nome || "").trim(),
-              cognome: (g?.cognome || "").trim(),
-            };
-          });
-          if (rows.length > 0) {
-            await supabase.from("presenze").insert(rows);
-          }
-
-          // inserisci minuti iniziali SOLO per i titolari
-          const minutiRows = titolari.map((gid) => ({
-            partita_id: id,
-            giocatore_stagione_id: gid,
-            entrata_min: 0,
-          }));
-          if (minutiRows.length > 0) {
-            await supabase.from("minuti_giocati").insert(minutiRows);
-          }
-
-          setInCampo(titolari); // i titolari scelti entrano subito "in campo"
-
-
-          setFormazioneAperta(false);
-        }}
-        className="w-full bg-montecarlo-secondary text-white py-2 rounded-lg"
-      >
-        Salva
-      </button>
-    </div>
-  </div>
-)}
-
-
-
-            {/* Modal Sostituzioni */}
-{sostituzioniAperte && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white p-6 rounded-lg shadow-montecarlo max-w-md w-full mx-2 space-y-4">
-      <h2 className="text-center text-lg font-semibold">Gestione Sostituzioni</h2>
-
-      {/* Lista giocatori in campo */}
-      <div className="space-y-2">
-        {inCampo.map((id) => {
-          const g = giocatori.find((x) => x.id === id);
-          if (!g) return null;
-          return (
-            <div
-              key={g.id}
-              className="flex items-center justify-between p-2 rounded bg-green-100"
-            >
-              <span>
-                {(g.cognome || "").trim()} {(g.nome || "").trim()} –{" "}
-                {formatTempoGiocato(g.id)}
-              </span>
-              <button
-                onClick={() => setSostituzioneAttiva(g.id)}
-                className="p-1"
-              >
-                <Repeat className="w-6 h-6 text-montecarlo-secondary" />
-              </button>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Se è attiva una sostituzione → mostra lista panchina */}
-      {sostituzioneAttiva && (
-        <div className="mt-4 p-2 border rounded bg-gray-50">
-          <h3 className="font-semibold text-sm mb-2">Scegli chi entra</h3>
-          {convocati
-            .filter((id) => !inCampo.includes(id))
-            .map((id) => {
-              const g = giocatori.find((x) => x.id === id);
-              if (!g) return null;
-              return (
-                <button
-                  key={id}
-                  onClick={async () => {
-  if (!partita || !sostituzioneAttiva) return;
-  const minuto = Math.floor(elapsed / 1000) / 60; // minuti con secondi interi
-
-  // chi esce → chiudiamo intervallo
-  await supabase
-    .from("minuti_giocati")
-    .update({ uscita_min: minuto })
-    .eq("partita_id", partita.id)
-    .eq("giocatore_stagione_id", sostituzioneAttiva)
-    .is("uscita_min", null);
-
-  // chi entra → nuovo intervallo
-  await supabase.from("minuti_giocati").insert({
-    partita_id: partita.id,
-    giocatore_stagione_id: g.id,
-    entrata_min: minuto,
-  });
-
-  // ✅ aggiorna subito stato locale
-  setInCampo((prev) => {
-    const senzaUscito = prev.filter((x) => x !== sostituzioneAttiva);
-    return [...senzaUscito, g.id];
-  });
-
-  // reset sostituzione
-  setSostituzioneAttiva(null);
-
-  // 🔄 refresh solo minuti (non schierati, perché lo hai già sistemato localmente)
-  await caricaMinutiGiocati();
-}}
-
-
-                  className="block w-full text-left px-2 py-1 rounded hover:bg-gray-200"
-                >
-                  {(g.cognome || "").trim()} {(g.nome || "").trim()} –{" "}
-                  {formatTempoGiocato(g.id)}
-                </button>
-              );
-            })}
-        </div>
-      )}
-
-      <button
-        onClick={() => setSostituzioniAperte(false)}
-        className="w-full bg-montecarlo-secondary text-white py-2 rounded-lg"
-      >
-        Chiudi
-      </button>
-    </div>
-  </div>
-)}
-
-{/* Bottoni tempi + parziali */}
-<div className="flex justify-center space-x-4 mt-6">
-  {[1, 2, 3, 4].map((t) => (
-    <div key={t} className="flex flex-col items-center">
-      <button
-        onClick={() => setTempo(t)}
-        className={`px-7 py-2 rounded-full font-medium ${
-          tempo === t
-            ? "bg-montecarlo-secondary text-white"
-            : "bg-montecarlo-gray-50 text-gray-900 hover:bg-montecarlo-gray-100"
-        }`}
-      >
-        {t}T
-      </button>
-      <span className="text-sm text-gray-900 mt-1">
-        {goalCasa[t - 1]} – {goalOspite[t - 1]}
-      </span>
-    </div>
-  ))}
-</div>
-
-{/* Sezione gestione goal */}
-{tempo && (
-  <div className="space-y-6 mt-6">
-    {/* Squadra Casa */}
-    <div>
-      <div className="flex items-center justify-between p-4 bg-montecarlo-red-50 rounded-lg border border-montecarlo-red-200">
-        <div className="flex items-center space-x-4">
-          {squadraCasa?.logo_url ? (
-            <img
-              src={squadraCasa.logo_url}
-              alt={`${squadraCasa?.nome || "Casa"} logo`}
-              className="w-12 h-12 rounded-full border-2 border-montecarlo-accent"
-            />
-          ) : (
-            <div className="w-12 h-12 bg-montecarlo-secondary rounded-full flex items-center justify-center text-white font-bold">
-              {squadraCasa?.nome?.charAt(0)}
-            </div>
-          )}
-          <span className="text-lg font-bold text-montecarlo-secondary">
-            {squadraCasa?.nome} ({totale(goalCasa)})
-          </span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <button onClick={() => decrementa("casa")} className="text-3xl">−</button>
-          <span className="text-lg font-bold">{goalCasa[tempo - 1]}</span>
-          <button onClick={() => incrementa("casa")} className="text-3xl">+</button>
-        </div>
-      </div>
-      {isMontecarlo(squadraCasa?.id, squadraCasa?.nome)
-        ? renderMarcatori(squadraCasa?.id)
-        : renderPortieriSubiti(squadraCasa?.id)}
-    </div>
-
-    {/* Squadra Ospite */}
-    <div>
-      <div className="flex items-center justify-between p-4 bg-montecarlo-gray-50 rounded-lg border border-montecarlo-gray-200">
-        <div className="flex items-center space-x-4">
-          {squadraOspite?.logo_url ? (
-            <img
-              src={squadraOspite.logo_url}
-              alt={`${squadraOspite?.nome || "Ospite"} logo`}
-              className="w-12 h-12 rounded-full border-2 border-montecarlo-accent"
-            />
-          ) : (
-            <div className="w-12 h-12 bg-montecarlo-secondary rounded-full flex items-center justify-center text-white font-bold">
-              {squadraOspite?.nome?.charAt(0)}
-            </div>
-          )}
-          <span className="text-lg font-bold text-montecarlo-secondary">
-            {squadraOspite?.nome} ({totale(goalOspite)})
-          </span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <button onClick={() => decrementa("ospite")} className="text-3xl">−</button>
-          <span className="text-lg font-bold">{goalOspite[tempo - 1]}</span>
-          <button onClick={() => incrementa("ospite")} className="text-3xl">+</button>
-        </div>
-      </div>
-      {isMontecarlo(squadraOspite?.id, squadraOspite?.nome)
-        ? renderMarcatori(squadraOspite?.id)
-        : renderPortieriSubiti(squadraOspite?.id)}
-    </div>
-  </div>
-)}
-
-{/* Salva stato */}
-<button
+            {/* Salva stato */}
+            <button
   onClick={salvaStatoConferma}
-  className="w-full bg-montecarlo-secondary text-white py-2 rounded-lg mt-6"
+  className="w-full bg-montecarlo-secondary text-white py-2 rounded-lg mt-4"
 >
   Salva
 </button>
           </div>
         </div>
       </div>
+   
   );
 }
