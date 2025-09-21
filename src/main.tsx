@@ -15,12 +15,14 @@ ReactDOM.createRoot(
   </React.StrictMode>
 );
 
-// 👉 registra il service worker SOLO in produzione
-if ("serviceWorker" in navigator && import.meta.env.PROD) {
+// ===============================
+// Registrazione Service Worker
+// ===============================
+if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("/service-worker.js")
-      .then(() => console.log("[SW] Registrato con successo"))
-      .catch((err) => console.error("[SW] Errore registrazione:", err));
+      .then(() => console.log("✅ Service Worker registrato"))
+      .catch((err) => console.error("❌ Errore registrazione SW:", err));
   });
 }
