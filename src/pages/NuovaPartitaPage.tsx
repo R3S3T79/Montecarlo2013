@@ -27,16 +27,17 @@ export default function NuovaPartitaPage() {
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
-    stagione_id: '',
-    stato: 'DaGiocare',
-    data: '',
-    ora: '',
-    squadra_casa_id: '',
-    squadra_ospite_id: '',
-    campionato_torneo: 'Campionato',
-    nome_torneo: '',   // 👈 giornata o nome torneo
-    luogo_torneo: ''   // 👈 solo per tornei
-  });
+  stagione_id: '',
+  stato: 'DaGiocare',
+  data: '',
+  ora: '',
+  squadra_casa_id: '',
+  squadra_ospite_id: '',
+  campionato_torneo: 'Campionato',
+  nome_torneo: '',
+  luogo_torneo: '',
+  squadra_ospitante_id: ''   // 👈 nuova proprietà
+});
 
   // carica squadre e stagioni
   useEffect(() => {
@@ -132,29 +133,25 @@ if (!error && gs) {
       : goalMC.reduce((a, b) => a + b, 0);
 
     const { data: partita, error } = await supabase
-      .from('partite')
-      .insert([{
-        stagione_id:       formData.stagione_id,
-        stato:             formData.stato,
-        squadra_casa_id:   formData.squadra_casa_id,
-        squadra_ospite_id: formData.squadra_ospite_id,
-        campionato_torneo: formData.campionato_torneo.trim(),
-        nome_torneo:       formData.nome_torneo || null,
-        luogo_torneo:      formData.luogo_torneo || null,
-        data_ora:  dataOra,
-        goal_a:    totCasa,
-        goal_b:    totOsp,
-        goal_a1:   goalMC[0],
-        goal_a2:   goalMC[1],
-        goal_a3:   goalMC[2],
-        goal_a4:   goalMC[3],
-        goal_b1:   goalAvv[0],
-        goal_b2:   goalAvv[1],
-        goal_b3:   goalAvv[2],
-        goal_b4:   goalAvv[3]
-      }])
-      .select()
-      .single();
+  .from('partite')
+  .insert([{
+    stagione_id:       formData.stagione_id,
+    stato:             formData.stato,
+    squadra_casa_id:   formData.squadra_casa_id,
+    squadra_ospite_id: formData.squadra_ospite_id,
+    squadra_ospitante_id: formData.squadra_ospitante_id || null, // 👈
+    campionato_torneo: formData.campionato_torneo.trim(),
+    nome_torneo:       formData.nome_torneo || null,
+    luogo_torneo:      formData.luogo_torneo || null,
+    data_ora:          dataOra,
+    goal_a:            totCasa,
+    goal_b:            totOsp,
+    goal_a1: goalMC[0], goal_a2: goalMC[1], goal_a3: goalMC[2], goal_a4: goalMC[3],
+    goal_b1: goalAvv[0], goal_b2: goalAvv[1], goal_b3: goalAvv[2], goal_b4: goalAvv[3]
+  }])
+  .select()
+  .single();
+
 
     if (error || !partita) {
       setLoading(false);
@@ -282,6 +279,8 @@ if (!error && gs) {
               <option value="Giocata">Giocata</option>
             </select>
             <select
+
+      
   required
   className="w-full border rounded px-4 py-2"
   value={formData.campionato_torneo}
@@ -294,6 +293,25 @@ if (!error && gs) {
 </select>
 
           </div>
+
+          {/* Squadra ospitante */}
+{['Torneo', 'Amichevole', 'Allenamento'].includes(formData.campionato_torneo) && (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">
+      Squadra ospitante
+    </label>
+    <select
+      className="w-full border rounded px-4 py-2"
+      value={formData.squadra_ospitante_id}
+      onChange={e => setFormData({ ...formData, squadra_ospitante_id: e.target.value })}
+    >
+      <option value="">Seleziona squadra ospitante</option>
+      {squadreOrd.map(s => (
+        <option key={s.id} value={s.id}>{s.nome}</option>
+      ))}
+    </select>
+  </div>
+)}
 
           {/* Campionato: giornata */}
           {formData.campionato_torneo === 'Campionato' && (
@@ -335,6 +353,8 @@ if (!error && gs) {
               </div>
             </div>
           )}
+
+
 
           {/* Formazione */}
           {formData.stato === 'Giocata' && (

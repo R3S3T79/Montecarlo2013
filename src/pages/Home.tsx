@@ -62,6 +62,7 @@ type PartitaLite = {
   goal_b4: number;
   squadra_casa?: SquadraLite | null;
   squadra_ospite?: SquadraLite | null;
+  squadra_ospitante?: SquadraLite | null;
   stagione_id?: string;
 };
 
@@ -324,48 +325,50 @@ useEffect(() => {
     let next: PartitaLite | null = null;
 
     // 1) provo a prendere la partita InCorso
-    const { data: inCorso, error: errInCorso } = await supabase
-      .from("partite")
-      .select(`
-        id, data_ora, stato, campionato_torneo, squadra_casa_id, squadra_ospite_id, stagione_id,
-        goal_a, goal_b, goal_a1, goal_a2, goal_a3, goal_a4,
-        goal_b1, goal_b2, goal_b3, goal_b4,
-        squadra_casa:squadre!partite_squadra_casa_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo),
-squadra_ospite:squadre!partite_squadra_ospite_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo)
-      `)
-      .eq("stato", "InCorso")
-      .order("data_ora", { ascending: true })
-      .limit(1);
+  const { data: inCorso, error: errInCorso } = await supabase
+  .from("partite")
+  .select(`
+    id, data_ora, stato, campionato_torneo, squadra_casa_id, squadra_ospite_id, stagione_id,
+    goal_a, goal_b, goal_a1, goal_a2, goal_a3, goal_a4,
+    goal_b1, goal_b2, goal_b3, goal_b4,
+    squadra_casa:squadre!partite_squadra_casa_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo),
+    squadra_ospite:squadre!partite_squadra_ospite_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo),
+    squadra_ospitante:squadre!partite_squadra_ospitante_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo)
+  `)
+  .eq("stato", "InCorso")
+  .order("data_ora", { ascending: true })
+  .limit(1);
 
-    if (errInCorso) {
-      console.error("[HomePage] Errore partita InCorso:", errInCorso.message);
-    }
+if (errInCorso) {
+  console.error("[HomePage] Errore partita InCorso:", errInCorso.message);
+}
 
-    if (inCorso && inCorso.length) {
-      next = inCorso[0] as PartitaLite;
-    } else {
-      // 2) se non ci sono InCorso, prendo la prossima DaGiocare
-      const { data: future, error: errFuture } = await supabase
-        .from("partite")
-        .select(`
-          id, data_ora, stato, campionato_torneo, squadra_casa_id, squadra_ospite_id, stagione_id,
-          goal_a, goal_b, goal_a1, goal_a2, goal_a3, goal_a4,
-          goal_b1, goal_b2, goal_b3, goal_b4,
-          squadra_casa:squadre!partite_squadra_casa_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo),
-squadra_ospite:squadre!partite_squadra_ospite_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo)
-        `)
-        .eq("stato", "DaGiocare")
-        .order("data_ora", { ascending: true })
-        .limit(1);
+if (inCorso && inCorso.length) {
+  next = inCorso[0] as PartitaLite;
+} else {
+  const { data: future, error: errFuture } = await supabase
+    .from("partite")
+    .select(`
+      id, data_ora, stato, campionato_torneo, squadra_casa_id, squadra_ospite_id, stagione_id,
+      goal_a, goal_b, goal_a1, goal_a2, goal_a3, goal_a4,
+      goal_b1, goal_b2, goal_b3, goal_b4,
+      squadra_casa:squadre!partite_squadra_casa_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo),
+      squadra_ospite:squadre!partite_squadra_ospite_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo),
+      squadra_ospitante:squadre!partite_squadra_ospitante_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo)
+    `)
+    .eq("stato", "DaGiocare")
+    .order("data_ora", { ascending: true })
+    .limit(1);
 
-      if (errFuture) {
-        console.error("[HomePage] Errore partita DaGiocare:", errFuture.message);
-      }
+  if (errFuture) {
+    console.error("[HomePage] Errore partita DaGiocare:", errFuture.message);
+  }
 
-      if (future && future.length) {
-        next = future[0] as PartitaLite;
-      }
-    }
+  if (future && future.length) {
+    next = future[0] as PartitaLite;
+  }
+}
+
 
     if (!mounted) return;
 
@@ -831,29 +834,31 @@ const fbPluginSrc = useMemo(() => {
         </>
       )}
 
-      {/* MAPPA CAMPO SQUADRA DI CASA */}
-      {match?.squadra_casa && (
-        <div style={{ marginTop: 12 }}>
-          <iframe
-            title="Mappa campo squadra di casa"
-            src={
-              match.squadra_casa.mappa_url
-                ? match.squadra_casa.mappa_url
-                : `https://www.google.com/maps?q=${encodeURIComponent(
-                    match.squadra_casa.nome_stadio ||
-                    match.squadra_casa.indirizzo ||
-                    match.squadra_casa.nome ||
-                    ""
-                  )}&output=embed`
-            }
-            width="100%"
-            height="250"
-            style={{ border: 0, borderRadius: 8 }}
-            loading="lazy"
-            allowFullScreen
-          ></iframe>
-        </div>
-      )}
+      {/* MAPPA CAMPO SQUADRA OSPITANTE */}
+{match?.squadra_ospitante && (
+  <div style={{ marginTop: 12 }}>
+    <iframe
+      title="Mappa campo squadra ospitante"
+      src={
+        match.squadra_ospitante.mappa_url
+          ? match.squadra_ospitante.mappa_url
+          : `https://www.google.com/maps?q=${encodeURIComponent(
+              match.squadra_ospitante.nome_stadio ||
+              match.squadra_ospitante.indirizzo ||
+              match.squadra_ospitante.nome ||
+              ""
+            )}&output=embed`
+      }
+      width="100%"
+      height="250"
+      style={{ border: 0, borderRadius: 8 }}
+      loading="lazy"
+      allowFullScreen
+    ></iframe>
+  </div>
+)}
+
+
     </div>
   )}
 </section>
