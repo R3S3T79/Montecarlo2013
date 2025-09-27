@@ -33,7 +33,6 @@ import NuovaPartitaPage from "./pages/NuovaPartitaPage";
 import EditPartitaPage from "./pages/EditPartitaPage";
 import DettaglioPartita from "./pages/DettaglioPartita";
 import EditPartitaGiocata from "./pages/EditPartitaGiocata";
-import MenuFormazione from "./components/MenuFormazione";
 import Galleria from "./pages/Galleria";
 // statistiche
 import StatisticheSquadra from "./pages/StatisticheSquadra";
@@ -144,7 +143,7 @@ export default function App() {
           <Route path="/giocatore/:id" element={<DettaglioGiocatore />} />
           <Route path="/aggiungi-giocatore" element={<AggiungiGiocatore />} />
           <Route path="/edit-giocatore/:id" element={<EditGiocatore />} />
-          <Route path="/formazione/:id" element={<MenuFormazione />} />
+         
 
           {/* Statistiche */}
           <Route path="/statistiche/squadra" element={<StatisticheSquadra />} />

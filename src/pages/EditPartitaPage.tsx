@@ -1,5 +1,5 @@
 // src/pages/EditPartitaPage.tsx
-// Data creazione chat: 2025-07-26
+// Data creazione chat: 2025-07-26 (rev: aggiunta gestione convocati con toggle seleziona/deseleziona tutti)
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -24,9 +24,8 @@ interface Partita {
   squadra_ospite_id: string;
   campionato_torneo: string;
   luogo_torneo: string | null;
-  squadra_ospitante_id: string | null;   // 👈 nuovo campo
+  squadra_ospitante_id: string | null;
 }
-
 
 export default function EditPartitaPage() {
   const { id } = useParams<{ id: string }>();
@@ -35,19 +34,23 @@ export default function EditPartitaPage() {
   const [squadre, setSquadre] = useState<Squadra[]>([]);
   const [stagioni, setStagioni] = useState<Stagione[]>([]);
   const [formData, setFormData] = useState<
-  Omit<Partita, 'id' | 'data_ora'> & { data: string; ora: string }
->({
-  stagione_id: '',
-  data: '',
-  ora: '',
-  stato: 'DaGiocare',
-  squadra_casa_id: '',
-  squadra_ospite_id: '',
-  campionato_torneo: 'Campionato',
-  luogo_torneo: '',
-  squadra_ospitante_id: ''  // 👈 aggiunto
-});
+    Omit<Partita, 'id' | 'data_ora'> & { data: string; ora: string }
+  >({
+    stagione_id: '',
+    data: '',
+    ora: '',
+    stato: 'DaGiocare',
+    squadra_casa_id: '',
+    squadra_ospite_id: '',
+    campionato_torneo: 'Campionato',
+    luogo_torneo: '',
+    squadra_ospitante_id: ''
+  });
 
+  // 👇 Stati per convocati
+  const [giocatori, setGiocatori] = useState<{ id: string; nome: string; cognome: string }[]>([]);
+  const [convocati, setConvocati] = useState<string[]>([]);
+  const [formazioneAperta, setFormazioneAperta] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -73,16 +76,42 @@ export default function EditPartitaPage() {
         if (partitaData) {
           const dt = new Date(partitaData.data_ora);
           setFormData({
-  stagione_id: partitaData.stagione_id,
-  data: dt.toISOString().split('T')[0],
-  ora: dt.toTimeString().slice(0, 5),
-  stato: partitaData.stato,
-  squadra_casa_id: partitaData.squadra_casa_id,
-  squadra_ospite_id: partitaData.squadra_ospite_id,
-  campionato_torneo: partitaData.campionato_torneo,
-  luogo_torneo: partitaData.luogo_torneo || '',
-  squadra_ospitante_id: partitaData.squadra_ospitante_id || ''  // 👈 aggiunto
-});
+            stagione_id: partitaData.stagione_id,
+            data: dt.toISOString().split('T')[0],
+            ora: dt.toTimeString().slice(0, 5),
+            stato: partitaData.stato,
+            squadra_casa_id: partitaData.squadra_casa_id,
+            squadra_ospite_id: partitaData.squadra_ospite_id,
+            campionato_torneo: partitaData.campionato_torneo,
+            luogo_torneo: partitaData.luogo_torneo || '',
+            squadra_ospitante_id: partitaData.squadra_ospitante_id || ''
+          });
+
+          // 👇 Carico giocatori stagione
+          const { data: giocatoriStagione } = await supabase
+            .from('giocatori_stagioni')
+            .select('id, nome, cognome')
+            .eq('stagione_id', partitaData.stagione_id)
+            .order('cognome', { ascending: true });
+
+          if (giocatoriStagione) {
+  const ordinati = [...giocatoriStagione].sort((a, b) => {
+    const c = (a.cognome || "").localeCompare(b.cognome || "", "it", { sensitivity: "base" });
+    if (c !== 0) return c;
+    return (a.nome || "").localeCompare(b.nome || "", "it", { sensitivity: "base" });
+  });
+  setGiocatori(ordinati);
+}
+
+          // 👇 Carico convocati già salvati
+          const { data: presenze } = await supabase
+            .from('presenze')
+            .select('giocatore_stagione_id')
+            .eq('partita_id', partitaData.id);
+
+          if (presenze) {
+            setConvocati(presenze.map((p) => p.giocatore_stagione_id));
+          }
         }
       } catch (err) {
         console.error('Error fetching data:', err);
@@ -97,35 +126,34 @@ export default function EditPartitaPage() {
     e.preventDefault();
     setLoading(true);
     try {
-  const dataOra = new Date(`${formData.data}T${formData.ora}`).toISOString();
-  const { error } = await supabase
-    .from('partite')
-    .update({
-      stagione_id: formData.stagione_id,
-      data_ora: dataOra,
-      stato: formData.stato,
-      squadra_casa_id: formData.squadra_casa_id,
-      squadra_ospite_id: formData.squadra_ospite_id,
-      campionato_torneo: formData.campionato_torneo,
-      luogo_torneo: formData.luogo_torneo || null,
-      squadra_ospitante_id: formData.squadra_ospitante_id || null, // 👈 importante
-    })
-    .eq('id', id);
+      const dataOra = new Date(`${formData.data}T${formData.ora}`).toISOString();
+      const { error } = await supabase
+        .from('partite')
+        .update({
+          stagione_id: formData.stagione_id,
+          data_ora: dataOra,
+          stato: formData.stato,
+          squadra_casa_id: formData.squadra_casa_id,
+          squadra_ospite_id: formData.squadra_ospite_id,
+          campionato_torneo: formData.campionato_torneo,
+          luogo_torneo: formData.luogo_torneo || null,
+          squadra_ospitante_id: formData.squadra_ospitante_id || null
+        })
+        .eq('id', id);
 
-  if (error) {
-    console.error("Errore Supabase:", error.message, error.details, error.hint);
-    alert("Errore: " + error.message);
-    throw error;
-  }
+      if (error) {
+        console.error("Errore Supabase:", error.message, error.details, error.hint);
+        alert("Errore: " + error.message);
+        throw error;
+      }
 
-  navigate('/calendario');
-} catch (err) {
-  console.error('Error updating match:', err);
-  alert('Salvataggio fallito: ' + (err.message || 'Errore sconosciuto'));
-} finally {
-  setLoading(false);
-}
-
+      navigate('/calendario');
+    } catch (err: any) {
+      console.error('Error updating match:', err);
+      alert('Salvataggio fallito: ' + (err.message || 'Errore sconosciuto'));
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {
@@ -139,8 +167,16 @@ export default function EditPartitaPage() {
   return (
     <div className="min-h-screen pt-2 px-2 pb-6">
       <div className="p-4 sm:p-6 bg-white/90 rounded-lg">
-        
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* 👇 Pulsante convocati */}
+          <button
+            type="button"
+            onClick={() => setFormazioneAperta(true)}
+            className="w-full bg-montecarlo-secondary text-white px-4 py-2 rounded-lg hover:bg-montecarlo-accent"
+          >
+            Convocati
+          </button>
+
           <div className="grid grid-cols-2 gap-4">
             <input
               type="date"
@@ -221,37 +257,35 @@ export default function EditPartitaPage() {
           </select>
 
           <select
-  value={formData.campionato_torneo}
-  onChange={e =>
-    setFormData({ ...formData, campionato_torneo: e.target.value })
-  }
-  className="w-full border border-montecarlo-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-montecarlo-accent"
-  required
->
-  <option value="Campionato">Campionato</option>
-  <option value="Torneo">Torneo</option>
-  <option value="Amichevole">Amichevole</option>
-  <option value="Allenamento">Allenamento</option> {/* ✅ nuovo valore */}
-</select>
+            value={formData.campionato_torneo}
+            onChange={e =>
+              setFormData({ ...formData, campionato_torneo: e.target.value })
+            }
+            className="w-full border border-montecarlo-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-montecarlo-accent"
+            required
+          >
+            <option value="Campionato">Campionato</option>
+            <option value="Torneo">Torneo</option>
+            <option value="Amichevole">Amichevole</option>
+            <option value="Allenamento">Allenamento</option>
+          </select>
 
-{['Torneo', 'Amichevole', 'Allenamento'].includes(formData.campionato_torneo) && (
-  <select
-    value={formData.squadra_ospitante_id}
-    onChange={e =>
-      setFormData({ ...formData, squadra_ospitante_id: e.target.value })
-    }
-    className="w-full border border-montecarlo-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-montecarlo-accent"
-  >
-    <option value="">Seleziona squadra ospitante</option>
-    {squadre.map(s => (
-      <option key={s.id} value={s.id}>
-        {s.nome}
-      </option>
-    ))}
-  </select>
-)}
-
-
+          {['Torneo', 'Amichevole', 'Allenamento'].includes(formData.campionato_torneo) && (
+            <select
+              value={formData.squadra_ospitante_id}
+              onChange={e =>
+                setFormData({ ...formData, squadra_ospitante_id: e.target.value })
+              }
+              className="w-full border border-montecarlo-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-montecarlo-accent"
+            >
+              <option value="">Seleziona squadra ospitante</option>
+              {squadre.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.nome}
+                </option>
+              ))}
+            </select>
+          )}
 
           <input
             type="text"
@@ -280,6 +314,87 @@ export default function EditPartitaPage() {
             </button>
           </div>
         </form>
+
+        {/* 👇 Modale convocati */}
+        {formazioneAperta && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full space-y-4">
+              <h2 className="text-lg font-semibold text-center">Seleziona Convocati</h2>
+
+              {/* Toggle seleziona/deseleziona tutti */}
+              <div className="flex justify-end mb-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (convocati.length === giocatori.length) {
+                      setConvocati([]);
+                    } else {
+                      setConvocati(giocatori.map((g) => g.id));
+                    }
+                  }}
+                  className="text-xs bg-montecarlo-gray-100 px-2 py-1 rounded hover:bg-montecarlo-gray-200"
+                >
+                  {convocati.length === giocatori.length
+                    ? "Deseleziona tutti"
+                    : "Seleziona tutti"}
+                </button>
+              </div>
+
+              <div className="max-h-64 overflow-y-auto space-y-2">
+                {giocatori.map((g) => (
+                  <label key={g.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={convocati.includes(g.id)}
+                      onChange={() =>
+                        setConvocati((prev) =>
+                          prev.includes(g.id)
+                            ? prev.filter((x) => x !== g.id)
+                            : [...prev, g.id]
+                        )
+                      }
+                    />
+                    {(g.cognome || '').trim()} {(g.nome || '').trim()}
+                  </label>
+                ))}
+              </div>
+
+              <div className="flex justify-between gap-4">
+                <button
+                  onClick={() => setFormazioneAperta(false)}
+                  className="flex-1 bg-gray-400 text-white py-2 rounded"
+                >
+                  Chiudi
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!id) return;
+                    await supabase.from('presenze').delete().eq('partita_id', id);
+
+                    const rows = convocati.map((gid) => {
+                      const g = giocatori.find((x) => x.id === gid);
+                      return {
+                        partita_id: id,
+                        giocatore_stagione_id: gid,
+                        stagione_id: formData.stagione_id,
+                        nome: g?.nome || '',
+                        cognome: g?.cognome || '',
+                      };
+                    });
+                    if (rows.length > 0) {
+                      await supabase.from('presenze').insert(rows);
+                    }
+
+                    setFormazioneAperta(false);
+                  }}
+                  className="flex-1 bg-montecarlo-secondary text-white py-2 rounded"
+                >
+                  Salva
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -168,13 +168,18 @@ export default function Step6_GironeUnico() {
   }, [matches, squadreMap]);
 
   const formatDate = (iso: string | null) => {
-    if (!iso) return "—";
-    const d = new Date(iso);
-    return `${d.toLocaleDateString("it-IT")} ${d.toLocaleTimeString("it-IT", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })}`;
-  };
+  if (!iso) return "—";
+  // Spezza la stringa ISO e ricostruisci l'orario senza shift di timezone
+  const [datePart, timePart] = iso.split("T");
+  if (!datePart || !timePart) return "—";
+
+  const [year, month, day] = datePart.split("-");
+  const [hour, minute] = timePart.split(":");
+
+  return `${day}/${month}/${year} ${hour}:${minute}`;
+};
+
+
 
   const handleEdit = (matchId: string) => {
     navigate(

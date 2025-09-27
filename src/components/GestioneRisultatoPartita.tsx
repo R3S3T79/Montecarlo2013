@@ -921,54 +921,54 @@ const salvaStatoConferma = async () => {
 <div className="max-h-64 overflow-y-auto">
   {giocatori.map((g) => (
     <div
-      key={g.id}
-      className="flex items-center justify-between py-1 border-b"
-    >
-      {/* Nome + minuti giocati */}
-      <span className="text-sm flex items-center">
-        {(g.cognome || "").trim()} {(g.nome || "").trim()}
-        <span className="ml-2 text-xs text-gray-500">
-  {minutiGiocati[g.id] ? formatTempo(minutiGiocati[g.id]) : "0:00"}
-</span>
-      </span>
+  key={g.id}
+  className="flex items-center py-1 border-b"
+>
+  {/* Nome + minuti giocati */}
+  <span className="text-sm flex items-center w-2/3">
+    {(g.cognome || "").trim()} {(g.nome || "").trim()}
+    <span className="ml-2 text-xs text-gray-500">
+      {minutiGiocati[g.id] ? formatTempo(minutiGiocati[g.id]) : "0:00"}
+    </span>
+  </span>
 
-      {/* Checkbox Convocato + Titolare */}
-      <div className="flex items-center gap-4">
-        {/* Convocato */}
-        <label className="flex items-center gap-1 text-xs">
-          <span>Conv</span>
-          <input
-            type="checkbox"
-            checked={convocati.includes(g.id)}
-            onChange={() =>
-              setConvocati((prev) =>
-                prev.includes(g.id)
-                  ? prev.filter((x) => x !== g.id)
-                  : [...prev, g.id]
-              )
-            }
-          />
-        </label>
+  {/* Checkbox Convocato + Titolare */}
+  <div className="flex items-center gap-6 w-1/3 justify-start">
+    {/* Convocato */}
+    <label className="flex items-center gap-1 text-xs">
+      <span>Conv</span>
+      <input
+        type="checkbox"
+        checked={convocati.includes(g.id)}
+        onChange={() =>
+          setConvocati((prev) =>
+            prev.includes(g.id)
+              ? prev.filter((x) => x !== g.id)
+              : [...prev, g.id]
+          )
+        }
+      />
+    </label>
 
-        {/* Titolare */}
-<label className="flex items-center gap-1 text-xs">
-  <span>Titol</span>
-  <input
-    type="checkbox"
-    checked={titolari.includes(g.id)}
-    disabled={!convocati.includes(g.id)}   // 🔹 Disabilita se non è convocato
-    onChange={() =>
-      setTitolari((prev) =>
-        prev.includes(g.id)
-          ? prev.filter((x) => x !== g.id)
-          : [...prev, g.id]
-      )
-    }
-  />
-</label>
+    {/* Titolare */}
+    <label className="flex items-center gap-1 text-xs">
+      <span>Titol</span>
+      <input
+        type="checkbox"
+        checked={titolari.includes(g.id)}
+        disabled={!convocati.includes(g.id)} // disabilita se non convocato
+        onChange={() =>
+          setTitolari((prev) =>
+            prev.includes(g.id)
+              ? prev.filter((x) => x !== g.id)
+              : [...prev, g.id]
+          )
+        }
+      />
+    </label>
+  </div>
+</div>
 
-      </div>
-    </div>
   ))}
 </div>
 
