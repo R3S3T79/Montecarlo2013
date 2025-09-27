@@ -24,7 +24,9 @@ interface Partita {
   squadra_ospite_id: string;
   campionato_torneo: string;
   luogo_torneo: string | null;
+  squadra_ospitante_id: string | null;   // 👈 nuovo campo
 }
+
 
 export default function EditPartitaPage() {
   const { id } = useParams<{ id: string }>();
@@ -33,17 +35,19 @@ export default function EditPartitaPage() {
   const [squadre, setSquadre] = useState<Squadra[]>([]);
   const [stagioni, setStagioni] = useState<Stagione[]>([]);
   const [formData, setFormData] = useState<
-    Omit<Partita, 'id' | 'data_ora'> & { data: string; ora: string }
-  >({
-    stagione_id: '',
-    data: '',
-    ora: '',
-    stato: 'DaGiocare',
-    squadra_casa_id: '',
-    squadra_ospite_id: '',
-    campionato_torneo: 'Campionato',
-    luogo_torneo: '',
-  });
+  Omit<Partita, 'id' | 'data_ora'> & { data: string; ora: string }
+>({
+  stagione_id: '',
+  data: '',
+  ora: '',
+  stato: 'DaGiocare',
+  squadra_casa_id: '',
+  squadra_ospite_id: '',
+  campionato_torneo: 'Campionato',
+  luogo_torneo: '',
+  squadra_ospitante_id: ''  // 👈 aggiunto
+});
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -69,15 +73,16 @@ export default function EditPartitaPage() {
         if (partitaData) {
           const dt = new Date(partitaData.data_ora);
           setFormData({
-            stagione_id: partitaData.stagione_id,
-            data: dt.toISOString().split('T')[0],
-            ora: dt.toTimeString().slice(0, 5),
-            stato: partitaData.stato,
-            squadra_casa_id: partitaData.squadra_casa_id,
-            squadra_ospite_id: partitaData.squadra_ospite_id,
-            campionato_torneo: partitaData.campionato_torneo,
-            luogo_torneo: partitaData.luogo_torneo || '',
-          });
+  stagione_id: partitaData.stagione_id,
+  data: dt.toISOString().split('T')[0],
+  ora: dt.toTimeString().slice(0, 5),
+  stato: partitaData.stato,
+  squadra_casa_id: partitaData.squadra_casa_id,
+  squadra_ospite_id: partitaData.squadra_ospite_id,
+  campionato_torneo: partitaData.campionato_torneo,
+  luogo_torneo: partitaData.luogo_torneo || '',
+  squadra_ospitante_id: partitaData.squadra_ospitante_id || ''  // 👈 aggiunto
+});
         }
       } catch (err) {
         console.error('Error fetching data:', err);
@@ -92,27 +97,35 @@ export default function EditPartitaPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const dataOra = new Date(`${formData.data}T${formData.ora}`).toISOString();
-      const { error } = await supabase
-        .from('partite')
-        .update({
-          stagione_id: formData.stagione_id,
-          data_ora: dataOra,
-          stato: formData.stato,
-          squadra_casa_id: formData.squadra_casa_id,
-          squadra_ospite_id: formData.squadra_ospite_id,
-          campionato_torneo: formData.campionato_torneo,
-          luogo_torneo: formData.luogo_torneo || null,
-        })
-        .eq('id', id);
-      if (error) throw error;
-      navigate('/calendario');
-    } catch (err) {
-      console.error('Error updating match:', err);
-      alert('Salvataggio fallito');
-    } finally {
-      setLoading(false);
-    }
+  const dataOra = new Date(`${formData.data}T${formData.ora}`).toISOString();
+  const { error } = await supabase
+    .from('partite')
+    .update({
+      stagione_id: formData.stagione_id,
+      data_ora: dataOra,
+      stato: formData.stato,
+      squadra_casa_id: formData.squadra_casa_id,
+      squadra_ospite_id: formData.squadra_ospite_id,
+      campionato_torneo: formData.campionato_torneo,
+      luogo_torneo: formData.luogo_torneo || null,
+      squadra_ospitante_id: formData.squadra_ospitante_id || null, // 👈 importante
+    })
+    .eq('id', id);
+
+  if (error) {
+    console.error("Errore Supabase:", error.message, error.details, error.hint);
+    alert("Errore: " + error.message);
+    throw error;
+  }
+
+  navigate('/calendario');
+} catch (err) {
+  console.error('Error updating match:', err);
+  alert('Salvataggio fallito: ' + (err.message || 'Errore sconosciuto'));
+} finally {
+  setLoading(false);
+}
+
   };
 
   if (loading) {
@@ -220,6 +233,24 @@ export default function EditPartitaPage() {
   <option value="Amichevole">Amichevole</option>
   <option value="Allenamento">Allenamento</option> {/* ✅ nuovo valore */}
 </select>
+
+{['Torneo', 'Amichevole', 'Allenamento'].includes(formData.campionato_torneo) && (
+  <select
+    value={formData.squadra_ospitante_id}
+    onChange={e =>
+      setFormData({ ...formData, squadra_ospitante_id: e.target.value })
+    }
+    className="w-full border border-montecarlo-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-montecarlo-accent"
+  >
+    <option value="">Seleziona squadra ospitante</option>
+    {squadre.map(s => (
+      <option key={s.id} value={s.id}>
+        {s.nome}
+      </option>
+    ))}
+  </select>
+)}
+
 
 
           <input

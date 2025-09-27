@@ -1,5 +1,5 @@
 // src/pages/DettaglioGiocatore.tsx
-// Data creazione chat: 14/08/2025 (rev: aggiunto campo Goal Subiti per portieri + medie voti utenti/mister)
+// Data creazione chat: 14/08/2025 (rev: aggiunto campo Goal Subiti per portieri + medie voti utenti/mister + minuti giocati totali)
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -24,6 +24,7 @@ interface StatisticheGiocatore {
   goalSubiti?: number;
   mediaVotoUtenti?: number;
   mediaVotoMister?: number;
+  minutiGiocatiTotali?: number;
 }
 
 interface Stagione {
@@ -44,6 +45,7 @@ export default function DettaglioGiocatore() {
     goalSubiti: 0,
     mediaVotoUtenti: 0,
     mediaVotoMister: 0,
+    minutiGiocatiTotali: 0,
   });
   const [stagioniDisponibili, setStagioniDisponibili] = useState<Stagione[]>([]);
   const [stagioneSelezionata, setStagioneSelezionata] = useState<string>('');
@@ -89,12 +91,33 @@ export default function DettaglioGiocatore() {
       .eq('stagione_id', stagioneId)
       .maybeSingle();
 
+    // Trova l'ID della riga in giocatori_stagioni
+    const { data: stagioneRow } = await supabase
+      .from('giocatori_stagioni')
+      .select('id')
+      .eq('giocatore_uid', giocatoreUid)
+      .eq('stagione_id', stagioneId)
+      .maybeSingle();
+
+    // Minuti totali giocati (sommando tutte le partite della stagione)
+    let totaleMinuti = 0;
+    if (stagioneRow?.id) {
+      const { data: minuti } = await supabase
+        .from('minuti_giocati_totali')
+        .select('tempo_giocato_sec')
+        .eq('giocatore_stagione_id', stagioneRow.id);
+
+      const totaleSec = minuti?.reduce((acc, m) => acc + (m.tempo_giocato_sec || 0), 0) || 0;
+      totaleMinuti = Math.floor(totaleSec / 60);
+    }
+
     setStatistiche({
       goalTotali: stats?.goal_totali || 0,
       presenzeTotali: stats?.presenze_totali || 0,
       goalSubiti: stats?.goal_subiti || 0,
       mediaVotoUtenti: voti?.media_voto_utenti || 0,
       mediaVotoMister: voti?.media_voto_mister || 0,
+      minutiGiocatiTotali: totaleMinuti,
     });
   };
 
@@ -219,7 +242,7 @@ export default function DettaglioGiocatore() {
             {giocatore.cognome} {giocatore.nome}
           </h1>
 
-          <div className="flex space-x-8 mb-6">
+          <div className="flex flex-wrap justify-center gap-8 mb-6">
             {/* Goal fatti */}
             <div className="text-center">
               <div className="text-2xl font-bold text-montecarlo-accent">{statistiche.goalTotali}</div>
@@ -230,6 +253,12 @@ export default function DettaglioGiocatore() {
             <div className="text-center">
               <div className="text-2xl font-bold text-montecarlo-gold-600">{statistiche.presenzeTotali}</div>
               <div className="text-sm text-black">Presenze</div>
+            </div>
+
+            {/* Minuti Giocati */}
+            <div className="text-center">
+              <div className="text-2xl font-bold text-montecarlo-secondary">{statistiche.minutiGiocatiTotali}</div>
+              <div className="text-sm text-black">Minuti Giocati</div>
             </div>
 
             {/* Media Goal solo se NON portiere */}
