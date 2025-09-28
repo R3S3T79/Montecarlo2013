@@ -1,5 +1,5 @@
 // src/components/GestioneRisultatoPartita.tsx
-// Data creazione: 18/08/2025 (rev: aggiunta gestione goal subiti portieri + squadra_segnante_id)
+// Data creazione: 18/08/2025 (rev: aggiunta gestione goal subiti portieri + squadra_segnante_id + minuti giocati)
 
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -18,41 +18,63 @@ interface TimerState {
 export default function GestioneRisultatoPartita() {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const MONTECARLO_ID = "a16a8645-9f86-41d9-a81f-a92931f1cc67";
 
+  // ========================
+  // Stati partita e squadre
+  // ========================
   const [partita, setPartita] = useState<any>(null);
   const [squadraCasa, setSquadraCasa] = useState<any>(null);
   const [squadraOspite, setSquadraOspite] = useState<any>(null);
 
+  // ========================
+  // Stati giocatori
+  // ========================
   const [giocatori, setGiocatori] = useState<
-    { id: string; nome: string | null; cognome: string | null; ruolo?: string | null; giocatore_uid?: string }[]
+    {
+      id: string;
+      nome: string | null;
+      cognome: string | null;
+      ruolo?: string | null;
+      giocatore_uid?: string;
+    }[]
   >([]);
   const [convocati, setConvocati] = useState<string[]>([]);
   const [titolari, setTitolari] = useState<string[]>([]);
 
+  // ========================
+  // Stati sostituzioni e minuti giocati
+  // ========================
   const [sostituzioniAperte, setSostituzioniAperte] = useState(false);
   const [sostituzioni, setSostituzioni] = useState<
     { uscente: string; entrante: string; minuto: number }[]
   >([]);
-  
-  // 🔹 nuovo stato: giocatore selezionato per uscire
   const [uscenteSelezionato, setUscenteSelezionato] = useState<string | null>(null);
 
+  // minuti giocati calcolati (secondi)
   const [minutiGiocati, setMinutiGiocati] = useState<Record<string, number>>({});
 
+  // righe raw da DB (entrata/uscita in secondi)
+  const [minutiRows, setMinutiRows] = useState<
+    { giocatore_stagione_id: string; entrata_sec: number | null; uscita_sec: number | null }[]
+  >([]);
 
-// 🔹 Righe raw da DB (entrata/uscita in secondi)
-const [minutiRows, setMinutiRows] = useState<
-  { giocatore_stagione_id: string; entrata_sec: number | null; uscita_sec: number | null }[]
->([]);
+  // per editing manuale dei minuti giocati
+const [editingTime, setEditingTime] = useState<string | null>(null);
+const [manualTime, setManualTime] = useState<string>("");
 
-
-
+  // ========================
+  // Stati UI
+  // ========================
   const [formazioneAperta, setFormazioneAperta] = useState(false);
   const [goalCasa, setGoalCasa] = useState([0, 0, 0, 0]);
   const [goalOspite, setGoalOspite] = useState([0, 0, 0, 0]);
   const [tempo, setTempo] = useState<number | null>(null);
 
+  // ========================
+  // Stati marcatori
+  // ========================
   const [marcatori, setMarcatori] = useState<
     Record<
       number,
@@ -66,22 +88,27 @@ const [minutiRows, setMinutiRows] = useState<
     >
   >({});
 
-  // TIMER
+  // ========================
+  // Timer
+  // ========================
   const [timerState, setTimerState] = useState<TimerState | null>(null);
   const [elapsed, setElapsed] = useState(0);
 
+  // ========================
+  // Helper
+  // ========================
   const totale = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
 
   const isMontecarlo = (teamId?: string, teamName?: string) =>
-    teamId === MONTECARLO_ID || (teamName || "").toLowerCase().includes("montecarlo");
+    teamId === MONTECARLO_ID ||
+    (teamName || "").toLowerCase().includes("montecarlo");
 
- // Converte secondi → "MM:SS"
-const formatTempo = (sec: number) => {
-  const minutes = Math.floor(sec / 60);
-  const seconds = sec % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-};
-
+  // Converte secondi → "MM:SS"
+  const formatTempo = (sec: number) => {
+    const minutes = Math.floor(sec / 60);
+    const seconds = sec % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  };
 
   // =====================
   // FETCH DATI INIZIALI + REALTIME
@@ -176,15 +203,6 @@ setMinutiRows(minutiDB || []);
 
  
 
-    if (presenze && presenze.length > 0) {
-      const ids = presenze
-        .map((x) => x.giocatore_stagione_id)
-        .filter((x): x is string => typeof x === "string");
-      setConvocati(ids);
-    } else {
-      setConvocati([]);
-    }
-
     const { data: marcatoriDB } = await supabase
       .from("marcatori")
       .select(
@@ -278,21 +296,20 @@ if (t) setTimerState(t);
 
   // calcolo elapsed
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    if (timerState) {
-      if (timerState.timer_status === "running" && timerState.timer_started_at) {
-        interval = setInterval(() => {
-          const started = new Date(timerState.timer_started_at!).getTime();
-          setElapsed(timerState.timer_offset_ms + (Date.now() - started));
-        }, 1000);
-      } else {
-        setElapsed(timerState.timer_offset_ms);
-      }
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [timerState]);
+  let interval: NodeJS.Timeout | null = null;
+  if (timerState?.timer_status === "running" && timerState.timer_started_at) {
+    interval = setInterval(() => {
+      const started = new Date(timerState.timer_started_at!).getTime();
+      setElapsed(timerState.timer_offset_ms + (Date.now() - started));
+    }, 1000);
+  } else if (timerState) {
+    setElapsed(timerState.timer_offset_ms);
+  }
+  return () => {
+    if (interval) clearInterval(interval);
+  };
+}, [timerState]);
+
 
   // 🔹 Ricalcolo continuo dei secondi giocati per ogni giocatore
 useEffect(() => {
@@ -314,97 +331,102 @@ useEffect(() => {
 }, [minutiRows, elapsed]);
 
 
-  // durata corrente "sorgente unica"
-  const currentDuration = timerState?.timer_duration_min ?? 20;
+  /// durata corrente "sorgente unica"
+const currentDuration = timerState?.timer_duration_min ?? 20;
 
-  const startTimer = async () => {
+// Avvia o riprende il timer
+const startTimer = async () => {
   if (!id) return;
 
-  // Avvia/aggiorna timer
+  const now = new Date().toISOString();
+
   await supabase.from("partita_timer_state").upsert({
     partita_id: id,
     timer_duration_min: currentDuration,
-    timer_started_at: new Date().toISOString(),
+    timer_started_at: now,
     timer_status: "running",
+    // 🔹 mantengo sempre l’offset accumulato
+    timer_offset_ms: timerState?.timer_offset_ms || 0,
   });
 
-  // Registra entrata dei titolari se non hanno già una riga "aperta"
-  const nowSec = Math.floor(elapsed / 1000);
-
-  if (titolari.length > 0) {
-    // DB
-    await supabase
-      .from("minuti_giocati")
-      .insert(
-        titolari
-          .filter(
-            (gid) =>
-              !minutiRows.some(
-                (r) => r.giocatore_stagione_id === gid && r.uscita_sec === null
-              )
-          )
-          .map((gid) => ({
-            partita_id: id,
-            giocatore_stagione_id: gid,
-            entrata_sec: nowSec, // ⬅️ secondi correnti
-            uscita_sec: null,
-          }))
-      );
-  }
-
-  // Stato locale
-  setMinutiRows((prev) => {
-    const aperti = new Set(
-      prev.filter((r) => r.uscita_sec === null).map((r) => r.giocatore_stagione_id)
-    );
-    const toAdd = titolari
-      .filter((gid) => !aperti.has(gid))
-      .map((gid) => ({
-        giocatore_stagione_id: gid,
-        entrata_sec: nowSec,
-        uscita_sec: null,
-      }));
-    return [...prev, ...toAdd];
-  });
+  setTimerState((prev) => ({
+    ...(prev || {}),
+    partita_id: id,
+    timer_duration_min: currentDuration,
+    timer_started_at: now,
+    timer_status: "running",
+    timer_offset_ms: prev?.timer_offset_ms || 0,
+  }));
 };
 
+// Metti in pausa il timer
+const pauseTimer = async () => {
+  if (!id || !timerState?.timer_started_at) return;
 
+  const diff = Date.now() - new Date(timerState.timer_started_at).getTime();
 
-  const pauseTimer = async () => {
-    if (!id || !timerState?.timer_started_at) return;
-    const diff = Date.now() - new Date(timerState.timer_started_at).getTime();
-    await supabase
-      .from("partita_timer_state")
-      .update({
-        timer_offset_ms: timerState.timer_offset_ms + diff,
-        timer_started_at: null,
-        timer_status: "paused",
-      })
-      .eq("partita_id", id);
-  };
+  await supabase
+    .from("partita_timer_state")
+    .update({
+      timer_offset_ms: (timerState.timer_offset_ms || 0) + diff,
+      timer_started_at: null,
+      timer_status: "paused",
+    })
+    .eq("partita_id", id);
 
-  const resetTimer = async () => {
-    if (!id) return;
-    await supabase
-      .from("partita_timer_state")
-      .update({
-        timer_offset_ms: 0,
-        timer_started_at: null,
-        timer_status: "stopped",
-      })
-      .eq("partita_id", id);
-  };
+  setTimerState((prev) => ({
+    ...(prev || {}),
+    timer_offset_ms: (prev?.timer_offset_ms || 0) + diff,
+    timer_started_at: null,
+    timer_status: "paused",
+  }));
+};
 
-  const changeDuration = async (minutes: number) => {
-    if (!id) return;
-    await supabase.from("partita_timer_state").upsert({
-      partita_id: id,
-      timer_duration_min: minutes,
+// Reset totale del timer
+const resetTimer = async () => {
+  if (!id) return;
+
+  await supabase
+    .from("partita_timer_state")
+    .update({
       timer_offset_ms: 0,
       timer_started_at: null,
       timer_status: "stopped",
-    });
-  };
+    })
+    .eq("partita_id", id);
+
+  setTimerState((prev) => ({
+    ...(prev || {}),
+    timer_offset_ms: 0,
+    timer_started_at: null,
+    timer_status: "stopped",
+  }));
+
+  setElapsed(0);
+};
+
+// Cambia la durata (minuti)
+const changeDuration = async (minutes: number) => {
+  if (!id) return;
+
+  await supabase.from("partita_timer_state").upsert({
+    partita_id: id,
+    timer_duration_min: minutes,
+    timer_offset_ms: 0,
+    timer_started_at: null,
+    timer_status: "stopped",
+  });
+
+  setTimerState((prev) => ({
+    ...(prev || {}),
+    timer_duration_min: minutes,
+    timer_offset_ms: 0,
+    timer_started_at: null,
+    timer_status: "stopped",
+  }));
+
+  setElapsed(0);
+};
 
   // =====================
   // MARCATORI / PORTIERI – helper locali & DB
@@ -951,86 +973,104 @@ const salvaStatoConferma = async () => {
             </span>
 
             {/* Convocato */}
-            <label className="flex items-center gap-1 text-xs">
-              <span>Conv</span>
-              <input
-                type="checkbox"
-                checked={convocati.includes(g.id)}
-                onChange={() =>
-                  setConvocati((prev) =>
-                    prev.includes(g.id)
-                      ? prev.filter((x) => x !== g.id)
-                      : [...prev, g.id]
-                  )
-                }
-              />
-            </label>
+<label className="flex items-center gap-1 text-xs">
+  <span>Conv</span>
+  <input
+  type="checkbox"
+  checked={convocati.includes(g.id)}
+  onChange={() => {
+    if (convocati.includes(g.id)) {
+      setConvocati((prev) => prev.filter((x) => x !== g.id));
+    } else {
+      setConvocati((prev) => [...prev, g.id]);
+    }
+  }}
+/>
+</label>
 
-            {/* Titolare */}
-            <label className="flex items-center gap-1 text-xs">
-              <span>Titol</span>
-              <input
-                type="checkbox"
-                checked={titolari.includes(g.id)}
-                disabled={!convocati.includes(g.id)}
-                onChange={() =>
-                  setTitolari((prev) =>
-                    prev.includes(g.id)
-                      ? prev.filter((x) => x !== g.id)
-                      : [...prev, g.id]
-                  )
-                }
-              />
-            </label>
+{/* Titolare */}
+<label className="flex items-center gap-1 text-xs">
+  <span>Titol</span>
+  <input
+    type="checkbox"
+    checked={titolari.includes(g.id)}
+    disabled={!convocati.includes(g.id)}
+    onChange={() => {
+      if (titolari.includes(g.id)) {
+        setTitolari((prev) => prev.filter((x) => x !== g.id));
+      } else {
+        setTitolari((prev) => [...prev, g.id]);
+      }
+    }}
+  />
+</label>
+
           </div>
         ))}
       </div>
 
       {/* Salva su DB */}
-      <button
-        onClick={async () => {
-          if (!partita) return;
-          await supabase.from("presenze").delete().eq("partita_id", id);
+<button
+  onClick={async () => {
+    if (!partita) return;
 
-          const rows = convocati.map((gid) => {
-            const g = giocatori.find((x) => x.id === gid);
-            return {
-              partita_id: id,
-              giocatore_stagione_id: gid,
-              stagione_id: partita.stagione_id,
-              nome: (g?.nome || "").trim(),
-              cognome: (g?.cognome || "").trim(),
-              titolare: titolari.includes(gid), // 🔹 salva anche il flag titolare
-            };
-          });
+    // 1) pulisci presenze precedenti
+    await supabase.from("presenze").delete().eq("partita_id", id);
 
-          if (rows.length > 0) {
-            await supabase.from("presenze").insert(rows);
-          }
+    // 2) salva convocati + titolari
+    const rows = convocati.map((gid) => {
+      const g = giocatori.find((x) => x.id === gid);
+      return {
+        partita_id: id,
+        giocatore_stagione_id: gid,
+        stagione_id: partita.stagione_id,
+        nome: (g?.nome || "").trim(),
+        cognome: (g?.cognome || "").trim(),
+        titolare: titolari.includes(gid),
+      };
+    });
 
-          setFormazioneAperta(false);
-        }}
-        className="w-full bg-montecarlo-secondary text-white py-2 rounded-lg mt-4"
-      >
-        Salva
-      </button>
+    if (rows.length > 0) {
+      await supabase.from("presenze").insert(rows);
+    }
+
+    // 3) inserisci righe in minuti_giocati per i titolari (se non ci sono già)
+    const nowSec = Math.floor(elapsed / 1000);
+    const iniziali = titolari.map((gid) => ({
+      partita_id: id,
+      giocatore_stagione_id: gid,
+      entrata_sec: nowSec,
+      uscita_sec: null,
+    }));
+
+    if (iniziali.length > 0) {
+      await supabase.from("minuti_giocati").insert(iniziali);
+    }
+
+    // 4) chiudi la modale
+    setFormazioneAperta(false);
+  }}
+  className="w-full bg-montecarlo-secondary text-white py-2 rounded-lg mt-4"
+>
+  Salva
+</button>
+
     </div>
   </div>
 )}
-
-
 
 
 {/* Modal Sostituzioni */}
 {sostituzioniAperte && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div className="bg-white p-6 rounded-lg shadow-montecarlo max-w-xs w-full h-[80vh] flex flex-col">
-      
 
       {/* Contenuto scrollabile */}
       <div className="flex-1 overflow-y-auto">
         {/* TITOLARI */}
-        <h3 className="text-lg font-bold text-montecarlo-secondary mt-2 mb-1">Schierati</h3>
+        <h3 className="text-lg font-bold text-montecarlo-secondary mt-2 mb-1">
+          Schierati
+        </h3>
         {[...titolari]
           .map((tid) => giocatori.find((g) => g.id === tid))
           .filter(Boolean)
@@ -1044,7 +1084,9 @@ const salvaStatoConferma = async () => {
             <div
               key={gioc!.id}
               onClick={() =>
-                setUscenteSelezionato((prev) => (prev === gioc!.id ? null : gioc!.id))
+                setUscenteSelezionato((prev) =>
+                  prev === gioc!.id ? null : gioc!.id
+                )
               }
               className={`cursor-pointer flex items-center justify-between pr-2 border-b py-1 ${
                 uscenteSelezionato === gioc!.id
@@ -1055,11 +1097,42 @@ const salvaStatoConferma = async () => {
               <span className="text-lg leading-none">
                 {(gioc!.cognome || "").trim()} {(gioc!.nome || "").trim()}
               </span>
+
+              {/* 🔹 tempo giocato editabile */}
+              {editingTime === gioc!.id ? (
+                <input
+                  type="text"
+                  value={manualTime}
+                  onChange={(e) => setManualTime(e.target.value)}
+                  onBlur={() => salvaTempoManuale(gioc!.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") salvaTempoManuale(gioc!.id);
+                  }}
+                  autoFocus
+                  className="w-16 border rounded px-1 text-right text-sm"
+                  placeholder="mm:ss"
+                />
+              ) : (
+                <span
+                  className="text-sm text-gray-600 cursor-pointer"
+                  onClick={() => {
+                    const sec = minutiGiocati[gioc!.id] || 0;
+                    const mm = String(Math.floor(sec / 60)).padStart(2, "0");
+                    const ss = String(sec % 60).padStart(2, "0");
+                    setManualTime(`${mm}:${ss}`);
+                    setEditingTime(gioc!.id);
+                  }}
+                >
+                  {formatTempo(minutiGiocati[gioc!.id] || 0)}
+                </span>
+              )}
             </div>
           ))}
 
         {/* PANCHINA */}
-        <h3 className="text-lg font-bold text-gray-600 mt-4 mb-1">A disposizione</h3>
+        <h3 className="text-lg font-bold text-gray-600 mt-4 mb-1">
+          A disposizione
+        </h3>
         {convocati
           .filter((cid) => !titolari.includes(cid))
           .map((cid) => giocatori.find((g) => g.id === cid))
@@ -1085,6 +1158,35 @@ const salvaStatoConferma = async () => {
               <span className="text-lg leading-none">
                 {(gioc!.cognome || "").trim()} {(gioc!.nome || "").trim()}
               </span>
+
+              {/* 🔹 tempo giocato editabile */}
+              {editingTime === gioc!.id ? (
+                <input
+                  type="text"
+                  value={manualTime}
+                  onChange={(e) => setManualTime(e.target.value)}
+                  onBlur={() => salvaTempoManuale(gioc!.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") salvaTempoManuale(gioc!.id);
+                  }}
+                  autoFocus
+                  className="w-16 border rounded px-1 text-right text-sm"
+                  placeholder="mm:ss"
+                />
+              ) : (
+                <span
+                  className="text-sm text-gray-600 cursor-pointer"
+                  onClick={() => {
+                    const sec = minutiGiocati[gioc!.id] || 0;
+                    const mm = String(Math.floor(sec / 60)).padStart(2, "0");
+                    const ss = String(sec % 60).padStart(2, "0");
+                    setManualTime(`${mm}:${ss}`);
+                    setEditingTime(gioc!.id);
+                  }}
+                >
+                  {formatTempo(minutiGiocati[gioc!.id] || 0)}
+                </span>
+              )}
             </div>
           ))}
       </div>
@@ -1099,11 +1201,6 @@ const salvaStatoConferma = async () => {
     </div>
   </div>
 )}
-
-
-
-
-
 
 
 
