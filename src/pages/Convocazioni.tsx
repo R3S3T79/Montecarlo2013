@@ -26,13 +26,59 @@ export default function Convocazioni() {
   const [nomeTorneo, setNomeTorneo] = useState<string>("");
   const [data, setData] = useState("");
   const [oraPartita, setOraPartita] = useState("");
-  const [ritrovoLuogo, setRitrovoLuogo] = useState("Campo di Montecarlo");
+  const [ritrovoLuogo, setRitrovoLuogo] = useState("");
   const [oraRitrovo, setOraRitrovo] = useState("");
-  const [convocati, setConvocati] = useState<Record<string, boolean>>({});
+  const [convocati, setConvocati] = useState<string[]>([]);
+  const [partitaId, setPartitaId] = useState<string | null>(null);
+  const [partite, setPartite] = useState<any[]>([]);
+  const MONTECARLO_ID = "a16a8645-9f86-41d9-a81f-a92931f1cc67";
+  const [partiteSelezionate, setPartiteSelezionate] = useState<any[]>([]);
+
+
 
   const allenatore = "Cesaretti Stefano";
   const collaboratore = "Mazzoni Cristiano";
   const accompagnatori = ["Cervetti Marco", "Marotta Simone", "Miressi Marco"].sort();
+
+  const togglePartita = (p: any) => {
+  setPartiteSelezionate((prev) => {
+    const exists = prev.find((x) => x.id === p.id);
+    if (exists) {
+      return prev.filter((x) => x.id !== p.id);
+    } else {
+      return [...prev, p];
+    }
+  });
+};
+
+
+  useEffect(() => {
+  const fetchPartite = async () => {
+    const { data, error } = await supabase
+      .from("partite")
+      .select(`
+        id,
+        data_ora,
+        campionato_torneo,
+        nome_torneo,
+        stato,
+        squadra_casa:squadra_casa_id ( id, nome ),
+        squadra_ospite:squadra_ospite_id ( id, nome )
+      `)
+      .eq("stato", "DaGiocare")
+      .order("data_ora", { ascending: true });
+
+    if (!error && data) {
+      setPartite(data);
+    } else {
+      console.error("Errore fetch partite:", error);
+    }
+  };
+
+  fetchPartite();
+}, []);
+
+
 
   // Carica squadre (escludendo Montecarlo)
   useEffect(() => {
@@ -49,31 +95,40 @@ export default function Convocazioni() {
     fetchSquadre();
   }, []);
 
-  // Carica giocatori stagione attuale
-  useEffect(() => {
-    const fetchGiocatori = async () => {
-      const { data: stagione } = await supabase
-        .from("stagioni")
-        .select("id")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+  // Carica giocatori stagione attuale + presenze della partita
+useEffect(() => {
+  const fetchGiocatori = async () => {
+    // stagione corrente
+    const { data: stagione } = await supabase
+      .from("stagioni")
+      .select("id")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-      if (stagione?.id) {
-        const { data, error } = await supabase
-          .from("giocatori_stagioni")
-          .select("id, nome, cognome")
-          .eq("stagione_id", stagione.id);
+    if (!stagione?.id) return;
 
-        if (!error && data) {
-          const ordinati = [...data].sort((a, b) => a.cognome.localeCompare(b.cognome));
-          setGiocatori(ordinati);
-          setConvocati(Object.fromEntries(ordinati.map((g) => [g.id, false])));
-        }
-      }
-    };
-    fetchGiocatori();
-  }, []);
+    // giocatori stagione
+    const { data: giocatoriStagione, error: errGioc } = await supabase
+      .from("giocatori_stagioni")
+      .select("id, nome, cognome")
+      .eq("stagione_id", stagione.id);
+
+    if (errGioc) {
+      console.error("Errore caricamento giocatori:", errGioc.message);
+      return;
+    }
+
+    const ordinati = (giocatoriStagione || []).sort((a, b) =>
+      (a.cognome || "").localeCompare(b.cognome || "")
+    );
+    setGiocatori(ordinati);
+  };
+
+  fetchGiocatori();
+}, []);
+
+
 
   // Calcola ora ritrovo un'ora prima
   useEffect(() => {
@@ -104,35 +159,85 @@ export default function Convocazioni() {
   };
 
   const toggleAll = () => {
-    const allSelected = Object.values(convocati).every((v) => v);
-    const updated = Object.fromEntries(giocatori.map((g) => [g.id, !allSelected]));
-    setConvocati(updated);
-  };
+  if (convocati.length === giocatori.length) {
+    setConvocati([]); // deseleziona tutti
+  } else {
+    setConvocati(giocatori.map((g) => g.id)); // seleziona tutti
+  }
+};
+
 
   const handleShareWhatsapp = async () => {
-    const node = document.getElementById("convocazione");
-    if (node) {
-      try {
-        const canvas = await html2canvas(node, { scale: 2, backgroundColor: "#ffffff" });
-        const dataUrl = canvas.toDataURL("image/png");
+  if (!partitaId && partiteSelezionate.length === 0) {
+    alert("Seleziona almeno una partita prima di condividere.");
+    return;
+  }
 
-        const blob = await (await fetch(dataUrl)).blob();
-        const file = new File([blob], "convocazione.png", { type: "image/png" });
+  try {
+    // recupera stagione attuale
+    const { data: stagione } = await supabase
+      .from("stagioni")
+      .select("id")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            title: "Convocazione Montecarlo 2013",
-            text: "Ecco la convocazione della prossima partita ⚽",
-            files: [file],
-          });
-        } else {
-          alert("Condivisione diretta non supportata. Salva e invia manualmente su WhatsApp.");
-        }
-      } catch (err) {
-        console.error("Errore screenshot:", err);
+    if (!stagione?.id) {
+      alert("Nessuna stagione trovata.");
+      return;
+    }
+
+    // lista partite da salvare
+    const partiteTarget = partiteSelezionate.length > 0
+      ? partiteSelezionate
+      : [{ id: partitaId }];
+
+    // crea record per i convocati selezionati
+    const records = [];
+    for (const p of partiteTarget) {
+  for (const gid of convocati) {
+    records.push({
+      partita_id: p.id,
+      giocatore_stagione_id: gid,
+      stagione_id: stagione.id,
+      titolare: false, // sempre false in convocazioni
+    });
+  }
+}
+
+    if (records.length > 0) {
+      const { error } = await supabase.from("presenze").insert(records);
+      if (error) {
+        console.error("Errore salvataggio presenze:", error);
+        alert("Errore nel salvataggio dei convocati.");
+        return;
       }
     }
-  };
+
+    // ====== Dopo il salvataggio, procedi con la condivisione ======
+    const node = document.getElementById("convocazione");
+    if (node) {
+      const canvas = await html2canvas(node, { scale: 2, backgroundColor: "#ffffff" });
+      const dataUrl = canvas.toDataURL("image/png");
+
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], "convocazione.png", { type: "image/png" });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: "Convocazione Montecarlo 2013",
+          text: "Ecco la convocazione della prossima partita ⚽",
+          files: [file],
+        });
+      } else {
+        alert("Condivisione diretta non supportata. Salva e invia manualmente su WhatsApp.");
+      }
+    }
+  } catch (err) {
+    console.error("Errore screenshot o salvataggio:", err);
+  }
+};
+
 
   const handleNumPartiteChange = (val: number) => {
     setNumPartite(val);
@@ -147,11 +252,22 @@ export default function Convocazioni() {
     });
   };
 
+ 
+
   return (
     <div className="p-6">
       {/* ===== FORM A SCHERMO ===== */}
       <div className="space-y-4 print:hidden">
         <div className="bg-white/90 rounded shadow p-4 m-2 space-y-4">
+         {/* Pulsante selezione partita */}
+<div className="mb-4">
+  <button
+    onClick={() => document.getElementById("modal-partite")?.classList.remove("hidden")}
+    className="bg-blue-600 text-white px-3 py-2 rounded"
+  >
+    Seleziona partita
+  </button>
+</div>
           {/* Competizione */}
           <label className="block font-bold">Competizione:</label>
           <select
@@ -269,7 +385,7 @@ export default function Convocazioni() {
         {/* Giocatori */}
         <div className="bg-white/90 rounded shadow p-4 m-2">
           <div className="flex items-center justify-between mb-2">
-            <label className="block font-bold text-lg">Giocatori:</label>
+            
             <button
               onClick={toggleAll}
               className="text-sm bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
@@ -282,16 +398,32 @@ export default function Convocazioni() {
               <li key={g.id} className="flex items-center space-x-2">
                 <input
                   type="checkbox"
-                  checked={convocati[g.id]}
-                  onChange={() => handleCheckbox(g.id)}
+                  checked={convocati.includes(g.id)}
+                  onChange={() => {
+                    if (convocati.includes(g.id)) {
+                      setConvocati((prev) => prev.filter((x) => x !== g.id));
+                    } else {
+                      setConvocati((prev) => [...prev, g.id]);
+                    }
+                  }}
                 />
-                <label onClick={() => handleCheckbox(g.id)} className="cursor-pointer">
+                <label
+                  onClick={() => {
+                    if (convocati.includes(g.id)) {
+                      setConvocati((prev) => prev.filter((x) => x !== g.id));
+                    } else {
+                      setConvocati((prev) => [...prev, g.id]);
+                    }
+                  }}
+                  className="cursor-pointer"
+                >
                   {g.cognome.toUpperCase()} {g.nome}
                 </label>
               </li>
             ))}
           </ul>
         </div>
+
 
         <button
           onClick={handleShareWhatsapp}
@@ -300,6 +432,93 @@ export default function Convocazioni() {
           Condividi su WhatsApp
         </button>
       </div>
+
+      <div id="modal-partite" className="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  <div className="bg-white p-4 rounded shadow max-w-md w-full mx-4">
+    <h2 className="text-lg font-bold mb-2">Scegli partita</h2>
+
+    <ul className="divide-y px-2">
+      {partite.map((p) => {
+        const selected = partiteSelezionate.find((x) => x.id === p.id);
+        return (
+          <li
+            key={p.id}
+            className={`py-2 cursor-pointer px-2 rounded ${
+              selected ? "bg-blue-100 font-semibold" : "hover:bg-gray-100"
+            }`}
+            onClick={() => togglePartita(p)}
+          >
+            <div>
+              {new Date(p.data_ora).toLocaleDateString("it-IT", {
+                weekday: "short",
+                day: "2-digit",
+                month: "2-digit",
+              })}{" "}
+              - {p.campionato_torneo}
+            </div>
+            <div className="text-sm text-gray-600">
+              {p.squadra_casa?.nome} vs {p.squadra_ospite?.nome}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+
+    <div className="flex justify-end space-x-2 mt-3">
+      <button
+        onClick={() => document.getElementById("modal-partite")?.classList.add("hidden")}
+        className="bg-gray-300 px-3 py-1 rounded"
+      >
+        Chiudi
+      </button>
+
+      <button
+        onClick={() => {
+          if (partiteSelezionate.length === 1) {
+            const p = partiteSelezionate[0];
+            setPartitaId(p.id);
+            setCompetizione(p.campionato_torneo || "Campionato");
+            setNomeTorneo(p.nome_torneo || "");
+            setData(p.data_ora.split("T")[0]);
+            setOraPartita(new Date(p.data_ora).toISOString().slice(11, 16));
+
+            // avversaria
+            if (p.squadra_casa?.id === MONTECARLO_ID) {
+              setSquadraAvversaria(p.squadra_ospite?.nome || "");
+            } else {
+              setSquadraAvversaria(p.squadra_casa?.nome || "");
+            }
+          } else if (partiteSelezionate.length > 1) {
+            setCompetizione("Torneo");
+            setNumPartite(partiteSelezionate.length);
+            setSquadreAvversarie(
+              partiteSelezionate.map((p) => {
+                if (p.squadra_casa?.id === MONTECARLO_ID) {
+                  return p.squadra_ospite?.nome || "";
+                } else {
+                  return p.squadra_casa?.nome || "";
+                }
+              })
+            );
+            setNomeTorneo(partiteSelezionate[0].nome_torneo || "");
+            setData(partiteSelezionate[0].data_ora.split("T")[0]);
+            setOraPartita(new Date(partiteSelezionate[0].data_ora).toISOString().slice(11, 16));
+          }
+
+         
+          document.getElementById("modal-partite")?.classList.add("hidden");
+        }}
+        className="bg-blue-600 text-white px-3 py-1 rounded"
+      >
+        Seleziona
+      </button>
+    </div>
+  </div>
+</div>
+
+
+
+
 
       {/* ===== LAYOUT EXPORT (screenshot) ===== */}
       <div id="convocazione" className="bg-white font-serif text-[14pt] p-6">
@@ -352,11 +571,11 @@ export default function Convocazioni() {
           <strong>CONVOCATI:</strong>
           <ul className="mt-3">
             {giocatori.map((g) => (
-              <li key={g.id} className={convocati[g.id] ? "" : "line-through"}>
-                <span>
-                  {g.cognome.toUpperCase()} {g.nome}
-                </span>
-              </li>
+              <li key={g.id} className={convocati.includes(g.id) ? "" : "line-through"}>
+  <span>
+    {g.cognome.toUpperCase()} {g.nome}
+  </span>
+</li>
             ))}
           </ul>
         </div>
