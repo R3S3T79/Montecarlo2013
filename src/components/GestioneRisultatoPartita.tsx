@@ -31,11 +31,15 @@ export default function GestioneRisultatoPartita() {
   const [titolari, setTitolari] = useState<string[]>([]);
 
   const [sostituzioniAperte, setSostituzioniAperte] = useState(false);
-const [sostituzioni, setSostituzioni] = useState<
-  { uscente: string; entrante: string; minuto: number }[]
->([]);
-const [giocatoreDaSostituire, setGiocatoreDaSostituire] = useState<string | null>(null);
-const [minutiGiocati, setMinutiGiocati] = useState<Record<string, number>>({});
+  const [sostituzioni, setSostituzioni] = useState<
+    { uscente: string; entrante: string; minuto: number }[]
+  >([]);
+  
+  // 🔹 nuovo stato: giocatore selezionato per uscire
+  const [uscenteSelezionato, setUscenteSelezionato] = useState<string | null>(null);
+
+  const [minutiGiocati, setMinutiGiocati] = useState<Record<string, number>>({});
+
 
 // 🔹 Righe raw da DB (entrata/uscita in secondi)
 const [minutiRows, setMinutiRows] = useState<
@@ -102,10 +106,27 @@ const formatTempo = (sec: number) => {
     setSquadraCasa(resCasa.data);
     setSquadraOspite(resOspite.data);
 
-    const { data: presenze } = await supabase
-      .from("presenze")
-      .select("giocatore_stagione_id, nome, cognome")
-      .eq("partita_id", id);
+    // Fetch presenze (convocati + titolari)
+const { data: presenze } = await supabase
+  .from("presenze")
+  .select("giocatore_stagione_id, nome, cognome, titolare")
+  .eq("partita_id", id);
+
+if (presenze) {
+  // Convocati = tutti quelli presenti in tabella
+  setConvocati(presenze.map((p) => p.giocatore_stagione_id));
+
+  // Titolari = solo quelli con flag titolare = true
+  setTitolari(
+    presenze
+      .filter((p) => p.titolare)
+      .map((p) => p.giocatore_stagione_id)
+  );
+} else {
+  setConvocati([]);
+  setTitolari([]);
+}
+
 
     const { data: giocatoriStagione } = await supabase
       .from("giocatori_stagioni")
@@ -885,8 +906,8 @@ const salvaStatoConferma = async () => {
             {/* Modal Convocati + Titolari */}
 {formazioneAperta && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white p-6 rounded-lg shadow-montecarlo max-w-md w-full mx-2 space-y-4">
-      <h2 className="text-center text-lg font-semibold">Seleziona Convocati & Titolari</h2>
+    <div className="bg-white p-6 rounded-lg shadow-montecarlo max-w-md w-full h-[80vh] flex flex-col">
+      
 
       {/* Pulsanti rapidi */}
       <div className="flex justify-between text-xs mb-2">
@@ -900,85 +921,77 @@ const salvaStatoConferma = async () => {
           }}
           className="px-2 py-1 bg-montecarlo-gray-100 rounded hover:bg-montecarlo-gray-200"
         >
-          {convocati.length === giocatori.length ? "Deseleziona Convocati" : "Seleziona Convocati"}
+          Seleziona Convocati ({convocati.length})
         </button>
 
         <button
           onClick={() => {
-            if (titolari.length === giocatori.length) {
+            if (titolari.length === convocati.length) {
               setTitolari([]); // deseleziona tutto
             } else {
-              setTitolari(giocatori.map((g) => g.id)); // seleziona tutti
+              setTitolari(convocati); // seleziona SOLO i convocati
             }
           }}
           className="px-2 py-1 bg-montecarlo-gray-100 rounded hover:bg-montecarlo-gray-200"
         >
-          {titolari.length === giocatori.length ? "Deseleziona Titolari" : "Seleziona Titolari"}
+          Seleziona Titolari ({titolari.length})
         </button>
       </div>
 
-      {/* Lista giocatori */}
-<div className="max-h-64 overflow-y-auto">
-  {giocatori.map((g) => (
-    <div
-  key={g.id}
-  className="flex items-center py-1 border-b"
->
-  {/* Nome + minuti giocati */}
-  <span className="text-sm flex items-center w-2/3">
-    {(g.cognome || "").trim()} {(g.nome || "").trim()}
-    <span className="ml-2 text-xs text-gray-500">
-      {minutiGiocati[g.id] ? formatTempo(minutiGiocati[g.id]) : "0:00"}
-    </span>
-  </span>
+      {/* Lista giocatori scrollabile */}
+      <div className="flex-1 overflow-y-auto">
+        {giocatori.map((g) => (
+          <div
+            key={g.id}
+            className="grid grid-cols-[minmax(150px,max-content)_auto_auto] items-center py-1 border-b text-sm gap-2"
+          >
+            {/* Nome */}
+            <span>
+              {(g.cognome || "").trim()} {(g.nome || "").trim()}
+            </span>
 
-  {/* Checkbox Convocato + Titolare */}
-  <div className="flex items-center gap-6 w-1/3 justify-start">
-    {/* Convocato */}
-    <label className="flex items-center gap-1 text-xs">
-      <span>Conv</span>
-      <input
-        type="checkbox"
-        checked={convocati.includes(g.id)}
-        onChange={() =>
-          setConvocati((prev) =>
-            prev.includes(g.id)
-              ? prev.filter((x) => x !== g.id)
-              : [...prev, g.id]
-          )
-        }
-      />
-    </label>
+            {/* Convocato */}
+            <label className="flex items-center gap-1 text-xs">
+              <span>Conv</span>
+              <input
+                type="checkbox"
+                checked={convocati.includes(g.id)}
+                onChange={() =>
+                  setConvocati((prev) =>
+                    prev.includes(g.id)
+                      ? prev.filter((x) => x !== g.id)
+                      : [...prev, g.id]
+                  )
+                }
+              />
+            </label>
 
-    {/* Titolare */}
-    <label className="flex items-center gap-1 text-xs">
-      <span>Titol</span>
-      <input
-        type="checkbox"
-        checked={titolari.includes(g.id)}
-        disabled={!convocati.includes(g.id)} // disabilita se non convocato
-        onChange={() =>
-          setTitolari((prev) =>
-            prev.includes(g.id)
-              ? prev.filter((x) => x !== g.id)
-              : [...prev, g.id]
-          )
-        }
-      />
-    </label>
-  </div>
-</div>
+            {/* Titolare */}
+            <label className="flex items-center gap-1 text-xs">
+              <span>Titol</span>
+              <input
+                type="checkbox"
+                checked={titolari.includes(g.id)}
+                disabled={!convocati.includes(g.id)}
+                onChange={() =>
+                  setTitolari((prev) =>
+                    prev.includes(g.id)
+                      ? prev.filter((x) => x !== g.id)
+                      : [...prev, g.id]
+                  )
+                }
+              />
+            </label>
+          </div>
+        ))}
+      </div>
 
-  ))}
-</div>
-
-
+      {/* Salva su DB */}
       <button
         onClick={async () => {
           if (!partita) return;
           await supabase.from("presenze").delete().eq("partita_id", id);
 
-          // Salva convocati
           const rows = convocati.map((gid) => {
             const g = giocatori.find((x) => x.id === gid);
             return {
@@ -987,13 +1000,17 @@ const salvaStatoConferma = async () => {
               stagione_id: partita.stagione_id,
               nome: (g?.nome || "").trim(),
               cognome: (g?.cognome || "").trim(),
+              titolare: titolari.includes(gid), // 🔹 salva anche il flag titolare
             };
           });
-          if (rows.length > 0) await supabase.from("presenze").insert(rows);
+
+          if (rows.length > 0) {
+            await supabase.from("presenze").insert(rows);
+          }
 
           setFormazioneAperta(false);
         }}
-        className="w-full bg-montecarlo-secondary text-white py-2 rounded-lg"
+        className="w-full bg-montecarlo-secondary text-white py-2 rounded-lg mt-4"
       >
         Salva
       </button>
@@ -1001,78 +1018,92 @@ const salvaStatoConferma = async () => {
   </div>
 )}
 
+
+
+
 {/* Modal Sostituzioni */}
 {sostituzioniAperte && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white p-6 rounded-lg shadow-montecarlo max-w-md w-full mx-2 space-y-4">
-      <h2 className="text-center text-lg font-semibold">Gestione Sostituzioni</h2>
+    <div className="bg-white p-6 rounded-lg shadow-montecarlo max-w-xs w-full h-[80vh] flex flex-col">
+      
 
-      <div className="max-h-64 overflow-y-auto space-y-3">
-        {titolari.map((tid) => {
-          const gioc = giocatori.find((g) => g.id === tid);
-          if (!gioc) return null;
-
-          return (
-            <div key={tid} className="flex flex-col border-b pb-2">
-              {/* Riga titolare + icona sostituzione */}
-              <div className="flex items-center justify-between pr-2">
-                <span className="text-sm flex items-center">
-                  {(gioc.cognome || "").trim()} {(gioc.nome || "").trim()}
-                  <span className="ml-2 text-xs text-gray-500">
-  {formatTempo(minutiGiocati[tid] || 0)}
-</span>
-                </span>
-                <FaArrowsRotate
-                  className="w-5 h-5 text-green-600 cursor-pointer mr-2"
-                  onClick={() => setGiocatoreDaSostituire(tid)}
-                />
-              </div>
-
-              {/* Dropdown per selezionare il sostituto */}
-              {giocatoreDaSostituire === tid && (
-                <select
-                  className="mt-2 border px-2 py-1 rounded"
-                  onChange={(e) => {
-                    const entrante = e.target.value;
-                    if (entrante) {
-                      const minuto = Math.floor(elapsed / 1000); // secondi correnti
-                      setSostituzioni((prev) => [
-                        ...prev,
-                        { uscente: tid, entrante, minuto },
-                      ]);
-                      salvaSostituzione(tid, entrante, minuto);
-                      setGiocatoreDaSostituire(null); // chiude il select
-                    }
-                  }}
-                >
-                  <option value="">-- Seleziona sostituto --</option>
-                  {convocati
-                    .filter((c) => !titolari.includes(c)) // SOLO panchinari
-                    .map((pid) => {
-                      const g = giocatori.find((gg) => gg.id === pid);
-                      if (!g) return null;
-                      return (
-                        <option key={pid} value={pid}>
-                          {(g.cognome || "").trim()} {(g.nome || "").trim()}
-                        </option>
-                      );
-                    })}
-                </select>
-              )}
+      {/* Contenuto scrollabile */}
+      <div className="flex-1 overflow-y-auto">
+        {/* TITOLARI */}
+        <h3 className="text-lg font-bold text-montecarlo-secondary mt-2 mb-1">Schierati</h3>
+        {[...titolari]
+          .map((tid) => giocatori.find((g) => g.id === tid))
+          .filter(Boolean)
+          .sort((a, b) => {
+            const cognA = (a!.cognome || "").toLowerCase();
+            const cognB = (b!.cognome || "").toLowerCase();
+            if (cognA !== cognB) return cognA.localeCompare(cognB);
+            return (a!.nome || "").toLowerCase().localeCompare((b!.nome || "").toLowerCase());
+          })
+          .map((gioc) => (
+            <div
+              key={gioc!.id}
+              onClick={() =>
+                setUscenteSelezionato((prev) => (prev === gioc!.id ? null : gioc!.id))
+              }
+              className={`cursor-pointer flex items-center justify-between pr-2 border-b py-1 ${
+                uscenteSelezionato === gioc!.id
+                  ? "bg-montecarlo-gray-200 font-bold"
+                  : "hover:bg-montecarlo-gray-100"
+              }`}
+            >
+              <span className="text-lg leading-none">
+                {(gioc!.cognome || "").trim()} {(gioc!.nome || "").trim()}
+              </span>
             </div>
-          );
-        })}
+          ))}
+
+        {/* PANCHINA */}
+        <h3 className="text-lg font-bold text-gray-600 mt-4 mb-1">A disposizione</h3>
+        {convocati
+          .filter((cid) => !titolari.includes(cid))
+          .map((cid) => giocatori.find((g) => g.id === cid))
+          .filter(Boolean)
+          .sort((a, b) => {
+            const cognA = (a!.cognome || "").toLowerCase();
+            const cognB = (b!.cognome || "").toLowerCase();
+            if (cognA !== cognB) return cognA.localeCompare(cognB);
+            return (a!.nome || "").toLowerCase().localeCompare((b!.nome || "").toLowerCase());
+          })
+          .map((gioc) => (
+            <div
+              key={gioc!.id}
+              onClick={() => {
+                if (uscenteSelezionato) {
+                  const minuto = Math.floor(elapsed / 1000);
+                  salvaSostituzione(uscenteSelezionato, gioc!.id, minuto);
+                  setUscenteSelezionato(null);
+                }
+              }}
+              className="cursor-pointer flex items-center justify-between pr-2 border-b py-1 hover:bg-montecarlo-gray-100"
+            >
+              <span className="text-lg leading-none">
+                {(gioc!.cognome || "").trim()} {(gioc!.nome || "").trim()}
+              </span>
+            </div>
+          ))}
       </div>
 
+      {/* Pulsante chiusura */}
       <button
         onClick={() => setSostituzioniAperte(false)}
-        className="w-full bg-red-500 text-white py-2 rounded-lg"
+        className="w-full bg-red-500 text-white py-2 rounded-lg mt-4"
       >
         Chiudi
       </button>
     </div>
   </div>
 )}
+
+
+
+
+
 
 
 
