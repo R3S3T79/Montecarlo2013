@@ -110,22 +110,31 @@ const [manualTime, setManualTime] = useState<string>("");
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
-  // =====================
-  // FETCH DATI INIZIALI + REALTIME
-  // =====================
-  useEffect(() => {
+// =====================
+// FETCH DATI INIZIALI + REALTIME
+// =====================
+useEffect(() => {
   if (!id) return;
   let subPartite: any = null;
   let subMarcatori: any = null;
   let subTimer: any = null;
 
   (async () => {
-    const { data: p } = await supabase.from("partite").select("*").eq("id", id).single();
-    if (!p) return;
+    // 1) Carico la partita
+    const { data: p, error: errP } = await supabase
+      .from("partite")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (errP || !p) {
+      console.error("Errore fetch partita:", errP?.message);
+      return;
+    }
     setPartita(p);
     setGoalCasa([p.goal_a1, p.goal_a2, p.goal_a3, p.goal_a4]);
     setGoalOspite([p.goal_b1, p.goal_b2, p.goal_b3, p.goal_b4]);
 
+    // 2) Squadre
     const [resCasa, resOspite] = await Promise.all([
       supabase.from("squadre").select("*").eq("id", p.squadra_casa_id).single(),
       supabase.from("squadre").select("*").eq("id", p.squadra_ospite_id).single(),
@@ -133,48 +142,33 @@ const [manualTime, setManualTime] = useState<string>("");
     setSquadraCasa(resCasa.data);
     setSquadraOspite(resOspite.data);
 
-    // Fetch presenze (convocati + titolari)
-const { data: presenze } = await supabase
-  .from("presenze")
-  .select("giocatore_stagione_id, nome, cognome, titolare")
-  .eq("partita_id", id);
+    // 3) Presenze (convocati + titolari)
+    const { data: presenze } = await supabase
+      .from("presenze")
+      .select("giocatore_stagione_id, nome, cognome, titolare")
+      .eq("partita_id", id);
 
-if (presenze) {
-  // Convocati = tutti quelli presenti in tabella
-  setConvocati(presenze.map((p) => p.giocatore_stagione_id));
+    if (presenze && presenze.length > 0) {
+      setConvocati(presenze.map((p) => p.giocatore_stagione_id));
+      setTitolari(presenze.filter((p) => p.titolare).map((p) => p.giocatore_stagione_id));
+    } else {
+      setConvocati([]);
+      setTitolari([]);
+    }
 
-  // Titolari = solo quelli con flag titolare = true
-  setTitolari(
-    presenze
-      .filter((p) => p.titolare)
-      .map((p) => p.giocatore_stagione_id)
-  );
-} else {
-  setConvocati([]);
-  setTitolari([]);
-}
-
-
-    const { data: giocatoriStagione } = await supabase
+    // 4) Giocatori stagione (lista completa)
+    const { data: giocatoriStagione, error: errG } = await supabase
       .from("giocatori_stagioni")
       .select("id, nome, cognome, ruolo, giocatore_uid")
       .eq("stagione_id", p.stagione_id);
 
-    // ⬇️ BLOCCO MINUTI (secondi)
-const { data: minutiDB, error: minErr } = await supabase
-  .from("minuti_giocati")
-  .select("giocatore_stagione_id, entrata_sec, uscita_sec")
-  .eq("partita_id", p.id);
-
-if (minErr) console.warn("[minuti_giocati] load:", minErr.message);
-setMinutiRows(minutiDB || []);
-// ⬆️ FINE BLOCCO MINUTI
-
+    if (errG) console.error("Errore fetch giocatori_stagioni:", errG.message);
 
     const mapGiocatori = new Map<
       string,
       { id: string; nome: string | null; cognome: string | null; ruolo?: string | null; giocatore_uid?: string }
     >();
+
     (giocatoriStagione || []).forEach((g) => {
       mapGiocatori.set(g.id, {
         id: g.id,
@@ -184,9 +178,9 @@ setMinutiRows(minutiDB || []);
         giocatore_uid: g.giocatore_uid,
       });
     });
+
     (presenze || []).forEach((pr) => {
       const idg = pr.giocatore_stagione_id;
-      if (!idg) return;
       if (!mapGiocatori.has(idg)) {
         mapGiocatori.set(idg, {
           id: idg,
@@ -195,19 +189,26 @@ setMinutiRows(minutiDB || []);
         });
       }
     });
+
     const elencoGiocatori = Array.from(mapGiocatori.values()).sort((a, b) => {
       const ac = (a.cognome || "").localeCompare(b.cognome || "");
       return ac !== 0 ? ac : (a.nome || "").localeCompare(b.nome || "");
     });
     setGiocatori(elencoGiocatori);
 
- 
+    // 5) Minuti giocati già registrati
+    const { data: minutiDB, error: minErr } = await supabase
+      .from("minuti_giocati")
+      .select("giocatore_stagione_id, entrata_sec, uscita_sec")
+      .eq("partita_id", p.id);
 
+    if (minErr) console.warn("[minuti_giocati] load:", minErr.message);
+    setMinutiRows(minutiDB || []);
+
+    // 6) Marcatori
     const { data: marcatoriDB } = await supabase
       .from("marcatori")
-      .select(
-        "giocatore_stagione_id, periodo, goal_tempo, portiere_subisce_id, squadra_segnante_id, id"
-      )
+      .select("giocatore_stagione_id, periodo, goal_tempo, portiere_subisce_id, squadra_segnante_id, id")
       .eq("partita_id", p.id);
 
     const perPeriodo: Record<number, any[]> = {};
@@ -223,76 +224,84 @@ setMinutiRows(minutiDB || []);
     });
     setMarcatori(perPeriodo);
 
-      // realtime partite
-      subPartite = supabase
-        .channel("realtime-partite")
-        .on(
-          "postgres_changes",
-          { event: "UPDATE", schema: "public", table: "partite", filter: `id=eq.${p.id}` },
-          ({ new: u }) => {
-            setGoalCasa([u.goal_a1, u.goal_a2, u.goal_a3, u.goal_a4]);
-            setGoalOspite([u.goal_b1, u.goal_b2, u.goal_b3, u.goal_b4]);
-          }
-        )
-        .subscribe();
+    // 7) Stato timer (non resetta al refresh)
+    const { data: t, error: tErr } = await supabase
+      .from("partita_timer_state")
+      .select("*")
+      .eq("partita_id", p.id)
+      .maybeSingle();
 
-      // realtime marcatori
-      subMarcatori = supabase
-        .channel("realtime-marcatori")
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "marcatori", filter: `partita_id=eq.${p.id}` },
-          async () => {
-            const { data: live } = await supabase
-              .from("marcatori")
-              .select(
-                "giocatore_stagione_id, periodo, goal_tempo, portiere_subisce_id, squadra_segnante_id, id"
-              )
-              .eq("partita_id", p.id);
-            const perLive: Record<number, any[]> = {};
-            live?.forEach((m) => {
-              perLive[m.periodo] = perLive[m.periodo] || [];
-              perLive[m.periodo].push({
-                goal_tempo: m.goal_tempo,
-                giocatore_stagione_id: m.giocatore_stagione_id,
-                portiere_subisce_id: m.portiere_subisce_id,
-                squadra_segnante_id: m.squadra_segnante_id,
-                id_supabase: m.id,
-              });
+    if (tErr) console.warn("[partita_timer_state] maybeSingle:", tErr.message);
+    if (t) {
+      setTimerState(t);
+      if (t.timer_status === "running" && t.timer_started_at) {
+        const started = new Date(t.timer_started_at).getTime();
+        setElapsed(t.timer_offset_ms + (Date.now() - started));
+      } else {
+        setElapsed(t.timer_offset_ms);
+      }
+    }
+
+    // 8) Realtime partite
+    subPartite = supabase
+      .channel("realtime-partite")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "partite", filter: `id=eq.${p.id}` },
+        ({ new: u }) => {
+          setGoalCasa([u.goal_a1, u.goal_a2, u.goal_a3, u.goal_a4]);
+          setGoalOspite([u.goal_b1, u.goal_b2, u.goal_b3, u.goal_b4]);
+        }
+      )
+      .subscribe();
+
+    // 9) Realtime marcatori
+    subMarcatori = supabase
+      .channel("realtime-marcatori")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "marcatori", filter: `partita_id=eq.${p.id}` },
+        async () => {
+          const { data: live } = await supabase
+            .from("marcatori")
+            .select("giocatore_stagione_id, periodo, goal_tempo, portiere_subisce_id, squadra_segnante_id, id")
+            .eq("partita_id", p.id);
+          const perLive: Record<number, any[]> = {};
+          live?.forEach((m) => {
+            perLive[m.periodo] = perLive[m.periodo] || [];
+            perLive[m.periodo].push({
+              goal_tempo: m.goal_tempo,
+              giocatore_stagione_id: m.giocatore_stagione_id,
+              portiere_subisce_id: m.portiere_subisce_id,
+              squadra_segnante_id: m.squadra_segnante_id,
+              id_supabase: m.id,
             });
-            setMarcatori(perLive);
-          }
-        )
-        .subscribe();
+          });
+          setMarcatori(perLive);
+        }
+      )
+      .subscribe();
 
-      // stato timer iniziale
-      const { data: t, error: tErr } = await supabase
-  .from("partita_timer_state")
-  .select("*")
-  .eq("partita_id", p.id)
-  .maybeSingle();
-if (tErr) console.warn("[partita_timer_state] maybeSingle:", tErr.message);
-if (t) setTimerState(t);
+    // 10) Realtime timer
+    subTimer = supabase
+      .channel("realtime-timer")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "partita_timer_state", filter: `partita_id=eq.${p.id}` },
+        ({ new: u }) => {
+          setTimerState(u as TimerState);
+        }
+      )
+      .subscribe();
+  })();
 
-      // realtime timer
-      subTimer = supabase
-        .channel("realtime-timer")
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "partita_timer_state", filter: `partita_id=eq.${p.id}` },
-          ({ new: u }) => {
-            setTimerState(u as TimerState);
-          }
-        )
-        .subscribe();
-    })();
+  return () => {
+    if (subPartite) supabase.removeChannel(subPartite);
+    if (subMarcatori) supabase.removeChannel(subMarcatori);
+    if (subTimer) supabase.removeChannel(subTimer);
+  };
+}, [id]);
 
-    return () => {
-      if (subPartite) supabase.removeChannel(subPartite);
-      if (subMarcatori) supabase.removeChannel(subMarcatori);
-      if (subTimer) supabase.removeChannel(subTimer);
-    };
-  }, [id]);
 
   // calcolo elapsed
   useEffect(() => {
@@ -339,16 +348,37 @@ const startTimer = async () => {
   if (!id) return;
 
   const now = new Date().toISOString();
+  const nowSec = Math.floor(Date.now() / 1000);
 
+  // 1. Chiudi eventuali righe aperte dei giocatori in campo
+  await supabase
+    .from("minuti_giocati")
+    .update({ uscita_sec: nowSec })
+    .eq("partita_id", id)
+    .is("uscita_sec", null);
+
+  // 2. Riapri righe nuove per i titolari in campo
+  const nuoveRighe = titolari.map((gid) => ({
+    partita_id: id,
+    giocatore_stagione_id: gid,
+    entrata_sec: nowSec,
+    uscita_sec: null,
+  }));
+  if (nuoveRighe.length > 0) {
+    await supabase.from("minuti_giocati").insert(nuoveRighe);
+  }
+
+  // 3. Aggiorna timer nel DB
   await supabase.from("partita_timer_state").upsert({
     partita_id: id,
     timer_duration_min: currentDuration,
     timer_started_at: now,
     timer_status: "running",
-    // 🔹 mantengo sempre l’offset accumulato
+    // mantieni l’offset accumulato
     timer_offset_ms: timerState?.timer_offset_ms || 0,
   });
 
+  // 4. Aggiorna stato locale
   setTimerState((prev) => ({
     ...(prev || {}),
     partita_id: id,
@@ -929,7 +959,6 @@ const salvaStatoConferma = async () => {
 {formazioneAperta && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div className="bg-white p-6 rounded-lg shadow-montecarlo max-w-md w-full h-[80vh] flex flex-col">
-      
 
       {/* Pulsanti rapidi */}
       <div className="flex justify-between text-xs mb-2">
@@ -965,7 +994,7 @@ const salvaStatoConferma = async () => {
         {giocatori.map((g) => (
           <div
             key={g.id}
-            className="grid grid-cols-[minmax(150px,max-content)_auto_auto] items-center py-1 border-b text-sm gap-2"
+            className="grid grid-cols-[minmax(150px,max-content)_auto_auto_auto] items-center py-1 border-b text-sm gap-2"
           >
             {/* Nome */}
             <span>
@@ -973,91 +1002,94 @@ const salvaStatoConferma = async () => {
             </span>
 
             {/* Convocato */}
-<label className="flex items-center gap-1 text-xs">
-  <span>Conv</span>
-  <input
-  type="checkbox"
-  checked={convocati.includes(g.id)}
-  onChange={() => {
-    if (convocati.includes(g.id)) {
-      setConvocati((prev) => prev.filter((x) => x !== g.id));
-    } else {
-      setConvocati((prev) => [...prev, g.id]);
-    }
-  }}
-/>
-</label>
+            <label className="flex items-center gap-1 text-xs">
+              <span>Conv</span>
+              <input
+                type="checkbox"
+                checked={convocati.includes(g.id)}
+                onChange={() => {
+                  if (convocati.includes(g.id)) {
+                    setConvocati((prev) => prev.filter((x) => x !== g.id));
+                  } else {
+                    setConvocati((prev) => [...prev, g.id]);
+                  }
+                }}
+              />
+            </label>
 
-{/* Titolare */}
-<label className="flex items-center gap-1 text-xs">
-  <span>Titol</span>
-  <input
-    type="checkbox"
-    checked={titolari.includes(g.id)}
-    disabled={!convocati.includes(g.id)}
-    onChange={() => {
-      if (titolari.includes(g.id)) {
-        setTitolari((prev) => prev.filter((x) => x !== g.id));
-      } else {
-        setTitolari((prev) => [...prev, g.id]);
-      }
-    }}
-  />
-</label>
+            {/* Titolare */}
+            <label className="flex items-center gap-1 text-xs">
+              <span>Titol</span>
+              <input
+                type="checkbox"
+                checked={titolari.includes(g.id)}
+                disabled={!convocati.includes(g.id)}
+                onChange={() => {
+                  if (titolari.includes(g.id)) {
+                    setTitolari((prev) => prev.filter((x) => x !== g.id));
+                  } else {
+                    setTitolari((prev) => [...prev, g.id]);
+                  }
+                }}
+              />
+            </label>
 
+            {/* Minuti giocati (formattati) */}
+            <span className="text-xs text-gray-600">
+              {formatTempo(minutiGiocati[g.id] || 0)}
+            </span>
           </div>
         ))}
       </div>
 
       {/* Salva su DB */}
-<button
-  onClick={async () => {
-    if (!partita) return;
+      <button
+        onClick={async () => {
+          if (!partita) return;
 
-    // 1) pulisci presenze precedenti
-    await supabase.from("presenze").delete().eq("partita_id", id);
+          // 1) pulisci presenze e minuti precedenti
+          await supabase.from("presenze").delete().eq("partita_id", id);
+          await supabase.from("minuti_giocati").delete().eq("partita_id", id);
 
-    // 2) salva convocati + titolari
-    const rows = convocati.map((gid) => {
-      const g = giocatori.find((x) => x.id === gid);
-      return {
-        partita_id: id,
-        giocatore_stagione_id: gid,
-        stagione_id: partita.stagione_id,
-        nome: (g?.nome || "").trim(),
-        cognome: (g?.cognome || "").trim(),
-        titolare: titolari.includes(gid),
-      };
-    });
+          // 2) salva convocati + titolari
+          const rows = convocati.map((gid) => {
+            const g = giocatori.find((x) => x.id === gid);
+            return {
+              partita_id: id,
+              giocatore_stagione_id: gid,
+              stagione_id: partita.stagione_id,
+              nome: (g?.nome || "").trim(),
+              cognome: (g?.cognome || "").trim(),
+              titolare: titolari.includes(gid),
+            };
+          });
+          if (rows.length > 0) {
+            await supabase.from("presenze").insert(rows);
+          }
 
-    if (rows.length > 0) {
-      await supabase.from("presenze").insert(rows);
-    }
+          // 3) inserisci righe in minuti_giocati SOLO per i titolari
+          const nowSec = Math.floor(elapsed / 1000);
+          const iniziali = titolari.map((gid) => ({
+            partita_id: id,
+            giocatore_stagione_id: gid,
+            entrata_sec: nowSec,
+            uscita_sec: null,
+          }));
+          if (iniziali.length > 0) {
+            await supabase.from("minuti_giocati").insert(iniziali);
+          }
 
-    // 3) inserisci righe in minuti_giocati per i titolari (se non ci sono già)
-    const nowSec = Math.floor(elapsed / 1000);
-    const iniziali = titolari.map((gid) => ({
-      partita_id: id,
-      giocatore_stagione_id: gid,
-      entrata_sec: nowSec,
-      uscita_sec: null,
-    }));
-
-    if (iniziali.length > 0) {
-      await supabase.from("minuti_giocati").insert(iniziali);
-    }
-
-    // 4) chiudi la modale
-    setFormazioneAperta(false);
-  }}
-  className="w-full bg-montecarlo-secondary text-white py-2 rounded-lg mt-4"
->
-  Salva
-</button>
-
+          // 4) chiudi la modale
+          setFormazioneAperta(false);
+        }}
+        className="w-full bg-montecarlo-secondary text-white py-2 rounded-lg mt-4"
+      >
+        Salva
+      </button>
     </div>
   </div>
 )}
+
 
 
 {/* Modal Sostituzioni */}

@@ -1,5 +1,5 @@
 // src/pages/DettaglioPrePartita.tsx
-// Data creazione chat: 2025-08-01 (rev2: separato container scontri + barra sfumata con ombra)
+// Data creazione chat: 2025-08-01 (rev5: aggiunto stato nella view resocontopartita + filtro Giocata)
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -18,6 +18,7 @@ interface Partita {
   data_ora: string;
   goal_a: number;
   goal_b: number;
+  stato: string;
   squadra_casa_id: Squadra;
   squadra_ospite_id: Squadra;
 }
@@ -25,16 +26,19 @@ interface Partita {
 interface Resoconto {
   partita_id: string;
   data_ora: string;
+  stato: string; // 👈 nuovo campo dalla view
   squadra_casa: string | null;
   squadra_ospite: string | null;
   goal_montecarlo_1: number | null;
-  goal_montecarlo_2: number | null;
-  goal_montecarlo_3: number | null;
-  goal_montecarlo_4: number | null;
   goal_avversaria_1: number | null;
+  goal_montecarlo_2: number | null;
   goal_avversaria_2: number | null;
+  goal_montecarlo_3: number | null;
   goal_avversaria_3: number | null;
+  goal_montecarlo_4: number | null;
   goal_avversaria_4: number | null;
+  goal_montecarlo_tot: number | null;
+  goal_avversaria_tot: number | null;
   esito: string | null;
 }
 
@@ -68,6 +72,7 @@ export default function DettaglioPrePartita(): JSX.Element {
           data_ora,
           goal_a,
           goal_b,
+          stato,
           squadra_casa_id(id, nome, logo_url),
           squadra_ospite_id(id, nome, logo_url)
         `)
@@ -81,13 +86,14 @@ export default function DettaglioPrePartita(): JSX.Element {
       }
       setPartita(d);
 
-      // precedenti dalla view resocontopartita
+      // precedenti SOLO con stato = Giocata
       const { data: prev, error: errPrev } = await supabase
         .from<Resoconto>('resocontopartita')
         .select('*')
         .or(
           `and(squadra_casa.eq.${d.squadra_casa_id.nome},squadra_ospite.eq.${d.squadra_ospite_id.nome}),and(squadra_casa.eq.${d.squadra_ospite_id.nome},squadra_ospite.eq.${d.squadra_casa_id.nome})`
         )
+        .eq('stato', 'Giocata') // 👈 filtro qui
         .order('data_ora', { ascending: false })
         .limit(5);
 
@@ -125,25 +131,8 @@ export default function DettaglioPrePartita(): JSX.Element {
   const sconfitte = precedenti.filter(p => p.esito === 'Sconfitta').length;
   const pareggi = precedenti.filter(p => p.esito === 'Pareggio').length;
 
-  const goalFatti = precedenti.reduce((acc, p) => {
-    return (
-      acc +
-      (p.goal_montecarlo_1 || 0) +
-      (p.goal_montecarlo_2 || 0) +
-      (p.goal_montecarlo_3 || 0) +
-      (p.goal_montecarlo_4 || 0)
-    );
-  }, 0);
-
-  const goalSubiti = precedenti.reduce((acc, p) => {
-    return (
-      acc +
-      (p.goal_avversaria_1 || 0) +
-      (p.goal_avversaria_2 || 0) +
-      (p.goal_avversaria_3 || 0) +
-      (p.goal_avversaria_4 || 0)
-    );
-  }, 0);
+  const goalFatti = precedenti.reduce((acc, p) => acc + (p.goal_montecarlo_tot || 0), 0);
+  const goalSubiti = precedenti.reduce((acc, p) => acc + (p.goal_avversaria_tot || 0), 0);
 
   const perc = (n: number) => (totale > 0 ? (n / totale) * 100 : 0);
 
@@ -199,7 +188,7 @@ export default function DettaglioPrePartita(): JSX.Element {
         </div>
 
         {/* Container separato scontri precedenti */}
-        {precedenti.length > 0 && (
+        {precedenti.length > 0 ? (
           <section className="mt-10 p-5 bg-white/90 rounded-lg shadow-md">
             <h3 className="text-base font-medium text-red-600 mb-4 text-center">
               Scontri precedenti
@@ -260,13 +249,7 @@ export default function DettaglioPrePartita(): JSX.Element {
                       <div className="flex justify-center items-center gap-2 text-base text-gray-800 font-medium">
                         <span>{p.squadra_casa}</span>
                         <span>
-                          <span>
-  {(p.squadra_casa === 'Montecarlo' ? p.goal_montecarlo_tot : p.goal_avversaria_tot) ?? 0}
-  -
-  {(p.squadra_ospite === 'Montecarlo' ? p.goal_montecarlo_tot : p.goal_avversaria_tot) ?? 0}
-</span>
-
-
+                          {(p.goal_montecarlo_tot ?? 0)}-{(p.goal_avversaria_tot ?? 0)}
                         </span>
                         <span>{p.squadra_ospite}</span>
                       </div>
@@ -276,6 +259,10 @@ export default function DettaglioPrePartita(): JSX.Element {
               })}
             </ul>
           </section>
+        ) : (
+          <div className="mt-10 p-5 bg-white/90 rounded-lg shadow-md text-center text-sm text-gray-600">
+            Nessuno scontro precedente registrato.
+          </div>
         )}
       </div>
     </div>

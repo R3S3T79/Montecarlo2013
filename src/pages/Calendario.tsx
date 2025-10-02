@@ -1,6 +1,6 @@
 // Data creazione chat: 2025-07-30
 // src/pages/Calendario.tsx
-// Basato sul file originale con aggiunta di campionato_torneo e modifica header cellule 
+// Basato sul file originale con aggiunta di campionato_torneo, nome_torneo e modifica header cellule 
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
@@ -13,6 +13,7 @@ interface Partita {
   id: string;
   data_ora: string;
   campionato_torneo: string;
+  nome_torneo?: string | null;
   casa: { nome: string; logo_url: string | null };
   ospite: { nome: string; logo_url: string | null };
 }
@@ -37,6 +38,7 @@ export default function Calendario(): JSX.Element {
           id,
           data_ora,
           campionato_torneo,
+          nome_torneo,
           casa:squadra_casa_id(nome, logo_url),
           ospite:squadra_ospite_id(nome, logo_url)
         `)
@@ -83,20 +85,27 @@ export default function Calendario(): JSX.Element {
                 onClick={() => handleClick(partita.id)}
                 className="cursor-pointer transform transition-all duration-300 hover:scale-[1.02]"
               >
-                {/* Header cella: tipo competizione a sinistra, data al centro */}
-                <div className="bg-gradient-montecarlo text-white px-4 py-2 rounded-t-lg flex items-center">
-                  <div className="text-xs font-medium">
-                    {partita.campionato_torneo}
+                {/* Header cella: tipo competizione + nome torneo opzionale */}
+                <div className="bg-gradient-montecarlo text-white px-4 py-2 rounded-t-lg flex flex-col">
+                  <div className="flex items-center">
+                    <div className="text-xs font-medium">
+                      {partita.campionato_torneo}
+                    </div>
+                    <div className="flex-1 text-sm font-medium text-center">
+                      {new Date(partita.data_ora).toLocaleString(undefined, {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </div>
                   </div>
-                  <div className="flex-1 text-sm font-medium text-center">
-                    {new Date(partita.data_ora).toLocaleString(undefined, {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </div>
+                  {partita.nome_torneo && partita.nome_torneo.trim() !== '' && (
+                    <div className="text-[11px] text-left font-light italic mt-1">
+                      {partita.nome_torneo}
+                    </div>
+                  )}
                 </div>
 
                 {/* Corpo cella con squadre */}
