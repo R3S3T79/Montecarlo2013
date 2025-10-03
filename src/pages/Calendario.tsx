@@ -88,7 +88,7 @@ export default function Calendario(): JSX.Element {
                 {/* Header cella: tipo competizione + nome torneo opzionale */}
                 <div className="bg-gradient-montecarlo text-white px-4 py-2 rounded-t-lg flex flex-col">
                   <div className="flex items-center">
-                    <div className="text-xs font-medium">
+                    <div className="text-sm font-medium">
                       {partita.campionato_torneo}
                     </div>
                     <div className="flex-1 text-sm font-medium text-center">
@@ -102,7 +102,7 @@ export default function Calendario(): JSX.Element {
                     </div>
                   </div>
                   {partita.nome_torneo && partita.nome_torneo.trim() !== '' && (
-                    <div className="text-[11px] text-left font-light italic mt-1">
+                    <div className="text-sm text-left font-light italic mt-1">
                       {partita.nome_torneo}
                     </div>
                   )}
