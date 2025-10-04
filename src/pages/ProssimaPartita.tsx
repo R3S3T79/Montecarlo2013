@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { Calendar, Clock, Plus, History } from "lucide-react";
+import CampoFormazione from "../components/CampoFormazione";
 
 interface SquadraInfo {
   id: string;
@@ -58,6 +59,7 @@ interface Giocatore {
   giocatore_uid: string;
   nome: string;
   cognome: string;
+  foto_url?: string | null; // 👈 aggiunto
 }
 
 interface TimerState {
@@ -81,6 +83,8 @@ export default function ProssimaPartita() {
   const [roleLoading, setRoleLoading] = useState(true);
   const [perTimeCasa, setPerTimeCasa] = useState<number[]>([0, 0, 0, 0]);
   const [perTimeOspite, setPerTimeOspite] = useState<number[]>([0, 0, 0, 0]);
+  const [titolari, setTitolari] = useState<string[]>([]);
+
 
   // TIMER
   const [timerState, setTimerState] = useState<TimerState | null>(null);
@@ -192,25 +196,36 @@ useEffect(() => {
 }, []);
 
 
-  // 3) elenco giocatori stagione
+    // 3) elenco giocatori stagione
   useEffect(() => {
     if (!partita) return;
     (async () => {
-      const { data: gs } = await supabase
-        .from("giocatori_stagioni")
-        .select("id,giocatore_uid,nome,cognome")
-        .eq("stagione_id", partita.stagione_id)
-        .order("cognome", { ascending: true });
+      const { data: gs, error } = await supabase
+  .from("giocatori_stagioni_view") // ✅ nome giusto
+  .select("id,giocatore_uid,nome,cognome,foto_url")
+  .eq("stagione_id", partita.stagione_id)
+  .order("cognome", { ascending: true });
 
-      const mapped: Giocatore[] = (gs || []).map((r: any) => ({
-        record_id: r.id,
-        giocatore_uid: r.giocatore_uid,
-        nome: r.nome,
-        cognome: r.cognome,
-      }));
-      setGiocatoriStagione(mapped);
-    })();
-  }, [partita]);
+if (error) {
+  console.error("Errore Supabase:", error);
+}
+
+const mapped: Giocatore[] = (gs || []).map((r: any) => ({
+  record_id: r.id,
+  giocatore_uid: r.giocatore_uid,
+  nome: r.nome,
+  cognome: r.cognome,
+  foto_url: r.foto_url,
+}));
+setGiocatoriStagione(mapped);
+
+// 👇 Popola titolari coi primi 9
+setTitolari(mapped.slice(0, 9).map((g) => g.giocatore_uid));
+
+    })(); // 👈 importante: chiudere subito la funzione async
+  }, [partita]); // 👈 dipendenza corretta
+
+
 
   const normalizeMarcatore = (row: any): Marcatore => ({
     id: row.id,
@@ -450,30 +465,37 @@ useEffect(() => {
   const minDisplay = `${timerIsNegative ? "-" : ""}${String(absMinutes).padStart(2, "0")}`;
   const secDisplay = String(absSeconds).padStart(2, "0");
   const timerClass = timerIsNegative ? "border-red-500 text-red-500" : "border-green-500 text-green-500";
+  // Posizioni modulo base 4-4-2 (percentuali rispetto al campo)
+const posizione = [
+  { x: 50, y: 95 }, // Portiere
+  { x: 50, y: 75 }, { x: 20, y: 70 }, { x: 80, y: 70 }, // Difensori
+  { x: 50, y: 55 }, { x: 20, y: 50 }, { x: 80, y: 50 }, // Centrocampisti
+  { x: 35, y: 35 }, { x: 65, y: 35 }, // Attaccanti
+];
+
 
   return (
-    
-      <div className="container mx-auto px-2">
-        <div className="max-w-md mx-auto space-y-6 ">
-          {/* Card prossima partita */}
-          <div className="bg-white/90 rounded-xl shadow-montecarlo overflow-hidden">
-            <div className="bg-montecarlo-red-50 p-4 border-l-4 border-montecarlo-secondary">
-              <div className="flex justify-center items-center space-x-4 text-montecarlo-secondary">
-                <div className="flex items-center">
-                  <Calendar className="mr-2" size={18} />
-                  <span className="font-semibold">{formatData(partita.data_ora)}</span>
-                </div>
-                <div className="flex items-center">
-                  <Clock className="mr-2" size={18} />
-                  <span className="font-semibold">{formatOra(partita.data_ora)}</span>
-                </div>
+    <div className="container mx-auto px-2">
+      <div className="max-w-md mx-auto space-y-6 ">
+        {/* Card prossima partita */}
+        <div className="bg-white/90 rounded-xl shadow-montecarlo overflow-hidden">
+          <div className="bg-montecarlo-red-50 p-4 border-l-4 border-montecarlo-secondary">
+            <div className="flex justify-center items-center space-x-4 text-montecarlo-secondary">
+              <div className="flex items-center">
+                <Calendar className="mr-2" size={18} />
+                <span className="font-semibold">{formatData(partita.data_ora)}</span>
               </div>
-              <div className="text-center mt-2">
-                <span className="bg-montecarlo-accent text-montecarlo-secondary px-3 py-1 rounded-full text-sm font-medium">
-                  {partita.campionato_torneo}
-                </span>
+              <div className="flex items-center">
+                <Clock className="mr-2" size={18} />
+                <span className="font-semibold">{formatOra(partita.data_ora)}</span>
               </div>
             </div>
+            <div className="text-center mt-2">
+              <span className="bg-montecarlo-accent text-montecarlo-secondary px-3 py-1 rounded-full text-sm font-medium">
+                {partita.campionato_torneo}
+              </span>
+            </div>
+          </div>
 
             <div className="p-6 space-y-6">
               {/* Squadra Casa */}
@@ -606,37 +628,45 @@ useEffect(() => {
               </div>
 
               {/* Pulsanti */}
-              {canEdit && (
-                <button
-                  onClick={handleVaiAlMatch}
-                  className="bg-gradient-montecarlo text-white px-6 py-3 rounded-lg flex items-center mx-auto hover:scale-105 transition"
-                >
-                  <History className="mr-2" size={20} />
-                  Gestisci Risultato
-                </button>
-              )}
-            </div>
+            {canEdit && (
+              <button
+                onClick={handleVaiAlMatch}
+                className="bg-gradient-montecarlo text-white px-6 py-3 rounded-lg flex items-center mx-auto hover:scale-105 transition"
+              >
+                <History className="mr-2" size={20} />
+                Gestisci Risultato
+              </button>
+            )}
           </div>
-
-          {/* Scontri precedenti */}
-          {precedenti.length > 0 && (
-            <div className="bg-white/90 rounded-xl shadow-montecarlo p-6">
-              <h3 className="text-lg font-bold mb-2 text-center">Scontri precedenti</h3>
-               <hr className="border-t border-gray-300 mb-4" />
-              <ul className="space-y-3 text-center">
-                {precedenti.map((p) => (
-                  <li key={p.id} className="text-sm text-gray-700">
-                    <div className="font-semibold">{formatData(p.data_ora)}</div>
-                    <div>
-  {p.casa.nome} <span className="font-bold">{p.goal_a} - {p.goal_b}</span> {p.ospite.nome}
-</div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
+
+      {partita && (
+  <CampoFormazione partitaId={partita.id} editable={true} />
+)}
+
+
+        {/* Scontri precedenti */}
+        {precedenti.length > 0 && (
+          <div className="bg-white/90 rounded-xl shadow-montecarlo p-6 mt-6">
+            <h3 className="text-lg font-bold mb-2 text-center">Scontri precedenti</h3>
+            <hr className="border-t border-gray-300 mb-4" />
+            <ul className="space-y-3 text-center">
+              {precedenti.map((p) => (
+                <li key={p.id} className="text-sm text-gray-700">
+                  <div className="font-semibold">{formatData(p.data_ora)}</div>
+                  <div>
+                    {p.casa.nome}{" "}
+                    <span className="font-bold">
+                      {p.goal_a} - {p.goal_b}
+                    </span>{" "}
+                    {p.ospite.nome}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
-   
+    </div>
   );
 }
