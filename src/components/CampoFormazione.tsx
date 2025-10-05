@@ -150,6 +150,88 @@ export default function CampoFormazione({
     }
   };
 
+  // ==================================================
+// FUNZIONI DI SUPPORTO MARCATORI / PORTIERI
+// ==================================================
+const renderMarcatori = (squadraId?: string) => {
+  if (!tempo || !squadraId) return null;
+
+  const isMC = isMontecarlo(
+    squadraId,
+    squadraId === squadraCasa?.id ? squadraCasa?.nome : squadraOspite?.nome
+  );
+  if (!isMC) return null;
+
+  // ✅ Evita crash se marcatori[tempo] non esiste
+  const listaPeriodo = marcatori?.[tempo] || [];
+  const lista = listaPeriodo.filter((m) => m.squadra_segnante_id === MONTECARLO_ID);
+
+  const convocatiSet = new Set(convocati);
+  const opzioni = giocatori.filter((g) => convocatiSet.has(g.id));
+
+  return (
+    <div className="container mx-auto px-2">
+      {lista.map((m) => (
+        <select
+          key={m.goal_tempo}
+          value={m.giocatore_stagione_id || ""}
+          onChange={(e) => selezionaMarcatore(tempo, m.goal_tempo, e.target.value)}
+          className="w-full border rounded px-2 py-1"
+        >
+          <option value="">-- Seleziona marcatore --</option>
+          {opzioni.map((g) => (
+            <option key={g.id} value={g.id}>
+              {(g.cognome || "").trim()} {(g.nome || "").trim()}
+            </option>
+          ))}
+        </select>
+      ))}
+    </div>
+  );
+};
+
+const renderPortieriSubiti = (squadraId?: string) => {
+  if (!tempo || !squadraId) return null;
+
+  const isMC = isMontecarlo(
+    squadraId,
+    squadraId === squadraCasa?.id ? squadraCasa?.nome : squadraOspite?.nome
+  );
+  if (isMC) return null;
+
+  // ✅ Evita crash se marcatori[tempo] non esiste
+  const listaPeriodo = marcatori?.[tempo] || [];
+  const lista = listaPeriodo.filter(
+    (m) => m.squadra_segnante_id && m.squadra_segnante_id !== MONTECARLO_ID
+  );
+
+  const convocatiSet = new Set(convocati);
+  const opzioniPortieri = giocatori.filter(
+    (g) => convocatiSet.has(g.id) && (g.ruolo || "").toLowerCase() === "portiere"
+  );
+
+  return (
+    <div className="container mx-auto px-2">
+      {lista.map((m) => (
+        <select
+          key={m.goal_tempo}
+          value={m.portiere_subisce_id || ""}
+          onChange={(e) => selezionaPortiereSubisce(tempo, m.goal_tempo, e.target.value)}
+          className="w-full border rounded px-2 py-1"
+        >
+          <option value="">-- Seleziona portiere --</option>
+          {opzioniPortieri.map((g) => (
+            <option key={g.id} value={g.id}>
+              {(g.cognome || "").trim()} {(g.nome || "").trim()}
+            </option>
+          ))}
+        </select>
+      ))}
+    </div>
+  );
+};
+
+
   // ============================
   // RENDER
   // ============================

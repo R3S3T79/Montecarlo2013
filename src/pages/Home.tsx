@@ -935,7 +935,7 @@ const styles: Record<string, React.CSSProperties> = {
   page: {
     maxWidth: 980,
     margin: "0 auto",
-    padding: "8px",
+    padding: "2px",
     paddingTop: 0,
     fontFamily:
       "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
@@ -992,7 +992,7 @@ vsCentered: {
   },
   heroTitle: {
     margin: 0,
-    fontSize: 35,
+    fontSize: 32,
     fontWeight: 600, // meno bold
     color: "white",
     letterSpacing: 0.3,
