@@ -489,9 +489,9 @@ const canCreator = role === UserRole.Creator;
       </aside>
 
       {/* CONTENUTO PRINCIPALE */}
-      <main className="w-full max-w-6xl mx-auto p-4 overflow-y-auto">
+      <main className="flex-1 overflow-auto mt-[48px] px-2">
   <div className="mt-2">
-    <Outlet />
+  <Outlet />
   </div>
 </main>
     </div>

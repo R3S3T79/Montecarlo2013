@@ -57,6 +57,9 @@ export default function GestioneRisultatoPartita() {
   // minuti giocati calcolati (secondi)
   const [minutiGiocati, setMinutiGiocati] = useState<Record<string, number>>({});
 
+  // tempo di riferimento interno del timer (in secondi)
+  const [nowSec, setNowSec] = useState(0);
+
   // righe raw da DB (entrata/uscita in secondi)
   const [minutiRows, setMinutiRows] = useState<
     { giocatore_stagione_id: string; entrata_sec: number | null; uscita_sec: number | null }[]
@@ -321,28 +324,40 @@ useEffect(() => {
   };
 }, [timerState]);
 
-
-  // 🔹 Ricalcolo continuo dei secondi giocati per ogni giocatore
+// 🔹 Aggiorna "nowSec" ogni secondo mentre il timer è attivo
 useEffect(() => {
-  if (!minutiRows) return;
-  console.log("⏱ useEffect minutiRows triggered | elapsed:", elapsed);
-
-  const nowSec = Math.floor(elapsed / 1000);
-  const calcolati: Record<string, number> = {};
-
-  minutiRows.forEach((r) => {
-    const inSec = r.entrata_sec ?? 0;
-    const outSec = r.uscita_sec ?? nowSec;
-    const diff = outSec - inSec;
-    if (diff > 0) {
-      calcolati[r.giocatore_stagione_id] =
-        (calcolati[r.giocatore_stagione_id] || 0) + diff;
+  let interval: NodeJS.Timeout | null = null;
+  if (timerState?.timer_status === "running") {
+    interval = setInterval(() => {
+      setNowSec((prev) => prev + 1);
+    }, 1000);
+  } else {
+    if (timerState?.timer_status === "paused") {
+      // conserva il valore attuale
+      setNowSec((prev) => prev);
+    } else if (timerState?.timer_status === "stopped") {
+      setNowSec(0);
     }
-  });
+  }
+  return () => {
+    if (interval) clearInterval(interval);
+  };
+}, [timerState?.timer_status]);
 
-  console.log("📊 minuti calcolati:", calcolati);
-  setMinutiGiocati(calcolati);
-}, [minutiRows, elapsed]);
+
+// 🔹 Ricalcolo continuo dei minuti giocati visibili nel menu convocati
+useEffect(() => {
+  if (!partita || !titolari.length) return;
+
+  setMinutiGiocati((prev) => {
+    const aggiornati: Record<string, number> = { ...prev };
+    titolari.forEach((id) => {
+      aggiornati[id] = (aggiornati[id] || 0) + 1;
+    });
+    return aggiornati;
+  });
+}, [nowSec, partita, titolari]);
+
 
 
 
@@ -473,28 +488,87 @@ const pauseTimer = async () => {
   }));
 };
 
-// Reset del solo cronometro (NON dei minuti accumulati)
+// 🔹 Reset Timer + chiusura delle run aperte (fine tempo)
 const resetTimer = async () => {
-  if (!id) return;
+  try {
+    if (!id) return;
 
-  await supabase
-    .from("partita_timer_state")
-    .update({
+    // Se elapsed non è ancora definito, interrompi
+    if (typeof elapsed !== "number" || isNaN(elapsed)) {
+      console.warn("⏹ resetTimer ignorato: elapsed non valido");
+      return;
+    }
+
+    // 1️⃣ Calcola il tempo totale trascorso (in secondi)
+    const nowSec = Math.floor(elapsed / 1000);
+    console.log("⏱️ Chiusura run aperte al secondo:", nowSec);
+
+    // 2️⃣ Chiudi tutte le run ancora aperte in minuti_giocati
+    const { error: closeErr } = await supabase
+      .from("minuti_giocati")
+      .update({ uscita_sec: nowSec })
+      .eq("partita_id", id)
+      .is("uscita_sec", null);
+
+    if (closeErr) {
+      console.error("❌ Errore chiusura run aperte al reset:", closeErr.message);
+    } else {
+      console.log("✅ Tutte le run aperte chiuse correttamente a", nowSec);
+    }
+
+    // 3️⃣ Aggiorna lo stato del timer nel DB
+    const { error: timerErr } = await supabase
+      .from("partita_timer_state")
+      .update({
+        timer_offset_ms: 0,
+        timer_started_at: null,
+        timer_status: "stopped",
+      })
+      .eq("partita_id", id);
+
+    if (timerErr) {
+      console.error("⚠️ Errore aggiornamento timer_state:", timerErr.message);
+    } else {
+      console.log("🕒 Timer resettato correttamente");
+    }
+
+    // 4️⃣ Aggiorna stato locale del timer
+    setTimerState((prev) => ({
+      ...(prev || {}),
       timer_offset_ms: 0,
       timer_started_at: null,
       timer_status: "stopped",
-    })
-    .eq("partita_id", id);
+    }));
 
-  setTimerState((prev) => ({
-    ...(prev || {}),
-    timer_offset_ms: 0,
-    timer_started_at: null,
-    timer_status: "stopped",
-  }));
+    // 5️⃣ Azzera cronometro visivo
+    setElapsed(0);
 
-  setElapsed(0);
+    // 6️⃣ Ricarica righe aggiornate (per sicurezza)
+    const { data: aggiornate, error: reloadErr } = await supabase
+      .from("minuti_giocati")
+      .select("giocatore_stagione_id, entrata_sec, uscita_sec")
+      .eq("partita_id", id);
+
+    if (reloadErr) {
+      console.warn("⚠️ Errore reload minuti_giocati:", reloadErr.message);
+    } else {
+      setMinutiRows(aggiornate || []);
+      console.log("♻️ minuti_giocati ricaricati dopo reset:", aggiornate);
+    }
+  } catch (err) {
+    console.error("💥 Errore imprevisto in resetTimer:", err);
+  }
 };
+
+
+// 🔹 Quando resetti il timer, azzera anche il conteggio minuti
+useEffect(() => {
+  if (timerState?.timer_status === "stopped") {
+    setMinutiGiocati({});
+    setNowSec(0);
+  }
+}, [timerState?.timer_status]);
+
 
 // Cambia la durata (minuti)
 const changeDuration = async (minutes: number) => {
