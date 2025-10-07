@@ -150,7 +150,8 @@ export default function Tornei() {
   }
 
   return (
-    <div className="min-h-screen mt-2 px-2 pb-6">
+    <div className="min-h-screen mt-2 w-full px-[2px] pb-6 box-border">
+
       <div className="w-full">
         {/* wrapper trasparente: lo sfondo si vede tra tornei */}
         <div className="rounded-xl shadow-montecarlo p-2 bg-transparent">

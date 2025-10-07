@@ -255,7 +255,7 @@ useEffect(() => {
  
 
   return (
-    <div className="p-6">
+   <div className="w-full px-[2px] pt-6 pb-6 box-border">
       {/* ===== FORM A SCHERMO ===== */}
       <div className="space-y-4 print:hidden">
         <div className="bg-white/90 rounded shadow p-4 m-2 space-y-4">

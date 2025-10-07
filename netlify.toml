@@ -4,10 +4,11 @@
   functions = "netlify/functions"
 
 [dev]
-  framework = "vite"
-  targetPort = 5173
-  port = 8888
-  envFiles = [".env"]  # <-- carica .env in netlify dev
+framework = "vite"
+targetPort = 5173
+port = 8888
+envFiles = [".env"]
+
 
 # Redirect API -> Functions (vale sia in dev che in prod)
 [[redirects]]

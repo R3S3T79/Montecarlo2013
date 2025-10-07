@@ -177,8 +177,8 @@ export default function StatisticheSquadra() {
   }, [stagioneSelezionata, montecarloId]);
 
   return (
-    <div className="min-h-screen px-2 md:px-8">
-      <div className="container mx-auto flex flex-col md:flex-row gap-6">
+    <div className="min-h-screen w-full px-[2px] box-border">
+  <div className="w-full flex flex-col md:flex-row gap-6">
         {/* Left: tabella statistiche */}
         <div className="bg-white/90 rounded-xl shadow-montecarlo flex-1 p-6 md:p-8">
           <select

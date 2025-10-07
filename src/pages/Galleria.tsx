@@ -214,7 +214,8 @@ export default function Galleria(): JSX.Element {
 
   // ======= RENDER =======
   return (
-    <div className="min-h-screen mt-2 px-2 pb-6">
+    <div className="min-h-screen mt-2 w-full px-[2px] pb-6 box-border">
+
       {/* Barra Upload in container trasparente */}
       <div
         style={{

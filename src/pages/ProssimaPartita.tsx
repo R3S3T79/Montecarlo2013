@@ -475,7 +475,8 @@ const posizione = [
 
 
   return (
-    <div className="container mx-auto px-2">
+    <div className="mx-auto w-full pl-[2px] pr-[4px] box-border">
+
       <div className="max-w-md mx-auto space-y-6 ">
         {/* Card prossima partita */}
         <div className="bg-white/90 rounded-xl shadow-montecarlo overflow-hidden">

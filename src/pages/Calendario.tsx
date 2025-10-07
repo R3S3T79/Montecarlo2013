@@ -5,7 +5,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import { Plus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../lib/roles';
 
@@ -64,7 +63,9 @@ export default function Calendario(): JSX.Element {
 
   return (
     <div className="min-h-screen pt-2 pb-2 ">
-      <div className="container mx-auto px-2 ">
+      <div className="w-full px-[2px]">
+
+
 
         {/* Contenuto Partite */}
         {loading ? (
@@ -78,7 +79,8 @@ export default function Calendario(): JSX.Element {
             </div>
           </div>
         ) : (
-          <ul className="space-y-4 max-w-md mx-auto">
+          <ul className="space-y-4 w-full">
+
             {partite.map((partita) => (
               <li
                 key={partita.id}

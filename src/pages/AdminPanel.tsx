@@ -298,7 +298,8 @@ export default function AdminPanel() {
                     <td className="p-2 text-sm text-gray-600">
                       {formatDate(u.created_at)}
                     </td>
-                    <td className="p-2 flex flex-wrap gap-2 items-center">
+                    <td className="p-2 flex items-center space-x-2 overflow-x-auto">
+
                       {roleButtons}
                       <button
                         onClick={() => resendWelcome(u.email)}
