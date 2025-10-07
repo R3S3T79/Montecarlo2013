@@ -828,7 +828,13 @@ const fbPluginSrc = useMemo(() => {
             </div>
           ) : (
             <div style={styles.liveHint}>
-              <Link to="/calendario">Vai al calendario</Link>
+              <Link
+  to="/calendario"
+  className="text-red-600 hover:text-red-800 transition"
+>
+  Vai al calendario
+</Link>
+
             </div>
           )}
         </>
@@ -863,7 +869,15 @@ const fbPluginSrc = useMemo(() => {
   )}
 </section>
 {/* METEO PREVISTO */}
-<WeatherWidget />
+<WeatherWidget luogo={
+  match?.squadra_ospitante?.nome_stadio ||
+  match?.squadra_ospitante?.indirizzo ||
+  match?.squadra_ospitante?.nome ||
+  match?.squadra_casa?.nome_stadio ||
+  match?.squadra_casa?.indirizzo ||
+  match?.squadra_casa?.nome
+}/>
+
 
       {/* FACEBOOK – plugin ufficiale */}
 <section style={styles.card}>

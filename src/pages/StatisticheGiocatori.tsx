@@ -183,7 +183,8 @@ if (!vErr && voti) {
 
   return (
     <div className="min-h-screen">
-      <div className="container mx-auto pt-2 px-2">
+      <div className="w-full px-[2px] pt-2 box-border">
+
         {/* 🔹 Filtri Stagione + Ruolo */}
         <div className="flex gap-2 mb-2">
           <select

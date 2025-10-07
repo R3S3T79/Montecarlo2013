@@ -155,7 +155,7 @@ export default function Risultati() {
   }
 
   return (
-    <div className="container mx-auto px-2">
+    <div className="container mx-auto px-0.5">
       {/* ✅ Box filtro sticky */}
       <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm mb-4 mt-2">
         <div className="rounded-xl shadow-montecarlo p-2 space-y-2">

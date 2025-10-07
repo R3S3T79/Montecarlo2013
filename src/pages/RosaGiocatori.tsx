@@ -90,7 +90,8 @@ export default function RosaGiocatori(): JSX.Element {
 
   return (
     <div className="min-h-screen">
-      <div className="container mx-auto pt-2 px-4 py-6">
+      <div className="w-full px-[2px] pt-2 pb-6 box-border">
+
         {/* Selettore stagione */}
         <div className="mb-4">
           <select
