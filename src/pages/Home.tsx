@@ -4,7 +4,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import WeatherWidget from "../components/WeatherWidget";
+import WeatherWidget_OpenMeteo from "../components/WeatherWidget_OpenMeteo";
+
 
 // ========================
 // Tipi
@@ -832,29 +833,16 @@ const fbPluginSrc = useMemo(() => {
 </section>
 {/* METEO PREVISTO */}
 {match && (
-  <WeatherWidget
-    latitude={
-      match.ospitante_lat !== null && match.ospitante_lat !== undefined
-        ? Number(match.ospitante_lat)
-        : match.casa_lat !== null && match.casa_lat !== undefined
-        ? Number(match.casa_lat)
-        : null
-    }
-    longitude={
-      match.ospitante_lon !== null && match.ospitante_lon !== undefined
-        ? Number(match.ospitante_lon)
-        : match.casa_lon !== null && match.casa_lon !== undefined
-        ? Number(match.casa_lon)
-        : null
-    }
-    nomeLuogo={
-      match.squadra_ospitante_nome ||
-      match.squadra_casa_nome ||
-      "Montecarlo"
-    }
-  />
+  <div style={{ marginBottom: 24 }}>
+    <WeatherWidget_OpenMeteo
+      latitude={match.ospitante_lat}
+      longitude={match.ospitante_lon}
+      fallbackLat={match.casa_lat}
+      fallbackLon={match.casa_lon}
+      luogo={match.squadra_ospitante_nome || match.squadra_casa_nome}
+    />
+  </div>
 )}
-
 
 
 
