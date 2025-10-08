@@ -1,5 +1,5 @@
 // src/components/WeatherWidget.tsx
-// Data creazione: 06/10/2025 (rev definitiva fix 404 + fallback stabile Montecarlo)
+// Data creazione: 07/10/2025 (rev: versione iframe stabile, compatibile locale+produzione)
 
 import React, { useEffect, useState } from "react";
 
@@ -8,7 +8,9 @@ interface WeatherWidgetProps {
 }
 
 export default function WeatherWidget({ luogo }: WeatherWidgetProps): JSX.Element {
-  const [urlForecast, setUrlForecast] = useState<string | null>(null);
+  const [urlForecast, setUrlForecast] = useState<string>(
+    "https://forecast7.com/it/43d840n10d680/montecarlo/"
+  );
   const [label, setLabel] = useState<string>("Montecarlo");
 
   useEffect(() => {
@@ -34,18 +36,14 @@ export default function WeatherWidget({ luogo }: WeatherWidgetProps): JSX.Elemen
             .replace(/\s+/g, "-")
             .toLowerCase();
 
-          // ✅ Se il nome include Montecarlo, usa coordinate fisse note
           if (name.includes("montecarlo")) {
             lat = 43.84;
             lon = 10.68;
           }
 
-          // ✅ conversione più robusta: 5 decimali e sempre n/e
           const latStr = `${Math.abs(lat).toFixed(5).replace(".", "d")}${lat >= 0 ? "n" : "s"}`;
           const lonStr = `${Math.abs(lon).toFixed(5).replace(".", "d")}${lon >= 0 ? "e" : "w"}`;
-
           const url = `https://forecast7.com/it/${latStr}${lonStr}/${name}/`;
-          console.log("🌦️ URL Meteo:", url);
 
           setUrlForecast(url);
           setLabel(name.replace(/-/g, " "));
@@ -66,51 +64,25 @@ export default function WeatherWidget({ luogo }: WeatherWidgetProps): JSX.Elemen
     loadCoords();
   }, [luogo]);
 
-  useEffect(() => {
-    if (!urlForecast) return;
-
-    const loadScript = () => {
-      const existing = document.getElementById("weatherwidget-io-js");
-      if (existing) existing.remove();
-      const script = document.createElement("script");
-      script.id = "weatherwidget-io-js";
-      script.src = "https://weatherwidget.io/js/widget.min.js";
-      script.async = true;
-      script.onload = () => {
-        console.log("☁️ Widget script caricato, inizializzo...");
-        setTimeout(() => {
-          (window as any).__weatherwidget_init?.();
-        }, 1500);
-      };
-      document.body.appendChild(script);
-    };
-
-    loadScript();
-  }, [urlForecast]);
-
   return (
-    <div style={{ marginTop: 12 }}>
-      {urlForecast ? (
-        <a
-          key={urlForecast}
-          className="weatherwidget-io"
-          href={urlForecast}
-          data-label_1={label}
-          data-label_2="Meteo"
-          data-days="3"
-          data-theme="pure"
-          style={{
-            display: "block",
-            borderRadius: 8,
-            overflow: "hidden",
-            textDecoration: "none",
-          }}
-        >
-          {label} Meteo
-        </a>
-      ) : (
-        <div style={{ textAlign: "center", opacity: 0.6 }}>Caricamento meteo…</div>
-      )}
+    <div style={{ marginTop: 12, textAlign: "center" }}>
+      <h3 style={{ fontWeight: 600, marginBottom: 8 }}>{label} – Meteo</h3>
+
+      <iframe
+        key={urlForecast}
+        src={urlForecast}
+        width="100%"
+        height="245"
+        frameBorder="0"
+        scrolling="no"
+        style={{
+          borderRadius: 8,
+          overflow: "hidden",
+          maxWidth: 400,
+          margin: "0 auto",
+        }}
+        title={`Meteo ${label}`}
+      ></iframe>
     </div>
   );
 }

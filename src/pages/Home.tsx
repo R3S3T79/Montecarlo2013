@@ -315,7 +315,8 @@ useEffect(() => {
   const [perTimeCasa, setPerTimeCasa] = useState<number[]>([0, 0, 0, 0]);
   const [perTimeOspite, setPerTimeOspite] = useState<number[]>([0, 0, 0, 0]);
 
-  useEffect(() => {
+
+ useEffect(() => {
   let mounted = true;
   let ch: any = null;
 
@@ -324,51 +325,37 @@ useEffect(() => {
 
     let next: PartitaLite | null = null;
 
-    // 1) provo a prendere la partita InCorso
-  const { data: inCorso, error: errInCorso } = await supabase
-  .from("partite")
-  .select(`
-    id, data_ora, stato, campionato_torneo, squadra_casa_id, squadra_ospite_id, stagione_id,
-    goal_a, goal_b, goal_a1, goal_a2, goal_a3, goal_a4,
-    goal_b1, goal_b2, goal_b3, goal_b4,
-    squadra_casa:squadre!partite_squadra_casa_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo),
-    squadra_ospite:squadre!partite_squadra_ospite_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo),
-    squadra_ospitante:squadre!partite_squadra_ospitante_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo)
-  `)
-  .eq("stato", "InCorso")
-  .order("data_ora", { ascending: true })
-  .limit(1);
+    // 1) Partita in corso
+    const { data: inCorso, error: errInCorso } = await supabase
+      .from("partite_v")
+      .select("*")
+      .eq("stato", "InCorso")
+      .order("data_ora", { ascending: true })
+      .limit(1);
 
-if (errInCorso) {
-  console.error("[HomePage] Errore partita InCorso:", errInCorso.message);
-}
+    if (errInCorso) {
+      console.error("[HomePage] Errore partita InCorso:", errInCorso.message);
+    }
 
-if (inCorso && inCorso.length) {
-  next = inCorso[0] as PartitaLite;
-} else {
-  const { data: future, error: errFuture } = await supabase
-    .from("partite")
-    .select(`
-      id, data_ora, stato, campionato_torneo, squadra_casa_id, squadra_ospite_id, stagione_id,
-      goal_a, goal_b, goal_a1, goal_a2, goal_a3, goal_a4,
-      goal_b1, goal_b2, goal_b3, goal_b4,
-      squadra_casa:squadre!partite_squadra_casa_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo),
-      squadra_ospite:squadre!partite_squadra_ospite_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo),
-      squadra_ospitante:squadre!partite_squadra_ospitante_id_fkey(id,nome,logo_url,mappa_url,nome_stadio,indirizzo)
-    `)
-    .eq("stato", "DaGiocare")
-    .order("data_ora", { ascending: true })
-    .limit(1);
+    if (inCorso && inCorso.length) {
+      next = inCorso[0] as PartitaLite;
+    } else {
+      // 2) Se non ce n'è una in corso, prendo la prossima da giocare
+      const { data: future, error: errFuture } = await supabase
+        .from("partite_v")
+        .select("*")
+        .eq("stato", "DaGiocare")
+        .order("data_ora", { ascending: true })
+        .limit(1);
 
-  if (errFuture) {
-    console.error("[HomePage] Errore partita DaGiocare:", errFuture.message);
-  }
+      if (errFuture) {
+        console.error("[HomePage] Errore partita DaGiocare:", errFuture.message);
+      }
 
-  if (future && future.length) {
-    next = future[0] as PartitaLite;
-  }
-}
-
+      if (future && future.length) {
+        next = future[0] as PartitaLite;
+      }
+    }
 
     if (!mounted) return;
 
@@ -377,7 +364,7 @@ if (inCorso && inCorso.length) {
       setPerTimeCasa([next.goal_a1, next.goal_a2, next.goal_a3, next.goal_a4]);
       setPerTimeOspite([next.goal_b1, next.goal_b2, next.goal_b3, next.goal_b4]);
 
-      // 3) attivo sottoscrizione realtime su questa partita
+      // Attivo realtime
       ch = supabase
         .channel(`partita-${next.id}`)
         .on(
@@ -407,76 +394,6 @@ if (inCorso && inCorso.length) {
   };
 }, []);
 
-  // carico i marcatori direttamente dalla view marcatori_alias
-  useEffect(() => {
-    if (!match) return;
-
-    (async () => {
-      const { data, error } = await supabase
-        .from("marcatori_alias")
-        .select(
-          "id, periodo, goal_tempo, giocatore_uid, giocatore_stagione_id, partita_id, stagione_id, giocatore_nome, giocatore_cognome"
-        )
-        .eq("partita_id", match.id)
-        .order("periodo", { ascending: true });
-
-    if (error) {
-      console.error("[HomePage] Errore marcatori init:", error.message);
-      setMarcatoriLive([]);
-      return;
-    }
-
-    const norm = (data || []).map((row: any) => normalizeMarcatore(row));
-    setMarcatoriLive(norm);
-  })();
-}, [match?.id]);
-
-// realtime su marcatori_alias
-useEffect(() => {
-  if (!match) return;
-
-  const ch2 = supabase
-    .channel(`realtime-marcatori-${match.id}`)
-    .on(
-      "postgres_changes",
-      { event: "INSERT", schema: "public", table: "marcatori", filter: `partita_id=eq.${match.id}` },
-      ({ new: row }) => {
-        const n = normalizeMarcatore(row);
-        setMarcatoriLive((prev) => [...prev, n]);
-      }
-    )
-    .on(
-      "postgres_changes",
-      { event: "UPDATE", schema: "public", table: "marcatori", filter: `partita_id=eq.${match.id}` },
-      ({ new: row }) => {
-        const n = normalizeMarcatore(row);
-        setMarcatoriLive((prev) => {
-          const i = prev.findIndex((m) => m.id === n.id);
-          if (i === -1) return [...prev, n];
-          const copy = [...prev];
-          copy[i] = n;
-          return copy;
-        });
-      }
-    )
-    .on(
-      "postgres_changes",
-      { event: "DELETE", schema: "public", table: "marcatori", filter: `partita_id=eq.${match.id}` },
-      ({ old }) => {
-        setMarcatoriLive((prev) => prev.filter((m) => m.id !== String(old.id)));
-      }
-    )
-    .subscribe();
-
-  return () => supabase.removeChannel(ch2);
-}, [match?.id]);
-
-// ✅ nuovo effetto per il plugin Facebook
-useEffect(() => {
-  if ((window as any).FB) {
-    (window as any).FB.XFBML.parse();
-  }
-}, []);
 
 // normalizzazione marcatore con nome e cognome
 const normalizeMarcatore = (row: any): Marcatore => ({
@@ -695,14 +612,16 @@ const fbPluginSrc = useMemo(() => {
             {/* Squadra Casa */}
             <div style={styles.teamLiveCol}>
               <div style={styles.teamLiveHead}>
-                {match.squadra_casa?.logo_url && (
-                  <img
-                    src={match.squadra_casa.logo_url}
-                    alt={match.squadra_casa?.nome || "Casa"}
-                    style={styles.teamLogo}
-                  />
-                )}
-                <div style={styles.teamName}>{match.squadra_casa?.nome || "Casa"}</div>
+                {match.squadra_casa_logo && (
+  <img
+    src={match.squadra_casa_logo}
+    alt={match.squadra_casa_nome || "Casa"}
+    style={styles.teamLogo}
+  />
+)}
+
+                <div style={styles.teamName}>{match.squadra_casa_nome || "Casa"}
+</div>
                 <span style={styles.liveScoreBlink}>{match.goal_a}</span>
               </div>
 
@@ -738,14 +657,15 @@ const fbPluginSrc = useMemo(() => {
             {/* Squadra Ospite */}
             <div style={styles.teamLiveCol}>
               <div style={styles.teamLiveHead}>
-                {match.squadra_ospite?.logo_url && (
-                  <img
-                    src={match.squadra_ospite.logo_url}
-                    alt={match.squadra_ospite?.nome || "Ospite"}
-                    style={styles.teamLogo}
-                  />
-                )}
-                <div style={styles.teamName}>{match.squadra_ospite?.nome || "Ospite"}</div>
+                {match.squadra_ospite_logo && (
+  <img
+    src={match.squadra_ospite_logo}
+    alt={match.squadra_ospite_nome || "Ospite"}
+    style={styles.teamLogo}
+  />
+)}
+
+                <div style={styles.teamName}>{match.squadra_ospite_nome || "Ospite"}</div>
                 <span style={styles.liveScoreBlink}>{match.goal_b}</span>
               </div>
 
@@ -791,15 +711,17 @@ const fbPluginSrc = useMemo(() => {
           <div style={styles.teamsRowColumn}>
             {/* Squadra Casa */}
             <div style={{ ...styles.teamSide, justifyContent: "flex-start" }}>
-              {match.squadra_casa?.logo_url && (
-                <img
-                  src={match.squadra_casa.logo_url}
-                  alt={match.squadra_casa?.nome || "Casa"}
-                  style={styles.teamLogo}
-                />
-              )}
+              {match.squadra_casa_logo && (
+  <img
+    src={match.squadra_casa_logo}
+    alt={match.squadra_casa_nome || "Casa"}
+    style={styles.teamLogo}
+  />
+)}
+
               <div style={{ ...styles.teamName, textAlign: "left" }}>
-                {match.squadra_casa?.nome || "Casa"}
+                {match.squadra_casa_nome || "Casa"}
+
               </div>
             </div>
 
@@ -809,15 +731,16 @@ const fbPluginSrc = useMemo(() => {
             {/* Squadra Ospite */}
             <div style={{ ...styles.teamSide, justifyContent: "flex-end" }}>
               <div style={{ ...styles.teamName, textAlign: "right" }}>
-                {match.squadra_ospite?.nome || "Ospite"}
+                {match.squadra_ospite_nome || "Ospite"}
               </div>
-              {match.squadra_ospite?.logo_url && (
-                <img
-                  src={match.squadra_ospite.logo_url}
-                  alt={match.squadra_ospite?.nome || "Ospite"}
-                  style={styles.teamLogo}
-                />
-              )}
+              {match.squadra_ospite_logo && (
+  <img
+    src={match.squadra_ospite_logo}
+    alt={match.squadra_ospite_nome || "Ospite"}
+    style={styles.teamLogo}
+  />
+)}
+
             </div>
           </div>
 
@@ -840,43 +763,64 @@ const fbPluginSrc = useMemo(() => {
         </>
       )}
 
-      {/* MAPPA CAMPO SQUADRA OSPITANTE */}
-{match?.squadra_ospitante && (
+      {/* MAPPA CAMPO SQUADRA OSPITANTE (fallback su squadra di casa) */}
+{match && (
   <div style={{ marginTop: 12 }}>
-    <iframe
-      title="Mappa campo squadra ospitante"
-      src={
-        match.squadra_ospitante.mappa_url
-          ? match.squadra_ospitante.mappa_url
-          : `https://www.google.com/maps?q=${encodeURIComponent(
-              match.squadra_ospitante.nome_stadio ||
-              match.squadra_ospitante.indirizzo ||
-              match.squadra_ospitante.nome ||
-              ""
-            )}&output=embed`
-      }
-      width="100%"
-      height="250"
-      style={{ border: 0, borderRadius: 8 }}
-      loading="lazy"
-      allowFullScreen
-    ></iframe>
+    {(() => {
+      // Preferisci squadra ospitante, poi fallback su squadra di casa
+      const osp = match.squadra_ospitante;
+      const casa = match.squadra_casa;
+
+      // Se esiste un mappa_url valido → usalo
+      const mapUrl =
+        osp?.mappa_url ||
+        casa?.mappa_url ||
+        `https://www.google.com/maps?q=${encodeURIComponent(
+          osp?.nome_stadio ||
+            osp?.indirizzo ||
+            casa?.nome_stadio ||
+            casa?.indirizzo ||
+            osp?.nome ||
+            casa?.nome ||
+            ""
+        )}&output=embed`;
+
+      return (
+        <iframe
+          title="Mappa campo"
+          src={mapUrl}
+          width="100%"
+          height="250"
+          style={{ border: 0, borderRadius: 8 }}
+          loading="lazy"
+          allowFullScreen
+        ></iframe>
+      );
+    })()}
   </div>
 )}
+
 
 
     </div>
   )}
 </section>
 {/* METEO PREVISTO */}
-<WeatherWidget luogo={
-  match?.squadra_ospitante?.nome_stadio ||
-  match?.squadra_ospitante?.indirizzo ||
-  match?.squadra_ospitante?.nome ||
-  match?.squadra_casa?.nome_stadio ||
-  match?.squadra_casa?.indirizzo ||
-  match?.squadra_casa?.nome
-}/>
+{match && (
+  <WeatherWidget
+    latitude={
+      match.ospitante_lat !== null && match.ospitante_lat !== undefined
+        ? match.ospitante_lat
+        : match.casa_lat
+    }
+    longitude={
+      match.ospitante_lon !== null && match.ospitante_lon !== undefined
+        ? match.ospitante_lon
+        : match.casa_lon
+    }
+  />
+)}
+
 
 
       {/* FACEBOOK – plugin ufficiale */}
