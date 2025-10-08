@@ -45,11 +45,13 @@ type SquadraLite = {
 
 type PartitaLite = {
   id: string;
-  data_ora: string; // timestamptz
+  data_ora: string;
   stato: "Giocata" | "DaGiocare" | "InCorso";
   campionato_torneo: "Campionato" | "Torneo" | "Amichevole" | string;
   squadra_casa_id: string;
   squadra_ospite_id: string;
+  stagione_id?: string;
+
   goal_a: number;
   goal_b: number;
   goal_a1: number;
@@ -60,11 +62,30 @@ type PartitaLite = {
   goal_b2: number;
   goal_b3: number;
   goal_b4: number;
-  squadra_casa?: SquadraLite | null;
-  squadra_ospite?: SquadraLite | null;
-  squadra_ospitante?: SquadraLite | null;
-  stagione_id?: string;
+
+  // Casa
+  squadra_casa_nome?: string | null;
+  squadra_casa_logo?: string | null;
+  casa_mappa_url?: string | null;
+  casa_nome_stadio?: string | null;
+  casa_indirizzo?: string | null;
+
+  // Ospite
+  squadra_ospite_nome?: string | null;
+  squadra_ospite_logo?: string | null;
+  ospite_mappa_url?: string | null;
+  ospite_nome_stadio?: string | null;
+  ospite_indirizzo?: string | null;
+
+  // Ospitante (campo)
+  squadra_ospitante_id?: string | null;
+  squadra_ospitante_nome?: string | null;
+  squadra_ospitante_logo?: string | null;
+  ospitante_mappa_url?: string | null;
+  ospitante_nome_stadio?: string | null;
+  ospitante_indirizzo?: string | null;
 };
+
 
 type Marcatore = {
   id: string;
@@ -763,32 +784,35 @@ const fbPluginSrc = useMemo(() => {
         </>
       )}
 
-      {/* MAPPA CAMPO SQUADRA OSPITANTE (fallback su squadra di casa) */}
+      {/* MAPPA CAMPO (preferisci URL già salvati) */}
 {match && (
   <div style={{ marginTop: 12 }}>
     {(() => {
-      // Preferisci squadra ospitante, poi fallback su squadra di casa
-      const osp = match.squadra_ospitante;
-      const casa = match.squadra_casa;
+      // priorità: URL mappa della squadra OSPITANTE (campo) > CASA > OSPITE
+      const urlDiretto =
+        match.ospitante_mappa_url ||
+        match.casa_mappa_url ||
+        match.ospite_mappa_url ||
+        null;
 
-      // Se esiste un mappa_url valido → usalo
-      const mapUrl =
-        osp?.mappa_url ||
-        casa?.mappa_url ||
-        `https://www.google.com/maps?q=${encodeURIComponent(
-          osp?.nome_stadio ||
-            osp?.indirizzo ||
-            casa?.nome_stadio ||
-            casa?.indirizzo ||
-            osp?.nome ||
-            casa?.nome ||
-            ""
-        )}&output=embed`;
+      // fallback: costruisco una query testuale
+      const queryFallback =
+        match.ospitante_nome_stadio ||
+        match.ospitante_indirizzo ||
+        match.squadra_ospitante_nome ||
+        match.casa_nome_stadio ||
+        match.casa_indirizzo ||
+        match.squadra_casa_nome ||
+        "Montecarlo";
+
+      const src = urlDiretto
+        ? urlDiretto // usa l’embed/url già salvato nel DB
+        : `https://www.google.com/maps?q=${encodeURIComponent(queryFallback)}&output=embed`;
 
       return (
         <iframe
           title="Mappa campo"
-          src={mapUrl}
+          src={src}
           width="100%"
           height="250"
           style={{ border: 0, borderRadius: 8 }}
@@ -802,6 +826,7 @@ const fbPluginSrc = useMemo(() => {
 
 
 
+
     </div>
   )}
 </section>
@@ -810,16 +835,26 @@ const fbPluginSrc = useMemo(() => {
   <WeatherWidget
     latitude={
       match.ospitante_lat !== null && match.ospitante_lat !== undefined
-        ? match.ospitante_lat
-        : match.casa_lat
+        ? Number(match.ospitante_lat)
+        : match.casa_lat !== null && match.casa_lat !== undefined
+        ? Number(match.casa_lat)
+        : null
     }
     longitude={
       match.ospitante_lon !== null && match.ospitante_lon !== undefined
-        ? match.ospitante_lon
-        : match.casa_lon
+        ? Number(match.ospitante_lon)
+        : match.casa_lon !== null && match.casa_lon !== undefined
+        ? Number(match.casa_lon)
+        : null
+    }
+    nomeLuogo={
+      match.squadra_ospitante_nome ||
+      match.squadra_casa_nome ||
+      "Montecarlo"
     }
   />
 )}
+
 
 
 
