@@ -1,16 +1,33 @@
 import type { Handler } from "@netlify/functions";
 
 export const handler: Handler = async (event) => {
-  const luogo = event.queryStringParameters?.q;
-  if (!luogo) return { statusCode: 400, body: "Missing q" };
+  try {
+    const q = event.queryStringParameters?.q || "Montecarlo";
 
-  const resp = await fetch(
-    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(luogo)}`
-  );
-  const json = await resp.text();
-  return {
-    statusCode: 200,
-    headers: { "Access-Control-Allow-Origin": "*" },
-    body: json,
-  };
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`;
+
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Montecarlo2013App/1.0 (https://montecarlo2013.netlify.app)",
+        "Accept-Language": "it",
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`OpenStreetMap response ${res.status}`);
+    }
+
+    const data = await res.json();
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    };
+  } catch (err: any) {
+    console.error("❌ Errore nella geocode function:", err);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: err.message || "Errore interno geocode" }),
+    };
+  }
 };
