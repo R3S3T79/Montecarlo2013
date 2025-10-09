@@ -5,6 +5,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import WeatherWidget_OpenMeteo from "../components/WeatherWidget_OpenMeteo";
+import CountdownVeronica from "../components/CountdownVeronica";
+
 
 
 // ========================
@@ -214,6 +216,8 @@ export default function HomePage(): JSX.Element {
     return [...marqueeItems, sep, ...marqueeItems];
   }, [marqueeItems]);
 
+
+
   // --------------------------------
 // COMPLEANNI — solo stagione attuale
 // --------------------------------
@@ -415,6 +419,13 @@ useEffect(() => {
     if (ch) supabase.removeChannel(ch);
   };
 }, []);
+  
+// ✅ Effetto per il plugin Facebook
+useEffect(() => {
+  if ((window as any).FB) {
+    (window as any).FB.XFBML.parse();
+  }
+}, []);
 
 
 // normalizzazione marcatore con nome e cognome
@@ -538,6 +549,9 @@ const fbPluginSrc = useMemo(() => {
     </div>
   </div>
 </section>
+
+{/* Countdown al compleanno di Veronica */}
+<CountdownVeronica />
 
       {/* COMPLEANNO GIOCATORE */}
       <section style={styles.card}>
@@ -727,63 +741,64 @@ const fbPluginSrc = useMemo(() => {
             </Link>
           </div>
         </>
-      ) : (
-        /* Struttura normale se non è in corso */
-        <>
-          <div style={styles.teamsRowColumn}>
-            {/* Squadra Casa */}
-            <div style={{ ...styles.teamSide, justifyContent: "flex-start" }}>
-              {match.squadra_casa_logo && (
-  <img
-    src={match.squadra_casa_logo}
-    alt={match.squadra_casa_nome || "Casa"}
-    style={styles.teamLogo}
-  />
-)}
+) : (
+  // Struttura normale se non è in corso
+  (
+    <>
+      <div style={styles.matchBorderBox}>
+        <div style={styles.teamsRowColumn}>
+          {/* Squadra Casa */}
+          <div style={{ ...styles.teamSide, justifyContent: "flex-start" }}>
+            {match.squadra_casa_logo && (
+              <img
+                src={match.squadra_casa_logo}
+                alt={match.squadra_casa_nome || "Casa"}
+                style={styles.teamLogo}
+              />
+            )}
 
-              <div style={{ ...styles.teamName, textAlign: "left" }}>
-                {match.squadra_casa_nome || "Casa"}
-
-              </div>
-            </div>
-
-            {/* VS centrato */}
-            <div style={styles.vsCentered}>VS</div>
-
-            {/* Squadra Ospite */}
-            <div style={{ ...styles.teamSide, justifyContent: "flex-end" }}>
-              <div style={{ ...styles.teamName, textAlign: "right" }}>
-                {match.squadra_ospite_nome || "Ospite"}
-              </div>
-              {match.squadra_ospite_logo && (
-  <img
-    src={match.squadra_ospite_logo}
-    alt={match.squadra_ospite_nome || "Ospite"}
-    style={styles.teamLogo}
-  />
-)}
-
+            <div style={{ ...styles.teamName, textAlign: "left" }}>
+              {match.squadra_casa_nome || "Casa"}
             </div>
           </div>
 
-          {isTodayMatch ? (
-            <div style={styles.liveHint}>
-              La partita è oggi. In attesa del calcio d’inizio…{" "}
-              <Link to="/prossima-partita">Vai a ProssimaPartita</Link>
-            </div>
-          ) : (
-            <div style={styles.liveHint}>
-              <Link
-  to="/calendario"
-  className="text-red-600 hover:text-red-800 transition"
->
-  Vai al calendario
-</Link>
+          {/* VS centrato */}
+          <div style={styles.vsCentered}>VS</div>
 
+          {/* Squadra Ospite */}
+          <div style={{ ...styles.teamSide, justifyContent: "flex-end" }}>
+            <div style={{ ...styles.teamName, textAlign: "right" }}>
+              {match.squadra_ospite_nome || "Ospite"}
             </div>
-          )}
-        </>
+            {match.squadra_ospite_logo && (
+              <img
+                src={match.squadra_ospite_logo}
+                alt={match.squadra_ospite_nome || "Ospite"}
+                style={styles.teamLogo}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {isTodayMatch ? (
+        <div style={styles.liveHint}>
+          La partita è oggi. In attesa del calcio d’inizio…{" "}
+          <Link to="/prossima-partita">Vai a ProssimaPartita</Link>
+        </div>
+      ) : (
+        <div style={styles.liveHint}>
+          <Link
+            to="/calendario"
+           className="text-red-600 hover:text-red-800 transition text-lg font-semibold"
+          >
+            Vai al calendario
+          </Link>
+        </div>
       )}
+    </>
+  )
+)}
 
       {/* MAPPA CAMPO (preferisci URL già salvati) */}
 {match && (
@@ -978,6 +993,14 @@ vsCentered: {
     color: "white",
     letterSpacing: 0.3,
   },
+  matchBorderBox: {
+  border: "2px solid black",
+  borderRadius: 12,
+  padding: "10px 14px",
+  marginTop: 8,
+  background: "rgba(255,255,255,0.9)",
+},
+
 
    // Cards
   card: {
@@ -1197,4 +1220,6 @@ if (!styleEl) {
 .marqueeTrack.paused { animation-play-state: paused; }
 `;
   document.head.appendChild(s);
+
 }
+
