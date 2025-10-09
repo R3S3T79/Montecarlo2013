@@ -1,11 +1,10 @@
 // ===============================
 // Service Worker Montecarlo2013
-// Cache esteso + Prefetch API
+// Cache esteso + Prefetch API + Popup Update
 // ===============================
 
-const CACHE_NAME = "montecarlo-cache-v3";
+const CACHE_NAME = "montecarlo-cache-v4"; // 🔹 incrementa a ogni deploy
 
-// Risorse statiche iniziali
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -17,7 +16,6 @@ const STATIC_ASSETS = [
   "/manifest.webmanifest",
 ];
 
-// API Supabase principali da prefetchare
 const SUPABASE_BASE = "https://nszeiidkuzqphujyovnx.supabase.co/rest/v1";
 const API_ENDPOINTS = [
   `${SUPABASE_BASE}/partite?select=*`,
@@ -30,26 +28,24 @@ const API_ENDPOINTS = [
 ];
 
 const SUPABASE_HEADERS = {
-  apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zemVpaWRrdXpxcGh1anlvdm54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5Njk5OTgsImV4cCI6MjA2MDU0NTk5OH0.VDvYzHjmEAAfuHTQqT5piOg4T6_HOMSFA8Q_Z7LFmfk",
-  Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zemVpaWRrdXpxcGh1anlvdm54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5Njk5OTgsImV4cCI6MjA2MDU0NTk5OH0.VDvYzHjmEAAfuHTQqT5piOg4T6_HOMSFA8Q_Z7LFmfk",
+  apikey:
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zemVpaWRrdXpxcGh1anlvdm54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5Njk5OTgsImV4cCI6MjA2MDU0NTk5OH0.VDvYzHjmEAAfuHTQqT5piOg4T6_HOMSFA8Q_Z7LFmfk",
+  Authorization:
+    "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zemVpaWRrdXpxcGh1anlvdm54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5Njk5OTgsImV4cCI6MjA2MDU0NTk5OH0.VDvYzHjmEAAfuHTQqT5piOg4T6_HOMSFA8Q_Z7LFmfk",
 };
 
-// Installazione: cache statici + prefetch API
+// Installazione
 self.addEventListener("install", (event) => {
-  console.log("[SW] Installazione...");
+  console.log("[SW] Installazione nuova versione...");
+  self.skipWaiting();
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
-      // cache asset statici
       await cache.addAll(STATIC_ASSETS);
-
-      // prefetch API
       for (const url of API_ENDPOINTS) {
         try {
           const res = await fetch(url, { headers: SUPABASE_HEADERS });
-          if (res.ok) {
-            cache.put(url, res.clone());
-          }
+          if (res.ok) cache.put(url, res.clone());
         } catch (err) {
           console.warn("[SW] Prefetch fallito:", url, err);
         }
@@ -58,54 +54,48 @@ self.addEventListener("install", (event) => {
   );
 });
 
-// Attivazione: pulizia cache vecchie
+// Attivazione
 self.addEventListener("activate", (event) => {
-  console.log("[SW] Attivazione, pulizia vecchie cache...");
+  console.log("[SW] Attivazione completata, pulizia cache vecchie...");
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)));
+      await self.clients.claim();
+
+      // 🔹 Avvisa le schede aperte che è disponibile un nuovo SW
+      const clientsList = await self.clients.matchAll();
+      for (const client of clientsList) {
+        client.postMessage({ type: "NEW_VERSION_AVAILABLE" });
+      }
+    })()
   );
 });
 
-// Fetch handler
+// Fetch
 self.addEventListener("fetch", (event) => {
   const { request } = event;
-
-  // Cache immagini
   if (request.destination === "image" || request.url.match(/\.(png|jpg|jpeg|svg|webp)$/)) {
     event.respondWith(staleWhileRevalidate(request));
     return;
   }
-
-  // Cache CSS e JS
-  if (request.url.match(/\.(css|js)$/)) {
+  if (request.url.match(/\.(css|js)$/) || request.url.includes("supabase.co")) {
     event.respondWith(staleWhileRevalidate(request));
     return;
   }
-
-  // Cache API Supabase
-  if (request.url.includes("supabase.co")) {
-    event.respondWith(staleWhileRevalidate(request));
-    return;
-  }
-
-  // Default
   event.respondWith(
     caches.match(request).then((cached) => cached || fetch(request).catch(() => caches.match("/offline.html")))
   );
 });
 
-// Funzione cache-first con aggiornamento in background
 async function staleWhileRevalidate(request) {
   const cache = await caches.open(CACHE_NAME);
   const cached = await cache.match(request);
-
   try {
     const fresh = await fetch(request, { headers: SUPABASE_HEADERS });
     cache.put(request, fresh.clone());
     return fresh;
-  } catch (err) {
+  } catch {
     return cached || caches.match("/offline.html");
   }
 }

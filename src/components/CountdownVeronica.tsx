@@ -98,7 +98,7 @@ export default function CountdownVeronica() {
   alt="Palloncini"
   className="absolute top-1/2 w-20 opacity-90 float-left"
   style={{
-    left: "calc(30% - 190px)", // distanza dal centro (più vicino al box)
+    left: "calc(25% - 190px)", // distanza dal centro (più vicino al box)
     transform: "translateY(-50%) scaleX(-1)",
   }}
 />
@@ -120,7 +120,18 @@ export default function CountdownVeronica() {
   alt="Palloncini"
   className="absolute top-1/2 w-20 opacity-90 float-right"
   style={{
-    right: "calc(30% - 190px)", // distanza simmetrica
+    right: "calc(25% - 190px)", // distanza simmetrica
+    transform: "translateY(-50%)",
+  }}
+/>
+
+{/* 🎈 Palloncino destro */}
+<img
+  src="/Palloncini.png"
+  alt="Palloncini"
+  className="absolute top-1/2 w-20 opacity-90 float-right"
+  style={{
+    right: "calc(40% - 190px)", // distanza simmetrica
     transform: "translateY(-50%)",
   }}
 />
@@ -145,16 +156,7 @@ export default function CountdownVeronica() {
         </p>
       </div>
 
-      {/* 🎈 Palloncino destro */}
-<img
-  src="/Palloncini.png"
-  alt="Palloncini"
-  className="absolute top-1/2 w-20 opacity-90 float-right"
-  style={{
-    right: "calc(40% - 190px)", // distanza simmetrica
-    transform: "translateY(-50%)",
-  }}
-/>
+      
     </div>
   );
 }

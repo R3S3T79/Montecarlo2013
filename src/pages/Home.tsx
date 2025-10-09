@@ -993,13 +993,21 @@ vsCentered: {
     color: "white",
     letterSpacing: 0.3,
   },
-  matchBorderBox: {
+ matchBorderBox: {
+  position: "relative",
   border: "2px solid black",
   borderRadius: 12,
   padding: "10px 14px",
   marginTop: 8,
-  background: "rgba(255,255,255,0.9)",
+  backgroundImage: "url('/Images/campo-sportivo.jpeg')", // ✅ percorso corretto
+  backgroundSize: "cover",
+  backgroundPosition: "center",
+  backgroundRepeat: "no-repeat",
+  overflow: "hidden",
+  color: "white", // ✅ testo in bianco
+  textShadow: "1px 1px 3px rgba(0,0,0,0.8)", // migliora la leggibilità
 },
+
 
 
    // Cards
@@ -1100,7 +1108,7 @@ fbIframe: { width: "100%", height: "100%", border: "none" },
     justifyContent: "center",
     gap: 8,
   },
-  teamLogo: { width: 32, height: 32, objectFit: "contain" },
+  teamLogo: { width: 35, height: 35, objectFit: "contain" },
   teamName: { fontSize: 20, fontWeight: 700 },
   scoreBubble: { marginLeft: 6, fontSize: 14, fontWeight: 700, opacity: 0.8 },
   vs: { fontSize: 16, opacity: 0.7, minWidth: 50, textAlign: "center" as const },
