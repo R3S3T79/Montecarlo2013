@@ -1,5 +1,5 @@
 // src/main.tsx
-// Data revisione: 12/10/2025 (rev: fix auto-update + banner + controllerchange log)
+// Data revisione: 12/10/2025 (rev: fix comunicazione SW → banner + listener robusto)
 
 import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom/client";
@@ -16,22 +16,31 @@ function UpdateBanner() {
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
+      // Listener messaggi dal Service Worker
       navigator.serviceWorker.addEventListener("message", (event) => {
+        console.log("[MAIN] Messaggio SW ricevuto:", event.data);
+
         if (event.data?.type === "NEW_VERSION_AVAILABLE") {
-          console.log("[SW] Nuova versione disponibile → mostro banner");
+          console.log("[MAIN] Nuova versione disponibile → mostro banner");
           setWaitingWorker(event.source as ServiceWorker);
           setShow(true);
         }
+      });
+
+      // Se il controller cambia → ricarica automatico
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        console.log("[MAIN] controllerchange → ricarico nuova versione");
+        window.location.reload();
       });
     }
   }, []);
 
   const updateApp = () => {
+    console.log("[MAIN] Clic su Aggiorna ora");
     if (waitingWorker) {
-      console.log("[SW] Forzo SKIP_WAITING → controllerchange scatterà");
       waitingWorker.postMessage({ type: "SKIP_WAITING" });
     }
-    // Se non c'è SW, ricarico comunque
+    // fallback: reload diretto
     window.location.reload();
   };
 
@@ -96,29 +105,28 @@ if (import.meta.env.MODE === "production" && "serviceWorker" in navigator) {
       .then((registration) => {
         console.log("✅ Service Worker registrato:", registration);
 
-        // Se c'è già un worker in attesa, segnalo aggiornamento
+        // 🔸 Se c'è già un worker waiting, notifica subito
         if (registration.waiting) {
-          console.log("[SW] Nuova versione già in attesa → invio messaggio");
+          console.log("[SW] Worker già in attesa → invio messaggio NEW_VERSION_AVAILABLE");
           registration.waiting.postMessage({ type: "NEW_VERSION_AVAILABLE" });
         }
 
-        // Quando un nuovo SW diventa “waiting”
+        // 🔸 Quando viene trovato un nuovo SW
         registration.addEventListener("updatefound", () => {
           const newWorker = registration.installing;
           if (newWorker) {
+            console.log("[SW] Nuovo worker trovato:", newWorker);
             newWorker.addEventListener("statechange", () => {
               if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-                console.log("[SW] installato nuovo worker → notifica banner");
-                newWorker.postMessage({ type: "NEW_VERSION_AVAILABLE" });
+                console.log("[SW] Worker installato → invio messaggio NEW_VERSION_AVAILABLE");
+                if (navigator.serviceWorker.controller) {
+                  navigator.serviceWorker.controller.postMessage({
+                    type: "NEW_VERSION_AVAILABLE",
+                  });
+                }
               }
             });
           }
-        });
-
-        // 🔁 Quando cambia il controller (nuovo SW attivo)
-        navigator.serviceWorker.addEventListener("controllerchange", () => {
-          console.log("[SW] controllerchange → reload forzato");
-          window.location.reload();
         });
       })
       .catch((err) => console.error("❌ Errore registrazione SW:", err));
