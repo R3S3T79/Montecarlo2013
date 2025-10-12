@@ -13,7 +13,6 @@ const STATIC_ASSETS = [
   "/Sfondo.png",
   "/vite.svg",
   "/offline.html",
-  "/manifest.json",
   "/manifest.webmanifest",
 ];
 
