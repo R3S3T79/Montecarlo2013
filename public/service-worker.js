@@ -4,7 +4,7 @@
 // Data revisione: 12/10/2025 (rev: fix messaggi update + skipWaiting coerente con main.tsx)
 // ===============================
 
-const CACHE_NAME = "montecarlo-cache-v4"; // 🔹 incrementa a ogni deploy
+const CACHE_NAME = "montecarlo-cache-v5"; // 🔹 incrementa a ogni deploy
 
 const STATIC_ASSETS = [
   "/",
