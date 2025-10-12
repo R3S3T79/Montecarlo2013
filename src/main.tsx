@@ -96,37 +96,42 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 );
 
 // ===============================
-// 🔹 Registrazione Service Worker
+// 🔹 Registrazione Service Worker (refresh automatico garantito)
 // ===============================
-if (import.meta.env.MODE === "production" && "serviceWorker" in navigator) {
+if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("/sw.js")
       .then((registration) => {
         console.log("✅ Service Worker registrato:", registration);
 
-        // 🔸 Se c'è già un worker waiting, notifica subito
+        // Se un nuovo SW è già waiting → chiedi di aggiornare subito
         if (registration.waiting) {
-          console.log("[SW] Worker già in attesa → invio messaggio NEW_VERSION_AVAILABLE");
-          registration.waiting.postMessage({ type: "NEW_VERSION_AVAILABLE" });
+          console.log("[SW] Worker in attesa → attivo skipWaiting");
+          registration.waiting.postMessage({ type: "SKIP_WAITING" });
         }
 
-        // 🔸 Quando viene trovato un nuovo SW
+        // Quando un nuovo SW viene trovato
         registration.addEventListener("updatefound", () => {
           const newWorker = registration.installing;
+          console.log("[SW] Nuovo SW trovato:", newWorker);
           if (newWorker) {
-            console.log("[SW] Nuovo worker trovato:", newWorker);
             newWorker.addEventListener("statechange", () => {
               if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-                console.log("[SW] Worker installato → invio messaggio NEW_VERSION_AVAILABLE");
-                if (navigator.serviceWorker.controller) {
-                  navigator.serviceWorker.controller.postMessage({
-                    type: "NEW_VERSION_AVAILABLE",
-                  });
-                }
+                console.log("[SW] Nuova versione installata → attivo SKIP_WAITING");
+                newWorker.postMessage({ type: "SKIP_WAITING" });
               }
             });
           }
+        });
+
+        // 🔁 Quando cambia il controller → reload automatico
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (refreshing) return;
+          refreshing = true;
+          console.log("[SW] Controller cambiato → ricarico pagina");
+          window.location.reload();
         });
       })
       .catch((err) => console.error("❌ Errore registrazione SW:", err));
