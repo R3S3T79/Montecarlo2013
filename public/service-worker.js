@@ -1,6 +1,7 @@
 // ===============================
 // Service Worker Montecarlo2013
 // Cache esteso + Prefetch API + Popup Update
+// Data revisione: 12/10/2025 (rev: fix messaggi update + skipWaiting coerente con main.tsx)
 // ===============================
 
 const CACHE_NAME = "montecarlo-cache-v4"; // 🔹 incrementa a ogni deploy
@@ -34,10 +35,12 @@ const SUPABASE_HEADERS = {
     "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zemVpaWRrdXpxcGh1anlvdm54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5Njk5OTgsImV4cCI6MjA2MDU0NTk5OH0.VDvYzHjmEAAfuHTQqT5piOg4T6_HOMSFA8Q_Z7LFmfk",
 };
 
+// ===============================
 // Installazione
+// ===============================
 self.addEventListener("install", (event) => {
   console.log("[SW] Installazione nuova versione...");
-  self.skipWaiting();
+  self.skipWaiting(); // 🔹 forza l’attivazione immediata
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
@@ -54,7 +57,9 @@ self.addEventListener("install", (event) => {
   );
 });
 
+// ===============================
 // Attivazione
+// ===============================
 self.addEventListener("activate", (event) => {
   console.log("[SW] Attivazione completata, pulizia cache vecchie...");
   event.waitUntil(
@@ -63,8 +68,8 @@ self.addEventListener("activate", (event) => {
       await Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)));
       await self.clients.claim();
 
-      // 🔹 Avvisa le schede aperte che è disponibile un nuovo SW
-      const clientsList = await self.clients.matchAll();
+      // 🔹 Avvisa tutte le schede che è disponibile una nuova versione
+      const clientsList = await self.clients.matchAll({ includeUncontrolled: true });
       for (const client of clientsList) {
         client.postMessage({ type: "NEW_VERSION_AVAILABLE" });
       }
@@ -72,17 +77,22 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Fetch
+// ===============================
+// Fetch handler
+// ===============================
 self.addEventListener("fetch", (event) => {
   const { request } = event;
+
   if (request.destination === "image" || request.url.match(/\.(png|jpg|jpeg|svg|webp)$/)) {
     event.respondWith(staleWhileRevalidate(request));
     return;
   }
+
   if (request.url.match(/\.(css|js)$/) || request.url.includes("supabase.co")) {
     event.respondWith(staleWhileRevalidate(request));
     return;
   }
+
   event.respondWith(
     caches.match(request).then((cached) => cached || fetch(request).catch(() => caches.match("/offline.html")))
   );
@@ -99,3 +109,13 @@ async function staleWhileRevalidate(request) {
     return cached || caches.match("/offline.html");
   }
 }
+
+// ===============================
+// Messaggi dal main thread
+// ===============================
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    console.log("[SW] Ricevuto SKIP_WAITING → attivo subito nuovo SW");
+    self.skipWaiting();
+  }
+});
