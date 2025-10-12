@@ -1,11 +1,15 @@
 // src/main.tsx
+// Data revisione: 12/10/2025 (rev: fix auto-update + banner + controllerchange log)
+
 import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
 
-// 🔹 Mini componente popup aggiornamento
+// ===============================
+// 🔹 Componente banner aggiornamento
+// ===============================
 function UpdateBanner() {
   const [show, setShow] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
@@ -14,7 +18,8 @@ function UpdateBanner() {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.addEventListener("message", (event) => {
         if (event.data?.type === "NEW_VERSION_AVAILABLE") {
-          console.log("[SW] Nuova versione disponibile");
+          console.log("[SW] Nuova versione disponibile → mostro banner");
+          setWaitingWorker(event.source as ServiceWorker);
           setShow(true);
         }
       });
@@ -23,8 +28,10 @@ function UpdateBanner() {
 
   const updateApp = () => {
     if (waitingWorker) {
+      console.log("[SW] Forzo SKIP_WAITING → controllerchange scatterà");
       waitingWorker.postMessage({ type: "SKIP_WAITING" });
     }
+    // Se non c'è SW, ricarico comunque
     window.location.reload();
   };
 
@@ -67,17 +74,20 @@ function UpdateBanner() {
   );
 }
 
+// ===============================
+// 🔹 Mount principale
+// ===============================
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <BrowserRouter>
       <App />
-      <UpdateBanner /> {/* 👈 Popup di aggiornamento */}
+      <UpdateBanner />
     </BrowserRouter>
   </React.StrictMode>
 );
 
 // ===============================
-// Registrazione Service Worker (solo in produzione)
+// 🔹 Registrazione Service Worker
 // ===============================
 if (import.meta.env.MODE === "production" && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -85,10 +95,31 @@ if (import.meta.env.MODE === "production" && "serviceWorker" in navigator) {
       .register("/sw.js")
       .then((registration) => {
         console.log("✅ Service Worker registrato:", registration);
+
+        // Se c'è già un worker in attesa, segnalo aggiornamento
         if (registration.waiting) {
-          console.log("[SW] Nuova versione già pronta → popup");
+          console.log("[SW] Nuova versione già in attesa → invio messaggio");
           registration.waiting.postMessage({ type: "NEW_VERSION_AVAILABLE" });
         }
+
+        // Quando un nuovo SW diventa “waiting”
+        registration.addEventListener("updatefound", () => {
+          const newWorker = registration.installing;
+          if (newWorker) {
+            newWorker.addEventListener("statechange", () => {
+              if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+                console.log("[SW] installato nuovo worker → notifica banner");
+                newWorker.postMessage({ type: "NEW_VERSION_AVAILABLE" });
+              }
+            });
+          }
+        });
+
+        // 🔁 Quando cambia il controller (nuovo SW attivo)
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          console.log("[SW] controllerchange → reload forzato");
+          window.location.reload();
+        });
       })
       .catch((err) => console.error("❌ Errore registrazione SW:", err));
   });
