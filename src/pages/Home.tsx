@@ -3,9 +3,9 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "../lib/supabaseClient";
-import WeatherWidget_OpenMeteo from "../components/WeatherWidget_OpenMeteo";
 import CountdownVeronica from "../components/CountdownVeronica";
+import WeatherWidget_OpenMeteo from "../components/WeatherWidget_OpenMeteo";
+import { supabase } from "../lib/supabaseClient";
 
 
 
@@ -35,15 +35,6 @@ type GiocatoreView = {
 type NextBirthdayInfo = {
   date: Date; // prossima occorrenza (anno corrente o prossimo)
   players: { uid: string; nome: string; cognome: string; foto_url: string | null }[];
-};
-
-type SquadraLite = {
-  id?: string;
-  nome: string | null;
-  logo_url: string | null;
-  mappa_url?: string | null;
-  nome_stadio?: string | null;
-  indirizzo?: string | null;
 };
 
 type PartitaLite = {
@@ -419,7 +410,70 @@ useEffect(() => {
     if (ch) supabase.removeChannel(ch);
   };
 }, []);
-  
+
+// ✅ Caricamento e Realtime Marcatori Live (view marcatori_v)
+useEffect(() => {
+  if (!match || match.stato !== "InCorso") return;
+
+  const MONTECARLO_ID = "a16a8645-9f86-41d9-a81f-a92931f1cc67";
+  let channel: any = null;
+
+  const loadMarcatori = async () => {
+    const { data, error } = await supabase
+      .from("marcatori_v") // ✅ ora è la view corretta
+      .select(`
+        id,
+        periodo,
+        goal_tempo,
+        giocatore_uid,
+        giocatore_stagione_id,
+        partita_id,
+        stagione_id,
+        squadra_segnante_id,
+        giocatore_nome,
+        giocatore_cognome
+      `)
+      .eq("partita_id", match.id)
+      .order("periodo", { ascending: true });
+
+    if (error) {
+      console.error("[HomePage] Errore caricamento marcatori (view marcatori_v):", error.message);
+      return;
+    }
+
+
+
+    // Mostra solo marcatori del Montecarlo
+    const mc = (data || []).filter(
+      (m) => m.squadra_segnante_id === MONTECARLO_ID
+    );
+    setMarcatoriLive(mc.map(normalizeMarcatore));
+  };
+
+  loadMarcatori();
+
+  // 🔁 Realtime aggiornamenti
+  channel = supabase
+    .channel(`realtime-marcatori-${match.id}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "marcatori",
+        filter: `partita_id=eq.${match.id}`,
+      },
+      () => loadMarcatori()
+    )
+    .subscribe();
+
+  return () => {
+    if (channel) supabase.removeChannel(channel);
+  };
+}, [match]);
+
+
+
 // ✅ Effetto per il plugin Facebook
 useEffect(() => {
   if ((window as any).FB) {
@@ -430,26 +484,29 @@ useEffect(() => {
 
 // normalizzazione marcatore con nome e cognome
 const normalizeMarcatore = (row: any): Marcatore => ({
-  id: String(row.id),
+  id: row.id,
   periodo: Number(row.periodo ?? row.goal_tempo ?? 1),
   giocatore_uid: String(row.giocatore_uid ?? row.giocatore_stagione_id ?? ""),
-  partita_id: String(row.partita_id),
-  stagione_id: String(row.stagione_id),
+  partita_id: row.partita_id,
+  stagione_id: row.stagione_id,
+  squadra_segnante_id: row.squadra_segnante_id ?? null,
   nome: row.giocatore_nome || "",
   cognome: row.giocatore_cognome || "",
 });
+
 
 const isLive = match?.stato === "InCorso";
 const isTodayMatch = match ? isSameCalendarDay(new Date(match.data_ora), new Date()) : false;
 
 const mcSide: "casa" | "ospite" | null = useMemo(() => {
   if (!match) return null;
-  const casa = (match.squadra_casa?.nome || "").toLowerCase();
-  const osp = (match.squadra_ospite?.nome || "").toLowerCase();
+  const casa = (match.squadra_casa_nome || "").toLowerCase();
+  const osp = (match.squadra_ospite_nome || "").toLowerCase();
   if (casa.includes(MONTECARLO_NAME_INCLUDES)) return "casa";
   if (osp.includes(MONTECARLO_NAME_INCLUDES)) return "ospite";
   return null;
 }, [match]);
+
 
 const marcatoriByPeriodo = useMemo(() => {
   const map: Record<number, Marcatore[]> = {};
@@ -459,6 +516,81 @@ const marcatoriByPeriodo = useMemo(() => {
   }
   return map;
 }, [marcatoriLive]);
+
+// =========================
+// TIMER LIVE (partita_timer_state)
+// =========================
+const [minuti, setMinuti] = useState(0);
+const [secondi, setSecondi] = useState(0);
+const [timerStatus, setTimerStatus] = useState<"running" | "paused" | "stopped">("stopped");
+
+useEffect(() => {
+  if (!isLive || !match) return;
+
+  let interval: NodeJS.Timeout | null = null;
+
+  // 🔹 funzione per aggiornare timer in base a offset_ms
+  const updateFromState = (state: any) => {
+    if (!state) return;
+    const offsetMs = state.timer_offset_ms || 0;
+    const totalSec = Math.floor(offsetMs / 1000);
+    setMinuti(Math.floor(totalSec / 60));
+    setSecondi(totalSec % 60);
+    setTimerStatus(state.timer_status || "stopped");
+  };
+
+  // 🔹 carica stato iniziale
+  const loadState = async () => {
+    const { data, error } = await supabase
+      .from("partita_timer_state")
+      .select("*")
+      .eq("partita_id", match.id)
+      .maybeSingle();
+
+    if (error) {
+      console.warn("[HomePage] Errore caricamento timer:", error.message);
+      return;
+    }
+    updateFromState(data);
+  };
+
+  loadState();
+
+  // 🔹 realtime updates
+  const channel = supabase
+    .channel(`realtime-timer-${match.id}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "partita_timer_state",
+        filter: `partita_id=eq.${match.id}`,
+      },
+      (payload) => {
+        updateFromState(payload.new);
+      }
+    )
+    .subscribe();
+
+  // 🔹 aggiorna ogni secondo solo se running
+  interval = setInterval(() => {
+    setSecondi((s) => {
+      if (timerStatus !== "running") return s;
+      if (s === 59) {
+        setMinuti((m) => m + 1);
+        return 0;
+      }
+      return s + 1;
+    });
+  }, 1000);
+
+  return () => {
+    if (interval) clearInterval(interval);
+    supabase.removeChannel(channel);
+  };
+}, [isLive, match, timerStatus]);
+
 
 // usa direttamente nome e cognome dalla view
 const renderNomeMarcatore = (m: Marcatore) => {
@@ -641,26 +773,37 @@ const fbPluginSrc = useMemo(() => {
         </span>
       </div>
 
+      
+{/* 🔹 Timer in tempo reale dal gestionerisultato */}
+{isLive && (
+  <div style={styles.timerInlineBox}>
+    <span style={styles.timerValue}>{pad2(minuti)}′</span>
+    <span style={styles.timerSeparator}>:</span>
+    <span style={styles.timerValue}>{pad2(secondi)}″</span>
+  </div>
+)}
+
+
+
       {isLive ? (
         <>
-         {/* Struttura Live */}
+          {/* Struttura LIVE */}
           <div style={styles.teamsLiveRow}>
             {/* Squadra Casa */}
             <div style={styles.teamLiveCol}>
               <div style={styles.teamLiveHead}>
                 {match.squadra_casa_logo && (
-  <img
-    src={match.squadra_casa_logo}
-    alt={match.squadra_casa_nome || "Casa"}
-    style={styles.teamLogo}
-  />
-)}
-
-                <div style={styles.teamName}>{match.squadra_casa_nome || "Casa"}
-</div>
+                  <img
+                    src={match.squadra_casa_logo}
+                    alt={match.squadra_casa_nome || "Casa"}
+                    style={styles.teamLogo}
+                  />
+                )}
+                <div style={styles.teamName}>{match.squadra_casa_nome || "Casa"}</div>
                 <span style={styles.liveScoreBlink}>{match.goal_a}</span>
               </div>
 
+              {/* 👇 Se Montecarlo è in casa, mostra marcatori live */}
               {mcSide === "casa" ? (
                 <div style={styles.scorersWrapper}>
                   {Object.entries(marcatoriByPeriodo).map(([periodo, lista]) => (
@@ -694,17 +837,17 @@ const fbPluginSrc = useMemo(() => {
             <div style={styles.teamLiveCol}>
               <div style={styles.teamLiveHead}>
                 {match.squadra_ospite_logo && (
-  <img
-    src={match.squadra_ospite_logo}
-    alt={match.squadra_ospite_nome || "Ospite"}
-    style={styles.teamLogo}
-  />
-)}
-
+                  <img
+                    src={match.squadra_ospite_logo}
+                    alt={match.squadra_ospite_nome || "Ospite"}
+                    style={styles.teamLogo}
+                  />
+                )}
                 <div style={styles.teamName}>{match.squadra_ospite_nome || "Ospite"}</div>
                 <span style={styles.liveScoreBlink}>{match.goal_b}</span>
               </div>
 
+              {/* 👇 Se Montecarlo è in trasferta, mostra marcatori live */}
               {mcSide === "ospite" ? (
                 <div style={styles.scorersWrapper}>
                   {Object.entries(marcatoriByPeriodo).map(([periodo, lista]) => (
@@ -741,64 +884,64 @@ const fbPluginSrc = useMemo(() => {
             </Link>
           </div>
         </>
-) : (
+      ) : (
   // Struttura normale se non è in corso
-  (
-    <>
-      <div style={styles.matchBorderBox}>
-        <div style={styles.teamsRowColumn}>
-          {/* Squadra Casa */}
-          <div style={{ ...styles.teamSide, justifyContent: "flex-start" }}>
-            {match.squadra_casa_logo && (
-              <img
-                src={match.squadra_casa_logo}
-                alt={match.squadra_casa_nome || "Casa"}
-                style={styles.teamLogo}
-              />
-            )}
+  <>
+    <div style={styles.matchBorderBox}>
+      <div style={styles.teamsRowColumn}>
+        {/* Squadra Casa */}
+        <div style={{ ...styles.teamSide, justifyContent: "flex-start" }}>
+          {match.squadra_casa_logo && (
+            <img
+              src={match.squadra_casa_logo}
+              alt={match.squadra_casa_nome || "Casa"}
+              style={styles.teamLogo}
+            />
+          )}
 
-            <div style={{ ...styles.teamName, textAlign: "left" }}>
-              {match.squadra_casa_nome || "Casa"}
-            </div>
+          <div style={{ ...styles.teamName, textAlign: "left" }}>
+            {match.squadra_casa_nome || "Casa"}
           </div>
+        </div>
 
-          {/* VS centrato */}
-          <div style={styles.vsCentered}>VS</div>
+        {/* VS centrato */}
+        <div style={styles.vsCentered}>VS</div>
 
-          {/* Squadra Ospite */}
-          <div style={{ ...styles.teamSide, justifyContent: "flex-end" }}>
-            <div style={{ ...styles.teamName, textAlign: "right" }}>
-              {match.squadra_ospite_nome || "Ospite"}
-            </div>
-            {match.squadra_ospite_logo && (
-              <img
-                src={match.squadra_ospite_logo}
-                alt={match.squadra_ospite_nome || "Ospite"}
-                style={styles.teamLogo}
-              />
-            )}
+        {/* Squadra Ospite */}
+        <div style={{ ...styles.teamSide, justifyContent: "flex-end" }}>
+          <div style={{ ...styles.teamName, textAlign: "right" }}>
+            {match.squadra_ospite_nome || "Ospite"}
           </div>
+          {match.squadra_ospite_logo && (
+            <img
+              src={match.squadra_ospite_logo}
+              alt={match.squadra_ospite_nome || "Ospite"}
+              style={styles.teamLogo}
+            />
+          )}
         </div>
       </div>
+    </div>
 
-      {isTodayMatch ? (
-        <div style={styles.liveHint}>
-          La partita è oggi. In attesa del calcio d’inizio…{" "}
-          <Link to="/prossima-partita">Vai a ProssimaPartita</Link>
-        </div>
-      ) : (
-        <div style={styles.liveHint}>
-          <Link
-            to="/calendario"
-           className="text-red-600 hover:text-red-800 transition text-lg font-semibold"
-          >
-            Vai al calendario
-          </Link>
-        </div>
-      )}
-    </>
-  )
+    {isTodayMatch ? (
+      <div style={styles.liveHint}>
+        La partita è oggi. In attesa del calcio d’inizio…{" "}
+        <Link to="/prossima-partita">Vai a ProssimaPartita</Link>
+      </div>
+    ) : (
+      <div style={styles.liveHint}>
+        <Link
+          to="/calendario"
+          className="text-red-600 hover:text-red-800 transition text-lg font-semibold"
+        >
+          Vai al calendario
+        </Link>
+      </div>
+    )}
+  </>
 )}
+
+
 
       {/* MAPPA CAMPO (preferisci URL già salvati) */}
 {match && (
@@ -877,6 +1020,7 @@ const fbPluginSrc = useMemo(() => {
     ></div>
   </div>
 </section>
+
 
     </div>
   );
@@ -1066,7 +1210,17 @@ vsCentered: {
     justifyContent: "space-between",
   },
   timerBox: { minWidth: 260 },
-  timerBig: { fontSize: 20, fontWeight: 600 },
+  timerBig: {
+  fontSize: 20,
+  fontWeight: 600,
+  textAlign: "center",
+  width: "100%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  minHeight: 40, // opzionale per centraggio verticale
+},
+
   timerHint: { fontSize: 14, opacity: 0.7 },
   birthdayNames: { flex: 1, minWidth: 220 },
   playerName: { fontSize: 24, fontWeight: 700, textAlign: "center" },
@@ -1093,6 +1247,25 @@ fbIframe: { width: "100%", height: "100%", border: "none" },
     padding: "4px 10px",
   },
   fixtureDate: { fontSize: 15, opacity: 0.9 },
+
+  timerInlineBox: {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 4,
+  marginTop: 4,
+},
+timerValue: {
+  fontFamily: "monospace",
+  fontSize: 14,
+  fontWeight: 700,
+  color: "red",
+},
+timerSeparator: {
+  fontSize: 13,
+  opacity: 0.7,
+},
+
 
   teamsRow: {
     display: "flex",

@@ -93,25 +93,40 @@ export default function ProssimaPartita() {
 
   const navigate = useNavigate();
 
-  // 1) ruolo
-  useEffect(() => {
-    (async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      const email = auth?.user?.email;
-      if (!email) {
-        setRole(null);
-        setRoleLoading(false);
-        return;
-      }
-      const { data } = await supabase
-        .from("pending_users")
-        .select("role")
-        .eq("email", email)
-        .single();
-      setRole(data?.role ?? null);
+ // 1) ruolo (versione finale: legge direttamente da user_profiles)
+useEffect(() => {
+  (async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const user = sessionData?.session?.user;
+
+    if (!user) {
+      console.warn("⚠️ Nessun utente loggato trovato in getSession()");
+      setRole(null);
       setRoleLoading(false);
-    })();
-  }, []);
+      return;
+    }
+
+    // 🔹 Recupera ruolo da user_profiles (cast esplicito per enum)
+const { data: profile, error } = await supabase
+  .from("user_profiles")
+  .select("role::text") // 👈 forza il cast a testo
+  .eq("user_id", user.id)
+  .maybeSingle();
+
+if (error) {
+  console.error("Errore lettura ruolo da user_profiles:", error);
+  setRole(null);
+} else {
+  console.log("✅ Ruolo trovato in user_profiles:", profile?.role);
+  setRole(profile?.role ?? null);
+}
+
+
+    setRoleLoading(false);
+  })();
+}, []);
+
+
 
 // 2) prossima partita + timer associato + scontri precedenti
 useEffect(() => {
