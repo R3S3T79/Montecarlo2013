@@ -23,6 +23,17 @@ export default function SidebarLayout(): JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
 
+   // 🔹 Nuovo stato: versione app da update-info.json
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+  useEffect(() => {
+    fetch("/update-info.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.version) setAppVersion(data.version);
+      })
+      .catch(() => console.warn("Impossibile caricare update-info.json"));
+  }, []);
+
   // Username da user_profiles per titolo "Ciao {username}"
   const [profileUsername, setProfileUsername] = useState<string>('');
   useEffect(() => {
@@ -243,9 +254,10 @@ const canCreator = role === UserRole.Creator;
       {/* HEADER */}
        <header className="fixed top-0 left-0 right-0 z-50 flex items-center px-4 pt-3 pb-1 bg-transparent text-white">
         {/* Pulsante hamburger */}
-        <button onClick={() => setDrawerOpen(true)} aria-label="Apri menu" className="mr-4">
-          <Menu size={24} />
-        </button>
+        <button onClick={() => setDrawerOpen(!drawerOpen)} aria-label="Apri/Chiudi menu" className="mr-4">
+  <Menu size={24} />
+</button>
+
 
  {/* Stelle su dettaglio partita */}
 {matchDetail && (
@@ -467,24 +479,33 @@ const canCreator = role === UserRole.Creator;
             </React.Fragment>
           ))}
 
-          {/* Footer sidebar */}
-          <div className="mt-auto pt-4 border-t border-white/20 px-2">
-            {user ? (
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={() => navigate('/profilo')}
-                  className="text-sm underline hover:text-gray-200"
-                >
-                  {profileUsername || user.user_metadata?.username || user.email}
-                </button>
-                <button onClick={handleLogout} className="underline hover:text-gray-200 text-sm">
-                  Logout
-                </button>
-              </div>
-            ) : (
-              <span className="text-sm">Accesso Pubblico</span>
-            )}
-          </div>
+          {/* 👇 Mostra la versione subito sotto "Galleria" */}
+{appVersion && (
+  <div className="border-t border-white/20 my-2 pt-2 text-xs text-gray-400 text-center">
+    Montecarlo 2013 v{appVersion}
+  </div>
+)}
+
+{/* Footer sidebar */}
+<div className="mt-auto pt-4 border-t border-white/20 px-2">
+  {user ? (
+    <div className="flex items-center justify-between">
+      <button
+        onClick={() => navigate('/profilo')}
+        className="text-sm underline hover:text-gray-200"
+      >
+        {profileUsername || user.user_metadata?.username || user.email}
+      </button>
+      <button onClick={handleLogout} className="underline hover:text-gray-200 text-sm">
+        Logout
+      </button>
+    </div>
+  ) : (
+    <span className="text-sm">Accesso Pubblico</span>
+  )}
+</div>
+
+
         </nav>
       </aside>
 

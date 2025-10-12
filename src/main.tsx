@@ -1,5 +1,5 @@
 // src/main.tsx
-// Data revisione: 12/10/2025 (rev: fix comunicazione SW → banner + listener robusto)
+// Data revisione: 12/10/2025 (rev: UpdateNotifier con icona + changelog + SW auto reload)
 
 import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom/client";
@@ -8,26 +8,36 @@ import App from "./App";
 import "./index.css";
 
 // ===============================
-// 🔹 Componente banner aggiornamento
+// 🔹 Componente UpdateNotifier (icona + popup changelog)
 // ===============================
-function UpdateBanner() {
-  const [show, setShow] = useState(false);
+function UpdateNotifier() {
+  const [showIcon, setShowIcon] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
+  const [changelog, setChangelog] = useState<string[]>([]);
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      // Listener messaggi dal Service Worker
+      // Listener per messaggi dal Service Worker
       navigator.serviceWorker.addEventListener("message", (event) => {
-        console.log("[MAIN] Messaggio SW ricevuto:", event.data);
+        console.log("[MAIN] Messaggio SW:", event.data);
 
         if (event.data?.type === "NEW_VERSION_AVAILABLE") {
-          console.log("[MAIN] Nuova versione disponibile → mostro banner");
+          console.log("[MAIN] Nuova versione disponibile → mostro icona update");
           setWaitingWorker(event.source as ServiceWorker);
-          setShow(true);
+          setShowIcon(true);
+
+          // 🔹 Carica changelog da /update-info.json (se presente)
+          fetch("/update-info.json", { cache: "no-store" })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+              if (data?.changelog) setChangelog(data.changelog);
+            })
+            .catch(() => console.warn("[MAIN] Nessun changelog trovato"));
         }
       });
 
-      // Se il controller cambia → ricarica automatico
+      // 🔁 Quando cambia il controller → reload automatico
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         console.log("[MAIN] controllerchange → ricarico nuova versione");
         window.location.reload();
@@ -35,51 +45,112 @@ function UpdateBanner() {
     }
   }, []);
 
+  const openUpdateModal = () => setShowModal(true);
+  const closeUpdateModal = () => setShowModal(false);
+
   const updateApp = () => {
-    console.log("[MAIN] Clic su Aggiorna ora");
-    if (waitingWorker) {
-      waitingWorker.postMessage({ type: "SKIP_WAITING" });
-    }
-    // fallback: reload diretto
+    console.log("[MAIN] Aggiorno app → skipWaiting");
+    if (waitingWorker) waitingWorker.postMessage({ type: "SKIP_WAITING" });
     window.location.reload();
   };
 
-  if (!show) return null;
+  if (!showIcon) return null;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        bottom: 20,
-        left: "50%",
-        transform: "translateX(-50%)",
-        background: "#fff0f5",
-        border: "2px solid #ff4d6d",
-        borderRadius: 12,
-        padding: "10px 20px",
-        zIndex: 9999,
-        boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
-        textAlign: "center",
-      }}
-    >
-      <span style={{ marginRight: 12, color: "#c60045", fontWeight: 600 }}>
-        È disponibile una nuova versione dell’app
-      </span>
+    <>
+      {/* 🔔 Icona di aggiornamento */}
       <button
-        onClick={updateApp}
+        onClick={openUpdateModal}
         style={{
-          background: "#ff4d6d",
-          color: "white",
+          position: "fixed",
+          bottom: 20,
+          right: 20,
+          width: 50,
+          height: 50,
+          borderRadius: "50%",
+          backgroundColor: "#c60045",
           border: "none",
-          borderRadius: 6,
-          padding: "6px 12px",
+          color: "white",
+          fontSize: 22,
+          fontWeight: "bold",
+          boxShadow: "0 3px 8px rgba(0,0,0,0.3)",
           cursor: "pointer",
-          fontWeight: 600,
+          zIndex: 9999,
         }}
+        title="Nuovo aggiornamento disponibile"
       >
-        Aggiorna ora
+        ⟳
       </button>
-    </div>
+
+      {/* 🪧 Popup changelog */}
+      {showModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9998,
+          }}
+          onClick={closeUpdateModal}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: 10,
+              padding: "20px 30px",
+              width: "90%",
+              maxWidth: 420,
+              textAlign: "center",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ color: "#c60045", marginBottom: 12 }}>
+              Nuova versione disponibile
+            </h3>
+            {changelog.length > 0 ? (
+              <ul
+                style={{
+                  textAlign: "left",
+                  marginBottom: 16,
+                  listStyle: "disc",
+                  paddingLeft: 22,
+                }}
+              >
+                {changelog.map((item, i) => (
+                  <li key={i} style={{ fontSize: 14, marginBottom: 4 }}>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p style={{ fontSize: 14, marginBottom: 16 }}>
+                Sono stati apportati miglioramenti all’app Montecarlo 2013.
+              </p>
+            )}
+            <button
+              onClick={updateApp}
+              style={{
+                background: "#c60045",
+                color: "white",
+                border: "none",
+                borderRadius: 6,
+                padding: "8px 14px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Aggiorna ora
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -90,7 +161,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <BrowserRouter>
       <App />
-      <UpdateBanner />
+      <UpdateNotifier />
     </BrowserRouter>
   </React.StrictMode>
 );
