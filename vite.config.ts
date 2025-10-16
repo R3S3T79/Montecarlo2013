@@ -12,8 +12,8 @@ export default defineConfig({
       includeAssets: [
         'favicon.ico',
         'apple-touch-icon.png',
-        'icon-192.png',
-        'icon-512.png'
+        'icon_192x192.png',
+        'icon_512x512.png'
       ],
       manifest: {
         name: 'Montecarlo2013',
@@ -29,7 +29,7 @@ export default defineConfig({
             type: 'image/png'
           },
           {
-            src: '/icon-512.png',
+            src: '/icon_512x512.png',
             sizes: '512x512',
             type: 'image/png'
           }
