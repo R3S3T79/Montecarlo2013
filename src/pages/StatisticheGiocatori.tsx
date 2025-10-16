@@ -4,6 +4,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 interface Stagione {
   id: string;
@@ -225,76 +226,104 @@ if (!vErr && voti) {
         {loading ? (
           <div className="text-center text-montecarlo-secondary">Caricamento...</div>
         ) : (
-          <div className="overflow-x-auto mt-2">
-            <table className="min-w-full bg-white/90 rounded-lg overflow-hidden">
-              <thead className="bg-montecarlo-red-600 text-white">
-                <tr>
-                  <th className="px-10 py-2 text-left cursor-pointer" onClick={() => sortData('giocatore')}>
-                    Giocatore
-                  </th>
-                  <th className="px-3 py-2 text-center cursor-pointer" onClick={() => sortData('gol')}>
-                    G
-                  </th>
-                  <th className="px-3 py-2 text-center cursor-pointer" onClick={() => sortData('presenze')}>
-                    P
-                  </th>
-                  <th className="px-3 py-2 text-center cursor-pointer" onClick={() => sortData('media')}>
-                    M
-                  </th>
-                  <th className="px-3 py-2 text-center cursor-pointer" onClick={() => sortData('media_voti_utenti')}>
-                    M.V.U
-                  </th>
-                  <th className="px-3 py-2 text-center cursor-pointer" onClick={() => sortData('media_voti_mister')}>
-                    M.V.A
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedRows.map((st) => (
-                  <tr
-                    key={st.giocatore_uid}
-                    className="border-b border-red-500 last:border-0 hover:bg-gray-50 cursor-pointer"
-                    onClick={() => navigate(`/giocatore/${st.giocatore_uid}`)}
-                  >
-                    <td className="px-4 py-2 flex items-center space-x-2">
-                      {st.foto_url ? (
-                        <img
-                          src={st.foto_url}
-                          alt="foto"
-                          className="w-8 h-8 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs text-white">
-                          ?
-                        </div>
-                      )}
-                      <div className="flex flex-col">
-                        <span>{st.giocatore_cognome}</span>
-                        <span>{st.giocatore_nome}</span>
-                      </div>
-                    </td>
+         <div className="overflow-x-auto mt-2">
+  <table className="w-full bg-white/90 rounded-lg overflow-hidden border-collapse text-sm">
+    <thead className="bg-montecarlo-red-600 text-white">
+      <tr className="text-center">
+        <th
+          className="px-2 py-2 text-left cursor-pointer whitespace-nowrap"
+          onClick={() => sortData('giocatore')}
+        >
+          Giocatore{" "}
+          {sortField === "giocatore" ? (
+            sortOrder === "asc" ? <ArrowUp size={13} className="inline ml-0.5" /> : <ArrowDown size={13} className="inline ml-0.5" />
+          ) : (
+            <ArrowUpDown size={13} className="inline ml-0.5 opacity-70" />
+          )}
+        </th>
 
-                    {/* Goal/Subiti */}
-                    <td className="px-4 py-2 text-center">
-                      {st.ruolo?.toLowerCase() === 'portiere' ? st.subiti : st.gol}
-                    </td>
+        {[
+          ["gol", "G"],
+          ["presenze", "P"],
+          ["media", "M"],
+          ["media_voti_utenti", "M.V.U"],
+          ["media_voti_mister", "M.V.A"],
+        ].map(([field, label]) => (
+          <th
+            key={field}
+            className="px-1 py-2 cursor-pointer whitespace-nowrap"
+            onClick={() => sortData(field as any)}
+          >
+            {label}{" "}
+            {sortField === field ? (
+              sortOrder === "asc" ? <ArrowUp size={13} className="inline ml-0.5" /> : <ArrowDown size={13} className="inline ml-0.5" />
+            ) : (
+              <ArrowUpDown size={13} className="inline ml-0.5 opacity-70" />
+            )}
+          </th>
+        ))}
+      </tr>
+    </thead>
 
-                    <td className="px-4 py-2 text-center">{st.presenze}</td>
-                    <td className="px-4 py-2 text-center">{st.media.toFixed(2)}</td>
-                    <td className="px-4 py-2 text-center">{st.media_voti_utenti.toFixed(2)}</td>
-                    <td className="px-4 py-2 text-center">{st.media_voti_mister.toFixed(2)}</td>
-                  </tr>
-                ))}
-                {sortedRows.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-6 text-center text-montecarlo-neutral">
-                      Nessun dato disponibile
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+    <tbody>
+  {sortedRows.map((st) => (
+    <tr
+      key={st.giocatore_uid}
+      className="border-b border-red-200 hover:bg-red-50 cursor-pointer transition-colors"
+      onClick={() => navigate(`/giocatore/${st.giocatore_uid}`)}
+    >
+      {/* Giocatore */}
+      <td className="py-1 pl-3 pr-2 flex items-center gap-2 text-left whitespace-nowrap">
+        {st.foto_url ? (
+          <img
+            src={st.foto_url}
+            alt="foto"
+            className="w-12 h-12 rounded-full object-cover"
+          />
+        ) : (
+          <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center text-sm text-white">
+            ?
           </div>
+        )}
+        <div className="flex flex-col leading-tight">
+          <span className="font-medium text-[14px]">{st.giocatore_cognome}</span>
+          <span className="text-[12px] text-gray-600">{st.giocatore_nome}</span>
+        </div>
+      </td>
+
+      {/* G */}
+      <td className="py-1 px-[4px] text-center">
+        {st.ruolo?.toLowerCase() === "portiere" ? st.subiti : st.gol}
+      </td>
+
+      {/* P */}
+      <td className="py-1 px-[4px] text-center">{st.presenze}</td>
+
+      {/* M */}
+      <td className="py-1 px-[4px] text-center">{st.media.toFixed(2)}</td>
+
+      {/* M.V.U */}
+      <td className="py-1 px-[4px] text-center">{st.media_voti_utenti.toFixed(2)}</td>
+
+      {/* M.V.A */}
+      <td className="py-1 px-[4px] text-center">{st.media_voti_mister.toFixed(2)}</td>
+    </tr>
+  ))}
+
+  {sortedRows.length === 0 && (
+    <tr>
+      <td colSpan={6} className="px-4 py-6 text-center text-montecarlo-neutral">
+        Nessun dato disponibile
+      </td>
+    </tr>
+  )}
+</tbody>
+
+  </table>
+</div>
+
+
+
         )}
       </div>
     </div>
