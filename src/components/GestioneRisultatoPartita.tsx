@@ -347,7 +347,7 @@ useEffect(() => {
 
 // 🔹 Ricalcolo continuo dei minuti giocati visibili nel menu convocati
 useEffect(() => {
-  if (!partita || !titolari.length) return;
+  if (!partita || timerState?.timer_status !== "running") return;
 
   setMinutiGiocati((prev) => {
     const aggiornati: Record<string, number> = { ...prev };
@@ -356,7 +356,8 @@ useEffect(() => {
     });
     return aggiornati;
   });
-}, [nowSec, partita, titolari]);
+}, [nowSec]);
+
 
 
 
