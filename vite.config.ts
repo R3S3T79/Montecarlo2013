@@ -24,7 +24,7 @@ export default defineConfig({
         theme_color: '#004aad',
         icons: [
           {
-            src: '/icon-192.png',
+            src: '/icon_192x192.png',
             sizes: '192x192',
             type: 'image/png'
           },
