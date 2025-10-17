@@ -30,6 +30,8 @@ export default function EditPartitaGiocata() {
   const [giocatoriStagione, setGiocatoriStagione] = useState<Giocatore[]>([]);
   const [portieriStagione, setPortieriStagione] = useState<Giocatore[]>([]);
   const [showFormazione, setShowFormazione] = useState(false);
+  const [minutiGiocati, setMinutiGiocati] = useState<Record<string, number>>({});
+
 
   const [tipoCompetizione, setTipoCompetizione] = useState<string>("");
   const [nomeTorneo, setNomeTorneo] = useState<string>("");
@@ -95,6 +97,21 @@ export default function EditPartitaGiocata() {
       } else {
         setFormazione(gsData.map((g) => g.id));
       }
+
+      // 🔹 Carico minuti giocati (in minuti) da minuti_giocati_totali
+const { data: min } = await supabase
+  .from("minuti_giocati_totali")
+  .select("giocatore_stagione_id, tempo_giocato_sec")
+  .eq("partita_id", id);
+
+if (min) {
+  setMinutiGiocati(
+    Object.fromEntries(
+      min.map((m) => [m.giocatore_stagione_id, Math.round((m.tempo_giocato_sec || 0) / 60)])
+    )
+  );
+}
+
 
       const { data: md } = await supabase
         .from("marcatori")
@@ -245,6 +262,17 @@ export default function EditPartitaGiocata() {
       await supabase.from("presenze").insert(nuovePres);
     }
 
+    // 🔹 Salvo i minuti giocati totali
+await supabase.from("minuti_giocati_totali").delete().eq("partita_id", id);
+const nuoviMinuti = Object.entries(minutiGiocati).map(([gid, min]) => ({
+  partita_id: id!,
+  giocatore_stagione_id: gid,
+  tempo_giocato_sec: (min || 0) * 60,
+}));
+if (nuoviMinuti.length)
+  await supabase.from("minuti_giocati_totali").insert(nuoviMinuti);
+
+
     navigate(`/partita/${id}`);
   };
 
@@ -376,24 +404,40 @@ export default function EditPartitaGiocata() {
 
             <div className="max-h-60 overflow-auto space-y-2">
               {giocatoriStagione.map((g) => (
-                <label
-                  key={g.id}
-                  className="flex items-center space-x-3 text-lg py-1"
-                >
-                  <input
-                    type="checkbox"
-                    checked={formazione.includes(g.id)}
-                    onChange={(e) => {
-                      const sel = e.target.checked;
-                      setFormazione((prev) =>
-                        sel ? [...prev, g.id] : prev.filter((x) => x !== g.id)
-                      );
-                    }}
-                    className="w-6 h-6 accent-rose-500 mr-2 shrink-0"
-                  />
-                  <span>{g.cognome} {g.nome}</span>
-                </label>
-              ))}
+  <div key={g.id} className="flex items-center justify-between py-1 border-b border-gray-100">
+    <label className="flex items-center space-x-3 text-lg">
+      <input
+        type="checkbox"
+        checked={formazione.includes(g.id)}
+        onChange={(e) => {
+          const sel = e.target.checked;
+          setFormazione((prev) =>
+            sel ? [...prev, g.id] : prev.filter((x) => x !== g.id)
+          );
+        }}
+        className="w-6 h-6 accent-rose-500 mr-2 shrink-0"
+      />
+      <span>{g.cognome} {g.nome}</span>
+    </label>
+
+    {/* 🔹 Input minuti giocati */}
+    <div className="flex items-center space-x-1">
+      <input
+        type="number"
+        className="w-16 border border-gray-300 rounded p-1 text-sm text-center"
+        value={minutiGiocati[g.id] || 0}
+        onChange={(e) =>
+          setMinutiGiocati((prev) => ({
+            ...prev,
+            [g.id]: parseInt(e.target.value) || 0,
+          }))
+        }
+      />
+      <span className="text-xs text-gray-600">min</span>
+    </div>
+  </div>
+))}
+
             </div>
           </div>
         )}

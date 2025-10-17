@@ -4,7 +4,7 @@
 // Data revisione: 13/10/2025 (rev: integrazione messaggi con main.tsx + gestione coerente SKIP_WAITING + avviso NEW_VERSION_AVAILABLE)
 // ===============================
 
-const CACHE_NAME = "montecarlo-cache-v7"; // 🔹 incrementa a ogni deploy
+const CACHE_NAME = "montecarlo-cache-v8"; // 🔹 incrementa a ogni deploy
 
 const STATIC_ASSETS = [
   "/",

@@ -241,13 +241,31 @@ const canCreator = role === UserRole.Creator;
   };
 
   const handleDetailDelete = async () => {
-    const id = matchDetail?.params.id;
-    if (!id || !window.confirm('Eliminare definitivamente questa partita?')) return;
-    await supabase.from('marcatori').delete().eq('partita_id', id);
-    await supabase.from('presenze').delete().eq('partita_id', id);
-    await supabase.from('partite').delete().eq('id', id);
-    navigate('/calendario', { replace: true });
-  };
+  const id = matchDetail?.params.id;
+  if (!id || !window.confirm("Eliminare definitivamente questa partita e tutti i dati collegati?")) return;
+
+  try {
+    // 🔹 Elimina tutti i dati correlati PRIMA della partita
+    await Promise.all([
+      supabase.from("minuti_giocati").delete().eq("partita_id", id),
+      supabase.from("minuti_giocati_totali").delete().eq("partita_id", id),
+      supabase.from("marcatori").delete().eq("partita_id", id),
+      supabase.from("presenze").delete().eq("partita_id", id),
+      supabase.from("formazioni_partita").delete().eq("partita_id", id),
+      supabase.from("partita_timer_state").delete().eq("partita_id", id),
+    ]);
+
+    // 🔹 Poi elimina la partita vera e propria
+    await supabase.from("partite").delete().eq("id", id);
+
+    alert("✅ Partita e dati collegati eliminati con successo.");
+    navigate("/calendario", { replace: true });
+  } catch (err) {
+    console.error("❌ Errore durante l'eliminazione completa:", err);
+    alert("Errore durante l'eliminazione della partita.");
+  }
+};
+
 
   return (
     <div className="relative h-screen flex overflow-hidden bg-transparent">
