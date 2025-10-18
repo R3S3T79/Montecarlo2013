@@ -233,6 +233,20 @@ useEffect(() => {
         alert("Condivisione diretta non supportata. Salva e invia manualmente su WhatsApp.");
       }
     }
+
+     // 🔹 Ripulisci tutti i campi dopo l'invio
+    setCompetizione("Campionato");
+    setNomeTorneo("");
+    setData("");
+    setOraPartita("");
+    setRitrovoLuogo("");
+    setOraRitrovo("");
+    setSquadraAvversaria("");
+    setSquadreAvversarie([""]);
+    setConvocati([]);
+    setPartiteSelezionate([]);
+    setPartitaId(null);
+
   } catch (err) {
     console.error("Errore screenshot o salvataggio:", err);
   }
@@ -480,7 +494,10 @@ useEffect(() => {
             setCompetizione(p.campionato_torneo || "Campionato");
             setNomeTorneo(p.nome_torneo || "");
             setData(p.data_ora.split("T")[0]);
-            setOraPartita(new Date(p.data_ora).toISOString().slice(11, 16));
+            const date = new Date(p.data_ora);
+const hh = String(date.getHours()).padStart(2, "0");
+const mm = String(date.getMinutes()).padStart(2, "0");
+setOraPartita(`${hh}:${mm}`);
 
             // avversaria
             if (p.squadra_casa?.id === MONTECARLO_ID) {
@@ -610,12 +627,16 @@ useEffect(() => {
 </div>
 
         {/* Footer */}
-        <div className="convocazioni-footer">
-          ASSOCIAZIONE SPORTIVA DILETTANTISTICA MONTECARLO <br />
-          Via Provinciale di Montecarlo, 32 – 55015 Montecarlo (LU) <br />
-          P.I. e C.F.: 02091460465 – Mail asdmontecarlo@gmail.com – Matricola LND 947185
-        </div>
-      </div>
-    </div>
+<div className="convocazioni-footer">
+  <span style={{ color: '#e60000' }}>
+    ASSOCIAZIONE SPORTIVA DILETTANTISTICA MONTECARLO
+  </span>
+  <br />
+  Via Provinciale di Montecarlo, 32 – 55015 Montecarlo (LU) <br />
+  P.I. e C.F.: 02091460465 – Mail asdmontecarlo@gmail.com – Matricola LND 947185
+</div>
+</div>
+</div>
+
   );
 }
