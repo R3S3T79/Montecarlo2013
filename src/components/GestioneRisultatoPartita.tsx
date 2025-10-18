@@ -5,7 +5,6 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import TimerCircolare from "./TimerCircolare";
-import { FaArrowsRotate } from "react-icons/fa6";
 import CampoFormazione from "../components/CampoFormazione";
 
 interface TimerState {

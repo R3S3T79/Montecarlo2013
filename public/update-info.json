@@ -1,5 +1,11 @@
 {
-  "version": "1.0.45",
-  "date": "2025-10-12T09:35:00Z",
-  "notes": "Test banner aggiornamento locale"
+  "version": "1.0.46",
+  "date": "2025-10-18T08:00:00Z",
+  "notes": "Aggiornamento service worker per popup aggiornamenti immediato",
+  "changelog": [
+    "✅ Fix notifica aggiornamento immediata dopo nuovo deploy",
+    "🔄 Migliorata coerenza tra service worker e main.tsx",
+    "🧹 Pulizia cache automatica delle versioni precedenti",
+    "🪧 Popup aggiornamento più affidabile e coerente"
+  ]
 }

@@ -1,10 +1,10 @@
 // ===============================
 // sw Montecarlo2013
 // Cache esteso + Prefetch API + Popup Update
-// Data revisione: 13/10/2025 (rev: integrazione messaggi con main.tsx + gestione coerente SKIP_WAITING + avviso NEW_VERSION_AVAILABLE)
+// Data revisione: 18/10/2025 (rev: v14 forzato clients.claim + log di conferma)
 // ===============================
 
-const CACHE_NAME = "montecarlo-cache-v8"; // 🔹 incrementa a ogni deploy
+const CACHE_NAME = "montecarlo-cache-v3";
 
 const STATIC_ASSETS = [
   "/",
@@ -39,67 +39,56 @@ const SUPABASE_HEADERS = {
 // ===============================
 self.addEventListener("install", (event) => {
   console.log("🆕 [SW] Install nuova versione in corso...");
-  self.skipWaiting(); // 🔹 forza l’attivazione immediata
+  self.skipWaiting();
+
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.addAll(STATIC_ASSETS);
+      console.log(`[SW] Cache iniziale caricata (${STATIC_ASSETS.length} file)`);
+
+      for (const url of API_ENDPOINTS) {
+        try {
+          const res = await fetch(url, { headers: SUPABASE_HEADERS });
+          if (res.ok) cache.put(url, res.clone());
+        } catch (err) {
+          console.warn("[SW] Prefetch fallito:", url, err);
+        }
+      }
+    })()
+  );
+});
+
+// ===============================
+// Attivazione (forzata con claim + log esteso)
+// ===============================
+self.addEventListener("activate", (event) => {
+  console.log("✅ [SW] Activate avviato → pulizia cache + claim immediato...");
 
   event.waitUntil(
     (async () => {
       try {
-        const cache = await caches.open(CACHE_NAME);
-        await cache.addAll(STATIC_ASSETS);
-        console.log(`[SW] Cache iniziale caricata (${STATIC_ASSETS.length} file)`);
+        const keys = await caches.keys();
+        await Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)));
+        console.log("🧹 [SW] Vecchie cache eliminate");
 
-        // Prefetch API Supabase
-        for (const url of API_ENDPOINTS) {
-          try {
-            const res = await fetch(url, { headers: SUPABASE_HEADERS });
-            if (res.ok) cache.put(url, res.clone());
-          } catch (err) {
-            console.warn("[SW] Prefetch fallito:", url, err);
-          }
+        await self.clients.claim();
+        console.log("📣 [SW] clients.claim() completato — pagina ora controllata dal SW");
+
+        const clientsList = await self.clients.matchAll({ includeUncontrolled: true, type: "window" });
+        console.log(`[SW] Trovati ${clientsList.length} client collegati`);
+        for (const client of clientsList) {
+          console.log("[SW → CLIENT]", { type: "NEW_VERSION_AVAILABLE", debug: true });
+          client.postMessage({ type: "NEW_VERSION_AVAILABLE", debug: true });
         }
+
+        console.log("📢 [SW] Messaggio NEW_VERSION_AVAILABLE inviato ai client attivi");
       } catch (err) {
-        console.error("[SW] Errore durante install:", err);
+        console.error("[SW] Errore durante activate:", err);
       }
     })()
   );
 });
-
-// ===============================
-// Attivazione
-// ===============================
-self.addEventListener("activate", (event) => {
-  console.log("✅ [SW] Attivazione completata, pulizia cache vecchie...");
-
-  event.waitUntil(
-    (async () => {
-      // Pulisce vecchie cache
-      const keys = await caches.keys();
-      await Promise.all(
-        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
-      );
-
-      await self.clients.claim();
-
-      // 🔹 Avvisa tutte le schede che è disponibile una nuova versione
-      const clientsList = await self.clients.matchAll({
-        includeUncontrolled: true,
-        type: "window",
-      });
-
-      for (const client of clientsList) {
-        client.postMessage({ type: "NEW_VERSION_AVAILABLE" });
-      }
-
-      console.log("📢 [SW] Avviso NEW_VERSION_AVAILABLE inviato a tutte le schede");
-    })()
-  );
-});
-
-// Evita di mettere in cache le chiamate Supabase di autenticazione
-if (request.url.includes("supabase.co/auth")) {
-  return; // lascia passare senza cache
-}
-
 
 // ===============================
 // Fetch handler
@@ -107,19 +96,18 @@ if (request.url.includes("supabase.co/auth")) {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
-  // 🔹 Immagini → cache dinamica con fallback
+  if (request.url.includes("supabase.co/auth")) return;
+
   if (request.destination === "image" || request.url.match(/\.(png|jpg|jpeg|svg|webp)$/)) {
     event.respondWith(staleWhileRevalidate(request));
     return;
   }
 
-  // 🔹 JS, CSS o API Supabase
   if (request.url.match(/\.(css|js)$/) || request.url.includes("supabase.co")) {
     event.respondWith(staleWhileRevalidate(request));
     return;
   }
 
-  // 🔹 Tutto il resto
   event.respondWith(
     caches
       .match(request)
@@ -147,8 +135,9 @@ async function staleWhileRevalidate(request) {
 // Messaggi dal main thread
 // ===============================
 self.addEventListener("message", (event) => {
+  console.log("%c[SW → MAIN] Messaggio ricevuto:", "color: #00ffff", event.data);
   if (event.data?.type === "SKIP_WAITING") {
-    console.log("[SW] Ricevuto SKIP_WAITING → attivo subito nuovo SW");
+    console.log("%c[SW] Ricevuto SKIP_WAITING → attivo subito nuovo SW", "color: #ffcc00");
     self.skipWaiting();
   }
 });
