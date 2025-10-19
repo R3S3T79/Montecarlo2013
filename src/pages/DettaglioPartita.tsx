@@ -192,70 +192,75 @@ export default function DettaglioPartita() {
   const goalCasaArr = [partita.goal_a1, partita.goal_a2, partita.goal_a3, partita.goal_a4]
   const goalOspiteArr = [partita.goal_b1, partita.goal_b2, partita.goal_b3, partita.goal_b4]
 
-  const renderSezione = (squadra: SquadraInfo, goals: number[]) => {
-    const total = goals.reduce((a, b) => a + b, 0)
-    const isMonte = squadra.nome === 'Montecarlo'
-    const marcatoriByTempo = (t: number) => partita.marcatori.filter(m => m.periodo === t)
+  const renderSezione = (squadra: SquadraInfo | null | undefined, goals: number[]) => {
+  if (!squadra || !squadra.nome) return null; // 👈 protezione doppia: oggetto o nome mancante
 
-    return (
-      <div className="bg-white/90 rounded-lg shadow-montecarlo overflow-hidden">
-        <div
-          className={`p-4 flex items-center justify-between ${
-            isMonte
-              ? 'bg-montecarlo-red-50 border border-montecarlo-red-200'
-              : 'bg-montecarlo-gray-50 border border-montecarlo-gray-200'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {squadra.logo_url && (
-              <img src={squadra.logo_url} alt={squadra.nome} className="w-8 h-8 object-contain" />
-            )}
-            <span
-              className={`font-bold text-lg ${
-                isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'
-              }`}
-            >
-              {squadra.nome}
-            </span>
-          </div>
+  const total = goals.reduce((a, b) => a + b, 0);
+  const isMonte = squadra?.nome === 'Montecarlo';
+  const marcatoriByTempo = (t: number) => partita?.marcatori?.filter(m => m.periodo === t) || [];
+
+  return (
+    <div className="bg-white/90 rounded-lg shadow-montecarlo overflow-hidden">
+      <div
+        className={`p-4 flex items-center justify-between ${
+          isMonte
+            ? 'bg-montecarlo-red-50 border border-montecarlo-red-200'
+            : 'bg-montecarlo-gray-50 border border-montecarlo-gray-200'
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          {squadra?.logo_url && (
+            <img src={squadra.logo_url} alt={squadra.nome} className="w-8 h-8 object-contain" />
+          )}
           <span
-            className={`font-bold text-2xl ${
+            className={`font-bold text-lg ${
               isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'
             }`}
           >
-            {total}
+            {squadra?.nome}
           </span>
         </div>
-        <div className="p-4 space-y-4">
-          {[1, 2, 3, 4].map(tempo => (
-            <div key={tempo}>
-              <div className="flex justify-between">
-                <span
-                  className={`font-medium ${isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'}`}
-                >
-                  {tempo}° Tempo
-                </span>
-                <span
-                  className={`font-semibold ${isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'}`}
-                >
-                  {goals[tempo - 1]}
-                </span>
-              </div>
-              {isMonte && (
-                <ul className="list-disc list-inside text-gray-700 text-lg mt-2">
-                  {marcatoriByTempo(tempo).map((m, i) => (
-                    <li key={i}>
-                      {m.giocatore.cognome} {m.giocatore.nome}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
+        <span
+          className={`font-bold text-2xl ${
+            isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'
+          }`}
+        >
+          {total}
+        </span>
       </div>
-    )
-  }
+
+      <div className="p-4 space-y-4">
+        {[1, 2, 3, 4].map(tempo => (
+          <div key={tempo}>
+            <div className="flex justify-between">
+              <span
+                className={`font-medium ${isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'}`}
+              >
+                {tempo}° Tempo
+              </span>
+              <span
+                className={`font-semibold ${isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'}`}
+              >
+                {goals[tempo - 1]}
+              </span>
+            </div>
+
+            {isMonte && (
+              <ul className="list-disc list-inside text-gray-700 text-lg mt-2">
+                {marcatoriByTempo(tempo).map((m, i) => (
+                  <li key={i}>
+                    {m.giocatore?.cognome || ''} {m.giocatore?.nome || ''}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 
   return (
     <div className="min-h-screen px-2 pb-2">
@@ -269,8 +274,9 @@ export default function DettaglioPartita() {
           </div>
 
           <div className="p-6 space-y-6">
-            {renderSezione(partita.casa, goalCasaArr)}
-            {renderSezione(partita.ospite, goalOspiteArr)}
+            {partita?.casa && renderSezione(partita.casa, goalCasaArr)}
+{partita?.ospite && renderSezione(partita.ospite, goalOspiteArr)}
+
 
             {/* Riepilogo / Telecronaca */}
             <div className="mt-6 bg-white/90 rounded-lg shadow-montecarlo p-4 relative">
