@@ -656,32 +656,117 @@ const posizione = [
           </div>
         </div>
 
-      {partita && (
+      {/* Campo Formazione: visibile solo se partita In Corso */}
+{partita?.stato === "InCorso" ? (
   <CampoFormazione partitaId={partita.id} editable={true} />
+) : (
+  <div
+  className="rounded-xl shadow-montecarlo p-10 mt-6 text-center italic font-medium text-xl"
+  style={{
+    backgroundImage: 'url("/Images/campo-sportivo.jpeg")',
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    color: "white",
+    textShadow: "0 1px 4px rgba(0,0,0,0.6)",
+  }}
+>
+  In attesa della formazione
+</div>
+
 )}
 
 
+
+
+
         {/* Scontri precedenti */}
-        {precedenti.length > 0 && (
-          <div className="bg-white/90 rounded-xl shadow-montecarlo p-6 mt-6">
-            <h3 className="text-lg font-bold mb-2 text-center">Scontri precedenti</h3>
-            <hr className="border-t border-gray-300 mb-4" />
-            <ul className="space-y-3 text-center">
-              {precedenti.map((p) => (
-                <li key={p.id} className="text-sm text-gray-700">
-                  <div className="font-semibold">{formatData(p.data_ora)}</div>
-                  <div>
-                    {p.casa.nome}{" "}
-                    <span className="font-bold">
-                      {p.goal_a} - {p.goal_b}
-                    </span>{" "}
-                    {p.ospite.nome}
-                  </div>
-                </li>
-              ))}
-            </ul>
+{precedenti.length > 0 && (
+  <div className="bg-white/90 rounded-xl shadow-montecarlo p-6 mt-6">
+    <h3 className="text-lg font-bold mb-2 text-center">Scontri precedenti</h3>
+    <hr className="border-t border-gray-300 mb-3" />
+
+    {/* Statistiche automatiche */}
+    {(() => {
+      let vittorie = 0;
+      let pareggi = 0;
+      let sconfitte = 0;
+
+      precedenti.forEach((p) => {
+        const montecarloCasa = p.casa.nome.toLowerCase().includes("montecarlo");
+        const mcGoal = montecarloCasa ? p.goal_a : p.goal_b;
+        const avvGoal = montecarloCasa ? p.goal_b : p.goal_a;
+
+        if (mcGoal > avvGoal) vittorie++;
+        else if (mcGoal === avvGoal) pareggi++;
+        else sconfitte++;
+      });
+
+      return (
+        <>
+          <div className="flex justify-center gap-6 text-sm text-gray-700 mb-4">
+            <div>
+              <span className="font-semibold text-green-600">Vittorie:</span> {vittorie}
+            </div>
+            <div>
+              <span className="font-semibold text-gray-700">Pareggi:</span> {pareggi}
+            </div>
+            <div>
+              <span className="font-semibold text-red-600">Sconfitte:</span> {sconfitte}
+            </div>
           </div>
-        )}
+
+          {/* Pronostico dinamico */}
+          <div className="text-center mb-3">
+            <span className="font-semibold text-montecarlo-secondary">
+              Pronostico del match attuale:
+            </span>{" "}
+            {vittorie > sconfitte ? (
+              <span className="italic text-green-700">
+                Montecarlo favorito
+              </span>
+            ) : vittorie < sconfitte ? (
+              <span className="italic text-red-700">
+                Folgore favorito
+              </span>
+            ) : (
+              <span className="italic text-gray-700">
+                Match equilibrato
+              </span>
+            )}
+          </div>
+
+          {/* Riga divisoria */}
+          <hr className="border-t border-gray-300 mb-5" />
+        </>
+      );
+    })()}
+
+    {/* Lista scontri precedenti */}
+<ul className="space-y-4">
+  {precedenti.map((p) => (
+    <li key={p.id} className="text-gray-700 text-sm">
+      {/* Data sopra con stile ovale giallo */}
+      <div className="flex justify-center mb-2">
+        <span className="bg-[#E8C547] text-[#B30000] px-3 py-1 rounded-full text-xs font-semibold">
+          {formatData(p.data_ora)}
+        </span>
+      </div>
+
+      {/* Riga con squadre e risultato */}
+      <div className="flex items-center justify-between text-center">
+        <span className="text-left w-1/3 truncate">{p.casa.nome}</span>
+        <span className="w-1/3 font-bold text-lg text-gray-900">
+          {p.goal_a} - {p.goal_b}
+        </span>
+        <span className="text-right w-1/3 truncate">{p.ospite.nome}</span>
+      </div>
+    </li>
+  ))}
+</ul>
+
+  </div>
+)}
+
       </div>
     </div>
   );
