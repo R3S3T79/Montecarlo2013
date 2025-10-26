@@ -52,11 +52,39 @@ export default function DettaglioPartita() {
   const [editing, setEditing] = useState(false)
   const [commento, setCommento] = useState<string>('')
 
-  const role =
-    (user?.user_metadata?.role as string) ||
-    (user?.app_metadata?.role as string) ||
-    'user'
-  const canEdit = role === 'admin' || role === 'creator'
+const [role, setRole] = useState<string | null>(null);
+const [roleLoading, setRoleLoading] = useState(true);
+
+useEffect(() => {
+  (async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userNow = sessionData?.session?.user;
+
+    if (!userNow) {
+      setRole(null);
+      setRoleLoading(false);
+      return;
+    }
+
+    const { data: prof, error } = await supabase
+      .from("user_profiles")
+      .select("role::text")
+      .eq("user_id", userNow.id)
+      .maybeSingle();
+
+    if (!error && prof?.role) setRole(prof.role);
+    else setRole(
+      (userNow.user_metadata?.role as string) ||
+      (userNow.app_metadata?.role as string) ||
+      null
+    );
+
+    setRoleLoading(false);
+  })();
+}, []);
+
+const canEdit = role === "admin" || role === "creator";
+
 
   const handleScreenshot = async () => {
     if (!containerRef.current) return
