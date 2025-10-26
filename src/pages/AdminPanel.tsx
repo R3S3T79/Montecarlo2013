@@ -35,8 +35,9 @@ export default function AdminPanel() {
     (async () => {
       setLoading(true);
       const { data, error } = await supabase
-        .from<PendingUser>("pending_users")
-        .select("id, email, username, created_at, confirmed, role");
+  .from<PendingUser>("pending_users")
+  .select("id, email, username, created_at, confirmed, role")
+  .order("username", { ascending: true }); // 🔹 ordina alfabeticamente per nome utente
       if (error) console.error("Errore fetch:", error);
       setPendingUsers(data || []);
       setLoading(false);

@@ -229,37 +229,35 @@ export default function Step6_GironeUnico() {
               <div className="text-base text-gray-500 mb-1 text-center">
                 {formatDate(m.data_match)}
               </div>
-              <div className="flex items-center">
-                <span className="w-1/3 text-left text-base">
-                  {home?.nome}
-                </span>
-                <span className="w-1/3 text-center">{score}</span>
-                <span className="w-1/3 text-right text-base">
-                  {away?.nome}
-                </span>
-              </div>
+             <div className="flex items-center justify-between px-2">
+  <span className="flex-1 text-left text-base truncate">{home?.nome}</span>
+  <span className="mx-2 text-center font-medium">{score}</span>
+  <span className="flex-1 text-right text-base truncate">{away?.nome}</span>
+</div>
+
             </div>
           );
         })}
       </div>
 
       {/* CLASSIFICA */}
-      <table className="bg-white/90 table-auto border-collapse text-center text-base mb-6 w-full border border-red-200">
-        <thead>
-          <tr>
-            <th className="px-2 py-1 border border-red-200 text-left">
-              Squadra
-            </th>
-            <th className="px-2 py-1 border border-red-200">PG</th>
-            <th className="px-2 py-1 border border-red-200">V</th>
-            <th className="px-2 py-1 border border-red-200">N</th>
-            <th className="px-2 py-1 border border-red-200">P</th>
-            <th className="px-2 py-1 border border-red-200">GF</th>
-            <th className="px-2 py-1 border border-red-200">GS</th>
-            <th className="px-2 py-1 border border-red-200">DR</th>
-            <th className="px-2 py-1 border border-red-200">Pt</th>
-          </tr>
-        </thead>
+<table className="bg-white/90 table-auto border-collapse text-center text-base mb-6 w-full border border-red-200">
+  <thead>
+    <tr>
+      <th className="px-2 py-1 border border-red-200 text-left">
+        Squadra
+      </th>
+      <th className="px-2 py-1 border border-red-200">G</th>   {/* ex PG */}
+      <th className="px-2 py-1 border border-red-200">V</th>
+      <th className="px-2 py-1 border border-red-200">N</th>
+      <th className="px-2 py-1 border border-red-200">P</th>
+      <th className="px-2 py-1 border border-red-200">F</th>   {/* ex GF */}
+      <th className="px-2 py-1 border border-red-200">S</th>   {/* ex GS */}
+      <th className="px-2 py-1 border border-red-200">D</th>   {/* ex DR */}
+      <th className="px-2 py-1 border border-red-200">P</th>   {/* ex Pt */}
+    </tr>
+  </thead>
+
         <tbody>
           {classifica.map((r) => (
             <tr key={r.id}>

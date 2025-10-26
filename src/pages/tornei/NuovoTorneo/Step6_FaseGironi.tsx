@@ -55,6 +55,10 @@ export default function Step6_FaseGironi() {
   const [formulaType, setFormulaType] = useState<"eliminazione" | "gironi">(
     "eliminazione"
   );
+ const [hasNextPhase, setHasNextPhase] = useState(false);
+ const [hasEliminationMatches, setHasEliminationMatches] = useState(false);
+
+
 
   // 1) fase gironi
   useEffect(() => {
@@ -71,6 +75,25 @@ export default function Step6_FaseGironi() {
         else setGroupPhaseId(data?.id ?? null);
       });
   }, [torneoId]);
+
+// ✅ Controlla se esiste già una fase successiva
+useEffect(() => {
+  if (!torneoId) return;
+
+  supabase
+    .from("fasi_torneo")
+    .select("id,tipo_fase")
+    .eq("torneo_id", torneoId)
+    .in("tipo_fase", ["eliminazione", "gironi"])
+    .then(({ data, error }) => {
+      if (!error && data && data.length > 0) {
+        setHasNextPhase(true);
+      } else {
+        setHasNextPhase(false);
+      }
+    });
+}, [torneoId]);
+
 
   // 2) nome torneo
   useEffect(() => {
@@ -185,29 +208,31 @@ useEffect(() => {
     });
   };
 
-  // ✅ Funzione aggiornata con cancellazione e rigenerazione accoppiamenti
+/// ✅ Funzione aggiornata con cancellazione e rigenerazione accoppiamenti
 const handleNextPhase = async () => {
   if (!torneoId) return;
 
-  // READ-ONLY: nessuna scrittura, solo decide dove andare
-  if (!canEdit) {
-    const { data: elim, error: elimErr } = await supabase
+  // ✅ Se c'è già una fase successiva, portaci direttamente
+  if (hasNextPhase || hasEliminationMatches) {
+    const { data: next } = await supabase
       .from("fasi_torneo")
-      .select("id")
+      .select("tipo_fase")
       .eq("torneo_id", torneoId)
-      .eq("tipo_fase", "eliminazione")
-      .maybeSingle();
+      .order("fase_numerica", { ascending: false })
+      .limit(1)
+      .single();
 
-    if (!elimErr && elim?.id) {
+    if (next?.tipo_fase === "eliminazione") {
       navigate(`/tornei/nuovo/step8-fasegironi/${torneoId}`);
-    } else {
-      navigate(`/tornei/nuovo/step7-fasegironi/${torneoId}`, {
-        state: { formulaType: "gironi" as const },
-      });
+      return;
     }
-    return;
+    if (next?.tipo_fase === "gironi") {
+      navigate(`/tornei/nuovo/step7-fasegironi/${torneoId}`);
+      return;
+    }
   }
 
+  // 🔽 Se non c'è nessuna fase salvata, continua con la creazione standard
   setSavingFormula(true);
 
   // cerca o crea fase eliminazione
@@ -249,15 +274,19 @@ const handleNextPhase = async () => {
       const oid = m.squadra_ospite?.id;
       [cid, oid].forEach((id) => {
         if (!id) return;
-        if (!byGroup[gir].some((x) => x.id === id)) byGroup[gir].push({ id, pts: 0 });
+        if (!byGroup[gir].some((x) => x.id === id))
+          byGroup[gir].push({ id, pts: 0 });
       });
       if (!m.giocata || !cid || !oid) return;
-      if (m.gol_casa! > m.gol_ospite!) byGroup[gir].find(x => x.id === cid)!.pts += 3;
-      else if (m.gol_ospite! > m.gol_casa!) byGroup[gir].find(x => x.id === oid)!.pts += 3;
-      else if (m.rigori_vincitore) byGroup[gir].find(x => x.id === m.rigori_vincitore)!.pts += 3;
+      if (m.gol_casa! > m.gol_ospite!)
+        byGroup[gir].find((x) => x.id === cid)!.pts += 3;
+      else if (m.gol_ospite! > m.gol_casa!)
+        byGroup[gir].find((x) => x.id === oid)!.pts += 3;
+      else if (m.rigori_vincitore)
+        byGroup[gir].find((x) => x.id === m.rigori_vincitore)!.pts += 3;
       else {
-        byGroup[gir].find(x => x.id === cid)!.pts += 1;
-        byGroup[gir].find(x => x.id === oid)!.pts += 1;
+        byGroup[gir].find((x) => x.id === cid)!.pts += 1;
+        byGroup[gir].find((x) => x.id === oid)!.pts += 1;
       }
     });
 
@@ -279,13 +308,14 @@ const handleNextPhase = async () => {
       return;
     }
 
-    // 🔥 elimina accoppiamenti vecchi
+    // 🔥 elimina solo partite non giocate (evita reset di risultati)
     await supabase
       .from("tornei_fasegironi")
       .delete()
       .eq("torneo_id", torneoId)
       .eq("fase_id", elimPhaseId)
-      .eq("girone", "eliminazione");
+      .eq("girone", "eliminazione")
+      .not("giocata", "is", true);
 
     // costruisci i nuovi match
     const toInsert = Array.from({ length: pairCount }, (_, i) => ({
@@ -311,155 +341,187 @@ const handleNextPhase = async () => {
 };
 
 
-
   if (authLoading || loading) {
     return <p className="text-center text-white py-6">Caricamento in corso…</p>;
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-4 space-y-6 print:p-0">
-      {/* ⛔️ Select visibile solo a chi può editare */}
-      {canEdit && (
-        <div className="flex justify-center items-center gap-2 print:hidden no-print">
-          <label className="text-white font-medium">Formula fase successiva:</label>
-          <select
-            className="border rounded px-2 py-1"
-            value={formulaType}
-            onChange={(e) =>
-              setFormulaType(e.currentTarget.value as "eliminazione" | "gironi")
-            }
-          >
-            <option value="eliminazione">Scontri Diretti</option>
-            <option value="gironi">Seconda Fase a Gironi</option>
-          </select>
-        </div>
-      )}
+  <div className="w-full p-0 m-0 space-y-6 print:p-0">
+    {/* ⛔️ Select visibile solo a chi può editare */}
+    {canEdit && !hasNextPhase && (
+  <div className="flex justify-center items-center gap-2 print:hidden no-print">
 
-      {Object.entries(partitePerGirone).map(([girone, matches]) => (
-        <div key={girone} className="space-y-4 avoid-break">
-          <h3 className="text-lg font-semibold text-center text-white print:text-black">
-  {girone}
-</h3>
-
-<table className="bg-white/90 w-full table-fixed border-collapse text-sm mb-4 print:mb-6">
-  <colgroup>
-    <col style={{ width: "42%" }} />
-    <col style={{ width: "16%" }} />
-    <col style={{ width: "42%" }} />
-  </colgroup>
-  <tbody>
-    {matches.map((m) => (
-      <tr
-        key={m.id}
-        onClick={canEdit ? () => handleEditPartita(m.id) : undefined}
-        className={canEdit ? "hover:bg-gray-100 cursor-pointer print:cursor-auto" : ""}
-      >
-        {/* Casa */}
-        <td className="border border-grey-200 px-2 py-1">
-          <div className="flex items-center gap-2 min-w-0">
-            {m.squadra_casa?.logo_url && (
-              <img
-                src={m.squadra_casa.logo_url}
-                alt={m.squadra_casa.nome}
-                className="w-4 h-4 rounded-full flex-none"
-              />
-            )}
-            <span className="truncate">{m.squadra_casa?.nome}</span>
-          </div>
-        </td>
-
-        {/* Risultato */}
-        <td className="border border-grey-200 px-2 py-1 text-center font-medium whitespace-nowrap">
-          {m.giocata ? `${m.gol_casa} – ${m.gol_ospite}` : "VS"}
-        </td>
-
-        {/* Ospite */}
-        <td className="border border-grey-200 px-2 py-1">
-          <div className="flex items-center gap-2 justify-end min-w-0">
-            <span className="truncate">{m.squadra_ospite?.nome}</span>
-            {m.squadra_ospite?.logo_url && (
-              <img
-                src={m.squadra_ospite.logo_url}
-                alt={m.squadra_ospite.nome}
-                className="w-4 h-4 rounded-full flex-none"
-              />
-            )}
-          </div>
-        </td>
-      </tr>
-    ))}
-  </tbody>
-</table>
-
-          {/* CLASSIFICA */}
-          <table className="w-full table-fixed border-collapse text-center text-sm mb-6 bg-white/85">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border px-3 py-1 text-left" style={{ width: "52%" }}>
-                  Squadra
-                </th>
-                <th className="border border-grey-200 px-2 py-1">PG</th>
-                <th className="border border-grey-200 px-2 py-1">V</th>
-                <th className="border border-grey-200 px-2 py-1">N</th>
-                <th className="border border-grey-200 px-2 py-1">P</th>
-                <th className="border border-grey-200 px-2 py-1">GF</th>
-                <th className="border border-grey-200 px-2 py-1">GS</th>
-                <th className="border border-grey-200 px-2 py-1">DR</th>
-                <th className="border border-grey-200 px-2 py-1">Pt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {classificaPerGirone[girone].map((r) => (
-                <tr key={r.id} className="align-middle">
-                  <td className="border px-3 py-1 text-left" style={{ width: "52%" }}>
-                    <div className="td-team">
-                      {r.logo_url && (
-                        <img
-                          src={r.logo_url}
-                          alt={r.nome}
-                          className="w-4 h-4 rounded-full flex-none"
-                        />
-                      )}
-                      <span className="name">{r.nome}</span>
-                    </div>
-                  </td>
-                  <td className="border border-grey-200 px-2 py-1">{r.PG}</td>
-                  <td className="border border-grey-200 px-2 py-1">{r.V}</td>
-                  <td className="border border-grey-200 px-2 py-1">{r.N}</td>
-                  <td className="border border-grey-200 px-2 py-1">{r.P}</td>
-                  <td className="border border-grey-200 px-2 py-1">{r.GF}</td>
-                  <td className="border border-grey-200 px-2 py-1">{r.GS}</td>
-                  <td className="border border-grey-200 px-2 py-1">{r.DR}</td>
-                  <td className="border border-grey-200 px-2 py-1">{r.Pt}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
-
-      {/* Pulsanti */}
-      <div className="flex justify-between print:hidden space-x-2">
-        <button
-          onClick={() => navigate(-1)}
-          className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+        
+        <select
+          className="border rounded px-2 py-1"
+          value={formulaType}
+          onChange={(e) =>
+            setFormulaType(e.currentTarget.value as "eliminazione" | "gironi")
+          }
         >
-          Indietro
-        </button>
-        <button
-          onClick={() => window.print()}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          Stampa
-        </button>
-        <button
-          onClick={handleNextPhase}
-          disabled={savingFormula}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
-        >
-          {savingFormula ? "Salvataggio…" : "Prossima Fase"}
-        </button>
+          <option value="eliminazione">Scontri Diretti</option>
+          <option value="gironi">Seconda Fase a Gironi</option>
+        </select>
       </div>
+    )}
+
+    {Object.entries(partitePerGirone).map(([girone, matches]) => (
+      <div key={girone} className="space-y-4 avoid-break">
+        <h3 className="text-lg font-semibold text-center text-white print:text-black">
+          {girone}
+        </h3>
+
+        {/* 🟢 Tabella partite */}
+<div
+  style={{
+    paddingLeft: "0px",
+    paddingRight: "0px",
+  }}
+>
+  <table
+    className="bg-white/90 w-full table-fixed border-collapse text-sm mb-4 print:mb-6"
+    style={{ borderRadius: "6px", overflow: "hidden" }}
+  >
+    <colgroup>
+      <col style={{ width: "42%" }} />
+      <col style={{ width: "16%" }} />
+      <col style={{ width: "42%" }} />
+    </colgroup>
+    <tbody>
+      {matches.map((m) => (
+        <tr
+          key={m.id}
+          onClick={canEdit ? () => handleEditPartita(m.id) : undefined}
+          className={
+            canEdit
+              ? "hover:bg-gray-100 cursor-pointer print:cursor-auto"
+              : ""
+          }
+        >
+          {/* Casa */}
+          <td className="border border-grey-200 px-2 py-1">
+            <div className="flex items-center gap-2 min-w-0">
+              {m.squadra_casa?.logo_url && (
+                <img
+                  src={m.squadra_casa.logo_url}
+                  alt={m.squadra_casa.nome}
+                  className="w-4 h-4 rounded-full flex-none"
+                />
+              )}
+              <span className="truncate">{m.squadra_casa?.nome}</span>
+            </div>
+          </td>
+
+          {/* Risultato */}
+          <td className="border border-grey-200 px-2 py-1 text-center font-medium whitespace-nowrap">
+            {m.giocata ? `${m.gol_casa} – ${m.gol_ospite}` : "VS"}
+          </td>
+
+          {/* Ospite */}
+          <td className="border border-grey-200 px-2 py-1">
+            <div className="flex items-center gap-2 justify-end min-w-0">
+              <span className="truncate">{m.squadra_ospite?.nome}</span>
+              {m.squadra_ospite?.logo_url && (
+                <img
+                  src={m.squadra_ospite.logo_url}
+                  alt={m.squadra_ospite.nome}
+                  className="w-4 h-4 rounded-full flex-none"
+                />
+              )}
+            </div>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
+
+{/* 🟢 CLASSIFICA */}
+<div
+  style={{
+    paddingLeft: "0px",
+    paddingRight: "0px",
+  }}
+>
+  <table
+    className="w-full table-fixed border-collapse text-center text-sm mb-6 bg-white/85"
+    style={{ borderRadius: "6px", overflow: "hidden" }}
+  >
+    <thead>
+      <tr className="bg-gray-100">
+        <th className="border px-3 py-1 text-left" style={{ width: "52%" }}>
+          Squadra
+        </th>
+        <th className="border border-grey-200 px-2 py-1">PG</th>
+        <th className="border border-grey-200 px-2 py-1">V</th>
+        <th className="border border-grey-200 px-2 py-1">N</th>
+        <th className="border border-grey-200 px-2 py-1">P</th>
+        <th className="border border-grey-200 px-2 py-1">GF</th>
+        <th className="border border-grey-200 px-2 py-1">GS</th>
+        <th className="border border-grey-200 px-2 py-1">DR</th>
+        <th className="border border-grey-200 px-2 py-1">Pt</th>
+      </tr>
+    </thead>
+    <tbody>
+      {classificaPerGirone[girone].map((r) => (
+        <tr key={r.id} className="align-middle">
+          <td className="border px-3 py-1 text-left" style={{ width: "52%" }}>
+            <div className="td-team">
+              {r.logo_url && (
+                <img
+                  src={r.logo_url}
+                  alt={r.nome}
+                  className="w-4 h-4 rounded-full flex-none"
+                />
+              )}
+              <span className="name">{r.nome}</span>
+            </div>
+          </td>
+          <td className="border border-grey-200 px-2 py-1">{r.PG}</td>
+          <td className="border border-grey-200 px-2 py-1">{r.V}</td>
+          <td className="border border-grey-200 px-2 py-1">{r.N}</td>
+          <td className="border border-grey-200 px-2 py-1">{r.P}</td>
+          <td className="border border-grey-200 px-2 py-1">{r.GF}</td>
+          <td className="border border-grey-200 px-2 py-1">{r.GS}</td>
+          <td className="border border-grey-200 px-2 py-1">{r.DR}</td>
+          <td className="border border-grey-200 px-2 py-1">{r.Pt}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
+
+      </div>
+    ))}
+
+    {/* Pulsanti */}
+    <div
+  className="flex justify-between print:hidden space-x-2"
+  style={{
+    paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)",
+  }}
+>
+      <button
+        onClick={() => navigate(-1)}
+        className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+      >
+        Indietro
+      </button>
+      <button
+        onClick={() => window.print()}
+        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+      >
+        Stampa
+      </button>
+      <button
+        onClick={handleNextPhase}
+        disabled={savingFormula}
+        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
+      >
+        {savingFormula ? "Salvataggio…" : "Prossima Fase"}
+      </button>
     </div>
-  );
+  </div>
+);
+
 }
