@@ -721,18 +721,17 @@ const posizione = [
               Pronostico del match attuale:
             </span>{" "}
             {vittorie > sconfitte ? (
-              <span className="italic text-green-700">
-                Montecarlo favorito
-              </span>
-            ) : vittorie < sconfitte ? (
-              <span className="italic text-red-700">
-                Folgore favorito
-              </span>
-            ) : (
-              <span className="italic text-gray-700">
-                Match equilibrato
-              </span>
-            )}
+  <span className="italic text-green-700">Montecarlo favorito</span>
+) : vittorie < sconfitte ? (
+  <span className="italic text-red-700">
+    {precedenti[0]?.casa.nome.toLowerCase().includes("montecarlo")
+      ? precedenti[0]?.ospite.nome
+      : precedenti[0]?.casa.nome}{" "}
+    favorito
+  </span>
+) : (
+  <span className="italic text-gray-700">Match equilibrato</span>
+)}
           </div>
 
           {/* Riga divisoria */}

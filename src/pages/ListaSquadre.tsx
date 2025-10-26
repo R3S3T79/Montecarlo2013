@@ -30,10 +30,12 @@ export default function ListaSquadre() {
 
   useEffect(() => {
     const fetchSquadre = async () => {
-      const { data, error } = await supabase
-        .from<Squadra>('squadre')
-        .select('*')
-        .order('nome');
+     const { data, error } = await supabase
+  .from<Squadra>('squadre')
+  .select('*')
+  .eq('visibile', true)       // 👈 mostra solo squadre visibili
+  .order('nome');
+
       if (error) console.error(error);
       else if (data) setSquadre(data);
       setLoading(false);

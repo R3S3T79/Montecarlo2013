@@ -136,7 +136,8 @@ elimMatches.forEach((m, idx) => {
   };
 
   return (
-  <div className="max-w-3xl mx-auto mt-2 px-2 space-y-6 print:p-0">
+  <div className="max-w-3xl mx-auto mt-2 px-[4px] space-y-4 print:p-0">
+
     {/* Scontri diretti */}
     {elimMatches.map((m) => (
       <div key={m.id} className="space-y-2">
@@ -145,45 +146,46 @@ elimMatches.forEach((m, idx) => {
         </h3>
 
         <div
-          onClick={() =>
-            canEdit &&
-            navigate(`/modifica-partita-fasegironi/${m.id}`, {
-              state: { torneoId },
-            })
-          }
-          className={`grid grid-cols-3 items-center py-2 px-3 bg-white/85 rounded ${
-            canEdit ? "cursor-pointer hover:bg-gray-100" : ""
-          }`}
-        >
-          {/* Casa */}
-          <div className="flex items-center space-x-2 justify-start">
-            {m.squadra_casa?.logo_url && (
-              <img
-                src={m.squadra_casa.logo_url}
-                alt={m.squadra_casa.nome}
-                className="w-5 h-5 rounded-full"
-              />
-            )}
-            <span>{m.squadra_casa?.nome}</span>
-          </div>
+  onClick={() =>
+    canEdit &&
+    navigate(`/modifica-partita-fasegironi/${m.id}`, {
+      state: { torneoId },
+    })
+  }
+  className={`grid grid-cols-[44%_12%_44%] items-center py-[4px] px-[6px] bg-white/85 rounded ${
+    canEdit ? "cursor-pointer hover:bg-gray-100" : ""
+  }`}
+>
+  {/* Casa */}
+  <div className="flex items-center space-x-2 justify-start leading-tight">
+    {m.squadra_casa?.logo_url && (
+      <img
+        src={m.squadra_casa.logo_url}
+        alt={m.squadra_casa.nome}
+        className="w-5 h-5 rounded-full flex-shrink-0"
+      />
+    )}
+    <span className="truncate">{m.squadra_casa?.nome}</span>
+  </div>
 
-          {/* Risultato */}
-          <div className="text-center font-medium">
-            {formatScore(m)}
-          </div>
+  {/* Risultato */}
+  <div className="text-center font-medium leading-tight">
+    {formatScore(m)}
+  </div>
 
-          {/* Ospite */}
-          <div className="flex items-center space-x-2 justify-end">
-            <span>{m.squadra_ospite?.nome}</span>
-            {m.squadra_ospite?.logo_url && (
-              <img
-                src={m.squadra_ospite.logo_url}
-                alt={m.squadra_ospite.nome}
-                className="w-5 h-5 rounded-full"
-              />
-            )}
-          </div>
-        </div>
+  {/* Ospite */}
+  <div className="flex items-center space-x-2 justify-end leading-tight">
+    <span className="truncate text-right">{m.squadra_ospite?.nome}</span>
+    {m.squadra_ospite?.logo_url && (
+      <img
+        src={m.squadra_ospite.logo_url}
+        alt={m.squadra_ospite.nome}
+        className="w-5 h-5 rounded-full flex-shrink-0"
+      />
+    )}
+  </div>
+</div>
+
       </div>
     ))}
 
@@ -222,7 +224,12 @@ elimMatches.forEach((m, idx) => {
     </div>
 
     {/* Pulsanti */}
-    <div className="flex justify-between print:hidden space-x-2">
+    <div
+  className="flex justify-between print:hidden space-x-2"
+  style={{
+    paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)",
+  }}
+>
       <button
         onClick={() => navigate(-1)}
         className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"

@@ -85,8 +85,10 @@ export default function Convocazioni() {
     const fetchSquadre = async () => {
       const { data, error } = await supabase
         .from("squadre")
-        .select("id, nome")
-        .order("nome", { ascending: true });
+.select("id, nome")
+.eq("visibile", true)   // 👈 mostra solo le squadre attive
+.order("nome", { ascending: true });
+
 
       if (!error && data) {
         setSquadre(data.filter((s) => s.id !== "a16a8645-9f86-41d9-a81f-a92931f1cc67"));

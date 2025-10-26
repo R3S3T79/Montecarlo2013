@@ -6,6 +6,8 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { supabase } from "../../../lib/supabaseClient";
 import { useAuth } from "../../../context/AuthContext";
 import { UserRole } from "../../../lib/roles";
+import { useScrollRestoration } from "../../../Hooks/useScrollRestoration";
+
 
 interface Squadra {
   id: string;
@@ -43,12 +45,19 @@ export default function Step7_FaseGironi() {
     UserRole.Authenticated;
   const canEdit = role === UserRole.Admin || role === UserRole.Creator;
 
+
+ 
+ 
+
   const [torneoNome, setTorneoNome] = useState<string>("");
   const [groupPhaseId, setGroupPhaseId] = useState<string | null>(null);
   const [secondPhaseId, setSecondPhaseId] = useState<string | null>(null);
   const [partite, setPartite] = useState<PartitaRaw[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [creating, setCreating] = useState<boolean>(false);
+
+   const pageReady = !authLoading && !loading;
+  useScrollRestoration(pageReady, `scroll-step7-${torneoId}`);
 
   // 1) Nome torneo
   useEffect(() => {
@@ -83,85 +92,157 @@ export default function Step7_FaseGironi() {
       });
   }, [torneoId]);
 
-  // 3) Crea Seconda Fase (una sola volta)
-  const creaSecondaFase = useCallback(async () => {
-    if (!canEdit || creating || !groupPhaseId || secondPhaseId) return;
-    setCreating(true);
+// =========================
+// ✅ CREA SECONDA FASE (raggruppamento per posizione: 1°, 2°, 3°, 4°)
+// =========================
+const creaSecondaFase = useCallback(async () => {
+  if (!canEdit || creating || !groupPhaseId || secondPhaseId) return;
+  setCreating(true);
 
-    // calcolo prossimo numero di fase
-    const { data: allFasi } = await supabase
-      .from("fasi_torneo")
-      .select("fase_numerica")
-      .eq("torneo_id", torneoId);
-    const nextNum =
-      (allFasi?.reduce((mx, f) => Math.max(mx, f.fase_numerica || 0), 0) ?? 0) +
-      1;
+  // Calcola numero di fase successiva
+  const { data: allFasi } = await supabase
+    .from("fasi_torneo")
+    .select("fase_numerica")
+    .eq("torneo_id", torneoId);
+  const nextNum =
+    (allFasi?.reduce((mx, f) => Math.max(mx, f.fase_numerica || 0), 0) ?? 0) + 1;
 
-    // inserimento fase
-    const { data: nf, error: fe } = await supabase
-      .from("fasi_torneo")
-      .insert({
-        torneo_id: torneoId,
-        tipo_fase: "gironi",
-        fase_numerica: nextNum,
-      })
-      .select("id")
-      .single();
-    if (fe || !nf) {
-      console.error("Errore creazione fase:", fe);
-      setCreating(false);
-      return;
-    }
-    setSecondPhaseId(nf.id);
+  // Crea nuova fase
+  const { data: nf, error: fe } = await supabase
+    .from("fasi_torneo")
+    .insert({
+      torneo_id: torneoId,
+      tipo_fase: "gironi",
+      fase_numerica: nextNum,
+    })
+    .select("id")
+    .single();
 
-    // preleva risultati Fase 1
-    const { data: raw } = await supabase
-      .from<PartitaRaw>("tornei_fasegironi")
-      .select(
-        "girone,giocata,squadra_casa(id,nome),squadra_ospite(id,nome),gol_casa,gol_ospite,rigori_vincitore"
-      )
-      .eq("torneo_id", torneoId)
-      .eq("fase_id", groupPhaseId);
-
-    // calcolo primi/secondi/terzi
-    const byGroup: Record<string, Squadra[]> = {};
-    (raw || []).forEach(m => {
-      if (!m.giocata) return;
-      const h = m.squadra_casa!, a = m.squadra_ospite!;
-      byGroup[m.girone] = byGroup[m.girone] || [];
-      [h, a].forEach(s => {
-        if (!byGroup[m.girone].find(x => x.id === s.id)) {
-          byGroup[m.girone].push(s);
-        }
-      });
-    });
-    const primis = Object.values(byGroup).map(arr => arr[0]).filter(Boolean);
-    const secondis = Object.values(byGroup).map(arr => arr[1]).filter(Boolean);
-    const ters = Object.values(byGroup).map(arr => arr[2]).filter(Boolean);
-
-    // costruisco calendario round-robin
-    const nuoviGironi = [
-      { label: "Girone A", squadre: primis },
-      { label: "Girone B", squadre: secondis },
-      { label: "Girone C", squadre: ters },
-    ];
-    const toInsert = nuoviGironi.flatMap(g => {
-      const squads = g.squadre.filter((s): s is Squadra => !!s);
-      return squads.flatMap((h, i) =>
-        squads.slice(i + 1).map((a, j) => ({
-          torneo_id: torneoId,
-          fase_id: nf.id,
-          girone: g.label,
-          match_number: i * squads.length + j + 1,
-          squadra_casa: h.id,
-          squadra_ospite: a.id,
-        }))
-      );
-    });
-
-    await supabase.from("tornei_fasegironi").insert(toInsert);
+  if (fe || !nf) {
+    console.error("Errore creazione fase:", fe);
     setCreating(false);
-  }, [canEdit, creating, groupPhaseId, secondPhaseId, torneoId]);
+    return;
+  }
+
+  const nuovaFaseId = nf.id;
+
+  // Recupera partite della fase precedente
+  const { data: raw } = await supabase
+    .from<PartitaRaw>("tornei_fasegironi")
+    .select(`
+      girone, giocata,
+      squadra_casa(id,nome),
+      squadra_ospite(id,nome),
+      gol_casa,gol_ospite,rigori_vincitore
+    `)
+    .eq("torneo_id", torneoId)
+    .eq("fase_id", groupPhaseId);
+
+  if (!raw || raw.length === 0) {
+    console.error("Nessuna partita trovata nella fase precedente");
+    setCreating(false);
+    return;
+  }
+
+  // Calcola classifiche per ogni girone
+  const statsByGroup: Record<string, Record<string, any>> = {};
+  raw.forEach((m) => {
+    const gir = m.girone;
+    if (!statsByGroup[gir]) statsByGroup[gir] = {};
+    const h = m.squadra_casa!;
+    const a = m.squadra_ospite!;
+    [h, a].forEach((s) => {
+      if (!statsByGroup[gir][s.id]) {
+        statsByGroup[gir][s.id] = { id: s.id, nome: s.nome, GF: 0, GS: 0, Pt: 0 };
+      }
+    });
+    if (!m.giocata) return;
+    const rh = statsByGroup[gir][h.id];
+    const ra = statsByGroup[gir][a.id];
+    rh.GF += m.gol_casa ?? 0;
+    rh.GS += m.gol_ospite ?? 0;
+    ra.GF += m.gol_ospite ?? 0;
+    ra.GS += m.gol_casa ?? 0;
+    if (m.gol_casa! > m.gol_ospite!) rh.Pt += 3;
+    else if (m.gol_ospite! > m.gol_casa!) ra.Pt += 3;
+    else if (m.rigori_vincitore) {
+      statsByGroup[gir][m.rigori_vincitore].Pt += 3;
+    } else {
+      rh.Pt += 1;
+      ra.Pt += 1;
+    }
+  });
+
+  // Ordina squadre in ciascun girone per punti
+  const classificheOrdinate = Object.fromEntries(
+    Object.entries(statsByGroup).map(([gir, val]) => [
+      gir,
+      Object.values(val).sort(
+        (a: any, b: any) =>
+          b.Pt - a.Pt || b.GF - a.GF || a.nome.localeCompare(b.nome)
+      ),
+    ])
+  );
+
+  const gironi = Object.keys(classificheOrdinate).sort();
+
+  // Controllo: servono almeno 2 gironi
+  if (gironi.length < 2) {
+    alert("Servono almeno 2 gironi per generare la seconda fase.");
+    setCreating(false);
+    return;
+  }
+
+  // Calcola numero massimo di posizioni (es. 4 se ci sono 4 squadre per girone)
+  const maxPos = Math.max(...Object.values(classificheOrdinate).map((v) => v.length));
+
+  // Crea nuovi gironi in base alla posizione
+  const toInsert: any[] = [];
+  for (let pos = 0; pos < maxPos; pos++) {
+    const squadrePosizione: any[] = [];
+    gironi.forEach((g) => {
+      const squadra = classificheOrdinate[g][pos];
+      if (squadra) squadrePosizione.push(squadra);
+    });
+
+    // Se meno di 2 squadre → ignora
+    if (squadrePosizione.length < 2) continue;
+
+    // Nome del nuovo girone
+    const gironeLabel = `Girone ${String.fromCharCode(65 + pos)}`; // A, B, C, D…
+
+    // Crea accoppiamenti round-robin tra le squadre di questa posizione
+    for (let i = 0; i < squadrePosizione.length; i++) {
+      for (let j = i + 1; j < squadrePosizione.length; j++) {
+        toInsert.push({
+          torneo_id: torneoId,
+          fase_id: nuovaFaseId,
+          girone: gironeLabel,
+          match_number: i * 10 + j,
+          squadra_casa: squadrePosizione[i].id,
+          squadra_ospite: squadrePosizione[j].id,
+          gol_casa: 0,
+          gol_ospite: 0,
+          giocata: false,
+          rigori_vincitore: null,
+        });
+      }
+    }
+  }
+
+  if (toInsert.length === 0) {
+    alert("Nessun accoppiamento valido generato.");
+    setCreating(false);
+    return;
+  }
+
+  await supabase.from("tornei_fasegironi").insert(toInsert);
+  console.log("✅ Seconda fase generata con", toInsert.length, "partite");
+
+  setCreating(false);
+}, [canEdit, creating, groupPhaseId, secondPhaseId, torneoId]);
+
+
 
   useEffect(() => {
     if (groupPhaseId && !secondPhaseId && !authLoading && !creating) {
@@ -232,27 +313,47 @@ export default function Step7_FaseGironi() {
     return byG;
   }, [partite]);
 
-  // 6) Classifica generale
   const classificaGenerale = useMemo(() => {
-    const order = ["Girone A", "Girone B", "Girone C"];
-    const offset: Record<string, number> = { "Girone A": 0, "Girone B": 3, "Girone C": 6 };
-    const list: { id: string; nome: string; logo_url: string | null; pos: number }[] = [];
-    order.forEach(g => {
-      (classificaPerGirone[g] || []).forEach((t, i) => {
-        list.push({ id: t.id, nome: t.nome, logo_url: t.logo_url, pos: offset[g] + i + 1 });
+  const list: { id: string; nome: string; logo_url: string | null; pos: number }[] = [];
+
+  // Filtra solo i gironi che hanno almeno una partita giocata
+  const gironiValidi = Object.entries(classificaPerGirone)
+    .filter(([girone, squadre]) => {
+      // Cerca almeno una partita giocata in questo girone
+      return partite.some(p => p.girone === girone && p.giocata);
+    })
+    .map(([girone]) => girone)
+    .sort();
+
+  // Posizione progressiva
+  let posCounter = 1;
+
+  gironiValidi.forEach(g => {
+    (classificaPerGirone[g] || []).forEach(t => {
+      list.push({
+        id: t.id,
+        nome: t.nome,
+        logo_url: t.logo_url,
+        pos: posCounter++,
       });
     });
-    return list.sort((a, b) => a.pos - b.pos);
-  }, [classificaPerGirone]);
+  });
+
+  return list;
+}, [classificaPerGirone, partite]);
+
 
   if (authLoading || loading) {
     return <p className="text-center text-white py-6">Caricamento in corso…</p>;
   }
 
   return (
-  <div className="max-w-3xl mx-auto mt-2 px-2 space-y-6 print:p-0">
+  <div className="w-full p-0 m-0 space-y-6 print:p-0">
+
+
     {Object.entries(classificaPerGirone).map(([girone, squadre]) => (
-      <div key={girone} className="space-y-4">
+  <div key={girone} className="space-y-[3px]">
+
         {/* Titolo Girone */}
         <h3 className="text-lg font-semibold text-center text-white">
           {girone}
@@ -264,12 +365,14 @@ export default function Step7_FaseGironi() {
   .sort((a, b) => a.match_number - b.match_number)
   .map(m => (
     <div
-      key={m.id}
-      className={`grid grid-cols-3 items-center bg-white/90 rounded p-2 mb-1 ${
-        canEdit ? "cursor-pointer hover:bg-gray-100" : ""
-      }`}
-      onClick={() => canEdit && navigate(`/modifica-partita-fasegironi/${m.id}`)}
-    >
+  key={m.id}
+  className={`grid grid-cols-[44%_12%_44%] items-center bg-white/90 rounded px-2 py-[4px] mb-0 ${
+    canEdit ? "cursor-pointer hover:bg-gray-100" : ""
+  }`}
+  style={{ lineHeight: "1.1" }}
+  onClick={() => canEdit && navigate(`/modifica-partita-fasegironi/${m.id}`)}
+>
+
       {/* Casa - allineata a sinistra */}
       <div className="text-left truncate">
         {m.squadra_casa!.nome}
@@ -287,28 +390,30 @@ export default function Step7_FaseGironi() {
 
         {/* Tabella Classifica Girone */}
         <table className="w-full border-collapse text-center text-sm bg-white/90 rounded">
-          <colgroup>
-            <col className="w-auto" /> {/* Squadra adatta al nome più lungo */}
-            <col className="w-12" />
-            <col className="w-12" />
-            <col className="w-12" />
-            <col className="w-12" />
-            <col className="w-12" />
-            <col className="w-12" />
-            <col className="w-12" />
-            <col className="w-12" />
-          </colgroup>
+        <colgroup>
+  <col style={{ width: "60%" }} />   {/* Colonna nomi squadre più larga */}
+  <col style={{ width: "5%" }} />
+  <col style={{ width: "5%" }} />
+  <col style={{ width: "5%" }} />
+  <col style={{ width: "5%" }} />
+  <col style={{ width: "5%" }} />
+  <col style={{ width: "5%" }} />
+  <col style={{ width: "5%" }} />
+  <col style={{ width: "5%" }} />
+</colgroup>
+
+
           <thead>
             <tr className="bg-gray-100">
               <th className="border px-3 py-1 text-left">Squadra</th>
-              <th className="border px-2 py-1">PG</th>
+              <th className="border px-2 py-1">G</th>
               <th className="border px-2 py-1">V</th>
               <th className="border px-2 py-1">N</th>
               <th className="border px-2 py-1">P</th>
-              <th className="border px-2 py-1">GF</th>
-              <th className="border px-2 py-1">GS</th>
-              <th className="border px-2 py-1">DR</th>
-              <th className="border px-2 py-1">Pt</th>
+              <th className="border px-2 py-1">F</th>
+              <th className="border px-2 py-1">S</th>
+              <th className="border px-2 py-1">D</th>
+              <th className="border px-2 py-1">P</th>
             </tr>
           </thead>
           <tbody>
@@ -341,46 +446,54 @@ export default function Step7_FaseGironi() {
       </div>
     ))}
 
-    {/* CLASSIFICA GENERALE */}
-    <div className="pt-4">
-      <h3 className="text-xl text-white font-semibold text-center mb-2">
-        Classifica Generale
-      </h3>
-      <table className="w-full table-auto border-collapse text-center text-sm bg-white/90 rounded">
-        <colgroup>
-          <col className="w-12" />
-          <col className="w-auto" />
-        </colgroup>
-        <thead>
-          <tr className="bg-gray-100">
-            <th className="border px-3 py-1">Pos</th>
-            <th className="border px-3 py-1 text-left">Squadra</th>
+    {/* CLASSIFICA GENERALE - mostrata solo se almeno una partita è giocata */}
+{partite.some(p => p.giocata) && (
+  <div className="pt-4">
+    <h3 className="text-xl text-white font-semibold text-center mb-2">
+      Classifica Generale
+    </h3>
+    <table className="w-full table-auto border-collapse text-center text-sm bg-white/90 rounded">
+      <colgroup>
+        <col style={{ width: "10%" }} />
+        <col style={{ width: "90%" }} />
+      </colgroup>
+      <thead>
+        <tr className="bg-gray-100">
+          <th className="border px-3 py-1">Pos</th>
+          <th className="border px-3 py-1 text-left">Squadra</th>
+        </tr>
+      </thead>
+      <tbody>
+        {classificaGenerale.map(item => (
+          <tr key={item.id}>
+            <td className="border px-3 py-1">{item.pos}</td>
+            <td className="border px-3 py-1 text-left">
+              <div className="flex items-center space-x-2">
+                {item.logo_url && (
+                  <img
+                    src={item.logo_url}
+                    alt={item.nome}
+                    className="w-5 h-5 rounded-full"
+                  />
+                )}
+                <span>{item.nome}</span>
+              </div>
+            </td>
           </tr>
-        </thead>
-        <tbody>
-          {classificaGenerale.map(item => (
-            <tr key={item.id}>
-              <td className="border px-3 py-1">{item.pos}</td>
-              <td className="border px-3 py-1 text-left">
-                <div className="flex items-center space-x-2">
-                  {item.logo_url && (
-                    <img
-                      src={item.logo_url}
-                      alt={item.nome}
-                      className="w-5 h-5 rounded-full"
-                    />
-                  )}
-                  <span>{item.nome}</span>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
+
 
     {/* PULSANTI */}
-    <div className="flex justify-between print:hidden space-x-2">
+    <div
+  className="flex justify-between print:hidden space-x-2"
+  style={{
+    paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)",
+  }}
+>
       <button
         onClick={() => navigate(-1)}
         className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"

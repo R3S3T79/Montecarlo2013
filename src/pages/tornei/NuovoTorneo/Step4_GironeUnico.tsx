@@ -42,33 +42,51 @@ export default function Step4_GironeUnico() {
         return;
       }
 
-      // --- ORDINAMENTO RICHIESTO ---
-      // Montecarlo deve essere la prima voce, il resto in ordine alfabetico.
-      // Usiamo l'ID noto per evitare collisioni con "Montecarlo Sq. B", ecc.
-      const MONTECARLO_ID = 'a16a8645-9f86-41d9-a81f-a92931f1cc67';
+     // --- ORDINAMENTO RICHIESTO ---
+// Montecarlo deve essere la prima voce,
+// Montecarlo Sq. B la seconda,
+// il resto in ordine alfabetico.
 
-      let elenco: Squadra[] = data ?? [];
+const MONTECARLO_A_ID = 'a16a8645-9f86-41d9-a81f-a92931f1cc67';
+const MONTECARLO_B_ID = 'f145b7f0-6f7e-42f2-9c88-7e37b203c4b3'; // ✅ ID Montecarlo Sq.B
 
-      // Se Montecarlo non è nella lista, la recuperiamo e aggiungiamo
-      if (!elenco.some(s => s.id === MONTECARLO_ID)) {
-        const { data: mc } = await supabase
-          .from('squadre')
-          .select('id, nome')
-          .eq('id', MONTECARLO_ID)
-          .maybeSingle();
-        if (mc) elenco = [...elenco, mc];
-      }
+let elenco: Squadra[] = data ?? [];
 
-      const montecarlo =
-        elenco.find(s => s.id === MONTECARLO_ID) ||
-        elenco.find(s => s.nome.trim().toLowerCase() === 'montecarlo');
+// Recupero eventuali voci mancanti (per sicurezza)
+const idsDaControllare = [MONTECARLO_A_ID, MONTECARLO_B_ID];
+for (const id of idsDaControllare) {
+  if (!elenco.some((s) => s.id === id)) {
+    const { data: extra } = await supabase
+      .from('squadre')
+      .select('id, nome')
+      .eq('id', id)
+      .maybeSingle();
+    if (extra) elenco.push(extra);
+  }
+}
 
-      const altre = elenco
-        .filter(s => s.id !== montecarlo?.id)
-        .sort((a, b) => a.nome.localeCompare(b.nome, 'it', { sensitivity: 'base' }));
+// Individua le due squadre principali
+const montecarloA =
+  elenco.find((s) => s.id === MONTECARLO_A_ID) ||
+  elenco.find((s) => s.nome.trim().toLowerCase() === 'montecarlo');
 
-      const ordered = montecarlo ? [montecarlo, ...altre] : altre;
-      // --- FINE ORDINAMENTO ---
+const montecarloB =
+  elenco.find((s) => s.id === MONTECARLO_B_ID) ||
+  elenco.find((s) => s.nome.trim().toLowerCase().includes('sq.b'));
+
+// Filtra tutte le altre
+const altre = elenco
+  .filter((s) => s.id !== montecarloA?.id && s.id !== montecarloB?.id)
+  .sort((a, b) => a.nome.localeCompare(b.nome, 'it', { sensitivity: 'base' }));
+
+// Ordine finale: Montecarlo, Montecarlo Sq.B, poi il resto
+const ordered = [
+  ...(montecarloA ? [montecarloA] : []),
+  ...(montecarloB ? [montecarloB] : []),
+  ...altre,
+];
+// --- FINE ORDINAMENTO ---
+
 
       setSquadre(ordered);
       setScelte(Array(state.numSquadre).fill(null));

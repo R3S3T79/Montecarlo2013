@@ -65,6 +65,7 @@ export default function SidebarLayout(): JSX.Element {
   const matchCalendario = useMatch('/calendario');
   const matchPre = useMatch('/pre-partita/:id');
   const matchDetail = useMatch('/partita/:id');
+const matchDetailAlt = useMatch('/partita/:id/*');
   const matchEditPartita = useMatch('/partita/:id/edit');
   const matchGestione = useMatch('/gestione-risultato/:id');
   const matchPlayer = useMatch('/giocatore/:id');
@@ -130,14 +131,52 @@ export default function SidebarLayout(): JSX.Element {
     })();
   }, [gestioneId]);
 
-  // Permessi utente
-  const role =
-    (user?.user_metadata?.role as UserRole) ||
-    (user?.app_metadata?.role as UserRole) ||
-    UserRole.Authenticated;
+  // Permessi utente — legge prima da user_profiles, fallback a metadata
+const [role, setRole] = React.useState<UserRole>(UserRole.Authenticated);
+const [roleLoading, setRoleLoading] = React.useState<boolean>(true);
 
- const canAdmin = role === UserRole.Admin;
+useEffect(() => {
+  (async () => {
+    try {
+      if (!user?.id) {
+        setRole(UserRole.Authenticated);
+        setRoleLoading(false);
+        return;
+      }
+
+      // 1) prova da user_profiles (ruolo autorevole)
+      const { data: prof, error } = await supabase
+        .from("user_profiles")
+        .select("role::text")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!error && prof?.role) {
+        // allinea a enum
+        const r = (prof.role as string).toLowerCase();
+        if (r === "admin") setRole(UserRole.Admin);
+        else if (r === "creator") setRole(UserRole.Creator);
+        else setRole(UserRole.Authenticated);
+      } else {
+        // 2) fallback a metadata
+        const metaRole =
+          (user?.user_metadata?.role as UserRole | undefined) ||
+          (user?.app_metadata?.role as UserRole | undefined) ||
+          UserRole.Authenticated;
+
+        setRole(metaRole);
+      }
+    } catch {
+      setRole(UserRole.Authenticated);
+    } finally {
+      setRoleLoading(false);
+    }
+  })();
+}, [user?.id]);
+
+const canAdmin = role === UserRole.Admin;
 const canCreator = role === UserRole.Creator;
+
 
   // Gruppi link — PRIMA voce: "Home"
   const group1 = [
@@ -423,7 +462,7 @@ const canCreator = role === UserRole.Creator;
           </>
         )}
 
-        {matchDetail && (canAdmin || canCreator) && (
+        {(matchDetail || matchDetailAlt) && (canAdmin || canCreator) && (
           <>
             <button
               onClick={() => navigate(`/modifica-partita-giocata/${matchDetail.params.id}`)}

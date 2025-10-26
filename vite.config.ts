@@ -71,4 +71,14 @@ export default defineConfig({
     include: ['bcryptjs'],
     exclude: ['lucide-react'],
   },
+  server: {
+    host: true,
+    port: 5173,
+    hmr: {
+      overlay: true
+    },
+    watch: {
+      usePolling: true
+    }
+  }
 })

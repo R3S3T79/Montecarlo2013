@@ -75,12 +75,33 @@
 
     <!-- ✅ Stile loader iniziale -->
     <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        background-color: #ffffff;
-      }
+/* ✅ Copre tutta l’altezza e mantiene lo sfondo visibile */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: url('/Sfondo.png') no-repeat center center fixed;
+  background-size: cover;
+  background-attachment: fixed;
+  background-color: #ffffff; /* fallback chiaro */
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: transparent; /* lascia vedere lo sfondo del body */
+  padding-bottom: env(safe-area-inset-bottom); /* copre anche area notch */
+}
+
+/* ✅ Aggiunge un po' di respiro visivo sotto i pulsanti inferiori */
+footer,
+.bottom-buttons,
+.print\:hidden:last-of-type {
+  margin-bottom: calc(env(safe-area-inset-bottom) + 12px);
+}
+
+
       #loader {
         display: flex;
         align-items: center;

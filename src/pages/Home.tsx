@@ -518,78 +518,89 @@ const marcatoriByPeriodo = useMemo(() => {
 }, [marcatoriLive]);
 
 // =========================
-// TIMER LIVE (partita_timer_state)
+// TIMER LIVE (partita_timer_state con logica ProssimaPartita)
 // =========================
-const [minuti, setMinuti] = useState(0);
-const [secondi, setSecondi] = useState(0);
-const [timerStatus, setTimerStatus] = useState<"running" | "paused" | "stopped">("stopped");
+const [timerState, setTimerState] = useState<any>(null);
+const [elapsedMs, setElapsedMs] = useState(0);
+const [totalSeconds, setTotalSeconds] = useState(0);
 
 useEffect(() => {
   if (!isLive || !match) return;
 
-  let interval: NodeJS.Timeout | null = null;
+  let channel: any = null;
+  let poll: any = null;
 
-  // 🔹 funzione per aggiornare timer in base a offset_ms
-  const updateFromState = (state: any) => {
-    if (!state) return;
-    const offsetMs = state.timer_offset_ms || 0;
-    const totalSec = Math.floor(offsetMs / 1000);
-    setMinuti(Math.floor(totalSec / 60));
-    setSecondi(totalSec % 60);
-    setTimerStatus(state.timer_status || "stopped");
-  };
-
-  // 🔹 carica stato iniziale
-  const loadState = async () => {
+  const fetchTimer = async () => {
     const { data, error } = await supabase
       .from("partita_timer_state")
       .select("*")
       .eq("partita_id", match.id)
       .maybeSingle();
-
-    if (error) {
-      console.warn("[HomePage] Errore caricamento timer:", error.message);
-      return;
-    }
-    updateFromState(data);
+    if (!error && data) setTimerState(data);
   };
 
-  loadState();
+  (async () => {
+    // 🔁 Realtime updates
+    channel = supabase
+      .channel(`realtime-timer-${match.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "partita_timer_state",
+          filter: `partita_id=eq.${match.id}`,
+        },
+        ({ new: row }) => setTimerState(row)
+      )
+      .subscribe();
 
-  // 🔹 realtime updates
-  const channel = supabase
-    .channel(`realtime-timer-${match.id}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "partita_timer_state",
-        filter: `partita_id=eq.${match.id}`,
-      },
-      (payload) => {
-        updateFromState(payload.new);
-      }
-    )
-    .subscribe();
-
-  // 🔹 aggiorna ogni secondo solo se running
-  interval = setInterval(() => {
-    setSecondi((s) => {
-      if (timerStatus !== "running") return s;
-      if (s === 59) {
-        setMinuti((m) => m + 1);
-        return 0;
-      }
-      return s + 1;
-    });
-  }, 1000);
+    // ⏱ Poll di sicurezza ogni 2 secondi
+    poll = setInterval(fetchTimer, 2000);
+    fetchTimer();
+  })();
 
   return () => {
-    if (interval) clearInterval(interval);
-    supabase.removeChannel(channel);
+    if (channel) supabase.removeChannel(channel);
+    if (poll) clearInterval(poll);
   };
-}, [isLive, match, timerStatus]);
+}, [isLive, match]);
+
+// 🔹 Aggiorna elapsedMs ogni secondo
+useEffect(() => {
+  if (!timerState) {
+    setElapsedMs(0);
+    return;
+  }
+
+  const updateElapsed = () => {
+    if (timerState.timer_status === "running" && timerState.timer_started_at) {
+      const started = new Date(timerState.timer_started_at).getTime();
+      setElapsedMs(timerState.timer_offset_ms + (Date.now() - started));
+    } else {
+      setElapsedMs(timerState.timer_offset_ms || 0);
+    }
+  };
+
+  updateElapsed();
+  const interval = setInterval(updateElapsed, 1000);
+  return () => clearInterval(interval);
+}, [timerState]);
+
+// 🔹 Calcola tempo rimanente
+useEffect(() => {
+  const durationMin = timerState?.timer_duration_min ?? 20;
+  const remaining = Math.floor(durationMin * 60) - Math.floor((elapsedMs || 0) / 1000);
+  setTotalSeconds(remaining);
+}, [elapsedMs, timerState]);
+
+// 🔹 Conversione per visualizzazione
+const isNegative = totalSeconds < 0;
+const absMinutes = Math.floor(Math.abs(totalSeconds) / 60);
+const absSeconds = Math.abs(totalSeconds) % 60;
+const minDisplay = `${isNegative ? "-" : ""}${String(absMinutes).padStart(2, "0")}`;
+const secDisplay = String(absSeconds).padStart(2, "0");
+
 
 
 // usa direttamente nome e cognome dalla view
@@ -777,11 +788,12 @@ const fbPluginSrc = useMemo(() => {
 {/* 🔹 Timer in tempo reale dal gestionerisultato */}
 {isLive && (
   <div style={styles.timerInlineBox}>
-    <span style={styles.timerValue}>{pad2(minuti)}′</span>
+    <span style={styles.timerValue}>{minDisplay}′</span>
     <span style={styles.timerSeparator}>:</span>
-    <span style={styles.timerValue}>{pad2(secondi)}″</span>
+    <span style={styles.timerValue}>{secDisplay}″</span>
   </div>
 )}
+
 
 
 
@@ -1250,23 +1262,24 @@ fbIframe: { width: "100%", height: "100%", border: "none" },
   },
   fixtureDate: { fontSize: 15, opacity: 0.9 },
 
-  timerInlineBox: {
+ timerInlineBox: {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: 4,
-  marginTop: 4,
+  gap: 6, // leggermente più spazio
+  marginTop: 6,
 },
 timerValue: {
   fontFamily: "monospace",
-  fontSize: 14,
-  fontWeight: 700,
+  fontSize: 20,     // ⬆️ aumentato da 14 → 20
+  fontWeight: 800,  // ⬆️ leggermente più bold
   color: "red",
 },
 timerSeparator: {
-  fontSize: 13,
+  fontSize: 18,     // ⬆️ aumentato per bilanciare
   opacity: 0.7,
 },
+
 
 
   teamsRow: {
