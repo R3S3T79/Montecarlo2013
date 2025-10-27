@@ -135,13 +135,17 @@ export default function VotazioniPartita(): JSX.Element {
                 };
               }
 
-              if (r.role === "mister") {
-                map[r.giocatore_id].sommaMister += Number(r.media_voto);
-                map[r.giocatore_id].countMister += Number(r.numero_voti);
-              } else {
-                map[r.giocatore_id].sommaUtenti += Number(r.media_voto);
-                map[r.giocatore_id].countUtenti += Number(r.numero_voti);
-              }
+             const ruolo = (r.role || "").toString().toLowerCase();
+
+// ✅ solo gli ADMIN vengono considerati come mister
+if (ruolo === "admin") {
+  map[r.giocatore_id].sommaMister += Number(r.media_voto);
+  map[r.giocatore_id].countMister += Number(r.numero_voti);
+} else {
+  map[r.giocatore_id].sommaUtenti += Number(r.media_voto);
+  map[r.giocatore_id].countUtenti += Number(r.numero_voti);
+}
+
             });
 
             const dm: Record<

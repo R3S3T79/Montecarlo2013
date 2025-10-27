@@ -1,11 +1,11 @@
 // src/pages/AllenamentiGiocatore.tsx
-// Data creazione chat: 2025-08-01 (rev: fix view giocatori_stagioni_view)
+// Data revisione: 27/10/2025 (fix ordine hook + ruolo da user_profiles)
 
-import React, { useEffect, useState } from 'react';
-import { useParams, Navigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabaseClient';
-import { UserRole } from '../lib/roles';
+import React, { useEffect, useState } from "react";
+import { useParams, Navigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabaseClient";
+import { UserRole } from "../lib/roles";
 
 // Chart.js
 import {
@@ -15,7 +15,7 @@ import {
   BarElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
 
@@ -30,56 +30,78 @@ interface StatisticheAllenamento {
 }
 
 export default function AllenamentiGiocatore(): JSX.Element {
-  const { user, loading: authLoading } = useAuth();
-  const role =
-    (user?.user_metadata?.role as UserRole) ||
-    (user?.app_metadata?.role as UserRole) ||
-    UserRole.Authenticated;
-
-  if (!authLoading && role !== UserRole.Admin && role !== UserRole.Creator) {
-    return <Navigate to="/" replace />;
-  }
-
-  // ATTENZIONE: qui l'ID che arriva dall'URL è l'id REALE del giocatore (giocatori.id)
+  const { user } = useAuth();
   const { id: playerId } = useParams<{ id: string }>();
-  if (!playerId) {
-    return <Navigate to="/allenamenti" replace />;
-  }
 
-  const [playerName, setPlayerName] = useState<string>('');
-  const [recordId, setRecordId] = useState<string>(''); // id riga stagione-giocatore (view)
+  const [role, setRole] = useState<UserRole>(UserRole.Authenticated);
+  const [roleLoading, setRoleLoading] = useState(true);
+  const [playerName, setPlayerName] = useState<string>("");
+  const [recordId, setRecordId] = useState<string>("");
   const [stats, setStats] = useState<StatisticheAllenamento | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
+  // ✅ Caricamento ruolo coerente con SidebarLayout
+  useEffect(() => {
+    (async () => {
+      if (!user?.id) {
+        setRole(UserRole.Authenticated);
+        setRoleLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("role::text")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!error && data?.role) {
+        const r = (data.role as string).toLowerCase();
+        if (r === "admin") setRole(UserRole.Admin);
+        else if (r === "creator") setRole(UserRole.Creator);
+        else setRole(UserRole.Authenticated);
+      } else {
+        const metaRole =
+          (user?.user_metadata?.role as UserRole | undefined) ||
+          (user?.app_metadata?.role as UserRole | undefined) ||
+          UserRole.Authenticated;
+        setRole(metaRole);
+      }
+      setRoleLoading(false);
+    })();
+  }, [user?.id]);
+
+  // ✅ Fetch statistiche
   useEffect(() => {
     async function fetchData() {
+      if (!playerId) return;
       setLoading(true);
 
-      // 1) Individua la stagione attiva OGGI
+      // 1️⃣ Individua la stagione attiva
       const oggi = new Date().toISOString().slice(0, 10);
       const { data: stag, error: stagErr } = await supabase
-        .from('stagioni')
-        .select('id')
-        .lte('data_inizio', oggi)
-        .gte('data_fine', oggi)
+        .from("stagioni")
+        .select("id")
+        .lte("data_inizio", oggi)
+        .gte("data_fine", oggi)
         .single();
 
       if (stagErr || !stag) {
-        console.error('Nessuna stagione attiva:', stagErr);
+        console.error("Nessuna stagione attiva:", stagErr);
         setLoading(false);
         return;
       }
 
-      // 2) Recupera nome/cognome e record stagione-giocatore dalla VIEW corretta
+      // 2️⃣ Dati anagrafici giocatore
       const { data: gs, error: gsErr } = await supabase
-        .from('giocatori_stagioni_view')
-        .select('id, giocatore_uid, nome, cognome')
-        .eq('giocatore_uid', playerId)   // id reale giocatore
-        .eq('stagione_id', stag.id)
+        .from("giocatori_stagioni_view")
+        .select("id, giocatore_uid, nome, cognome")
+        .eq("giocatore_uid", playerId)
+        .eq("stagione_id", stag.id)
         .single();
 
       if (gsErr || !gs) {
-        console.error('Record giocatori_stagioni_view non trovato:', gsErr);
+        console.error("Record giocatori_stagioni_view non trovato:", gsErr);
         setLoading(false);
         return;
       }
@@ -87,20 +109,20 @@ export default function AllenamentiGiocatore(): JSX.Element {
       setRecordId(gs.id);
       setPlayerName(`${gs.cognome} ${gs.nome}`);
 
-      // 3) Recupera tutti gli allenamenti del giocatore per la stagione corrente
+      // 3️⃣ Allenamenti giocatore
       const { data: allen, error: allenErr } = await supabase
-        .from('allenamenti')
-        .select('data_allenamento, presente')
-        .eq('giocatore_uid', playerId)
-        .eq('stagione_id', stag.id);
+        .from("allenamenti")
+        .select("data_allenamento, presente")
+        .eq("giocatore_uid", playerId)
+        .eq("stagione_id", stag.id);
 
       if (allenErr || !allen) {
-        console.error('Errore fetch allenamenti:', allenErr);
+        console.error("Errore fetch allenamenti:", allenErr);
         setLoading(false);
         return;
       }
 
-      // 4) Calcolo statistiche
+      // 4️⃣ Statistiche
       const now = new Date();
       const weekAgo = new Date(now);
       weekAgo.setDate(now.getDate() - 7);
@@ -109,25 +131,19 @@ export default function AllenamentiGiocatore(): JSX.Element {
 
       let totale = 0,
         presenze = 0,
-        assenze = 0;
-      let presSett = 0,
+        assenze = 0,
+        presSett = 0,
         assSett = 0,
         presMese = 0,
         assMese = 0;
 
       allen.forEach((a) => {
-        // data_allenamento è di tipo DATE: parsiamolo in modo sicuro (YYYY-MM-DD)
         const d = new Date(`${a.data_allenamento}T00:00:00`);
-
         totale++;
-        if (a.presente) presenze++; else assenze++;
-
-        if (d >= weekAgo) {
-          a.presente ? presSett++ : assSett++;
-        }
-        if (d >= monthAgo) {
-          a.presente ? presMese++ : assMese++;
-        }
+        if (a.presente) presenze++;
+        else assenze++;
+        if (d >= weekAgo) a.presente ? presSett++ : assSett++;
+        if (d >= monthAgo) a.presente ? presMese++ : assMese++;
       });
 
       setStats({
@@ -139,19 +155,22 @@ export default function AllenamentiGiocatore(): JSX.Element {
       });
       setLoading(false);
     }
-
     fetchData();
   }, [playerId]);
 
-  if (authLoading || loading) {
+  // ✅ Gestione rendering condizionale dopo caricamento ruolo
+  if (roleLoading || loading)
     return (
       <div className="min-h-screen flex items-center justify-center text-white">
         Caricamento…
       </div>
     );
+
+  if (role !== UserRole.Admin && role !== UserRole.Creator) {
+    return <Navigate to="/" replace />;
   }
 
-  if (!stats) {
+  if (!playerId || !stats) {
     return (
       <div className="min-h-screen flex items-center justify-center text-white">
         Errore nel caricamento delle statistiche.
@@ -166,7 +185,7 @@ export default function AllenamentiGiocatore(): JSX.Element {
         {playerName}
       </h1>
 
-      {/* Riquadro unico con Totale / Presenze / Assenze affiancati */}
+      {/* Totali */}
       <div className="bg-white/90 p-6 rounded-lg shadow">
         <div className="flex flex-row justify-around text-center">
           <div>
@@ -175,16 +194,20 @@ export default function AllenamentiGiocatore(): JSX.Element {
           </div>
           <div>
             <div className="text-sm text-gray-500">Presenze</div>
-            <div className="text-2xl font-semibold text-green-600">{stats.presenze}</div>
+            <div className="text-2xl font-semibold text-green-600">
+              {stats.presenze}
+            </div>
           </div>
           <div>
             <div className="text-sm text-gray-500">Assenze</div>
-            <div className="text-2xl font-semibold text-red-600">{stats.assenze}</div>
+            <div className="text-2xl font-semibold text-red-600">
+              {stats.assenze}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Statistiche Settimana e Mese */}
+      {/* Ultima settimana / mese */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white/90 p-6 rounded-lg shadow">
           <div className="text-sm text-gray-500">Ultima Settimana</div>
@@ -202,9 +225,11 @@ export default function AllenamentiGiocatore(): JSX.Element {
         </div>
       </div>
 
-      {/* Grafico presenze/assenze */}
+      {/* Grafico */}
       <div className="bg-white/90 p-6 rounded-lg shadow">
-        <h2 className="text-center font-semibold mb-4">Presenze vs Assenze</h2>
+        <h2 className="text-center font-semibold mb-4">
+          Presenze vs Assenze
+        </h2>
         <Bar
           data={{
             labels: ["Allenamenti"],
@@ -212,12 +237,12 @@ export default function AllenamentiGiocatore(): JSX.Element {
               {
                 label: "Presenze",
                 data: [stats.presenze],
-                backgroundColor: "rgba(34,197,94,0.8)", // verde
+                backgroundColor: "rgba(34,197,94,0.8)",
               },
               {
                 label: "Assenze",
                 data: [stats.assenze],
-                backgroundColor: "rgba(239,68,68,0.8)", // rosso
+                backgroundColor: "rgba(239,68,68,0.8)",
               },
             ],
           }}

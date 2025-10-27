@@ -87,7 +87,7 @@ const matchDetailAlt = useMatch('/partita/:id/*');
   const matchStep3FgNumeroSquadre = useMatch('/tornei/nuovo/step3-fgnumerosquadre/:torneoId');
   const matchStep4FaseGironi = useMatch('/tornei/nuovo/step4-FaseGironi/:torneoId');
   const matchStep5_5FaseGironi = useMatch('/tornei/nuovo/step5-5-FaseGironi/:torneoId');
-  const matchAllenamenti = useMatch({ path: '/allenamenti', end: true });
+  const matchAllenamenti = useMatch('/allenamenti/*');
   const matchAllenamentiNuovo = useMatch('/allenamenti/nuovo');
   const matchStoricoAllenamenti = useMatch('/allenamenti/storico-allenamenti');
   const matchProssimaPartita = useMatch('/prossima-partita');
@@ -154,9 +154,9 @@ useEffect(() => {
       if (!error && prof?.role) {
         // allinea a enum
         const r = (prof.role as string).toLowerCase();
-        if (r === "admin") setRole(UserRole.Admin);
-        else if (r === "creator") setRole(UserRole.Creator);
-        else setRole(UserRole.Authenticated);
+        if (r === "admin" || r === "Admin") setRole(UserRole.Admin);
+else if (r === "creator" || r === "Creator") setRole(UserRole.Creator);
+else setRole(UserRole.Authenticated);
       } else {
         // 2) fallback a metadata
         const metaRole =
@@ -376,7 +376,8 @@ const canCreator = role === UserRole.Creator;
           </button>
         )}
 
-        {matchAllenamenti && (canAdmin || canCreator) && (
+        {(matchAllenamenti || location.pathname.startsWith('/allenamenti')) && (canAdmin || canCreator) && (
+
           <>
             <button
               onClick={() => navigate('/allenamenti/nuovo')}
