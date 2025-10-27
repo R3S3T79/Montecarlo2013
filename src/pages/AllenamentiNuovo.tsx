@@ -1,14 +1,14 @@
 // src/pages/AllenamentiNuovo.tsx
-// Data creazione chat: 2025-08-10
+// Data revisione: 27/10/2025 (fix definitivo hook order)
 
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Navigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabaseClient';
-import { UserRole } from '../lib/roles';
+import React, { useState, useEffect } from "react";
+import { useNavigate, Navigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabaseClient";
+import { UserRole } from "../lib/roles";
 
 interface Giocatore {
-  id: string;      // sarà l'id reale del giocatore
+  id: string;
   nome: string;
   cognome: string;
 }
@@ -24,76 +24,118 @@ export default function AllenamentiNuovo(): JSX.Element {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const dateParam = searchParams.get('data');
+
+  const dateParam = searchParams.get("data");
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState<string>(dateParam ?? today);
-
-  const role =
-    (user?.user_metadata?.role as UserRole) ||
-    (user?.app_metadata?.role as UserRole) ||
-    UserRole.Authenticated;
-  if (role !== UserRole.Admin && role !== UserRole.Creator) {
-    return <Navigate to="/" replace />;
-  }
-
   const [players, setPlayers] = useState<Giocatore[]>([]);
   const [selections, setSelections] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState<boolean>(true);
-
   const [seasons, setSeasons] = useState<Stagione[]>([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState<string>("");
 
-  const weekdays = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+  // Ruolo coerente con SidebarLayout
+  const [role, setRole] = useState<UserRole>(UserRole.Authenticated);
+  const [roleLoading, setRoleLoading] = useState(true);
+
+  // ✅ Carica ruolo da user_profiles
+  useEffect(() => {
+    (async () => {
+      if (!user?.id) {
+        setRole(UserRole.Authenticated);
+        setRoleLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("role::text")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!error && data?.role) {
+        const r = (data.role as string).toLowerCase();
+        if (r === "admin") setRole(UserRole.Admin);
+        else if (r === "creator") setRole(UserRole.Creator);
+        else setRole(UserRole.Authenticated);
+      } else {
+        const metaRole =
+          (user?.user_metadata?.role as UserRole | undefined) ||
+          (user?.app_metadata?.role as UserRole | undefined) ||
+          UserRole.Authenticated;
+        setRole(metaRole);
+      }
+
+      setRoleLoading(false);
+    })();
+  }, [user?.id]);
+
+  const weekdays = [
+    "Domenica",
+    "Lunedì",
+    "Martedì",
+    "Mercoledì",
+    "Giovedì",
+    "Venerdì",
+    "Sabato",
+  ];
   const selectedDayName = weekdays[new Date(date).getDay()];
 
+  // Carica stagioni
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase
-        .from('stagioni')
-        .select('id, nome, data_inizio, data_fine')
-        .order('data_inizio', { ascending: false });
+        .from("stagioni")
+        .select("id, nome, data_inizio, data_fine")
+        .order("data_inizio", { ascending: false });
 
       if (error || !data) {
-        console.error('Errore caricamento stagioni:', error);
+        console.error("Errore caricamento stagioni:", error);
         return;
       }
 
       setSeasons(data);
 
-      const oggi = new Date().toISOString().split('T')[0];
-      const attiva = data.find(s => s.data_inizio <= oggi && s.data_fine >= oggi);
+      const oggi = new Date().toISOString().split("T")[0];
+      const attiva = data.find(
+        (s) => s.data_inizio <= oggi && s.data_fine >= oggi
+      );
       setSelectedSeasonId(attiva ? attiva.id : data[0]?.id ?? "");
     })();
   }, []);
 
+  // Carica giocatori
   useEffect(() => {
     async function load() {
       if (!selectedSeasonId) return;
       setLoading(true);
 
       const { data: gsData, error: gsError } = await supabase
-  .from('giocatori_stagioni_view')
-  .select('giocatore_uid, nome, cognome')
-  .eq('stagione_id', selectedSeasonId)
-  .order('cognome', { ascending: true });
+        .from("giocatori_stagioni_view")
+        .select("giocatore_uid, nome, cognome")
+        .eq("stagione_id", selectedSeasonId)
+        .order("cognome", { ascending: true });
 
       if (gsError || !gsData) {
-        console.error('Errore fetch v_giocatori_stagioni:', gsError);
+        console.error("Errore fetch giocatori_stagioni_view:", gsError);
         setPlayers([]);
         setSelections({});
         setLoading(false);
         return;
       }
 
-      const list = gsData.map(r => ({
-  id: r.giocatore_uid,   // qui usi il giocatore_uid
-  nome: r.nome,
-  cognome: r.cognome
-}));
+      const list = gsData.map((r) => ({
+        id: r.giocatore_uid,
+        nome: r.nome,
+        cognome: r.cognome,
+      }));
+
       setPlayers(list);
 
       const initSel: Record<string, boolean> = {};
-      list.forEach(p => { initSel[p.id] = false });
+      list.forEach((p) => {
+        initSel[p.id] = false;
+      });
 
       setSelections(initSel);
       setLoading(false);
@@ -102,28 +144,35 @@ export default function AllenamentiNuovo(): JSX.Element {
   }, [selectedSeasonId]);
 
   const togglePresenza = (id: string, presente: boolean) => {
-    setSelections(prev => ({ ...prev, [id]: presente }));
+    setSelections((prev) => ({ ...prev, [id]: presente }));
   };
 
   const handleSave = async () => {
-    const records = players.map(p => ({
+    const records = players.map((p) => ({
       giocatore_uid: p.id,
       data_allenamento: date,
       presente: selections[p.id] === true,
-      stagione_id: selectedSeasonId
+      stagione_id: selectedSeasonId,
     }));
 
-    const { error } = await supabase.from('allenamenti').insert(records);
+    const { error } = await supabase.from("allenamenti").insert(records);
     if (error) {
-      console.error('Salvataggio fallito', error);
-      alert('Errore durante il salvataggio.');
+      console.error("Salvataggio fallito", error);
+      alert("Errore durante il salvataggio.");
     } else {
-      navigate('/allenamenti');
+      navigate("/allenamenti");
     }
   };
 
+  // ✅ RENDER FINALE SICURO (niente return prima)
+  if (roleLoading) return <div className="p-4">Caricamento ruolo…</div>;
+
+  if (role !== UserRole.Admin && role !== UserRole.Creator) {
+    return <Navigate to="/" replace />;
+  }
+
   if (loading) {
-    return <div className="min-h-screen">Caricamento…</div>;
+    return <div className="min-h-screen p-4">Caricamento dati…</div>;
   }
 
   return (
@@ -132,20 +181,21 @@ export default function AllenamentiNuovo(): JSX.Element {
         {/* Selettore giorno, data e stagione */}
         <div className="mb-6 text-center">
           <div className="flex flex-col md:flex-row items-center md:space-x-4 space-y-3 md:space-y-0">
-
-            <span className="text-lg text-gray-800 font-semibold">{selectedDayName}</span>
+            <span className="text-lg text-gray-800 font-semibold">
+              {selectedDayName}
+            </span>
             <input
               type="date"
               value={date}
-              onChange={e => setDate(e.target.value)}
+              onChange={(e) => setDate(e.target.value)}
               className="rounded-md bg-white border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
             />
             <select
               value={selectedSeasonId}
-              onChange={e => setSelectedSeasonId(e.target.value)}
+              onChange={(e) => setSelectedSeasonId(e.target.value)}
               className="rounded-md bg-white border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
             >
-              {seasons.map(s => (
+              {seasons.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.nome}
                 </option>
@@ -154,12 +204,15 @@ export default function AllenamentiNuovo(): JSX.Element {
           </div>
         </div>
 
-        {/* Lista giocatori con divisori rossi */}
+        {/* Lista giocatori */}
         <ul className="divide-y divide-red-400 mb-6">
-          {players.map(p => {
+          {players.map((p) => {
             const isPresente = selections[p.id];
             return (
-              <li key={p.id} className="flex items-center justify-between py-3 px-2">
+              <li
+                key={p.id}
+                className="flex items-center justify-between py-3 px-2"
+              >
                 <span className="text-xl font-bold text-gray-900">
                   {p.cognome} {p.nome}
                 </span>
@@ -168,8 +221,8 @@ export default function AllenamentiNuovo(): JSX.Element {
                     onClick={() => togglePresenza(p.id, true)}
                     className={`px-4 py-1 rounded ${
                       isPresente
-                        ? 'bg-green-600 text-white'
-                        : 'bg-green-200 text-green-800'
+                        ? "bg-green-600 text-white"
+                        : "bg-green-200 text-green-800"
                     }`}
                   >
                     Presente
@@ -178,8 +231,8 @@ export default function AllenamentiNuovo(): JSX.Element {
                     onClick={() => togglePresenza(p.id, false)}
                     className={`px-4 py-1 rounded ${
                       !isPresente
-                        ? 'bg-red-600 text-white'
-                        : 'bg-red-200 text-red-800'
+                        ? "bg-red-600 text-white"
+                        : "bg-red-200 text-red-800"
                     }`}
                   >
                     Assente
