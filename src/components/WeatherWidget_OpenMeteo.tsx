@@ -1,5 +1,5 @@
 // src/components/WeatherWidget_OpenMeteo_Daily.tsx
-// Data: 08/10/2025 — Versione estesa con previsioni 3 giorni Open-Meteo (no API key)
+// Data: 29/10/2025 — Versione con gradiente dinamico e contrasto alto
 
 import React, { useEffect, useState } from "react";
 
@@ -58,7 +58,7 @@ export default function WeatherWidget_OpenMeteo_Daily({
           tmin: data.daily.temperature_2m_min[i],
           code: data.daily.weathercode[i],
         }));
-        setDaily(dailyArr.slice(0, 3)); // solo oggi + 2 giorni
+        setDaily(dailyArr.slice(0, 3));
       } catch (err) {
         console.warn("[WeatherWidget_OpenMeteo_Daily] Errore:", err);
         setNow(null);
@@ -76,10 +76,16 @@ export default function WeatherWidget_OpenMeteo_Daily({
     };
   }, [lat, lon]);
 
-  return (
-    <div style={styles.card}>
-      <h3 style={styles.title}>🌤 Meteo</h3>
+  // 🔹 Determina il gradiente dinamico in base al meteo
+  const backgroundGradient = getGradientByWeather(now?.weathercode);
 
+  return (
+    <div style={{ 
+  ...styles.card, 
+  background: backgroundGradient || "linear-gradient(145deg, #0052d4 0%, #4364f7 50%, #6fb1fc 100%)"
+}}>
+
+      <h3 style={styles.title}>🌤 Meteo {nomeLuogo}</h3>
 
       {loading ? (
         <div style={styles.loading}>Caricamento meteo...</div>
@@ -113,9 +119,9 @@ export default function WeatherWidget_OpenMeteo_Daily({
   );
 }
 
-// --------------------------------------
+// --------------------------
 // Funzioni di supporto
-// --------------------------------------
+// --------------------------
 function getWeatherIcon(code?: number): string {
   if (code === undefined) return "❔";
   if ([0, 1].includes(code)) return "☀️";
@@ -129,7 +135,6 @@ function getWeatherIcon(code?: number): string {
 }
 
 function getWeatherDescription(code?: number): string {
-  if (code === undefined) return "";
   const map: Record<number, string> = {
     0: "Sereno",
     1: "Prevalentemente sereno",
@@ -152,8 +157,35 @@ function getWeatherDescription(code?: number): string {
     95: "Temporale",
     96: "Temporale con grandine",
   };
-  return map[code] || "Condizioni variabili";
+  return map[code ?? 0] || "Condizioni variabili";
 }
+
+function getGradientByWeather(code?: number): string {
+  // 🎨 Versione con contrasti più evidenti e transizioni più ampie
+  if (!code)
+    return "linear-gradient(160deg, #007bff 0%, #66ccff 100%)"; // Default: blu acceso
+
+  if ([0, 1].includes(code))
+    return "linear-gradient(160deg, #00aaff 0%, #a1c4fd 100%)"; // ☀️ Sereno (azzurro cielo brillante)
+  
+  if ([2, 3].includes(code))
+    return "linear-gradient(160deg, #7f8c8d 0%, #bdc3c7 100%)"; // ⛅ Nuvoloso (grigio chiaro più visibile)
+  
+  if ([45, 48].includes(code))
+    return "linear-gradient(160deg, #606c88 0%, #3f4c6b 100%)"; // 🌫️ Nebbia (tono freddo)
+  
+  if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code))
+    return "linear-gradient(160deg, #1e3c72 0%, #2a5298 100%)"; // 🌧️ Pioggia (blu profondo)
+  
+  if ([95, 96, 99].includes(code))
+    return "linear-gradient(160deg, #141E30 0%, #243B55 100%)"; // ⛈️ Temporale (scuro drammatico)
+  
+  if ([71, 73, 75].includes(code))
+    return "linear-gradient(160deg, #83a4d4 0%, #b6fbff 100%)"; // ❄️ Neve (azzurro ghiaccio)
+
+  return "linear-gradient(160deg, #007bff 0%, #66ccff 100%)";
+}
+
 
 function formatDayLabel(date: string, index: number): string {
   const days = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
@@ -163,34 +195,46 @@ function formatDayLabel(date: string, index: number): string {
   return days[d.getDay()];
 }
 
-// --------------------------------------
-// Stili inline (in linea con HomePage)
-// --------------------------------------
+// --------------------------
+// Stili moderni scuri e contrastati
+// --------------------------
 const styles: Record<string, React.CSSProperties> = {
   card: {
-    background: "rgba(255,255,255,0.8)",
-    border: "1px solid #e8e8e8",
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 14,
-    textAlign: "center",
+  borderRadius: 16,
+  padding: 16,
+  color: "white",
+  textAlign: "center",
+  boxShadow: `
+    0 4px 10px rgba(0,0,0,0.3),         /* ombra di profondità */
+    0 0 15px rgba(173, 216, 230, 0.6),  /* 💡 bagliore azzurro */
+    0 0 30px rgba(255, 255, 255, 0.4)   /* 💡 alone bianco diffuso */
+  `,
+  transition: "background 0.4s ease, box-shadow 0.4s ease",
+},
+
+  title: {
+    margin: 0,
+    fontSize: 18,
+    fontWeight: 700,
+    letterSpacing: 0.3,
+    marginBottom: 10,
+    textShadow: "1px 1px 3px rgba(0,0,0,0.5)",
   },
-  title: { margin: 0, fontSize: 18, fontWeight: 600, marginBottom: 6 },
-  loading: { fontSize: 14, opacity: 0.7 },
+  loading: { fontSize: 14, opacity: 0.9 },
   nowBox: {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
   },
-  icon: { fontSize: 28 },
-  temp: { fontSize: 24, fontWeight: 700 },
-  desc: { fontSize: 14, opacity: 0.9 },
-  wind: { fontSize: 13, opacity: 0.8, marginTop: 4 },
+  icon: { fontSize: 38 },
+  temp: { fontSize: 30, fontWeight: 800 },
+  desc: { fontSize: 15, marginTop: 4, opacity: 0.95 },
+  wind: { fontSize: 13, marginTop: 4, opacity: 0.85 },
   dailyBox: {
     display: "flex",
     justifyContent: "space-around",
-    marginTop: 12,
+    marginTop: 14,
     gap: 10,
     flexWrap: "wrap",
   },
@@ -198,11 +242,20 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    fontSize: 13,
+    background: "rgba(255,255,255,0.15)",
+    borderRadius: 12,
+    padding: "6px 10px",
     minWidth: 70,
+    backdropFilter: "blur(4px)",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
   },
-  dayLabel: { fontWeight: 600 },
+  dayLabel: {
+    fontWeight: 700,
+    marginBottom: 2,
+    fontSize: 13,
+    textTransform: "uppercase",
+  },
   dayIcon: { fontSize: 22 },
-  dayTemp: { marginTop: 2 },
-  error: { color: "red", fontSize: 13 },
+  dayTemp: { fontSize: 13, marginTop: 2 },
+  error: { color: "#fff", fontSize: 13, opacity: 0.8 },
 };

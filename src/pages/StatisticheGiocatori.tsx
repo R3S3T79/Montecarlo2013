@@ -5,6 +5,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { useAuth } from '../context/AuthContext';
+import { UserRole } from '../lib/roles';
+
 
 interface Stagione {
   id: string;
@@ -23,12 +26,29 @@ interface Statistica {
   gol: number;
   subiti: number;
   media: number;
-  media_voti_utenti: number;
   media_voti_mister: number;
 }
 
 export default function StatisticheGiocatori(): JSX.Element {
   const navigate = useNavigate();
+  const { user } = useAuth();
+const [role, setRole] = useState<string | null>(null);
+
+useEffect(() => {
+  if (!user) return;
+
+  (async () => {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single();
+
+    if (!error && data) setRole(data.role);
+    console.log("[StatisticheGiocatori] Ruolo utente:", data.role);
+  })();
+}, [user]);
+
 
   const [stagioni, setStagioni] = useState<Stagione[]>([]);
   const [stagioneSelezionata, setStagioneSelezionata] = useState<string>('');
@@ -38,7 +58,7 @@ export default function StatisticheGiocatori(): JSX.Element {
   const [rows, setRows] = useState<Statistica[]>([]);
 
   const [sortField, setSortField] = useState<
-    'giocatore' | 'gol' | 'presenze' | 'media' | 'media_voti_utenti' | 'media_voti_mister'
+    'giocatore' | 'gol' | 'presenze' | 'media' | 'media_voti_mister'
   >('giocatore');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
@@ -126,7 +146,6 @@ if (!vErr && voti) {
             gol,
             subiti,
             media,
-            media_voti_utenti: medieMap[r.giocatore_uid]?.utenti ?? 0,
             media_voti_mister: medieMap[r.giocatore_uid]?.mister ?? 0,
           };
         });
@@ -140,7 +159,7 @@ if (!vErr && voti) {
 
   // Ordinamento
   const sortData = (
-    field: 'giocatore' | 'gol' | 'presenze' | 'media' | 'media_voti_utenti' | 'media_voti_mister'
+    field: 'giocatore' | 'gol' | 'presenze' | 'media' | 'media_voti_mister'
   ) => {
     if (sortField === field) {
       setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
@@ -172,8 +191,6 @@ if (!vErr && voti) {
         cmp = a.presenze - b.presenze;
       } else if (sortField === 'media') {
         cmp = a.media - b.media;
-      } else if (sortField === 'media_voti_utenti') {
-        cmp = a.media_voti_utenti - b.media_voti_utenti;
       } else {
         cmp = a.media_voti_mister - b.media_voti_mister;
       }
@@ -216,9 +233,7 @@ if (!vErr && voti) {
         {/* Legenda */}
 <div className="grid grid-cols-2 gap-y-1 gap-x-4 text-sm text-gray-600 pt-2 px-2 text-white">
   <div><strong>G</strong> = Fatti/Subiti</div>
-  <div><strong>M.V.U</strong> = Media Utenti</div>
   <div><strong>P</strong> = Presenze</div>
-  <div><strong>M.V.A</strong> = Media Allenatore</div>
   <div className="col-span-2"><strong>M</strong> = Media Goal fatti/subiti</div>
 </div>
 
@@ -244,10 +259,12 @@ if (!vErr && voti) {
 
         {[
           ["gol", "G"],
-          ["presenze", "P"],
-          ["media", "M"],
-          ["media_voti_utenti", "M.V.U"],
-          ["media_voti_mister", "M.V.A"],
+["presenze", "P"],
+["media", "M"],
+...(role === 'admin' || role === 'creator'
+  ? [["media_voti_mister", "M.V.A"]]
+  : []),
+
         ].map(([field, label]) => (
           <th
             key={field}
@@ -302,11 +319,13 @@ if (!vErr && voti) {
       {/* M */}
       <td className="py-1 px-[4px] text-center">{st.media.toFixed(2)}</td>
 
-      {/* M.V.U */}
-      <td className="py-1 px-[4px] text-center">{st.media_voti_utenti.toFixed(2)}</td>
 
-      {/* M.V.A */}
-      <td className="py-1 px-[4px] text-center">{st.media_voti_mister.toFixed(2)}</td>
+      {(role === 'admin' || role === 'creator') && (
+  <td className="py-1 px-[4px] text-center">
+    {st.media_voti_mister.toFixed(2)}
+  </td>
+)}
+
     </tr>
   ))}
 

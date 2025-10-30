@@ -5,6 +5,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
+import { UserRole } from '../lib/roles';
+
 
 interface Giocatore {
   giocatore_stagione_id: string;
@@ -25,6 +27,8 @@ interface StatisticheGiocatore {
   mediaVotoUtenti?: number;
   mediaVotoMister?: number;
   minutiGiocatiTotali?: number;
+  allenamentiFatti?: number;
+  allenamentiSaltati?: number;
 }
 
 interface Stagione {
@@ -34,19 +38,41 @@ interface Stagione {
 
 export default function DettaglioGiocatore() {
   const { user, loading: authLoading } = useAuth();
+  const [role, setRole] = useState<UserRole>(UserRole.Authenticated);
+
+useEffect(() => {
+  if (!user?.id) return;
+  (async () => {
+    const { data, error } = await supabase
+      .from("user_profiles")
+      .select("role::text")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!error && data?.role) {
+      const r = (data.role as string).toLowerCase();
+      if (r === "admin") setRole(UserRole.Admin);
+      else if (r === "creator") setRole(UserRole.Creator);
+      else setRole(UserRole.Authenticated);
+    }
+  })();
+}, [user?.id]);
+
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation() as { state?: { stagioneId?: string } };
 
   const [giocatore, setGiocatore] = useState<Giocatore | null>(null);
   const [statistiche, setStatistiche] = useState<StatisticheGiocatore>({
-    goalTotali: 0,
-    presenzeTotali: 0,
-    goalSubiti: 0,
-    mediaVotoUtenti: 0,
-    mediaVotoMister: 0,
-    minutiGiocatiTotali: 0,
-  });
+  goalTotali: 0,
+  presenzeTotali: 0,
+  goalSubiti: 0,
+  mediaVotoUtenti: 0,
+  mediaVotoMister: 0,
+  minutiGiocatiTotali: 0,
+  allenamentiFatti: 0,
+  allenamentiSaltati: 0,
+});
   const [stagioniDisponibili, setStagioniDisponibili] = useState<Stagione[]>([]);
   const [stagioneSelezionata, setStagioneSelezionata] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -75,7 +101,8 @@ export default function DettaglioGiocatore() {
   }, [id]);
 
   const fetchStatistiche = async (giocatoreUid: string, stagioneId: string) => {
-    // Statistiche base
+  try {
+    // 🔹 Statistiche base (goal, presenze, subiti)
     const { data: stats } = await supabase
       .from('v_stat_giocatore_stagione')
       .select('goal_totali, presenze_totali, goal_subiti')
@@ -83,15 +110,15 @@ export default function DettaglioGiocatore() {
       .eq('stagione_id', stagioneId)
       .maybeSingle();
 
-    // Medie voti utenti/mister
+    // 🔹 Medie voti mister
     const { data: voti } = await supabase
       .from('voti_giocatori_media')
-      .select('media_voto_utenti, media_voto_mister')
+      .select('media_voto_mister')
       .eq('giocatore_uid', giocatoreUid)
       .eq('stagione_id', stagioneId)
       .maybeSingle();
 
-    // Trova l'ID della riga in giocatori_stagioni
+    // 🔹 Trova la riga in giocatori_stagioni per calcolare i minuti totali
     const { data: stagioneRow } = await supabase
       .from('giocatori_stagioni')
       .select('id')
@@ -99,7 +126,6 @@ export default function DettaglioGiocatore() {
       .eq('stagione_id', stagioneId)
       .maybeSingle();
 
-    // Minuti totali giocati (sommando tutte le partite della stagione)
     let totaleMinuti = 0;
     if (stagioneRow?.id) {
       const { data: minuti } = await supabase
@@ -111,15 +137,44 @@ export default function DettaglioGiocatore() {
       totaleMinuti = Math.floor(totaleSec / 60);
     }
 
+// 🔹 Allenamenti fatti e saltati
+let fatti = 0;
+let saltati = 0;
+
+// Il campo giocatore_uid in "allenamenti" fa riferimento a "giocatori.id"
+// quindi possiamo usare direttamente il valore di giocatoreUid come ID del giocatore
+const { data: allenamenti, error: errAll } = await supabase
+  .from('allenamenti')
+  .select('presente')
+  .eq('giocatore_uid', giocatoreUid)
+  .eq('stagione_id', stagioneId);
+
+if (errAll) {
+  console.error("Errore query allenamenti:", errAll);
+}
+
+if (allenamenti && allenamenti.length > 0) {
+  fatti = allenamenti.filter(a => a.presente === true).length;
+  saltati = allenamenti.filter(a => a.presente === false).length;
+}
+
+
+
+
+    // 🔹 Aggiorna lo stato finale
     setStatistiche({
       goalTotali: stats?.goal_totali || 0,
       presenzeTotali: stats?.presenze_totali || 0,
       goalSubiti: stats?.goal_subiti || 0,
-      mediaVotoUtenti: voti?.media_voto_utenti || 0,
       mediaVotoMister: voti?.media_voto_mister || 0,
       minutiGiocatiTotali: totaleMinuti,
+      allenamentiFatti: fatti,
+      allenamentiSaltati: saltati,
     });
-  };
+  } catch (error) {
+    console.error("Errore fetchStatistiche:", error);
+  }
+};
 
   const fetchGiocatore = async (stagioneId: string) => {
     if (!id) return;
@@ -242,71 +297,91 @@ export default function DettaglioGiocatore() {
             {giocatore.cognome} {giocatore.nome}
           </h1>
 
-          <div className="flex flex-wrap justify-center gap-8 mb-6">
-            {/* Goal fatti */}
-            <div className="text-center">
-              <div className="text-2xl font-bold text-montecarlo-accent">{statistiche.goalTotali}</div>
-              <div className="text-sm text-black">Goal</div>
-            </div>
+          {/* 🔹 Sezione statistiche principali */}
+<div className="flex flex-wrap justify-center gap-8 mb-6">
+  {/* Goal fatti */}
+  <div className="text-center">
+    <div className="text-2xl font-bold text-montecarlo-accent">
+      {statistiche.goalTotali}
+    </div>
+    <div className="text-sm text-black">Goal</div>
+  </div>
 
-            {/* Presenze */}
-            <div className="text-center">
-              <div className="text-2xl font-bold text-montecarlo-gold-600">{statistiche.presenzeTotali}</div>
-              <div className="text-sm text-black">Presenze</div>
-            </div>
+  {/* Presenze */}
+  <div className="text-center">
+    <div className="text-2xl font-bold text-montecarlo-gold-600">
+      {statistiche.presenzeTotali}
+    </div>
+    <div className="text-sm text-black">Presenze</div>
+  </div>
 
-            {/* Minuti Giocati */}
-            <div className="text-center">
-              <div className="text-2xl font-bold text-montecarlo-secondary">{statistiche.minutiGiocatiTotali}</div>
-              <div className="text-sm text-black">Minuti Giocati</div>
-            </div>
+  {/* Goal Subiti solo se Portiere */}
+  {giocatore.ruolo === "Portiere" && (
+    <div className="text-center">
+      <div className="text-2xl font-bold text-montecarlo-red-600">
+        {statistiche.goalSubiti}
+      </div>
+      <div className="text-sm text-black">Goal Subiti</div>
+    </div>
+  )}
 
-            {/* Media Goal solo se NON portiere */}
-            {statistiche.presenzeTotali > 0 && giocatore.ruolo !== "Portiere" && (
-              <div className="text-center">
-                <div className="text-2xl font-bold text-montecarlo-green-600">
-                  {(statistiche.goalTotali / statistiche.presenzeTotali).toFixed(2)}
-                </div>
-                <div className="text-sm text-black">Media Goal</div>
-              </div>
-            )}
+  {/* Media Goal solo se NON portiere */}
+  {statistiche.presenzeTotali > 0 && giocatore.ruolo !== "Portiere" && (
+    <div className="text-center">
+      <div className="text-2xl font-bold text-montecarlo-green-600">
+        {(statistiche.goalTotali / statistiche.presenzeTotali).toFixed(2)}
+      </div>
+      <div className="text-sm text-black">Media Goal</div>
+    </div>
+  )}
+</div>
 
-            {/* Goal Subiti solo se Portiere */}
-            {giocatore.ruolo === "Portiere" && (
-              <div className="text-center">
-                <div className="text-2xl font-bold text-montecarlo-red-600">
-                  {statistiche.goalSubiti}
-                </div>
-                <div className="text-sm text-black">Goal Subiti</div>
-              </div>
-            )}
-          </div>
+{/* 🔸 Separatore */}
+<hr className="w-2/3 border-t border-gray-300 my-3" />
 
-          {/* 🔹 Medie Voti Utenti + Mister */}
-          <div className="flex space-x-8 mb-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-500">
-                {statistiche.mediaVotoUtenti?.toFixed(2) ?? "0.00"}
-              </div>
-              <div className="text-sm text-black">Media Voti Utenti</div>
-            </div>
+{/* 🔹 Allenamenti Fatti / Saltati */}
+<div className="flex flex-wrap justify-center gap-8 mb-6">
+  <div className="text-center">
+    <div className="text-2xl font-bold text-green-600">
+      {statistiche.allenamentiFatti}
+    </div>
+    <div className="text-sm text-black">Allenamenti Fatti</div>
+  </div>
 
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-500">
-                {statistiche.mediaVotoMister?.toFixed(2) ?? "0.00"}
-              </div>
-              <div className="text-sm text-black">Media Voti Mister</div>
-            </div>
-          </div>
+  <div className="text-center">
+    <div className="text-2xl font-bold text-red-600">
+      {statistiche.allenamentiSaltati}
+    </div>
+    <div className="text-sm text-black">Allenamenti Saltati</div>
+  </div>
+</div>
+
+{/* 🔸 Separatore */}
+<hr className="w-2/3 border-t border-gray-300 my-3" />
+
+{/* 🔹 Media Voto Mister — visibile solo ad Admin o Creator */}
+{(role === UserRole.Admin || role === UserRole.Creator) && (
+  <div className="flex justify-center mb-6">
+    <div className="text-center">
+      <div className="text-2xl font-bold text-blue-500">
+        {statistiche.mediaVotoMister?.toFixed(2) ?? "0.00"}
+      </div>
+      <div className="text-sm text-black">Media Voti Mister</div>
+    </div>
+  </div>
+)}
+
+
+
 
           <div className="w-full max-w-md space-y-4">
             {giocatore.data_nascita && (
-              <div className="flex justify-between items-center py-2 border-b">
-                <span className="text-black">Data di nascita</span>
-                <span className="font-medium">{formatData(giocatore.data_nascita)}</span>
-                {eta && <span className="text-sm text-black ml-2">({eta} anni)</span>}
-              </div>
-            )}
+  <div className="flex justify-between items-center py-2 border-b">
+    <span className="text-black">Data di nascita</span>
+    <span className="font-medium">{formatData(giocatore.data_nascita)}</span>
+  </div>
+)}
+
             {giocatore.ruolo && (
               <div className="flex justify-between items-center py-2 border-b">
                 <span className="text-black">Ruolo</span>
