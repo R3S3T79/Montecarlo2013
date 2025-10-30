@@ -316,18 +316,15 @@ const canCreator = role === UserRole.Creator;
 </button>
 
 
- {/* Stelle su dettaglio partita */}
-{matchDetail && (
-  <>
-    {/* Stella dorata piena */}
-    <button
-      onClick={() => navigate(`/partita/${matchDetail.params.id}/votazioni`)}
-      aria-label="Vota Giocatori"
-      className="mr-3 hover:scale-110 transition"
-    >
-      <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-    </button>
-  </>
+{/* Stelle su dettaglio partita — visibile solo ad admin/creator */}
+{matchDetail && (canAdmin || canCreator) && (
+  <button
+    onClick={() => navigate(`/partita/${matchDetail.params.id}/votazioni`)}
+    aria-label="Vota Giocatori"
+    className="mr-3 hover:scale-110 transition"
+  >
+    <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+  </button>
 )}
 
 

@@ -663,18 +663,24 @@ const fbPluginSrc = useMemo(() => {
   </div>
 </header>
 
-      {/* NOTIZIE */}
-      <section style={{ ...styles.card, ...styles.cardLarge }}>
+{(() => {
+  console.log("📰 marqueeLoop:", marqueeLoop.length, marqueeLoop.map((n) => n.testo));
+  return null;
+})()}
+
+
+    <section style={{ ...styles.card, ...styles.cardLarge }}>
   <div style={styles.newsStrip}>
     <div style={styles.marqueeMask}>
       <div
         ref={newsTrackRef}
+        className="marqueeTrack"   // ✅ necessario per far funzionare la pausa
         style={styles.marqueeTrack}
         onMouseEnter={() => newsTrackRef.current?.classList.add("paused")}
-  onMouseLeave={() => newsTrackRef.current?.classList.remove("paused")}
-  onTouchStart={() => newsTrackRef.current?.classList.add("paused")}
-  onTouchEnd={() => newsTrackRef.current?.classList.remove("paused")}
->
+        onMouseLeave={() => newsTrackRef.current?.classList.remove("paused")}
+        onTouchStart={() => newsTrackRef.current?.classList.add("paused")}
+        onTouchEnd={() => newsTrackRef.current?.classList.remove("paused")}
+      >
         {marqueeLoop.map((n, idx) => (
           <span
             key={idx}
@@ -693,74 +699,102 @@ const fbPluginSrc = useMemo(() => {
   </div>
 </section>
 
+
 {/* Countdown al compleanno di Veronica */}
 <CountdownVeronica />
 
-      {/* COMPLEANNO GIOCATORE */}
-      <section style={styles.card}>
-        <div style={styles.blockHeader}>
-          <h2 style={styles.blockTitle}>
-            Prossimo Compleanno
-            {nextBirthday && (
-              <span style={styles.blockDate}>
-                {" "}— {formatItalianDate(nextBirthday.date)}
-              </span>
-            )}
-          </h2>
-        </div>
+{/* COMPLEANNO GIOCATORE */}
+<section
+  style={{
+    ...styles.card,
+    ...(nextBirthday
+      ? getBirthdayBackground(nextBirthday.date, nowTick)
+      : {}),
+  }}
+>
 
-        {nextBirthday ? (
-          <div style={styles.birthdayRow}>
-            <div style={styles.timerBox}>
-              <div style={styles.timerBig}>
-                {(() => {
-                  if (!nextBirthday) return "-";
-                  const target = nextBirthday.date;
-                  const now = nowTick;
-                  const diffMs = target.getTime() - now.getTime();
-                  if (isSameCalendarDay(now, target) || diffMs <= 0) return "Oggi 🎉";
-                  const totalMinutes = Math.floor(diffMs / 60000);
-                  const days = Math.floor(totalMinutes / (60 * 24));
-                  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
-                  const minutes = totalMinutes % 60;
-                  return `- ${days} ${days === 1 ? "Giorno" : "Giorni"}, ${hours} ${hours === 1 ? "Ora" : "Ore"}, ${minutes} Min`;
-                })()}
+
+  {nextBirthday ? (
+    isSameCalendarDay(nowTick, nextBirthday.date) ? (
+      // 🎂 Giorno del compleanno: layout centrato
+      <div style={styles.birthdayFullBox}>
+        <div style={styles.birthdayTodayText}>Buon compleanno!</div>
+
+        <div style={styles.birthdayNamesCentered}>
+          {nextBirthday.players.map((p) => (
+            <div key={p.uid} style={styles.birthdayPlayerBox}>
+              {p.foto_url && (
+                <img
+                  src={p.foto_url}
+                  alt={`${p.nome} ${p.cognome}`}
+                  style={styles.birthdayPhoto}
+                />
+              )}
+              <div style={styles.playerName}>
+                {(p.cognome || "").trim()} {(p.nome || "").trim()}
               </div>
             </div>
+          ))}
+        </div>
+      </div>
+    ) : (
+      // ⏱ Giorni precedenti al compleanno — LAYOUT CENTRATO
+<div style={styles.birthdayCountdownBox}>
+  <div style={styles.birthdayDate}>
+    {formatItalianDate(nextBirthday.date)}
+  </div>
 
-            {/* Lista giocatori festeggiati */}
-<div style={styles.birthdayNames}>
-  {nextBirthday.players.map((p) => (
-    <div key={p.uid} style={styles.birthdayPlayerBox}>
-      {p.foto_url && (
-        <img
-          src={p.foto_url}
-          alt={`${p.nome} ${p.cognome}`}
-          style={styles.birthdayPhoto}
-        />
-      )}
-      <div style={styles.playerName}>
-        {(p.cognome || "").trim()} {(p.nome || "").trim()}
+  <div style={styles.timerBig}>
+    {(() => {
+      const target = nextBirthday.date;
+      const now = nowTick;
+      const diffMs = target.getTime() - now.getTime();
+      const totalMinutes = Math.floor(diffMs / 60000);
+      const days = Math.floor(totalMinutes / (60 * 24));
+      const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+      const minutes = totalMinutes % 60;
+      return `- ${days} ${days === 1 ? "Giorno" : "Giorni"}, ${hours} ${hours === 1 ? "Ora" : "Ore"}, ${minutes} Min`;
+    })()}
+  </div>
+
+  <div style={styles.birthdayNamesCentered}>
+    {nextBirthday.players.map((p) => (
+      <div key={p.uid} style={styles.birthdayPlayerBox}>
+        {p.foto_url && (
+          <img
+            src={p.foto_url}
+            alt={`${p.nome} ${p.cognome}`}
+            style={styles.birthdayPhoto}
+          />
+        )}
+        <div style={styles.playerName}>
+          {(p.cognome || "").trim()} {(p.nome || "").trim()}
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+
+    )
+  ) : (
+    // ❌ Nessun compleanno disponibile
+    <div style={styles.birthdayRow}>
+      <div style={styles.timerBox}>
+        <div style={styles.timerBig}>—</div>
+        <div style={styles.timerHint}>Nessun compleanno disponibile</div>
+      </div>
+      <div style={styles.birthdayNames}>
+        <div style={styles.playerNameMuted}>—</div>
       </div>
     </div>
-  ))}
-</div>
-          </div>
-        ) : (
-          <div style={styles.birthdayRow}>
-            <div style={styles.timerBox}>
-              <div style={styles.timerBig}>—</div>
-              <div style={styles.timerHint}>Nessun compleanno disponibile</div>
-            </div>
-            <div style={styles.birthdayNames}>
-              <div style={styles.playerNameMuted}>—</div>
-            </div>
-          </div>
-        )}
-      </section>
+  )}
+</section>
+
+
 
       {/* PROSSIMO IMPEGNO */}
-<section style={styles.card}>
+<section style={{ ...styles.card, ...styles.wideCard }}>
+
   {loadingMatch ? (
     <div style={styles.liveHint}>Caricamento…</div>
   ) : !match ? (
@@ -779,9 +813,10 @@ const fbPluginSrc = useMemo(() => {
             <span style={styles.livePillInline}>LIVE</span>
           )}
         </div>
-        <span style={styles.fixtureDate}>
-          {formatItalianDateTime(new Date(match.data_ora))}
-        </span>
+        <span style={{ ...styles.fixtureDate, fontWeight: "bold" }}>
+  {formatItalianDateTime(new Date(match.data_ora))}
+</span>
+
       </div>
 
       
@@ -957,7 +992,8 @@ const fbPluginSrc = useMemo(() => {
 
       {/* MAPPA CAMPO (preferisci URL già salvati) */}
 {match && (
-  <div style={{ marginTop: 12 }}>
+  <div style={{ marginTop: 12, ...styles.wideCard }}>
+
     {(() => {
       // priorità: URL mappa della squadra OSPITANTE (campo) > CASA > OSPITE
       const urlDiretto =
@@ -1084,6 +1120,43 @@ function formatItalianWeekday(d: Date) {
 function capitalizeSafe(v: string) { if (!v) return v; const s = v.toLowerCase(); return s.charAt(0).toUpperCase() + s.slice(1); }
 
 // ---------------------------
+// Sfondo dinamico compleanni
+// ---------------------------
+function getBirthdayBackground(targetDate: Date, now: Date) {
+  const diffDays = (targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+
+  // 🎂 Giorno del compleanno → immagine torta
+  if (isSameCalendarDay(now, targetDate) || diffDays <= 0.3) {
+    return {
+      backgroundImage: "url('/Images/Torta.jpeg')",
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+      backgroundRepeat: "no-repeat",
+      color: "white",
+      textShadow: "1px 1px 4px rgba(0,0,0,0.8)",
+      transition: "background 0.6s ease-in-out",
+    };
+  }
+
+  // ☀️ Nei 5 giorni precedenti → gradiente caldo
+  if (diffDays > 0.3 && diffDays <= 5) {
+    return {
+      background: "linear-gradient(135deg, #ffe8a1, #ffc271)",
+      color: "#4b2e05",
+      transition: "background 0.6s ease-in-out",
+    };
+  }
+
+  // 🎈 Altrimenti → sfondo neutro
+  return {
+    background: "rgba(255,255,255,0.9)",
+    color: "black",
+    transition: "background 0.6s ease-in-out",
+  };
+}
+
+
+// ---------------------------
 // Stili
 const styles: Record<string, React.CSSProperties> = {
   page: {
@@ -1097,16 +1170,67 @@ const styles: Record<string, React.CSSProperties> = {
 
 birthdayPlayerBox: {
   display: "flex",
+  flexDirection: "column",
   alignItems: "center",
-  gap: 8,
+  justifyContent: "center",
+  gap: 6,
   marginBottom: 8,
+  width: "100%",
 },
+
 birthdayPhoto: {
-  width: 48,
-  height: 48,
+  width: 90,
+  height: 90,
   borderRadius: "50%",
   objectFit: "cover",
-  border: "2px solid #eee",
+  border: "3px solid white",
+  boxShadow: "0 0 10px rgba(0,0,0,0.6)",
+  marginBottom: 8, // ⬅️ spazio tra foto e nome
+},
+
+birthdayTodayBox: {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  textAlign: "center",
+  width: "100%",
+  padding: "20px 0",
+},
+
+birthdayTodayText: {
+  fontSize: 32,
+  fontWeight: 800,
+  color: "white",
+  textShadow: "2px 2px 6px rgba(0,0,0,0.9)",
+  textAlign: "center",
+  marginBottom: 25, // distanzia dal logo
+  letterSpacing: 0.3,
+},
+
+
+birthdayFullBox: {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  textAlign: "center",
+  width: "100%",
+  minHeight: 220,
+  padding: "20px 10px",
+},
+
+birthdayNamesCentered: {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  width: "100%",
+},
+
+debugMarquee: {
+  outline: "3px solid red",
+  background: "rgba(255,0,0,0.1)",
 },
 
 teamsRowColumn: {
@@ -1128,6 +1252,17 @@ vsCentered: {
   opacity: 0.8,
   textAlign: "center",
 },
+wideCard: {
+  width: "99%",                // 🔹 occupa il 96% del container, lasciando un po’ di respiro ai lati
+  marginLeft: "auto",          // 🔹 centrata
+  marginRight: "auto",
+  borderRadius: 14,
+  display: "block",
+  boxSizing: "border-box",
+},
+
+
+
 
   // HERO
   header: {
@@ -1170,42 +1305,74 @@ vsCentered: {
 
    // Cards
   card: {
-    background: "rgba(255,255,255,0.8)",   // bianco semitrasparente 90%
-    border: "2px solid #e8e8e8",           // bordo più spesso
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 14,
-    boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-  },
+  background: "rgba(255,255,255,0.8)",
+  border: "2px solid #e8e8e8",
+  borderRadius: 12,
+  padding: 20,                        // ⬅️ aumentato
+  marginBottom: 14,
+  boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+  display: "flex",                    // ⬅️ centraggio contenuti
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  textAlign: "center",
+},
   cardLarge: {
     paddingTop: 18,
     paddingBottom: 18,
   },
 
   // Notizie (ingrandite)
-  newsStrip: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-    overflow: "hidden",
-  },
-  marqueeMask: {
-    position: "relative",
-    overflow: "hidden",
-    flex: 1,
-    height: 40, // più alto
-  },
-  marqueeTrack: {
-    position: "absolute",
-    whiteSpace: "nowrap",
-    willChange: "transform",
-    animation: "scrollLeft 20s linear infinite",
-    height: "40px",
-    display: "flex",
-    alignItems: "center",
-  },
-  newsItem: { marginRight: 24, fontSize: 18 }, // testo più grande
-  dot: { marginRight: 24, opacity: 0.5, fontSize: 18 },
+ // 🔹 Sezione notizie / marquee
+newsStrip: {
+  position: "relative",
+  display: "block",
+  overflow: "hidden",
+  width: "100%",
+  height: 40,
+},
+
+marqueeMask: {
+  position: "relative",
+  overflow: "hidden",
+  width: "100%",
+  height: 40,
+  background: "transparent", // ✅ sfondo trasparente
+  zIndex: 10,
+},
+
+marqueeTrack: {
+  position: "absolute",
+  top: 0,
+  left: 0,
+  display: "inline-flex",
+  alignItems: "center",
+  whiteSpace: "nowrap",
+  willChange: "transform",
+  animation: "scrollLeft 40s linear infinite", // ✅ movimento fluido
+  height: 40,
+  lineHeight: "40px",
+  color: "black", // ✅ visibile
+  fontSize: 18,
+  fontWeight: 600,
+  paddingLeft: "100%",        // ✅ parte da destra
+  width: "max-content",       // ✅ adatta al testo
+  zIndex: 20,
+},
+
+newsItem: {
+  marginRight: 32,
+  fontSize: 18,
+  color: "black",
+},
+
+dot: {
+  marginRight: 32,
+  opacity: 0.5,
+  fontSize: 18,
+  color: "black",
+},
+
 
   // Compleanni
   blockHeader: {
@@ -1235,9 +1402,36 @@ vsCentered: {
   minHeight: 40, // opzionale per centraggio verticale
 },
 
+birthdayCountdownBox: {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  textAlign: "center",
+  width: "100%",
+  minHeight: 120,      // ⬅️ centraggio verticale migliore
+  gap: 6,
+  minHeight: 200,
+},
+
+birthdayDate: {
+  fontSize: 22,
+  fontWeight: 700,
+  color: "white",
+  textShadow: "1px 1px 3px rgba(0,0,0,0.7)",
+  marginBottom: 4,     // ⬅️ piccolo distacco
+},
+
+
   timerHint: { fontSize: 14, opacity: 0.7 },
   birthdayNames: { flex: 1, minWidth: 220 },
-  playerName: { fontSize: 24, fontWeight: 700, textAlign: "center" },
+ playerName: {
+  fontSize: 26,
+  fontWeight: 800,
+  textAlign: "center",
+  color: "white",
+  textShadow: "1px 1px 3px rgba(0,0,0,0.8)",
+},
   playerNameMuted: { fontSize: 14, opacity: 0.8 },
 
   // Facebook (senza intestazione)
@@ -1400,22 +1594,35 @@ if (!styleEl) {
   s.id = "home-inline-anim";
   s.innerHTML = `
 @keyframes scrollLeft {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
 }
+
 @keyframes blink {
   0%, 100% { opacity: 1; }
-  50% { opacity: .25; }
+  50% { opacity: 0.25; }
 }
+
 .blink {
   animation: blink 1s linear infinite;
 }
 
-/* pausa marquee quando utente tiene sopra il cursore o seleziona */
-.marqueeTrack:hover { animation-play-state: paused; }
-.marqueeTrack.paused { animation-play-state: paused; }
-`;
-  document.head.appendChild(s);
-
+/* Classe base per il testo scorrevole */
+.marqueeTrack {
+  animation: scrollLeft 40s linear infinite;
+  white-space: nowrap;
+  will-change: transform;
 }
 
+/* Pausa animazione quando l'utente passa sopra o tocca */
+.marqueeTrack:hover,
+.marqueeTrack.paused {
+  animation-play-state: paused;
+}
+`;
+  document.head.appendChild(s);
+}
