@@ -1,26 +1,19 @@
-// src/main.tsx
-// Data ripristino: 22/10/2025 (rev: versione stabile pre 19/10 — SW disattivato, avvio pulito)
+// ===============================
+// 🔹 Gestione Service Worker (PWA)
+// ===============================
+import { registerSW } from 'virtual:pwa-register'
 
-import React from "react";
-import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import App from "./App";
-import "./index.css";
-
-// ===============================
-// 🔹 Mount principale
-// ===============================
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>
-);
-
-// ===============================
-// 🔹 Service Worker DISATTIVATO in locale
-// ===============================
-if ("serviceWorker" in navigator) {
-  console.log("🚫 SW disattivato in ambiente locale");
-}
+const updateSW = registerSW({
+  onNeedRefresh() {
+    // ✅ popup visibile quando c'è un nuovo deploy
+    const confirmed = window.confirm(
+      'È disponibile una nuova versione di Montecarlo2013.\nVuoi aggiornare ora?'
+    )
+    if (confirmed) {
+      updateSW(true)
+    }
+  },
+  onOfflineReady() {
+    console.log('App pronta per l\'uso offline')
+  },
+})
