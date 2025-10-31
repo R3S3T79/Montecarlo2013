@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt', // ✅ mostra popup aggiornamento quando disponibile
       includeAssets: [
         'favicon.ico',
         'apple-touch-icon.png',
@@ -24,19 +24,15 @@ export default defineConfig({
         background_color: '#ffffff',
         theme_color: '#004aad',
         icons: [
-          {
-            src: '/icon_192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: '/icon_512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          }
+          { src: '/icon_192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/icon_512x512.png', sizes: '512x512', type: 'image/png' },
+          { src: '/apple-touch-icon-180.png', sizes: '180x180', type: 'image/png' }
         ]
       },
       workbox: {
+        clientsClaim: true,
+        skipWaiting: false,
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
             urlPattern: ({ url }) =>
@@ -51,21 +47,19 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: ({ url }) =>
-              url.origin === self.location.origin,
+            urlPattern: ({ url }) => url.origin === self.location.origin,
             handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'static-resources'
-            }
+            options: { cacheName: 'static-resources' }
           }
         ]
-      }
+      },
+      devOptions: {
+        enabled: true,
+      },
     })
   ],
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
+    alias: { '@': path.resolve(__dirname, './src') },
   },
   optimizeDeps: {
     include: ['bcryptjs'],
@@ -74,11 +68,7 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
-    hmr: {
-      overlay: true
-    },
-    watch: {
-      usePolling: true
-    }
-  }
+    hmr: { overlay: true },
+    watch: { usePolling: true },
+  },
 })
