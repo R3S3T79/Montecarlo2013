@@ -1,10 +1,10 @@
 // ===============================
 // sw Montecarlo2013
 // Cache esteso + Prefetch API + Popup Update
-// Data revisione: 18/10/2025 (rev: v14 forzato clients.claim + log di conferma)
+// Data revisione: 31/10/2025 (rev: v15 - comunicazione stabile + skipWaiting automatico)
 // ===============================
 
-const CACHE_NAME = "montecarlo-cache-v3";
+const CACHE_NAME = "montecarlo-cache-v4";
 
 const STATIC_ASSETS = [
   "/",
@@ -39,8 +39,6 @@ const SUPABASE_HEADERS = {
 // ===============================
 self.addEventListener("install", (event) => {
   console.log("🆕 [SW] Install nuova versione in corso...");
-  self.skipWaiting();
-
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
@@ -60,7 +58,7 @@ self.addEventListener("install", (event) => {
 });
 
 // ===============================
-// Attivazione (forzata con claim + log esteso)
+// Attivazione (claim immediato + messaggio client)
 // ===============================
 self.addEventListener("activate", (event) => {
   console.log("✅ [SW] Activate avviato → pulizia cache + claim immediato...");
@@ -73,13 +71,13 @@ self.addEventListener("activate", (event) => {
         console.log("🧹 [SW] Vecchie cache eliminate");
 
         await self.clients.claim();
-        console.log("📣 [SW] clients.claim() completato — pagina ora controllata dal SW");
+        console.log("📣 [SW] clients.claim() completato");
 
         const clientsList = await self.clients.matchAll({ includeUncontrolled: true, type: "window" });
         console.log(`[SW] Trovati ${clientsList.length} client collegati`);
+
         for (const client of clientsList) {
-          console.log("[SW → CLIENT]", { type: "NEW_VERSION_AVAILABLE", debug: true });
-          client.postMessage({ type: "NEW_VERSION_AVAILABLE", debug: true });
+          client.postMessage({ type: "NEW_VERSION_AVAILABLE" });
         }
 
         console.log("📢 [SW] Messaggio NEW_VERSION_AVAILABLE inviato ai client attivi");
@@ -135,9 +133,8 @@ async function staleWhileRevalidate(request) {
 // Messaggi dal main thread
 // ===============================
 self.addEventListener("message", (event) => {
-  console.log("%c[SW → MAIN] Messaggio ricevuto:", "color: #00ffff", event.data);
   if (event.data?.type === "SKIP_WAITING") {
-    console.log("%c[SW] Ricevuto SKIP_WAITING → attivo subito nuovo SW", "color: #ffcc00");
+    console.log("⚡ [SW] Ricevuto SKIP_WAITING → attivo subito nuovo SW");
     self.skipWaiting();
   }
 });
