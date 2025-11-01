@@ -1,5 +1,5 @@
 // src/main.tsx
-// Data revisione: 01/11/2025 — Montecarlo2013 con banner elegante + log visivi + log console
+// Data revisione: 01/11/2025 — Montecarlo2013 con banner elegante + log visivi + refresh immediato
 
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
@@ -95,7 +95,7 @@ function ServiceWorkerManager() {
         const updateSW = registerSW({
           immediate: true,
 
-          // 🔸 quando viene trovata una nuova build
+          // 🔸 Quando viene trovata una nuova build
           onNeedRefresh() {
             const time = logSW("Nuova versione trovata → onNeedRefresh()");
             setBuildTime(time);
@@ -144,29 +144,49 @@ function ServiceWorkerManager() {
           logSW("controllerchange → nuovo SW ora controlla la pagina");
         });
 
-        // 🔁 controllo manuale ogni minuto
+        // 🔁 Controllo aggiornamenti manuale ogni 20s
         setInterval(() => {
-          logSW("Check aggiornamenti manuale...");
+          logSW("🔁 Check aggiornamenti manuale...");
           updateSW();
-        }, 60000);
+        }, 20000);
+
+        // 👀 Controlla aggiornamenti quando la scheda torna visibile
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") {
+            logSW("👀 Scheda riaperta → controllo aggiornamenti immediato");
+            navigator.serviceWorker.getRegistration().then((reg) => reg?.update());
+          }
+        });
+      });
+
+      // 📩 Ascolta messaggi diretti dal service worker
+      navigator.serviceWorker.addEventListener("message", (event) => {
+        if (event.data?.type === "NEW_VERSION_AVAILABLE") {
+          const time = logSW("⚡ Messaggio dal SW → Nuova versione disponibile");
+          setBuildTime(time);
+          setShowBanner(true);
+        }
       });
     }
   }, []);
 
+  // =======================================
+  // 🔘 Bottone "Aggiorna ora"
+  // =======================================
   const handleRefresh = () => {
     if (waitingWorker) {
-      logSW("Bottone cliccato: invio SKIP_WAITING al worker", waitingWorker);
+      logSW("🔁 Bottone cliccato → invio SKIP_WAITING al worker", waitingWorker);
       waitingWorker.postMessage({ type: "SKIP_WAITING" });
 
       waitingWorker.addEventListener("statechange", () => {
-        logSW("waitingWorker stato →", waitingWorker.state);
+        logSW("⚙️ Worker stato →", waitingWorker.state);
         if (waitingWorker.state === "activated") {
-          logSW("Nuovo SW attivato → ricarico pagina");
+          logSW("✅ Nuovo SW attivato → ricarico pagina");
           window.location.reload();
         }
       });
     } else {
-      logSW("Nessun worker in attesa → ricarico forzato");
+      logSW("⚡ Nessun worker in attesa → reload forzato (già attivo)");
       window.location.reload();
     }
   };
