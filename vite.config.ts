@@ -9,13 +9,14 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt', // mostra popup quando c'è update
-      filename: 'sw.js', // Nome fisso per il service worker
-      includeAssets: [
-        'favicon.ico',
-        'apple-touch-icon.png',
-        'icon_192x192.png',
-        'icon_512x512.png'
+  registerType: 'prompt',
+  filename: "sw.js",
+  injectRegister: "auto",
+  includeAssets: [
+    'favicon.ico',
+    'apple-touch-icon.png',
+    'icon_192x192.png',
+    'icon_512x512.png'
       ],
       manifest: {
         name: 'Montecarlo2013',
