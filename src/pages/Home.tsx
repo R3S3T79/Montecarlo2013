@@ -663,10 +663,7 @@ const fbPluginSrc = useMemo(() => {
   </div>
 </header>
 
-{(() => {
-  console.log("📰 marqueeLoop:", marqueeLoop.length, marqueeLoop.map((n) => n.testo));
-  return null;
-})()}
+
 
 
     <section style={{ ...styles.card, ...styles.cardLarge }}>

@@ -1,17 +1,31 @@
 // src/main.tsx
-// Data revisione: 01/11/2025 — aggiornamento automatico Montecarlo2013 con banner elegante
+// Data revisione: 01/11/2025 — Montecarlo2013 con banner elegante + log visivi + log console
 
 import React, { useEffect, useState } from "react";
-import type { ServiceWorker } from "typescript"; // Aggiunto per il tipo ServiceWorker
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
 
 // =======================================
-// 🔹 Banner aggiornamento con dark/light mode
+// 🔹 Helper per log con timestamp
 // =======================================
-function UpdateBanner({ onRefresh }: { onRefresh: () => void }) {
+function logSW(message: string, ...args: any[]) {
+  const time = new Date().toLocaleTimeString();
+  console.log(`[SW LOG ${time}] ${message}`, ...args);
+  return time;
+}
+
+// =======================================
+// 🔹 Banner aggiornamento con dark/light mode + log visivo
+// =======================================
+function UpdateBanner({
+  onRefresh,
+  buildTime,
+}: {
+  onRefresh: () => void;
+  buildTime: string;
+}) {
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
 
   const background = prefersDark
@@ -39,11 +53,16 @@ function UpdateBanner({ onRefresh }: { onRefresh: () => void }) {
         transition: "background 0.3s ease",
       }}
     >
-      ⚡ Aggiorna <b>Montecarlo2013</b>!
+      ⚡ Nuova versione di <b>Montecarlo2013</b> disponibile!
+      <br />
+      <span style={{ fontSize: 13, opacity: 0.8 }}>
+        Build rilevata alle: <b>{buildTime}</b>
+      </span>
+      <br />
       <button
         onClick={onRefresh}
         style={{
-          marginLeft: 12,
+          marginTop: 6,
           padding: "6px 14px",
           backgroundColor: buttonBg,
           color: buttonText,
@@ -60,73 +79,105 @@ function UpdateBanner({ onRefresh }: { onRefresh: () => void }) {
   );
 }
 
-
 // =======================================
-// 🔹 Componente che gestisce il Service Worker
+// 🔹 Gestore Service Worker con log
 // =======================================
 function ServiceWorkerManager() {
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const [showBanner, setShowBanner] = useState(false);
+  const [buildTime, setBuildTime] = useState<string>("");
 
   useEffect(() => {
-    // Importa la funzione di registrazione del service worker da vite-plugin-pwa
-    import('virtual:pwa-register').then(({ registerSW }) => {
-      registerSW({
-        immediate: true,
-        onNeedRefresh() {
-          // Quando un nuovo service worker è in attesa (installed)
-          // e pronto per l'attivazione, mostriamo il banner.
-          setShowBanner(true);
-        },
-        onOfflineReady() {
-          console.log('✅ App pronta per l\'uso offline');
-        },
-        onRegistered(registration) {
-          if (registration) {
-            console.log('✅ SW registrato:', registration.scope);
-            // Salva il worker in attesa per poterlo attivare al click
-            registration.addEventListener('updatefound', () => {
-              const newWorker = registration.installing;
-              if (newWorker) {
-                newWorker.addEventListener('statechange', () => {
-                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+    if ("serviceWorker" in navigator) {
+      import("virtual:pwa-register").then(({ registerSW }) => {
+        logSW("Inizializzazione registerSW...");
+
+        const updateSW = registerSW({
+          immediate: true,
+
+          // 🔸 quando viene trovata una nuova build
+          onNeedRefresh() {
+            const time = logSW("Nuova versione trovata → onNeedRefresh()");
+            setBuildTime(time);
+            setShowBanner(true);
+          },
+
+          onOfflineReady() {
+            logSW("App pronta per uso offline");
+          },
+
+          onRegistered(registration) {
+            if (registration) {
+              logSW("Service Worker registrato con scope:", registration.scope);
+
+              registration.addEventListener("updatefound", () => {
+                const newWorker = registration.installing;
+                if (!newWorker) return;
+                logSW("updatefound → nuovo worker in installazione:", newWorker);
+
+                newWorker.addEventListener("statechange", () => {
+                  logSW("Nuovo worker stato →", newWorker.state);
+                  if (
+                    newWorker.state === "installed" &&
+                    navigator.serviceWorker.controller
+                  ) {
+                    const time = logSW(
+                      "Nuovo worker installato e in attesa di attivazione"
+                    );
+                    setBuildTime(time);
                     setWaitingWorker(newWorker);
+                    setShowBanner(true);
                   }
                 });
-              }
-            });
-          }
-        },
-        onRegisterError(error) {
-          console.error('❌ Errore SW:', error);
-        },
+              });
+            } else {
+              logSW("⚠️ Registrazione SW non completata o non disponibile");
+            }
+          },
+
+          onRegisterError(error) {
+            logSW("❌ Errore nella registrazione SW:", error);
+          },
+        });
+
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          logSW("controllerchange → nuovo SW ora controlla la pagina");
+        });
+
+        // 🔁 controllo manuale ogni minuto
+        setInterval(() => {
+          logSW("Check aggiornamenti manuale...");
+          updateSW();
+        }, 60000);
       });
-    });
+    }
   }, []);
 
   const handleRefresh = () => {
     if (waitingWorker) {
-      // Invia il messaggio per saltare lo stato di attesa
-      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
-      // Ricarica la pagina dopo l'attivazione
-      waitingWorker.addEventListener('statechange', () => {
-        if (waitingWorker.state === 'activated') {
+      logSW("Bottone cliccato: invio SKIP_WAITING al worker", waitingWorker);
+      waitingWorker.postMessage({ type: "SKIP_WAITING" });
+
+      waitingWorker.addEventListener("statechange", () => {
+        logSW("waitingWorker stato →", waitingWorker.state);
+        if (waitingWorker.state === "activated") {
+          logSW("Nuovo SW attivato → ricarico pagina");
           window.location.reload();
         }
       });
     } else {
-      // Se non c'è un waitingWorker (caso di onNeedRefresh senza waitingWorker esplicito)
-      // si può forzare la ricarica, ma è meno pulito.
-      // In un setup standard con registerSW, onNeedRefresh implica che c'è un worker in attesa.
+      logSW("Nessun worker in attesa → ricarico forzato");
       window.location.reload();
     }
   };
 
-  return showBanner ? <UpdateBanner onRefresh={handleRefresh} /> : null;
+  return showBanner ? (
+    <UpdateBanner onRefresh={handleRefresh} buildTime={buildTime} />
+  ) : null;
 }
 
 // =======================================
-// 🔹 Montaggio principale React
+// 🔹 Mount principale React
 // =======================================
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
