@@ -9,37 +9,49 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-  registerType: 'prompt',
-  filename: "sw.js",
+  registerType: "autoUpdate",
   injectRegister: "auto",
+  filename: "sw.js",
   includeAssets: [
-    'favicon.ico',
-    'apple-touch-icon.png',
-    'icon_192x192.png',
-    'icon_512x512.png'
-      ],
-      manifest: {
-        name: 'Montecarlo2013',
-        short_name: 'Montecarlo',
-        start_url: '/',
-        display: 'standalone',
-        background_color: '#ffffff',
-        theme_color: '#004aad',
-        icons: [
-          { src: '/icon_192x192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icon_512x512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/apple-touch-icon-180.png', sizes: '180x180', type: 'image/png' },
-        ],
+    "favicon.ico",
+    "apple-touch-icon.png",
+    "icon_192x192.png",
+    "icon_512x512.png"
+  ],
+  manifest: {
+    name: "Montecarlo2013",
+    short_name: "Montecarlo",
+    start_url: "/",
+    display: "standalone",
+    background_color: "#ffffff",
+    theme_color: "#004aad",
+    icons: [
+      { src: "/icon_192x192.png", sizes: "192x192", type: "image/png" },
+      { src: "/icon_512x512.png", sizes: "512x512", type: "image/png" }
+    ]
+  },
+  workbox: {
+    clientsClaim: true,
+    skipWaiting: true,
+    runtimeCaching: [
+      {
+        urlPattern: ({ url }) =>
+          url.origin === self.location.origin && url.pathname.endsWith(".png"),
+        handler: "CacheFirst",
+        options: {
+          cacheName: "images-cache",
+          expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 30 }
+        }
       },
-      workbox: {
-        clientsClaim: true,
-        skipWaiting: false,
-        cleanupOutdatedCaches: true,
-      },
-      devOptions: {
-        enabled: true,
-      },
-    }),
+      {
+        urlPattern: ({ url }) => url.origin === self.location.origin,
+        handler: "StaleWhileRevalidate",
+        options: { cacheName: "static-resources" }
+      }
+    ]
+  }
+});
+
   ],
   resolve: {
     alias: {
