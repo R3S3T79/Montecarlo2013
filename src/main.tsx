@@ -1,52 +1,46 @@
 // src/main.tsx
-// Data revisione: 31/10/2025 — versione con controllo automatico aggiornamenti PWA (popup + polling)
+// Data: 31/10/2025 — aggiornamento automatico Montecarlo2013
 
-// ============================================
-// 🔹 Import principali
-// ============================================
-import React from "react";
+import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
 
-// ============================================
-// 🔹 Montaggio principale React
-// ============================================
+function UpdatePopup() {
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("message", (event) => {
+        if (event.data?.type === "NEW_VERSION_AVAILABLE") {
+          const confirmed = window.confirm(
+            "⚡ È disponibile una nuova versione di Montecarlo2013.\nVuoi aggiornare ora?"
+          );
+          if (confirmed && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({ type: "SKIP_WAITING" });
+            window.location.reload();
+          }
+        }
+      });
+    }
+  }, []);
+  return null;
+}
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <BrowserRouter>
       <App />
+      <UpdatePopup />
     </BrowserRouter>
   </React.StrictMode>
 );
 
-// ============================================
-// 🔹 Gestione Service Worker (vite-plugin-pwa)
-// ============================================
-import { registerSW } from "virtual:pwa-register";
-
-// intervallo di controllo aggiornamenti (in ms)
-const intervalMS = 60 * 1000; // ogni 60 secondi
-
-const updateSW = registerSW({
-  // ⚡ quando viene trovata una nuova versione
-  onNeedRefresh() {
-    const confirmed = window.confirm(
-      "È disponibile una nuova versione di Montecarlo2013.\nVuoi aggiornare ora?"
-    );
-    if (confirmed) updateSW(true);
-  },
-
-  // 📦 quando l'app è pronta per l'uso offline
-  onOfflineReady() {
-    console.log("✅ App pronta per uso offline");
-  },
-});
-
-// 🔁 forza controllo aggiornamenti anche se l'app resta aperta
-setInterval(() => {
-  updateSW();
-}, intervalMS);
-
-console.log("🔄 Controllo aggiornamenti PWA attivo ogni", intervalMS / 1000, "secondi");
+// Registrazione SW personalizzato
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register(`/sw-${Date.now()}.js`)
+      .then((reg) => console.log("✅ SW registrato:", reg.scope))
+      .catch((err) => console.error("❌ Errore SW:", err));
+  });
+}
