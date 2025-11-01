@@ -1,8 +1,2 @@
 /sw.js
   Cache-Control: no-cache, no-store, must-revalidate
-
-/sw-*
-  Cache-Control: no-cache, no-store, must-revalidate
-
-/service-worker.js
-  Cache-Control: no-cache, no-store, must-revalidate

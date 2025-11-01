@@ -2,6 +2,7 @@
 // Data revisione: 01/11/2025 — aggiornamento automatico Montecarlo2013 con banner elegante
 
 import React, { useEffect, useState } from "react";
+import type { ServiceWorker } from "typescript"; // Aggiunto per il tipo ServiceWorker
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
@@ -68,47 +69,56 @@ function ServiceWorkerManager() {
   const [showBanner, setShowBanner] = useState(false);
 
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker
-          .register(`/sw-${Date.now()}.js`)
-          .then((registration) => {
-            console.log("✅ SW registrato:", registration.scope);
-
-            // se c'è già un worker in attesa → mostra banner
-            if (registration.waiting) {
-              setWaitingWorker(registration.waiting);
-              setShowBanner(true);
-            }
-
-            // quando arriva un nuovo worker
-            registration.addEventListener("updatefound", () => {
+    // Importa la funzione di registrazione del service worker da vite-plugin-pwa
+    import('virtual:pwa-register').then(({ registerSW }) => {
+      registerSW({
+        immediate: true,
+        onNeedRefresh() {
+          // Quando un nuovo service worker è in attesa (installed)
+          // e pronto per l'attivazione, mostriamo il banner.
+          setShowBanner(true);
+        },
+        onOfflineReady() {
+          console.log('✅ App pronta per l\'uso offline');
+        },
+        onRegistered(registration) {
+          if (registration) {
+            console.log('✅ SW registrato:', registration.scope);
+            // Salva il worker in attesa per poterlo attivare al click
+            registration.addEventListener('updatefound', () => {
               const newWorker = registration.installing;
-              if (!newWorker) return;
-              newWorker.addEventListener("statechange", () => {
-                if (
-                  newWorker.state === "installed" &&
-                  navigator.serviceWorker.controller
-                ) {
-                  setWaitingWorker(newWorker);
-                  setShowBanner(true);
-                }
-              });
+              if (newWorker) {
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    setWaitingWorker(newWorker);
+                  }
+                });
+              }
             });
-          })
-          .catch((err) => console.error("❌ Errore SW:", err));
+          }
+        },
+        onRegisterError(error) {
+          console.error('❌ Errore SW:', error);
+        },
       });
-    }
+    });
   }, []);
 
   const handleRefresh = () => {
     if (waitingWorker) {
-      waitingWorker.postMessage({ type: "SKIP_WAITING" });
-      waitingWorker.addEventListener("statechange", () => {
-        if (waitingWorker.state === "activated") {
+      // Invia il messaggio per saltare lo stato di attesa
+      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+      // Ricarica la pagina dopo l'attivazione
+      waitingWorker.addEventListener('statechange', () => {
+        if (waitingWorker.state === 'activated') {
           window.location.reload();
         }
       });
+    } else {
+      // Se non c'è un waitingWorker (caso di onNeedRefresh senza waitingWorker esplicito)
+      // si può forzare la ricarica, ma è meno pulito.
+      // In un setup standard con registerSW, onNeedRefresh implica che c'è un worker in attesa.
+      window.location.reload();
     }
   };
 
