@@ -10,7 +10,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'prompt', // mostra popup quando c'è update
-      filename: `sw-${Date.now()}.js`, // 👈 cambia nome a ogni build
+      filename: 'sw.js', // Nome fisso per il service worker
       includeAssets: [
         'favicon.ico',
         'apple-touch-icon.png',

@@ -23,7 +23,6 @@ self.addEventListener('activate', e => {
     caches.keys().then(keys => Promise.all(keys.map(k => k !== CACHE_NAME && caches.delete(k))))
   );
   self.clients.claim();
-  notifyClients();
 });
 
 self.addEventListener('fetch', e => {
@@ -39,9 +38,4 @@ self.addEventListener('message', e => {
   }
 });
 
-async function notifyClients() {
-  const list = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  for (const client of list) {
-    client.postMessage({ type: 'NEW_VERSION_AVAILABLE' });
-  }
-}
+
