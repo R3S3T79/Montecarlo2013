@@ -125,16 +125,44 @@ export default function DettaglioPrePartita(): JSX.Element {
     year: '2-digit',
   });
 
-  // ======== CALCOLO STATISTICHE =========
-  const totale = precedenti.length;
-  const vittorie = precedenti.filter(p => p.esito === 'Vittoria').length;
-  const sconfitte = precedenti.filter(p => p.esito === 'Sconfitta').length;
-  const pareggi = precedenti.filter(p => p.esito === 'Pareggio').length;
+ // ======== CALCOLO STATISTICHE =========
 
-  const goalFatti = precedenti.reduce((acc, p) => acc + (p.goal_montecarlo_tot || 0), 0);
-  const goalSubiti = precedenti.reduce((acc, p) => acc + (p.goal_avversaria_tot || 0), 0);
+// individua il nome "nostra squadra" (es. Montecarlo o Montecarlo B)
+const nomeMontecarlo =
+  partita.squadra_casa_id.nome.includes("Montecarlo")
+    ? partita.squadra_casa_id.nome
+    : partita.squadra_ospite_id.nome;
 
-  const perc = (n: number) => (totale > 0 ? (n / totale) * 100 : 0);
+// inizializza contatori
+let vittorie = 0;
+let sconfitte = 0;
+let pareggi = 0;
+let goalFatti = 0;
+let goalSubiti = 0;
+
+precedenti.forEach(p => {
+  // identifica se Montecarlo era in casa o trasferta
+  const isMontecarloCasa = p.squadra_casa === nomeMontecarlo;
+
+  const goalMC = isMontecarloCasa
+    ? p.goal_montecarlo_tot ?? 0
+    : p.goal_avversaria_tot ?? 0;
+
+  const goalAvv = isMontecarloCasa
+    ? p.goal_avversaria_tot ?? 0
+    : p.goal_montecarlo_tot ?? 0;
+
+  goalFatti += goalMC;
+  goalSubiti += goalAvv;
+
+  if (goalMC > goalAvv) vittorie++;
+  else if (goalMC < goalAvv) sconfitte++;
+  else pareggi++;
+});
+
+const totale = vittorie + sconfitte + pareggi;
+const perc = (n: number) => (totale > 0 ? (n / totale) * 100 : 0);
+
 
   return (
     <div className="min-h-screen pt-2 px-2 pb-6">
