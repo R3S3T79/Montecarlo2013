@@ -34,26 +34,34 @@ export const handler: Handler = async () => {
             const url = `${BASE_URL}?squadra=${nomeSquadra}&camp=${CAMP_ID}&nome=${nomeSquadra}`;
       console.log(`📥 Scarico ${url}`);
 
-      let html: string;
-      try {
-        const res = await fetch(url, {
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml",
-          },
-        });
+      let html: string | null = null;
 
-        if (!res.ok) {
-          console.warn(`⚠️ Errore fetch per ${s.squadra}: ${res.status}`);
-          continue;
-        }
+try {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36",
+      Accept: "text/html,application/xhtml+xml",
+    },
+  });
 
-        html = await res.text();
-      } catch (e) {
-        console.warn(`⚠️ Fetch fallita per ${s.squadra}:`, e);
-        continue;
-      }
+  if (!response.ok) {
+    console.warn(`⚠️ Errore fetch per ${s.squadra}: ${response.status}`);
+    continue;
+  }
+
+  html = await response.text();
+  console.log(`✅ Pagina scaricata correttamente per ${s.squadra}`);
+} catch (e) {
+  console.warn(`⚠️ Fetch fallita per ${s.squadra}:`, e);
+  continue;
+}
+
+if (!html) {
+  console.warn(`⚠️ Nessun HTML per ${s.squadra}`);
+  continue;
+}
+
 
 
       html = await res.text();
