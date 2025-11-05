@@ -56,7 +56,7 @@ export const handler: Handler = async () => {
       }
 
 
-      const html = await res.text();
+      html = await res.text();
       const $ = cheerio.load(html);
 
       // Ogni riga partita ha 5 <td> (giornata/data, casa, ospite, risultato)
