@@ -1,11 +1,11 @@
 // src/pages/Classifica.tsx
-// Data: 05/11/2025 — versione ibrida: aggiorna classifica anche in locale senza Netlify
+// Data: 05/11/2025 — versione aggiornata con stile uniforme alla pagina Risultati
 
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext";
 import { UserRole } from "../lib/roles";
-import * as cheerio from "cheerio"; // ✅ assicurati che sia installato: npm install cheerio
+import * as cheerio from "cheerio";
 import { useNavigate } from "react-router-dom";
 
 interface RigaClassifica {
@@ -30,8 +30,7 @@ export default function Classifica(): JSX.Element {
   const [role, setRole] = useState<UserRole>(UserRole.Authenticated);
   const navigate = useNavigate();
 
-
-  // ✅ Recupera ruolo utente per mostrare pulsante solo ad admin/creator
+  // ✅ Recupera ruolo utente
   useEffect(() => {
     const fetchRole = async () => {
       if (!user?.id) return;
@@ -49,7 +48,7 @@ export default function Classifica(): JSX.Element {
     fetchRole();
   }, [user?.id]);
 
-  // ✅ Carica classifica da Supabase
+  // ✅ Carica classifica
   const caricaClassifica = async () => {
     try {
       setLoading(true);
@@ -59,7 +58,13 @@ export default function Classifica(): JSX.Element {
         .order("punti", { ascending: false })
         .order("differenza_reti", { ascending: false });
       if (error) throw error;
-      setRighe(data || []);
+
+      // 🔹 aggiorna posizione reale
+      const dataConPosizione = (data || []).map((r, i) => ({
+        ...r,
+        posizione: i + 1,
+      }));
+      setRighe(dataConPosizione);
     } catch (err: any) {
       setErrore(err.message);
     } finally {
@@ -71,16 +76,14 @@ export default function Classifica(): JSX.Element {
     caricaClassifica();
   }, []);
 
-  // ✅ Aggiorna la classifica — ibrido (locale o Netlify)
+  // ✅ Aggiorna la classifica (solo creator)
   const aggiornaClassifica = async () => {
     try {
       setLoading(true);
-
       const isLocal = window.location.hostname === "localhost";
       if (isLocal) {
         console.log("🔹 Modalità locale: aggiornamento diretto da Campionando.it");
 
-        // Scarica HTML direttamente
         const res = await fetch("https://campionando.it/classi.php?camp=6158");
         const html = await res.text();
         const $ = cheerio.load(html);
@@ -118,7 +121,6 @@ export default function Classifica(): JSX.Element {
 
         if (rows.length === 0) throw new Error("Nessuna riga trovata su Campionando.it");
 
-        // Svuota tabella e inserisci nuovi dati
         await supabase.from("classifica").delete().neq("id", "00000000-0000-0000-0000-000000000000");
         const { error } = await supabase.from("classifica").insert(rows);
         if (error) throw error;
@@ -141,70 +143,84 @@ export default function Classifica(): JSX.Element {
     }
   };
 
-  if (loading) {
+  if (loading)
     return (
-      <div style={{ textAlign: "center", marginTop: 40 }}>⏳ Caricamento classifica...</div>
+      <div className="text-center mt-10 text-white font-semibold text-lg">
+        ⏳ Caricamento classifica...
+      </div>
     );
-  }
 
-  if (errore) {
+  if (errore)
     return (
-      <div style={{ color: "red", textAlign: "center", marginTop: 40 }}>
+      <div className="text-center mt-10 text-red-600 font-semibold">
         Errore nel caricamento: {errore}
       </div>
     );
-  }
 
   return (
-    <div style={stili.container}>
-      <h2 style={stili.titolo}>🏆 Classifica Campionato</h2>
+    <div className="container mx-auto px-2">
+      {/* Titolo */}
+      <h2 className="text-center text-white font-bold text-2xl mb-4 drop-shadow-md">
+        🏆 Classifica Campionato
+      </h2>
 
-      {(role === UserRole.Admin || role === UserRole.Creator) && (
-        <div style={{ textAlign: "center", marginBottom: 16 }}>
-          <button onClick={aggiornaClassifica} style={stili.bottone}>
+      {/* Pulsante visibile solo al Creator */}
+      {role === UserRole.Creator && (
+        <div className="text-center mb-4">
+          <button
+            onClick={aggiornaClassifica}
+            className="bg-[#7d7e7b] hover:bg-[#696a67] text-white font-semibold px-4 py-2 rounded-md transition-all shadow-montecarlo"
+          >
             🔄 Aggiorna classifica ora
           </button>
         </div>
       )}
 
-      <div style={{ overflowX: "auto" }}>
-        <table style={stili.tabella}>
-          <thead>
-            <tr style={stili.intestazione}>
-              <th>#</th>
-              <th>Squadra</th>
-              <th>P</th>
-              <th>G</th>
-              <th>V</th>
-              <th>N</th>
-              <th>P</th>
-              <th>GF</th>
-              <th>GS</th>
-              <th>D</th>
+      {/* Tabella contenitore */}
+      <div className="bg-white/90 rounded-lg shadow-montecarlo border-l-4 border-montecarlo-secondary overflow-hidden">
+        <table className="w-full border-collapse text-[15px]">
+          <thead className="bg-[#f10909] text-white font-semibold">
+            <tr>
+              <th className="py-2 text-center w-8">#</th>
+              <th className="py-2 text-left px-3">Squadra</th>
+              <th className="py-2 text-center w-8">P</th>
+              <th className="py-2 text-center w-8">G</th>
+              <th className="py-2 text-center w-8">V</th>
+              <th className="py-2 text-center w-8">N</th>
+              <th className="py-2 text-center w-8">P</th>
+              <th className="py-2 text-center w-10">GF</th>
+              <th className="py-2 text-center w-10">GS</th>
+              <th className="py-2 text-center w-10">D</th>
             </tr>
           </thead>
+
           <tbody>
-            {righe.map((r, i) => (
-              <tr key={r.id || i} style={i % 2 === 0 ? stili.rigaChiara : stili.rigaScura}>
-                <td>{r.posizione}</td>
-                <td style={stili.squadra}>
-  <span
-    onClick={() => navigate(`/scontri/${encodeURIComponent(r.squadra)}`)}
-    style={{
-      cursor: "pointer",
-      color: r.squadra.toLowerCase().includes("montecarlo")
-        ? "#d00000"
-        : "#004aad",
-      fontWeight: r.squadra.toLowerCase().includes("montecarlo") ? 700 : 600,
-      textDecoration: "underline",
-    }}
-  >
-    {r.squadra}
-  </span>
-</td>
+  {righe.map((r, i) => (
+    <tr
+      key={r.id || i}
+      className={`text-center transition-colors ${
+        i % 2 === 0
+          ? "bg-white/95"   // 🔹 più chiara
+          : "bg-[#fce5e5]/90" // 🔹 rosa chiaro Montecarlo
+      }`}
+    >
 
-
-                <td style={{ fontWeight: 700 }}>{r.punti}</td>
+                <td className="py-2">{r.posizione}</td>
+                <td className="text-left px-3 font-semibold">
+                  <span
+                    onClick={() =>
+                      navigate(`/scontri/${encodeURIComponent(r.squadra)}`)
+                    }
+                    className={`cursor-pointer underline ${
+                      r.squadra.toLowerCase().includes("montecarlo")
+                        ? "text-[#e63946] font-bold"
+                        : "text-black"
+                    }`}
+                  >
+                    {r.squadra}
+                  </span>
+                </td>
+                <td className="font-bold">{r.punti}</td>
                 <td>{r.partite_giocate}</td>
                 <td>{r.vinte}</td>
                 <td>{r.pareggiate}</td>
@@ -212,10 +228,13 @@ export default function Classifica(): JSX.Element {
                 <td>{r.goal_fatti}</td>
                 <td>{r.goal_subiti}</td>
                 <td
-                  style={{
-                    color: r.differenza_reti > 0 ? "green" : r.differenza_reti < 0 ? "red" : "gray",
-                    fontWeight: 600,
-                  }}
+                  className={`font-semibold ${
+                    r.differenza_reti > 0
+                      ? "text-green-600"
+                      : r.differenza_reti < 0
+                      ? "text-red-600"
+                      : "text-gray-600"
+                  }`}
                 >
                   {r.differenza_reti}
                 </td>
@@ -225,60 +244,9 @@ export default function Classifica(): JSX.Element {
         </table>
       </div>
 
-      <p style={stili.footer}>
+      <p className="text-center text-white text-sm opacity-80 mt-3">
         Ultimo aggiornamento automatico ogni sera alle 21:00.
       </p>
     </div>
   );
 }
-
-const stili: Record<string, React.CSSProperties> = {
-  container: {
-    padding: "20px",
-    maxWidth: 800,
-    margin: "0 auto",
-  },
-  titolo: {
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  bottone: {
-    background: "#004aad",
-    color: "white",
-    border: "none",
-    padding: "8px 14px",
-    borderRadius: 6,
-    cursor: "pointer",
-    fontWeight: 600,
-  },
-  tabella: {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: 15,
-  },
-  intestazione: {
-    background: "#004aad",
-    color: "white",
-    textAlign: "center",
-  },
-  squadra: {
-    textAlign: "left",
-    fontWeight: 600,
-  },
-  rigaChiara: {
-    background: "#f8f8f8",
-    textAlign: "center",
-    height: 36,
-  },
-  rigaScura: {
-    background: "#ffffff",
-    textAlign: "center",
-    height: 36,
-  },
-  footer: {
-    textAlign: "center",
-    fontSize: 13,
-    opacity: 0.7,
-    marginTop: 12,
-  },
-};
