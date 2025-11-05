@@ -22,3 +22,8 @@ envFiles = [".env"]
   from = "/*"
   to = "/index.html"
   status = 200
+
+ [[scheduled]]
+  name = "update-classifica"
+  cron = "0 21 * * *"
+  path = "/.netlify/functions/update-classifica"

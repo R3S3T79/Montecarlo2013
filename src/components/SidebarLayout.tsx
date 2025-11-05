@@ -182,6 +182,7 @@ const canCreator = role === UserRole.Creator;
   const group1 = [
     { to: '/', label: 'Home' },
     { to: '/risultati', label: 'Risultati' },
+    { to: '/classifica', label: 'Classifica' },
     { to: '/calendario', label: 'Calendario' },
     { to: '/prossima-partita', label: 'Prossima Partita' },
   ];

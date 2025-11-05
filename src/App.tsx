@@ -34,6 +34,8 @@ import EditPartitaPage from "./pages/EditPartitaPage";
 import DettaglioPartita from "./pages/DettaglioPartita";
 import EditPartitaGiocata from "./pages/EditPartitaGiocata";
 import Galleria from "./pages/Galleria";
+import Classifica from "./pages/Classifica";
+import DettaglioScontri from "./pages/DettaglioScontri";
 // statistiche
 import StatisticheSquadra from "./pages/StatisticheSquadra";
 import StatisticheGiocatori from "./pages/StatisticheGiocatori";
@@ -130,13 +132,32 @@ export default function App() {
 
 
           {/* Calendario e partite */}
-          <Route path="/calendario" element={<Calendario />} />
-          <Route path="/risultati" element={<Risultati />} />
-          <Route path="/nuova-partita" element={<NuovaPartitaPage />} />
-          <Route path="/partita/:id" element={<DettaglioPartita />} />
-          <Route path="/partita/:id/edit" element={<EditPartitaPage />} />
-          <Route path="/pre-partita/:id" element={<DettaglioPrePartita />} />
-          <Route path="/modifica-partita-giocata/:id" element={<EditPartitaGiocata />} />
+<Route path="/calendario" element={<Calendario />} />
+<Route path="/risultati" element={<Risultati />} />
+<Route path="/nuova-partita" element={<NuovaPartitaPage />} />
+<Route path="/partita/:id" element={<DettaglioPartita />} />
+<Route path="/partita/:id/edit" element={<EditPartitaPage />} />
+<Route path="/pre-partita/:id" element={<DettaglioPrePartita />} />
+<Route path="/modifica-partita-giocata/:id" element={<EditPartitaGiocata />} />
+
+<Route
+  path="/classifica"
+  element={
+    <ProtectedRoute>
+      <Classifica />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/scontri/:nome"
+  element={
+    <ProtectedRoute>
+      <DettaglioScontri />
+    </ProtectedRoute>
+  }
+/>
+
 
           {/* Rose e giocatori */}
           <Route path="/rosa" element={<RosaGiocatori />} />
