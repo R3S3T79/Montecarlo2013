@@ -49,50 +49,51 @@ export const handler: Handler = async () => {
       }
 
       const $ = cheerio.load(html || "");
-      const rows = $("table tr");
-      let conteggio = 0;
+ // Parsing robusto basato su HTML reale Campionando
+const rows = $("table tr");
+let conteggio = 0;
 
-      rows.each((i, el) => {
-        const cols = $(el).find("td");
-        if (cols.length < 4) return;
+rows.each((i, el) => {
+  const cols = $(el).find("td");
+  if (cols.length < 4) return; // serve giornata + 3 colonne
 
-        // testo pulito
-        const giornataTxt = pulisci($(cols[0]).text());
-        const casaTxt = pulisci($(cols[1]).text());
-        const risultatoTxt = pulisci($(cols[2]).text());
-        const ospiteTxt = pulisci($(cols[3]).text());
+  const giornataTxt = pulisci($(cols[0]).text());
+  if (!giornataTxt.includes("Giornata")) return;
 
-        // validazione
-        if (!giornataTxt.includes("Giornata")) return;
-        if (!casaTxt || !ospiteTxt) return;
+  const dataTxt = giornataTxt.match(/\d{2}\/\d{2}\/\d{4}/)?.[0] || null;
+  const giornataNum = estraiNumeroGiornata(giornataTxt);
 
-        const dataTxt = giornataTxt.match(/\d{2}\/\d{2}\/\d{4}/)?.[0] || null;
-        const giornataNum = estraiNumeroGiornata(giornataTxt);
+  // Squadra casa e ospite: prendi sempre il testo dopo le immagini
+  const casaTxt = pulisci($(cols[1]).text());
+  const ospiteTxt = pulisci($(cols[2]).text());
 
-        let goalCasa: number | null = null;
-        let goalOspite: number | null = null;
+  // Risultato: in ultima colonna
+  const risultatoTxt = pulisci($(cols[3]).text());
+  let goalCasa: number | null = null;
+  let goalOspite: number | null = null;
 
-        if (risultatoTxt.includes("-")) {
-          const [a, b] = risultatoTxt.split("-").map((x) => x.trim());
-          goalCasa = parseInt(a) || null;
-          goalOspite = parseInt(b) || null;
-        }
+  if (risultatoTxt.includes("-")) {
+    const [a, b] = risultatoTxt.split("-").map((x) => parseInt(x.trim()));
+    goalCasa = isNaN(a) ? null : a;
+    goalOspite = isNaN(b) ? null : b;
+  }
 
-        // salva solo se almeno la data esiste
-        if (dataTxt && casaTxt && ospiteTxt) {
-          tuttePartite.push({
-            giornata: giornataNum,
-            data_match: parseData(dataTxt),
-            squadra_casa: casaTxt,
-            squadra_ospite: ospiteTxt,
-            goal_casa: goalCasa,
-            goal_ospite: goalOspite,
-          });
-          conteggio++;
-        }
-      });
+  if (!casaTxt || !ospiteTxt) return; // skip righe vuote
 
-      console.log(`✅ ${conteggio} partite estratte per ${s.squadra}`);
+  tuttePartite.push({
+    giornata: giornataNum,
+    data_match: parseData(dataTxt),
+    squadra_casa: casaTxt,
+    squadra_ospite: ospiteTxt,
+    goal_casa: goalCasa,
+    goal_ospite: goalOspite,
+  });
+  conteggio++;
+});
+
+console.log(`✅ ${conteggio} partite estratte per ${s.squadra}`);
+
+
       await new Promise((r) => setTimeout(r, 1000));
     }
 
