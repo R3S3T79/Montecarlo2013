@@ -1,5 +1,5 @@
 // netlify/functions/update-partite-classifica.ts
-// Data: 05/11/2025 — Versione completa con parsing cheerio e salvataggio Supabase
+// Data: 05/11/2025 — Parsing corretto struttura Campionando + pulizia testo
 
 import { Handler } from "@netlify/functions";
 import * as cheerio from "cheerio";
@@ -15,27 +15,24 @@ const BASE_URL = "https://campionando.it/ruolino.php";
 
 export const handler: Handler = async () => {
   try {
-    // 1️⃣ Leggi le squadre
     const { data: squadre, error: errSquadre } = await supabase
       .from("classifica")
       .select("squadra");
 
     if (errSquadre || !squadre?.length)
-      throw new Error("Impossibile leggere le squadre dalla tabella classifica.");
+      throw new Error("Impossibile leggere la lista squadre dalla classifica.");
 
-    console.log(`🔹 Trovate ${squadre.length} squadre in classifica.`);
+    console.log(`🔹 ${squadre.length} squadre trovate.`);
 
     const tuttePartite: any[] = [];
 
-    // 2️⃣ Cicla le squadre
     for (const s of squadre) {
       const nomeSquadra = encodeURIComponent(s.squadra);
       const url = `${BASE_URL}?squadra=${nomeSquadra}&camp=${CAMP_ID}&nome=${nomeSquadra}`;
-      console.log(`\n📡 Fetch per squadra: ${s.squadra}`);
-      console.log(`➡️  URL: ${url}`);
+
+      console.log(`\n📡 ${s.squadra} → ${url}`);
 
       let html: string | null = null;
-
       try {
         const response = await fetch(url, {
           headers: {
@@ -44,33 +41,30 @@ export const handler: Handler = async () => {
             Accept: "text/html,application/xhtml+xml",
           },
         });
-
-        if (!response.ok) {
-          console.warn(`⚠️ Errore fetch ${response.status}`);
-          continue;
-        }
-
+        if (!response.ok) continue;
         html = await response.text();
-      } catch (error: any) {
-        console.error(`❌ Errore rete per ${s.squadra}:`, error.message);
+      } catch (e: any) {
+        console.error(`❌ Errore fetch ${s.squadra}:`, e.message);
         continue;
       }
 
-      if (!html) continue;
-
-      // 3️⃣ Parsing HTML con cheerio
-      const $ = cheerio.load(html);
-      const rows = $("tr");
-      let countPartite = 0;
+      const $ = cheerio.load(html || "");
+      const rows = $("table tr");
+      let conteggio = 0;
 
       rows.each((i, el) => {
         const cols = $(el).find("td");
         if (cols.length < 4) return;
 
-        const giornataTxt = $(cols[0]).text().trim();
-        const casa = $(cols[1]).text().trim();
-        const risultatoTxt = $(cols[2]).text().trim();
-        const ospite = $(cols[3]).text().trim();
+        // testo pulito
+        const giornataTxt = pulisci($(cols[0]).text());
+        const casaTxt = pulisci($(cols[1]).text());
+        const risultatoTxt = pulisci($(cols[2]).text());
+        const ospiteTxt = pulisci($(cols[3]).text());
+
+        // validazione
+        if (!giornataTxt.includes("Giornata")) return;
+        if (!casaTxt || !ospiteTxt) return;
 
         const dataTxt = giornataTxt.match(/\d{2}\/\d{2}\/\d{4}/)?.[0] || null;
         const giornataNum = estraiNumeroGiornata(giornataTxt);
@@ -84,56 +78,52 @@ export const handler: Handler = async () => {
           goalOspite = parseInt(b) || null;
         }
 
-        if (casa && ospite) {
+        // salva solo se almeno la data esiste
+        if (dataTxt && casaTxt && ospiteTxt) {
           tuttePartite.push({
+            giornata: giornataNum,
             data_match: parseData(dataTxt),
-            squadra_casa: casa,
-            squadra_ospite: ospite,
+            squadra_casa: casaTxt,
+            squadra_ospite: ospiteTxt,
             goal_casa: goalCasa,
             goal_ospite: goalOspite,
-            giornata: giornataNum,
           });
-          countPartite++;
+          conteggio++;
         }
       });
 
-      console.log(`✅ Estratte ${countPartite} partite da ${s.squadra}`);
+      console.log(`✅ ${conteggio} partite estratte per ${s.squadra}`);
       await new Promise((r) => setTimeout(r, 1000));
     }
 
     if (tuttePartite.length === 0)
-      throw new Error("Nessuna partita trovata nei ruolini squadra.");
+      throw new Error("Nessuna partita trovata nei ruolini.");
 
-    // 4️⃣ Cancella vecchi dati e inserisci nuovi
     await supabase.from("classifica_partite").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    const { error: insErr } = await supabase.from("classifica_partite").insert(tuttePartite);
+    if (insErr) throw insErr;
 
-    const { error: insertErr } = await supabase.from("classifica_partite").insert(tuttePartite);
-    if (insertErr) throw insertErr;
-
-    console.log(`✅ Inserite ${tuttePartite.length} partite totali`);
+    console.log(`✅ Inserite ${tuttePartite.length} partite totali.`);
     return {
       statusCode: 200,
-      body: JSON.stringify({
-        message: "Partite aggiornate correttamente",
-        totale: tuttePartite.length,
-      }),
+      body: JSON.stringify({ message: "Partite aggiornate", totale: tuttePartite.length }),
     };
   } catch (err: any) {
     console.error("❌ Errore update-partite-classifica:", err);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: err.message }),
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
 
-// 🔧 Helper per estrarre numero giornata
+// 🔧 pulizia testo
+function pulisci(txt: string): string {
+  return txt.replace(/\s+/g, " ").replace(/\n/g, "").trim();
+}
+
 function estraiNumeroGiornata(testo: string): number | null {
   const m = testo.match(/Giornata\s+(\d+)/i);
   return m ? parseInt(m[1]) : null;
 }
 
-// 🔧 Helper per formattare date tipo 12/10/2025
 function parseData(txt: string | null): string | null {
   if (!txt) return null;
   const m = txt.match(/(\d{2})\/(\d{2})\/(\d{4})/);
