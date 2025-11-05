@@ -1,8 +1,7 @@
 // netlify/functions/update-partite-classifica.ts
-// Data: 05/11/2025 — Legge i ruolini squadra da Campionando.it (struttura tabella standard)
+// Data: 05/11/2025 — Test fetch ruolini da Campionando.it (senza parsing, solo log)
 
 import { Handler } from "@netlify/functions";
-import * as cheerio from "cheerio";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -26,111 +25,61 @@ export const handler: Handler = async () => {
 
     console.log(`🔹 Trovate ${squadre.length} squadre in classifica.`);
 
-    const tuttePartite: any[] = [];
-
-    // 2️⃣ Cicla le squadre
+    // 2️⃣ Cicla le squadre per scaricare la pagina ruolino
     for (const s of squadre) {
-      const nomeSquadra = encodeURIComponent(s.squadra.trim());
-            const url = `${BASE_URL}?squadra=${nomeSquadra}&camp=${CAMP_ID}&nome=${nomeSquadra}`;
-      console.log(`📥 Scarico ${url}`);
+      const nomeSquadra = encodeURIComponent(s.squadra);
+      const url = `${BASE_URL}?squadra=${nomeSquadra}&camp=${CAMP_ID}&nome=${nomeSquadra}`;
+
+      console.log(`\n📡 Inizio fetch per squadra: ${s.squadra}`);
+      console.log(`➡️  URL: ${url}`);
 
       let html: string | null = null;
 
-try {
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36",
-      Accept: "text/html,application/xhtml+xml",
-    },
-  });
+      try {
+        const response = await fetch(url, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36",
+            Accept: "text/html,application/xhtml+xml",
+          },
+        });
 
-  if (!response.ok) {
-    console.warn(`⚠️ Errore fetch per ${s.squadra}: ${response.status}`);
-    continue;
-  }
+        console.log(`🔁 Risposta HTTP: ${response.status} (${response.statusText})`);
 
-  html = await response.text();
-  console.log(`✅ Pagina scaricata correttamente per ${s.squadra}`);
-} catch (e) {
-  console.warn(`⚠️ Fetch fallita per ${s.squadra}:`, e);
-  continue;
-}
-
-if (!html) {
-  console.warn(`⚠️ Nessun HTML per ${s.squadra}`);
-  continue;
-}
-
-
-
-      html = await res.text();
-      const $ = cheerio.load(html);
-
-      // Ogni riga partita ha 5 <td> (giornata/data, casa, ospite, risultato)
-      $("table tr").each((i, el) => {
-        const cols = $(el).find("td");
-        if (cols.length === 0) return;
-
-        // Riga giornata (es. "Giornata 1 - 12/10/2025")
-        if (cols.length === 1 && $(cols[0]).text().includes("Giornata")) {
-          return;
+        if (!response.ok) {
+          console.warn(`⚠️ Errore nel download per ${s.squadra} → status ${response.status}`);
+          continue;
         }
 
-        if (cols.length >= 5) {
-          const giornataTxt = $(cols[0]).text().trim();
-          const dataTxt = giornataTxt.match(/\d{2}\/\d{2}\/\d{4}/)?.[0] || null;
-          const casa = $(cols[1]).text().trim();
-          const ospite = $(cols[3]).text().trim();
-          const risultato = $(cols[2]).text().trim();
+        html = await response.text();
+        console.log(`✅ Pagina HTML scaricata correttamente (${html.length} caratteri)`);
 
-          let goalCasa: number | null = null;
-          let goalOspite: number | null = null;
-          if (risultato.includes("-")) {
-            const [a, b] = risultato.split("-").map((x) => x.trim());
-            goalCasa = parseInt(a) || null;
-            goalOspite = parseInt(b) || null;
-          }
+      } catch (error: any) {
+        console.error(`❌ Errore fetch per ${s.squadra}:`, error.message || error);
+        continue;
+      }
 
-          if (casa && ospite) {
-            tuttePartite.push({
-              data_match: parseData(dataTxt),
-              squadra_casa: casa,
-              squadra_ospite: ospite,
-              goal_casa: goalCasa,
-              goal_ospite: goalOspite,
-              giornata: estraiNumeroGiornata(giornataTxt),
-              campo: null,
-              note: null,
-            });
-          }
-        }
-      });
+      if (!html) {
+        console.warn(`⚠️ Nessun HTML disponibile per ${s.squadra}, salto...`);
+        continue;
+      }
+
+      // Log anteprima HTML (prime 300 lettere)
+      console.log("📜 Anteprima HTML:", html.slice(0, 300));
+
+      // TODO: parsing cheerio qui (temporaneamente solo test)
+      console.log(`ℹ️ Parsing non ancora attivo per ${s.squadra}`);
+
+      // Attendi 1 secondo tra le richieste per non sovraccaricare Campionando
+      await new Promise((r) => setTimeout(r, 1000));
     }
 
-    if (tuttePartite.length === 0) {
-      throw new Error("Nessuna partita trovata nei ruolini squadra.");
-    }
+    console.log("✅ Fine ciclo di test — nessuna partita salvata per ora.");
 
-    // 3️⃣ Cancella vecchi dati
-    await supabase
-      .from("classifica_partite")
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
-
-    // 4️⃣ Inserisci nuove partite
-    const { error: insertErr } = await supabase
-      .from("classifica_partite")
-      .insert(tuttePartite);
-
-    if (insertErr) throw insertErr;
-
-    console.log(`✅ Inserite ${tuttePartite.length} partite`);
     return {
       statusCode: 200,
       body: JSON.stringify({
-        message: "Partite aggiornate correttamente",
-        totale: tuttePartite.length,
+        message: "Test completato — log disponibile su Netlify.",
       }),
     };
   } catch (err: any) {
@@ -141,18 +90,3 @@ if (!html) {
     };
   }
 };
-
-// 🔧 Helper per estrarre numero giornata
-function estraiNumeroGiornata(testo: string): number | null {
-  const m = testo.match(/Giornata\s+(\d+)/i);
-  return m ? parseInt(m[1]) : null;
-}
-
-// 🔧 Helper per formattare date tipo 12/10/2025
-function parseData(txt: string | null): string | null {
-  if (!txt) return null;
-  const m = txt.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-  if (!m) return null;
-  const [, dd, mm, yyyy] = m;
-  return `${yyyy}-${mm}-${dd}`;
-}
