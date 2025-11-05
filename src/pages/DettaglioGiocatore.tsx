@@ -279,20 +279,39 @@ if (allenamenti && allenamenti.length > 0) {
           </div>
         )}
 
-        <div className="bg-white/90 rounded-xl shadow-montecarlo p-6 flex flex-col items-center">
-          <div className="w-32 h-32 rounded-full bg-gray-200 overflow-hidden mb-4 border-2 border-montecarlo-accent">
-            {giocatore.foto_url ? (
-              <img
-                src={giocatore.foto_url}
-                alt={`${giocatore.cognome} ${giocatore.nome}`}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full bg-montecarlo-secondary text-white flex items-center justify-center text-4xl font-bold">
-                {giocatore.cognome[0]}
-              </div>
-            )}
-          </div>
+       <div className="bg-white/90 rounded-xl shadow-montecarlo p-6 flex flex-col items-center">
+  <div className="w-44 h-44 rounded-[50%] overflow-hidden mb-4 border-4 border-montecarlo-accent shadow-lg bg-black flex items-center justify-center">
+  {giocatore.video_url ? (
+    <video
+      key={giocatore.video_url} // forza reload video se cambia
+      src={giocatore.video_url}
+      autoPlay
+      muted
+      loop
+      playsInline
+      preload="auto"
+      onCanPlay={(e) => e.currentTarget.play()}
+      className="w-full h-full object-contain rounded-[50%]"
+      style={{
+        transform: 'scale(0.9) translateY(3%)',
+        transformOrigin: 'center center',
+      }}
+    />
+  ) : giocatore.foto_url ? (
+    <img
+      src={giocatore.foto_url}
+      alt={`${giocatore.cognome} ${giocatore.nome}`}
+      className="w-full h-full object-cover rounded-[50%]"
+    />
+  ) : (
+    <div className="w-full h-full bg-montecarlo-secondary text-white flex items-center justify-center text-5xl font-bold rounded-[50%]">
+      {giocatore.cognome[0]}
+    </div>
+  )}
+</div>
+
+
+
           <h1 className="text-2xl font-bold text-montecarlo-secondary mb-4">
             {giocatore.cognome} {giocatore.nome}
           </h1>
