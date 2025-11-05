@@ -1,5 +1,6 @@
 // src/pages/DettaglioScontri.tsx
 // Data: 05/11/2025 — Mostra tutti gli scontri (partite) di una squadra dal campionato completo
+// Rev9: uniformato lo stile alla pagina Risultati/Classifica
 
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -26,13 +27,12 @@ export default function DettaglioScontri(): JSX.Element {
 
   useEffect(() => {
     if (!nome) return;
-    const squadraNome = decodeURIComponent(nome); // ✅ evita problemi con spazi e caratteri speciali
+    const squadraNome = decodeURIComponent(nome);
 
     const caricaPartite = async () => {
       try {
         setLoading(true);
 
-        // ✅ Nuova query sulla tabella classifica_partite
         const { data, error } = await supabase
           .from("classifica_partite")
           .select("*")
@@ -56,74 +56,88 @@ export default function DettaglioScontri(): JSX.Element {
 
   if (loading)
     return (
-      <div style={{ textAlign: "center", marginTop: 40 }}>
+      <div className="text-center mt-10 text-white font-semibold text-lg">
         ⏳ Caricamento scontri di {nome}...
       </div>
     );
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2 style={{ textAlign: "center", marginBottom: 20 }}>
+    <div className="container mx-auto px-2">
+      <h2 className="text-center text-white font-bold text-2xl mb-4 drop-shadow-md">
         ⚽ Scontri di {decodeURIComponent(nome || "")}
       </h2>
 
       {partite.length === 0 ? (
-        <p style={{ textAlign: "center" }}>Nessuna partita trovata.</p>
+        <p className="text-center text-white font-medium">Nessuna partita trovata.</p>
       ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table style={stili.tabella}>
-            <thead>
-              <tr style={stili.intestazione}>
-                <th>Giornata</th>
-                <th>Data</th>
-                <th>Ora</th>
-                <th>Casa</th>
-                <th>Risultato</th>
-                <th>Ospite</th>
-                <th>Campo</th>
+        <div className="bg-white/90 rounded-lg shadow-montecarlo border-l-4 border-montecarlo-secondary overflow-hidden">
+          <table className="w-full border-collapse text-[15px]">
+            <thead className="bg-[#f10909] text-white font-semibold">
+              <tr>
+                <th className="py-2 text-center w-8">#</th>
+                <th colSpan={3} className="py-2 text-center">Match</th>
               </tr>
             </thead>
             <tbody>
-              {partite.map((p) => {
-                const dataFormattata = p.data_match
-                  ? new Date(p.data_match).toLocaleDateString("it-IT")
+              {partite.map((p, i) => {
+                const data = p.data_match
+                  ? new Date(p.data_match).toLocaleDateString("it-IT", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "2-digit",
+                    })
                   : "-";
+
                 const risultato =
                   p.goal_casa !== null && p.goal_ospite !== null
                     ? `${p.goal_casa} - ${p.goal_ospite}`
                     : "-";
+
+                const isMontecarlo = (nomeSquadra: string) =>
+                  nomeSquadra.toLowerCase().includes("montecarlo");
+
                 return (
-                  <tr key={p.id} style={stili.riga}>
-                    <td>{p.giornata ?? "-"}</td>
-                    <td>{dataFormattata}</td>
-                    <td>{p.ora_match || "-"}</td>
-                    <td
-                      style={{
-                        color: p.squadra_casa
-                          .toLowerCase()
-                          .includes("montecarlo")
-                          ? "#d00000"
-                          : "inherit",
-                        fontWeight: 600,
-                      }}
+                  <React.Fragment key={p.id}>
+                    <tr
+                      className={`text-center ${
+                        i % 2 === 0
+                          ? "bg-white/95"
+                          : "bg-[#fce5e5]/90"
+                      }`}
                     >
-                      {p.squadra_casa}
-                    </td>
-                    <td style={{ fontWeight: 600 }}>{risultato}</td>
-                    <td
-                      style={{
-                        color: p.squadra_ospite
-                          .toLowerCase()
-                          .includes("montecarlo")
-                          ? "#d00000"
-                          : "inherit",
-                        fontWeight: 600,
-                      }}
+                      <td colSpan={4} className="py-2 font-semibold text-black border-b border-white/60">
+                         {data}
+                      </td>
+                    </tr>
+                    <tr
+                      className={`text-center ${
+                        i % 2 === 0
+                          ? "bg-white/95"
+                          : "bg-[#fce5e5]/90"
+                      }`}
                     >
-                      {p.squadra_ospite}
-                    </td>
-                    <td>{p.campo || "-"}</td>
-                  </tr>
+                      <td className="py-3">{p.giornata || "-"}</td>
+                      <td
+                        className={`text-left px-2 ${
+                          isMontecarlo(p.squadra_casa)
+                            ? "text-[#e63946] font-semibold"
+                            : "text-black"
+                        }`}
+                      >
+                        {p.squadra_casa}
+                      </td>
+                      <td className="font-bold text-center w-12">{risultato}</td>
+                      <td
+                        className={`text-right px-2 ${
+                          isMontecarlo(p.squadra_ospite)
+                            ? "text-[#e63946] font-semibold"
+                            : "text-black"
+                        }`}
+                      >
+                        {p.squadra_ospite}
+                      </td>
+                    </tr>
+                  </React.Fragment>
                 );
               })}
             </tbody>
@@ -131,38 +145,14 @@ export default function DettaglioScontri(): JSX.Element {
         </div>
       )}
 
-      <div style={{ textAlign: "center", marginTop: 16 }}>
-        <button onClick={() => navigate(-1)} style={stili.bottone}>
-          ⬅️ Torna indietro
+      <div className="text-center mt-4">
+        <button
+          onClick={() => navigate(-1)}
+          className="bg-[#7d7e7b] hover:bg-[#696a67] text-white font-semibold px-4 py-2 rounded-md transition-all shadow-montecarlo"
+        >
+          Torna indietro
         </button>
       </div>
     </div>
   );
 }
-
-const stili: Record<string, React.CSSProperties> = {
-  tabella: {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: 15,
-  },
-  intestazione: {
-    background: "#004aad",
-    color: "white",
-    textAlign: "center",
-    height: 36,
-  },
-  riga: {
-    textAlign: "center",
-    height: 36,
-    background: "#fff",
-  },
-  bottone: {
-    background: "#004aad",
-    color: "white",
-    border: "none",
-    padding: "6px 14px",
-    borderRadius: 6,
-    cursor: "pointer",
-  },
-};
