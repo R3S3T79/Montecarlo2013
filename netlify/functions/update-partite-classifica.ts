@@ -1,8 +1,8 @@
 // netlify/functions/update-partite-classifica.ts
-// Data: 05/11/2025 — Aggiorna automaticamente la tabella classifica_partite da Campionando.it
+// Data: 05/11/2025 — Legge tutti i ruolini squadra per il campionato 6158 e aggiorna la tabella classifica_partite
 
 import { Handler } from "@netlify/functions";
-import * as cheerio from "cheerio"; // ✅ usa import ESM corretto
+import * as cheerio from "cheerio";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -10,91 +10,101 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// 🔗 pagina Campionando “Risultati e calendario”
-const CAMP_URL = "https://campionando.it/risultati.php?camp=6158";
+const CAMP_ID = "6158";
+const BASE_URL = "https://campionando.it/ruolino.php";
 
 export const handler: Handler = async () => {
   try {
-    // 1️⃣ Scarica la pagina HTML
-    const res = await fetch(CAMP_URL);
-    if (!res.ok) throw new Error(`Impossibile scaricare la pagina (${res.status})`);
+    // 1️⃣ Prende tutte le squadre dalla tabella classifica
+    const { data: squadre, error: errSquadre } = await supabase
+      .from("classifica")
+      .select("squadra");
 
-    const html = await res.text();
-    const $ = cheerio.load(html);
-
-    const partite: any[] = [];
-    let giornataCorrente: number | null = null;
-
-    // 2️⃣ Scansiona la pagina
-    $("table tr").each((i, el) => {
-      const cols = $(el).find("td");
-
-      // Riga giornata (es. "Giornata 5 - 01/11/2025")
-      if (cols.length === 1 && $(cols[0]).text().toLowerCase().includes("giornata")) {
-        const testo = $(cols[0]).text().trim();
-        const numMatch = testo.match(/Giornata\s+(\d+)/i);
-        giornataCorrente = numMatch ? parseInt(numMatch[1]) : null;
-        return;
-      }
-
-      // Riga partita
-      if (cols.length >= 5) {
-        const data = $(cols[0]).text().trim() || null;
-        const ora = $(cols[1]).text().trim() || null;
-        const squadraCasa = $(cols[2]).text().trim();
-        const risultato = $(cols[3]).text().trim();
-        const squadraOspite = $(cols[4]).text().trim();
-        const campo = cols.length >= 6 ? $(cols[5]).text().trim() : null;
-
-        let goalCasa: number | null = null;
-        let goalOspite: number | null = null;
-
-        if (risultato && risultato.includes("-")) {
-          const [gf, gs] = risultato.split("-").map((v) => v.trim());
-          goalCasa = parseInt(gf) || null;
-          goalOspite = parseInt(gs) || null;
-        }
-
-        if (squadraCasa && squadraOspite) {
-          partite.push({
-            giornata: giornataCorrente,
-            data_match: data ? parseDataCampionando(data) : null,
-            ora_match: ora || null,
-            squadra_casa: squadraCasa,
-            squadra_ospite: squadraOspite,
-            goal_casa: goalCasa,
-            goal_ospite: goalOspite,
-            campo: campo || null,
-          });
-        }
-      }
-    });
-
-    if (partite.length === 0) {
-      throw new Error("Nessuna partita trovata nella pagina Campionando!");
+    if (errSquadre || !squadre?.length) {
+      throw new Error("Impossibile leggere la lista squadre dalla tabella classifica.");
     }
 
-    // 3️⃣ Svuota la tabella esistente
-    const { error: delError } = await supabase
-      .from("classifica_partite")
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+    console.log(`🔹 Trovate ${squadre.length} squadre in classifica.`);
 
-    if (delError) throw delError;
+    const tuttePartite: any[] = [];
 
-    // 4️⃣ Inserisci nuove partite
-    const { error: insError } = await supabase
-      .from("classifica_partite")
-      .insert(partite);
+    // 2️⃣ Per ogni squadra, scarica il suo ruolino
+    for (const s of squadre) {
+      const nomeSquadra = encodeURIComponent(s.squadra.trim());
+      const url = `${BASE_URL}?squadra=${nomeSquadra}&camp=${CAMP_ID}&nome=${nomeSquadra}`;
+      console.log(`📥 Scarico ${url}`);
 
-    if (insError) throw insError;
+      const res = await fetch(url);
+      if (!res.ok) {
+        console.warn(`⚠️ Errore fetch per ${s.squadra}: ${res.status}`);
+        continue;
+      }
 
-    console.log(`✅ Inserite ${partite.length} partite da Campionando.it`);
+      const html = await res.text();
+      const $ = cheerio.load(html);
+
+      let giornata = 0;
+
+      $("table tr").each((i, el) => {
+        const text = $(el).text().trim();
+        const cols = $(el).find("td");
+
+        // Riga giornata
+        if (cols.length === 1 && text.toLowerCase().includes("giornata")) {
+          const m = text.match(/Giornata\s+(\d+)/i);
+          giornata = m ? parseInt(m[1]) : giornata;
+        }
+
+        // Riga partita
+        if (cols.length >= 5) {
+          const giornataTxt = $(cols[0]).text().trim();
+          const dataTxt = $(cols[1]).text().trim();
+          const casa = $(cols[2]).text().trim();
+          const risultato = $(cols[3]).text().trim();
+          const ospite = $(cols[4]).text().trim();
+
+          let goalCasa: number | null = null;
+          let goalOspite: number | null = null;
+          if (risultato.includes("-")) {
+            const [a, b] = risultato.split("-").map((x) => x.trim());
+            goalCasa = parseInt(a) || null;
+            goalOspite = parseInt(b) || null;
+          }
+
+          if (casa && ospite) {
+            tuttePartite.push({
+              giornata,
+              data_match: parseData(dataTxt),
+              ora_match: null,
+              squadra_casa: casa,
+              squadra_ospite: ospite,
+              goal_casa: goalCasa,
+              goal_ospite: goalOspite,
+              campo: null,
+              note: null,
+            });
+          }
+        }
+      });
+    }
+
+    if (!tuttePartite.length) {
+      throw new Error("Nessuna partita trovata nei ruolini squadra.");
+    }
+
+    // 3️⃣ Cancella vecchi dati
+    await supabase.from("classifica_partite").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+
+    // 4️⃣ Inserisce nuove partite
+    const { error: insertErr } = await supabase.from("classifica_partite").insert(tuttePartite);
+    if (insertErr) throw insertErr;
+
+    console.log(`✅ Inserite ${tuttePartite.length} partite da ${squadre.length} squadre`);
     return {
       statusCode: 200,
       body: JSON.stringify({
         message: "Partite aggiornate correttamente",
-        totale: partite.length,
+        totale: tuttePartite.length,
       }),
     };
   } catch (err: any) {
@@ -106,10 +116,10 @@ export const handler: Handler = async () => {
   }
 };
 
-// 🧠 Funzione helper per convertire “01/11/2025” → “2025-11-01”
-function parseDataCampionando(dataStr: string): string | null {
-  const m = dataStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+// 🔧 Helper per formattare date tipo 12/10/2025
+function parseData(txt: string): string | null {
+  const m = txt.match(/(\d{2})\/(\d{2})\/(\d{4})/);
   if (!m) return null;
-  const [, giorno, mese, anno] = m;
-  return `${anno}-${mese}-${giorno}`;
+  const [, dd, mm, yyyy] = m;
+  return `${yyyy}-${mm}-${dd}`;
 }
