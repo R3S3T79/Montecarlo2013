@@ -2,7 +2,7 @@
 // Data: 05/11/2025 — Aggiornamento automatico classifica da campionando.it
 
 import { Handler } from "@netlify/functions";
-import cheerio from "cheerio";
+import * as cheerio from "cheerio";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
