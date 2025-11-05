@@ -99,27 +99,38 @@ export const handler: Handler = async () => {
     if (tuttePartite.length === 0)
       throw new Error("Nessuna partita trovata nei ruolini.");
 
-    // 4️⃣ Filtra i duplicati (stessa data e stesse squadre invertite)
-    const uniche: any[] = [];
-    const visti = new Set();
+   // 4️⃣ Filtra i duplicati (stessa data e stesse squadre invertite)
+const uniche: any[] = [];
+const visti = new Set();
 
-    for (const p of tuttePartite) {
-      const chiave = [
-        p.data_match,
-        [p.squadra_casa, p.squadra_ospite].sort().join("-"),
-        p.goal_casa,
-        p.goal_ospite,
-      ].join("|");
+for (const p of tuttePartite) {
+  if (!p.data_match || !p.squadra_casa || !p.squadra_ospite) continue;
 
-      if (!visti.has(chiave)) {
-        visti.add(chiave);
-        uniche.push(p);
-      }
-    }
+  // Genera chiave unica indipendente dall'ordine casa/ospite
+  const chiave = [
+    p.data_match,
+    [p.squadra_casa, p.squadra_ospite].sort().join("-"),
+    p.goal_casa ?? "x",
+    p.goal_ospite ?? "x",
+  ].join("|");
 
-    console.log(
-      `🧹 Eliminati ${tuttePartite.length - uniche.length} duplicati. Rimaste ${uniche.length} partite.`
-    );
+  if (!visti.has(chiave)) {
+    visti.add(chiave);
+    uniche.push(p);
+  }
+}
+
+// Ordina per data e giornata
+uniche.sort((a, b) => {
+  if (a.data_match < b.data_match) return -1;
+  if (a.data_match > b.data_match) return 1;
+  return (a.giornata || 0) - (b.giornata || 0);
+});
+
+console.log(
+  `🧹 Eliminati ${tuttePartite.length - uniche.length} duplicati. Rimaste ${uniche.length} partite.`
+);
+
 
     // 5️⃣ Cancella vecchi dati e salva i nuovi
     await supabase
