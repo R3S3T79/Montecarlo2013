@@ -31,14 +31,30 @@ export const handler: Handler = async () => {
     // 2️⃣ Cicla le squadre
     for (const s of squadre) {
       const nomeSquadra = encodeURIComponent(s.squadra.trim());
-      const url = `${BASE_URL}?squadra=${nomeSquadra}&camp=${CAMP_ID}&nome=${nomeSquadra}`;
+            const url = `${BASE_URL}?squadra=${nomeSquadra}&camp=${CAMP_ID}&nome=${nomeSquadra}`;
       console.log(`📥 Scarico ${url}`);
 
-      const res = await fetch(url);
-      if (!res.ok) {
-        console.warn(`⚠️ Errore fetch per ${s.squadra}: ${res.status}`);
+      let html: string;
+      try {
+        const res = await fetch(url, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml",
+          },
+        });
+
+        if (!res.ok) {
+          console.warn(`⚠️ Errore fetch per ${s.squadra}: ${res.status}`);
+          continue;
+        }
+
+        html = await res.text();
+      } catch (e) {
+        console.warn(`⚠️ Fetch fallita per ${s.squadra}:`, e);
         continue;
       }
+
 
       const html = await res.text();
       const $ = cheerio.load(html);
