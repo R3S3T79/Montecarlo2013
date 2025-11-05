@@ -27,3 +27,14 @@ envFiles = [".env"]
   name = "update-classifica"
   cron = "0 21 * * *"
   path = "/.netlify/functions/update-classifica"
+
+  [[scheduled]]
+  name = "update-classifica"
+  cron = "0 21 * * *"
+  path = "/.netlify/functions/update-classifica"
+
+[[scheduled]]
+  name = "update-partite-classifica"
+  cron = "5 21 * * *"
+  path = "/.netlify/functions/update-partite-classifica"
+
