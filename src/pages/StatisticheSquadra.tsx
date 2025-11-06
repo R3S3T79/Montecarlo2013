@@ -1,5 +1,5 @@
 // src/pages/StatisticheSquadra.tsx
-// Data creazione chat: 2025-08-10
+// Data creazione chat: 2025-08-10 — Rev3: aggiunti colori dinamici per vittorie/pareggi/sconfitte/gol fatti/subiti
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
@@ -49,12 +49,12 @@ interface StatistichePartite {
 export default function StatisticheSquadra() {
   const [stagioni, setStagioni] = useState<Stagione[]>([]);
   const [stagioneSelezionata, setStagioneSelezionata] = useState<string>('');
+  const [filtroCompetizione, setFiltroCompetizione] = useState<string>('Tutte');
   const [statistiche, setStatistiche] = useState<StatistichePartite | null>(null);
   const [matchMaxFatti, setMatchMaxFatti] = useState<PartitaEstesa | null>(null);
   const [matchMaxSubiti, setMatchMaxSubiti] = useState<PartitaEstesa | null>(null);
   const [matchMaxDifferenza, setMatchMaxDifferenza] = useState<PartitaEstesa | null>(null);
   const [loading, setLoading] = useState(true);
-
   const [montecarloId, setMontecarloId] = useState<string>('');
 
   useEffect(() => {
@@ -75,9 +75,7 @@ export default function StatisticheSquadra() {
         .eq('nome', 'Montecarlo')
         .single();
 
-      if (squadra) {
-        setMontecarloId(squadra.id);
-      }
+      if (squadra) setMontecarloId(squadra.id);
     }
     fetchInitialData();
   }, []);
@@ -96,12 +94,17 @@ export default function StatisticheSquadra() {
             squadra_ospite_id,
             goal_a,
             goal_b,
+            campionato_torneo,
             casa:squadra_casa_id(nome),
             ospite:squadra_ospite_id(nome)
           `)
           .eq('stato', 'Giocata')
           .eq('stagione_id', stagioneSelezionata)
           .neq('campionato_torneo', 'Allenamento');
+
+        if (filtroCompetizione !== 'Tutte') {
+          query = query.eq('campionato_torneo', filtroCompetizione);
+        }
 
         const { data: partite, error } = await query;
 
@@ -126,7 +129,6 @@ export default function StatisticheSquadra() {
           const goalFatti = èCasa ? p.goal_a : p.goal_b;
           const goalSubiti = èCasa ? p.goal_b : p.goal_a;
 
-          // Totali
           tot.giocate++;
           tot.gol_fatti += goalFatti;
           tot.gol_subiti += goalSubiti;
@@ -134,7 +136,6 @@ export default function StatisticheSquadra() {
           else if (goalFatti === goalSubiti) tot.pareggi++;
           else tot.sconfitte++;
 
-          // Casa/Trasferta
           if (èCasa) {
             casa.giocate++;
             casa.gol_fatti += goalFatti;
@@ -151,16 +152,9 @@ export default function StatisticheSquadra() {
             else trasf.sconfitte++;
           }
 
-          // Massimi
-          if (!maxF || goalFatti > (maxF.squadra_casa_id === montecarloId ? maxF.goal_a : maxF.goal_b)) {
-            maxF = p;
-          }
-          if (!maxS || goalSubiti > (maxS.squadra_casa_id === montecarloId ? maxS.goal_b : maxS.goal_a)) {
-            maxS = p;
-          }
-          if (!maxD || Math.abs(goalFatti - goalSubiti) > Math.abs((maxD.squadra_casa_id === montecarloId ? maxD.goal_a : maxD.goal_b) - (maxD.squadra_casa_id === montecarloId ? maxD.goal_b : maxD.goal_a))) {
-            maxD = p;
-          }
+          if (!maxF || goalFatti > (maxF.squadra_casa_id === montecarloId ? maxF.goal_a : maxF.goal_b)) maxF = p;
+          if (!maxS || goalSubiti > (maxS.squadra_casa_id === montecarloId ? maxS.goal_b : maxS.goal_a)) maxS = p;
+          if (!maxD || Math.abs(goalFatti - goalSubiti) > Math.abs((maxD.squadra_casa_id === montecarloId ? maxD.goal_a : maxD.goal_b) - (maxD.squadra_casa_id === montecarloId ? maxD.goal_b : maxD.goal_a))) maxD = p;
         });
 
         setStatistiche({ totali: tot, casa, trasferta: trasf });
@@ -174,21 +168,31 @@ export default function StatisticheSquadra() {
       }
     }
     fetchStatistiche();
-  }, [stagioneSelezionata, montecarloId]);
+  }, [stagioneSelezionata, filtroCompetizione, montecarloId]);
 
   return (
     <div className="min-h-screen w-full px-[2px] box-border">
-  <div className="w-full flex flex-col md:flex-row gap-6">
-        {/* Left: tabella statistiche */}
+      <div className="w-full flex flex-col md:flex-row gap-6">
         <div className="bg-white/90 rounded-xl shadow-montecarlo flex-1 p-6 md:p-8">
           <select
             value={stagioneSelezionata}
             onChange={e => setStagioneSelezionata(e.target.value)}
-            className="w-full mb-6 border-2 border-montecarlo-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-montecarlo-secondary/40"
+            className="w-full mb-3 border-2 border-montecarlo-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-montecarlo-secondary/40"
           >
             {stagioni.map(s => (
               <option key={s.id} value={s.id}>{s.nome}</option>
             ))}
+          </select>
+
+          <select
+            value={filtroCompetizione}
+            onChange={e => setFiltroCompetizione(e.target.value)}
+            className="w-full mb-6 border-2 border-montecarlo-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-montecarlo-secondary/40"
+          >
+            <option value="Tutte">Tutte le Competizioni</option>
+            <option value="Campionato">Campionato</option>
+            <option value="Torneo">Tornei</option>
+            <option value="Amichevole">Amichevoli</option>
           </select>
 
           {loading ? (
@@ -198,59 +202,57 @@ export default function StatisticheSquadra() {
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full border border-gray-200 rounded-lg">
-  <thead className="bg-montecarlo-red-600 text-white">
-    <tr>
-      <th className="px-4 py-2 text-left">Statistiche</th>
-      <th className="px-4 py-2 text-center">Totale</th>
-      <th className="px-4 py-2 text-center">Casa</th>
-      <th className="px-4 py-2 text-center">Trasf.</th>
-    </tr>
-  </thead>
-  <tbody className="text-gray-900">
-    <tr className="border-t border-montecarlo-red-600">
-      <td className="px-4 py-2">Giocate</td>
-      <td className="text-center">{statistiche.totali.giocate}</td>
-      <td className="text-center">{statistiche.casa.giocate}</td>
-      <td className="text-center">{statistiche.trasferta.giocate}</td>
-    </tr>
-    <tr className="border-t border-montecarlo-red-600">
-      <td className="px-4 py-2">Vittorie</td>
-      <td className="text-center">{statistiche.totali.vittorie}</td>
-      <td className="text-center">{statistiche.casa.vittorie}</td>
-      <td className="text-center">{statistiche.trasferta.vittorie}</td>
-    </tr>
-    <tr className="border-t border-montecarlo-red-600">
-      <td className="px-4 py-2">Pareggi</td>
-      <td className="text-center">{statistiche.totali.pareggi}</td>
-      <td className="text-center">{statistiche.casa.pareggi}</td>
-      <td className="text-center">{statistiche.trasferta.pareggi}</td>
-    </tr>
-    <tr className="border-t border-montecarlo-red-600">
-      <td className="px-4 py-2">Sconfitte</td>
-      <td className="text-center">{statistiche.totali.sconfitte}</td>
-      <td className="text-center">{statistiche.casa.sconfitte}</td>
-      <td className="text-center">{statistiche.trasferta.sconfitte}</td>
-    </tr>
-    <tr className="border-t border-montecarlo-red-600">
-      <td className="px-4 py-2">Gol fatti</td>
-      <td className="text-center">{statistiche.totali.gol_fatti}</td>
-      <td className="text-center">{statistiche.casa.gol_fatti}</td>
-      <td className="text-center">{statistiche.trasferta.gol_fatti}</td>
-    </tr>
-    <tr className="border-t border-montecarlo-red-600">
-      <td className="px-4 py-2">Gol subiti</td>
-      <td className="text-center">{statistiche.totali.gol_subiti}</td>
-      <td className="text-center">{statistiche.casa.gol_subiti}</td>
-      <td className="text-center">{statistiche.trasferta.gol_subiti}</td>
-    </tr>
-  </tbody>
-</table>
-
+                <thead className="bg-montecarlo-red-600 text-white">
+                  <tr>
+                    <th className="px-4 py-2 text-left">Statistiche</th>
+                    <th className="px-4 py-2 text-center">Totale</th>
+                    <th className="px-4 py-2 text-center">Casa</th>
+                    <th className="px-4 py-2 text-center">Trasf.</th>
+                  </tr>
+                </thead>
+                <tbody className="text-gray-900">
+                  <tr className="border-t border-montecarlo-red-600">
+                    <td className="px-4 py-2">Giocate</td>
+                    <td className="text-center">{statistiche.totali.giocate}</td>
+                    <td className="text-center">{statistiche.casa.giocate}</td>
+                    <td className="text-center">{statistiche.trasferta.giocate}</td>
+                  </tr>
+                  <tr className="border-t border-montecarlo-red-600 text-green-600 font-semibold">
+                    <td className="px-4 py-2">Vittorie</td>
+                    <td className="text-center">{statistiche.totali.vittorie}</td>
+                    <td className="text-center">{statistiche.casa.vittorie}</td>
+                    <td className="text-center">{statistiche.trasferta.vittorie}</td>
+                  </tr>
+                  <tr className="border-t border-montecarlo-red-600 text-gray-500 font-semibold">
+                    <td className="px-4 py-2">Pareggi</td>
+                    <td className="text-center">{statistiche.totali.pareggi}</td>
+                    <td className="text-center">{statistiche.casa.pareggi}</td>
+                    <td className="text-center">{statistiche.trasferta.pareggi}</td>
+                  </tr>
+                  <tr className="border-t border-montecarlo-red-600 text-red-600 font-semibold">
+                    <td className="px-4 py-2">Sconfitte</td>
+                    <td className="text-center">{statistiche.totali.sconfitte}</td>
+                    <td className="text-center">{statistiche.casa.sconfitte}</td>
+                    <td className="text-center">{statistiche.trasferta.sconfitte}</td>
+                  </tr>
+                  <tr className="border-t border-montecarlo-red-600 text-green-600 font-semibold">
+                    <td className="px-4 py-2">Gol fatti</td>
+                    <td className="text-center">{statistiche.totali.gol_fatti}</td>
+                    <td className="text-center">{statistiche.casa.gol_fatti}</td>
+                    <td className="text-center">{statistiche.trasferta.gol_fatti}</td>
+                  </tr>
+                  <tr className="border-t border-montecarlo-red-600 text-red-600 font-semibold">
+                    <td className="px-4 py-2">Gol subiti</td>
+                    <td className="text-center">{statistiche.totali.gol_subiti}</td>
+                    <td className="text-center">{statistiche.casa.gol_subiti}</td>
+                    <td className="text-center">{statistiche.trasferta.gol_subiti}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           )}
         </div>
 
-        {/* Right: record match */}
         <div className="flex-1 md:w-1/3 space-y-4">
           {matchMaxFatti && (
             <div className="bg-white/90 p-4 md:p-6 rounded-xl shadow-montecarlo">

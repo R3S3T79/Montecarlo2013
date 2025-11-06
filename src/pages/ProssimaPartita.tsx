@@ -442,7 +442,7 @@ setTitolari(mapped.slice(0, 9).map((g) => g.giocatore_uid));
   if (!partita) {
     return (
 
-        <div className="container mx-auto px-2">
+        <div className="container mx-auto px-0">
           
             <Calendar className="mx-auto text-montecarlo-neutral mb-4" size={48} />
             <h2 className="text-xl font-bold text-montecarlo-secondary mb-4">

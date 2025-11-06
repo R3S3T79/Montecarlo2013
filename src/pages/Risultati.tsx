@@ -148,7 +148,7 @@ export default function Risultati() {
 
   if (loading || loadingData) {
     return (
-      <div className="container mx-auto px-2">
+      <div className="container mx-auto px-0">
         <span>Caricamento…</span>
       </div>
     );
