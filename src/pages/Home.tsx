@@ -1406,10 +1406,10 @@ birthdayCountdownBox: {
   justifyContent: "center",
   textAlign: "center",
   width: "100%",
-  minHeight: 120,      // ⬅️ centraggio verticale migliore
   gap: 6,
-  minHeight: 200,
+  minHeight: 200, // centraggio verticale migliore
 },
+
 
 birthdayDate: {
   fontSize: 22,
