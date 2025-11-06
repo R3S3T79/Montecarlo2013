@@ -913,7 +913,7 @@ const changeDuration = async (minutes: number) => {
     const opzioni = giocatori.filter((g) => convocatiSet.has(g.id));
 
     return (
-      <div className="container mx-auto px-2">
+      <div className="container mx-auto px-0">
         {lista.map((m) => (
           <select
             key={m.goal_tempo}
@@ -954,7 +954,7 @@ const changeDuration = async (minutes: number) => {
     
 
     return (
-      <div className="container mx-auto px-2">
+      <div className="container mx-auto px-0">
         {lista.map((m) => (
           <select
             key={m.goal_tempo}

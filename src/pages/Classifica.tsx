@@ -1,5 +1,5 @@
 // src/pages/Classifica.tsx
-// Data: 05/11/2025 — versione aggiornata con stile uniforme alla pagina Risultati
+// Data: 06/11/2025 — versione con caricamento loghi da tabella "squadre" tramite confronto nome flessibile
 
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
@@ -20,6 +20,7 @@ interface RigaClassifica {
   goal_subiti: number;
   differenza_reti: number;
   punti: number;
+  logo_url?: string | null;
 }
 
 export default function Classifica(): JSX.Element {
@@ -48,29 +49,69 @@ export default function Classifica(): JSX.Element {
     fetchRole();
   }, [user?.id]);
 
-  // ✅ Carica classifica
   const caricaClassifica = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("classifica")
-        .select("*")
-        .order("punti", { ascending: false })
-        .order("differenza_reti", { ascending: false });
-      if (error) throw error;
+  try {
+    setLoading(true);
 
-      // 🔹 aggiorna posizione reale
-      const dataConPosizione = (data || []).map((r, i) => ({
-        ...r,
-        posizione: i + 1,
-      }));
-      setRighe(dataConPosizione);
-    } catch (err: any) {
-      setErrore(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // 1️⃣ Carica classifica
+    const { data, error } = await supabase
+      .from("classifica")
+      .select("*")
+      .order("punti", { ascending: false })
+      .order("differenza_reti", { ascending: false });
+    if (error) throw error;
+
+    const dataConPosizione = (data || []).map((r, i) => ({
+      ...r,
+      posizione: i + 1,
+    }));
+
+    // 2️⃣ Carica le squadre con nome, alias e logo
+    const { data: squadre, error: errSquadre } = await supabase
+      .from("squadre")
+      .select("nome, alias, logo_url");
+    if (errSquadre) throw errSquadre;
+
+    // 3️⃣ Funzione di normalizzazione (ignora maiuscole, spazi, punti, accenti)
+    const normalizza = (s: string) =>
+      s
+        ? s
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]/g, "")
+        : "";
+
+    // 4️⃣ Collega il logo: prima prova con alias, poi con nome
+    const classificaConLoghi = dataConPosizione.map((r) => {
+      const squadraNome = normalizza(r.squadra);
+
+      const match = squadre?.find((sq) => {
+        const nomeNorm = normalizza(sq.nome);
+        const aliasNorm = normalizza(sq.alias || "");
+        return squadraNome === aliasNorm || squadraNome === nomeNorm;
+      });
+
+      return { ...r, logo_url: match?.logo_url || null };
+    });
+
+    setRighe(classificaConLoghi);
+
+    // 🔍 Debug opzionale (puoi rimuoverlo dopo i test)
+    console.table(
+      classificaConLoghi.map((r) => ({
+        squadra: r.squadra,
+        logo_trovato: !!r.logo_url,
+      }))
+    );
+  } catch (err: any) {
+    console.error("❌ Errore caricamento:", err);
+    setErrore(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   useEffect(() => {
     caricaClassifica();
@@ -119,11 +160,17 @@ export default function Classifica(): JSX.Element {
           }
         });
 
-        if (rows.length === 0) throw new Error("Nessuna riga trovata su Campionando.it");
+        if (rows.length === 0)
+          throw new Error("Nessuna riga trovata su Campionando.it");
 
-        await supabase.from("classifica").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-        const { error } = await supabase.from("classifica").insert(rows);
-        if (error) throw error;
+        await supabase
+          .from("classifica")
+          .delete()
+          .neq("id", "00000000-0000-0000-0000-000000000000");
+        const { error: insErr } = await supabase
+          .from("classifica")
+          .insert(rows);
+        if (insErr) throw insErr;
 
         alert(`✅ Classifica aggiornata (${rows.length} squadre)`);
       } else {
@@ -158,10 +205,10 @@ export default function Classifica(): JSX.Element {
     );
 
   return (
-    <div className="container mx-auto px-2">
+    <div className="container mx-auto px-0">
       {/* Titolo */}
       <h2 className="text-center text-white font-bold text-2xl mb-4 drop-shadow-md">
-        🏆 Classifica Campionato
+        Classifica Campionato
       </h2>
 
       {/* Pulsante visibile solo al Creator */}
@@ -183,7 +230,7 @@ export default function Classifica(): JSX.Element {
             <tr>
               <th className="py-2 text-center w-8">#</th>
               <th className="py-2 text-left px-3">Squadra</th>
-              <th className="py-2 text-center w-8">P</th>
+              <th className="py-2 text-center w-8">PT</th>
               <th className="py-2 text-center w-8">G</th>
               <th className="py-2 text-center w-8">V</th>
               <th className="py-2 text-center w-8">N</th>
@@ -195,38 +242,59 @@ export default function Classifica(): JSX.Element {
           </thead>
 
           <tbody>
-  {righe.map((r, i) => (
-    <tr
-      key={r.id || i}
-      className={`text-center transition-colors ${
-        i % 2 === 0
-          ? "bg-white/95"   // 🔹 più chiara
-          : "bg-[#fce5e5]/90" // 🔹 rosa chiaro Montecarlo
-      }`}
-    >
+            {righe.map((r, i) => (
+              <tr
+                key={r.id || i}
+                className={`text-center transition-colors ${
+                  i % 2 === 0 ? "bg-white/95" : "bg-[#fce5e5]/90"
+                }`}
+              >
+                <td className="py-2 pr-1 text-right">{r.posizione}</td>
 
-                <td className="py-2">{r.posizione}</td>
-                <td className="text-left px-3 font-semibold">
-                  <span
-                    onClick={() =>
-                      navigate(`/scontri/${encodeURIComponent(r.squadra)}`)
-                    }
-                    className={`cursor-pointer underline ${
-                      r.squadra.toLowerCase().includes("montecarlo")
-                        ? "text-[#e63946] font-bold"
-                        : "text-black"
-                    }`}
-                  >
-                    {r.squadra}
-                  </span>
+                <td className="text-left pl-1 pr-4 font-semibold">
+  <div className="flex items-center gap-2">
+
+
+                    {/* Logo squadra */}
+                    {r.logo_url ? (
+                      <img
+                        src={r.logo_url}
+                        alt={`${r.squadra} logo`}
+                        className="w-6 h-6 object-contain rounded-full bg-white border border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-gray-200" />
+                    )}
+
+                    {/* Nome squadra */}
+                    <span
+                      onClick={() =>
+                        navigate(`/scontri/${encodeURIComponent(r.squadra)}`)
+                      }
+                      style={{
+                        textDecoration: "underline",
+                        textDecorationThickness: "1px",
+                        textUnderlineOffset: "2px",
+                      }}
+                      className={`cursor-pointer ${
+                        r.squadra.toLowerCase().includes("montecarlo")
+                          ? "text-[#e63946] font-bold"
+                          : "text-black"
+                      }`}
+                    >
+                      {r.squadra}
+                    </span>
+                  </div>
                 </td>
-                <td className="font-bold">{r.punti}</td>
+
+                {/* Colonne colorate */}
+                <td className="font-bold text-[#004aad]">{r.punti}</td>
                 <td>{r.partite_giocate}</td>
-                <td>{r.vinte}</td>
-                <td>{r.pareggiate}</td>
-                <td>{r.perse}</td>
-                <td>{r.goal_fatti}</td>
-                <td>{r.goal_subiti}</td>
+                <td className="text-[#008000] font-semibold">{r.vinte}</td>
+                <td className="text-[#666666]">{r.pareggiate}</td>
+                <td className="text-[#d00000] font-semibold">{r.perse}</td>
+                <td className="text-[#008000] font-semibold">{r.goal_fatti}</td>
+                <td className="text-[#d00000] font-semibold">{r.goal_subiti}</td>
                 <td
                   className={`font-semibold ${
                     r.differenza_reti > 0
@@ -243,10 +311,6 @@ export default function Classifica(): JSX.Element {
           </tbody>
         </table>
       </div>
-
-      <p className="text-center text-white text-sm opacity-80 mt-3">
-        Ultimo aggiornamento automatico ogni sera alle 21:00.
-      </p>
     </div>
   );
 }
