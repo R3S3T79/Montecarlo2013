@@ -97,13 +97,7 @@ export default function Classifica(): JSX.Element {
 
     setRighe(classificaConLoghi);
 
-    // 🔍 Debug opzionale (puoi rimuoverlo dopo i test)
-    console.table(
-      classificaConLoghi.map((r) => ({
-        squadra: r.squadra,
-        logo_trovato: !!r.logo_url,
-      }))
-    );
+   
   } catch (err: any) {
     console.error("❌ Errore caricamento:", err);
     setErrore(err.message);
@@ -225,11 +219,11 @@ export default function Classifica(): JSX.Element {
 
       {/* Tabella contenitore */}
       <div className="bg-white/90 rounded-lg shadow-montecarlo border-l-4 border-montecarlo-secondary overflow-hidden">
-        <table className="w-full border-collapse text-[15px]">
+        <table className="w-full border-collapse text-[17px]">
           <thead className="bg-[#f10909] text-white font-semibold">
             <tr>
-              <th className="py-2 text-center w-8">#</th>
-              <th className="py-2 text-left px-3">Squadra</th>
+              <th className="py-1 text-center w-8">#</th>
+              <th className="py-1 text-left px-3 w-[170px]">Squadra</th>
               <th className="py-2 text-center w-8">PT</th>
               <th className="py-2 text-center w-8">G</th>
               <th className="py-2 text-center w-8">V</th>
@@ -249,7 +243,7 @@ export default function Classifica(): JSX.Element {
                   i % 2 === 0 ? "bg-white/95" : "bg-[#fce5e5]/90"
                 }`}
               >
-                <td className="py-2 pr-1 text-right">{r.posizione}</td>
+                <td className="py-3.5 pr-1 text-right">{r.posizione}</td>
 
                 <td className="text-left pl-1 pr-4 font-semibold">
   <div className="flex items-center gap-2">
@@ -276,11 +270,11 @@ export default function Classifica(): JSX.Element {
                         textDecorationThickness: "1px",
                         textUnderlineOffset: "2px",
                       }}
-                      className={`cursor-pointer ${
-                        r.squadra.toLowerCase().includes("montecarlo")
-                          ? "text-[#e63946] font-bold"
-                          : "text-black"
-                      }`}
+                      className={`cursor-pointer text-[15px] leading-tight ${
+    r.squadra.toLowerCase().includes("montecarlo")
+      ? "text-[#e63946] font-bold"
+      : "text-black font-medium"
+  }`}
                     >
                       {r.squadra}
                     </span>

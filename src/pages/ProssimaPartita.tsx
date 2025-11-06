@@ -743,15 +743,24 @@ const posizione = [
     {/* Lista scontri precedenti */}
 <ul className="space-y-4">
   {precedenti.map((p) => (
-    <li key={p.id} className="text-gray-700 text-sm">
-      {/* Data sopra con stile ovale giallo */}
+    <li
+  key={p.id}
+  onClick={() => navigate(`/partita/${p.id}`)}
+  className="
+    text-gray-700 text-sm
+    transition-transform active:scale-[0.98]
+    hover:scale-[1.02] hover:bg-montecarlo-red-50
+    rounded-lg p-2 select-none
+    shadow-sm active:shadow-inner
+  "
+>
+
       <div className="flex justify-center mb-2">
         <span className="bg-[#E8C547] text-[#B30000] px-3 py-1 rounded-full text-xs font-semibold">
           {formatData(p.data_ora)}
         </span>
       </div>
 
-      {/* Riga con squadre e risultato */}
       <div className="flex items-center justify-between text-center">
         <span className="text-left w-1/3 truncate">{p.casa.nome}</span>
         <span className="w-1/3 font-bold text-lg text-gray-900">
@@ -762,6 +771,7 @@ const posizione = [
     </li>
   ))}
 </ul>
+
 
   </div>
 )}
