@@ -136,23 +136,24 @@ footer,
     <!-- Radice React -->
     <div id="root" style="display: none;"></div>
 
-    <!-- Ingresso principale React/Vite -->
-    <script type="module">
-      import "/src/main.tsx";
+   <!-- Ingresso principale React/Vite -->
+<script type="module" src="/src/main.tsx"></script>
 
-      // Quando React è pronto, nasconde il loader e mostra l’app
-      window.addEventListener("DOMContentLoaded", () => {
-        const loader = document.getElementById("loader");
-        const root = document.getElementById("root");
-        setTimeout(() => {
-          loader?.classList.add("fade-out");
-          setTimeout(() => {
-            loader?.remove();
-            if (root) root.style.display = "block";
-          }, 400);
-        }, 400);
-      });
-    </script>
+<script>
+  // Quando React è pronto, nasconde il loader e mostra l’app
+  window.addEventListener("DOMContentLoaded", () => {
+    const loader = document.getElementById("loader");
+    const root = document.getElementById("root");
+    setTimeout(() => {
+      loader?.classList.add("fade-out");
+      setTimeout(() => {
+        loader?.remove();
+        if (root) root.style.display = "block";
+      }, 400);
+    }, 400);
+  });
+</script>
+
 
     <!-- ✅ SDK Facebook -->
     <div id="fb-root"></div>
