@@ -124,31 +124,32 @@ export default function DettaglioScontri(): JSX.Element {
                 </div>
 
                 {/* Corpo con squadre e risultato */}
-                <div className="p-4 grid grid-cols-[2fr_auto_2fr] items-center gap-4">
-                  <span
-                    className={`font-semibold text-right ${
-                      isMontecarlo(p.squadra_casa)
-                        ? "text-[#e63946]"
-                        : "text-black"
-                    }`}
-                  >
-                    {p.squadra_casa}
-                  </span>
+<div className="p-4 grid grid-cols-[2fr_auto_2fr] items-center gap-4">
+  <span
+    className={`font-medium text-sm text-right ${
+      isMontecarlo(p.squadra_casa)
+        ? "text-[#e63946]"
+        : "text-black"
+    }`}
+  >
+    {p.squadra_casa}
+  </span>
 
-                  <span className="text-montecarlo-secondary font-bold text-lg">
-                    {risultato}
-                  </span>
+  <span className="text-montecarlo-secondary font-bold text-base">
+    {risultato}
+  </span>
 
-                  <span
-                    className={`font-semibold text-left ${
-                      isMontecarlo(p.squadra_ospite)
-                        ? "text-[#e63946]"
-                        : "text-black"
-                    }`}
-                  >
-                    {p.squadra_ospite}
-                  </span>
-                </div>
+  <span
+    className={`font-medium text-sm text-left ${
+      isMontecarlo(p.squadra_ospite)
+        ? "text-[#e63946]"
+        : "text-black"
+    }`}
+  >
+    {p.squadra_ospite}
+  </span>
+</div>
+
               </div>
             );
           })}

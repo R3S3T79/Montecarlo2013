@@ -303,8 +303,19 @@ export default function Classifica(): JSX.Element {
               </tr>
             ))}
           </tbody>
-        </table>
+                </table>
+      </div>
+
+      {/* Pulsante per aprire il grafico andamento classifica */}
+      <div className="text-center mt-6 mb-10">
+        <button
+          onClick={() => navigate("/grafico-classifica")}
+          className="bg-gradient-to-b from-[#8a8a8a] to-[#5e5e5e] hover:from-[#9c9c9c] hover:to-[#6f6f6f] text-white font-semibold px-5 py-2.5 rounded-md transition-all duration-150 shadow-lg active:translate-y-[1px]"
+        >
+          📈 Vedi andamento classifica
+        </button>
       </div>
     </div>
   );
 }
+

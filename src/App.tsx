@@ -23,6 +23,8 @@ import RosaGiocatori from "./pages/RosaGiocatori";
 import DettaglioGiocatore from "./pages/DettaglioGiocatore";
 import AggiungiGiocatore from "./pages/AggiungiGiocatore";
 import EditGiocatore from "./pages/EditGiocatore";
+import GraficoAndamentoClassifica from "./pages/GraficoAndamentoClassifica";
+
 
 // pagine interne
 import Home from "./pages/Home";
@@ -109,6 +111,8 @@ export default function App() {
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/update-password" element={<UpdatePassword />} />
+        <Route path="/grafico-classifica" element={<GraficoAndamentoClassifica />} />
+
 
 
         {/* Layout protetto */}
