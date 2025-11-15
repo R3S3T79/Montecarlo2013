@@ -1,5 +1,5 @@
 // netlify/functions/update-partite-classifica.ts
-// Data: 05/11/2025 — Parsing definitivo + rimozione duplicati + pulizia testo
+// Data: 15/11/2025 — Real Calendar Mode (Mercoledì→Martedì) + deduplica + nomi originali
 
 import { Handler } from "@netlify/functions";
 import * as cheerio from "cheerio";
@@ -15,7 +15,7 @@ const BASE_URL = "https://campionando.it/ruolino.php";
 
 export const handler: Handler = async () => {
   try {
-    // 1️⃣ Legge le squadre dalla tabella classifica
+    // 1️⃣ Legge squadre
     const { data: squadre, error: errSquadre } = await supabase
       .from("classifica")
       .select("squadra");
@@ -27,7 +27,7 @@ export const handler: Handler = async () => {
 
     const tuttePartite: any[] = [];
 
-    // 2️⃣ Cicla su ogni squadra
+    // 2️⃣ Parsing ruolini Campionando
     for (const s of squadre) {
       const nomeSquadra = encodeURIComponent(s.squadra);
       const url = `${BASE_URL}?squadra=${nomeSquadra}&camp=${CAMP_ID}&nome=${nomeSquadra}`;
@@ -52,23 +52,23 @@ export const handler: Handler = async () => {
 
       const $ = cheerio.load(html || "");
       const rows = $("table tr");
-      let conteggio = 0;
 
-      // 3️⃣ Parsing righe della tabella
+      let estratte = 0;
+
       rows.each((i, el) => {
         const cols = $(el).find("td");
-        if (cols.length < 4) return; // serve giornata + 3 colonne
+        if (cols.length < 4) return;
 
         const giornataTxt = pulisci($(cols[0]).text());
         if (!giornataTxt.includes("Giornata")) return;
 
         const dataTxt = giornataTxt.match(/\d{2}\/\d{2}\/\d{4}/)?.[0] || null;
-        const giornataNum = estraiNumeroGiornata(giornataTxt);
 
-        // Squadre e risultato
         const casaTxt = pulisci($(cols[1]).text());
         const ospiteTxt = pulisci($(cols[2]).text());
         const risultatoTxt = pulisci($(cols[3]).text());
+
+        if (!casaTxt || !ospiteTxt) return;
 
         let goalCasa: number | null = null;
         let goalOspite: number | null = null;
@@ -79,60 +79,118 @@ export const handler: Handler = async () => {
           goalOspite = isNaN(b) ? null : b;
         }
 
-        if (!casaTxt || !ospiteTxt) return;
-
         tuttePartite.push({
-          giornata: giornataNum,
           data_match: parseData(dataTxt),
-          squadra_casa: casaTxt,
-          squadra_ospite: ospiteTxt,
+          squadra_casa: normalizzaSquadra(casaTxt),
+          squadra_ospite: normalizzaSquadra(ospiteTxt),
+          squadra_casa_originale: casaTxt,
+          squadra_ospite_originale: ospiteTxt,
           goal_casa: goalCasa,
           goal_ospite: goalOspite,
         });
-        conteggio++;
+
+        estratte++;
       });
 
-      console.log(`✅ ${conteggio} partite estratte per ${s.squadra}`);
-      await new Promise((r) => setTimeout(r, 800)); // piccola pausa
+      console.log(`✅ ${estratte} partite estratte per ${s.squadra}`);
+
+      await new Promise((r) => setTimeout(r, 700)); // piccola pausa
     }
 
     if (tuttePartite.length === 0)
       throw new Error("Nessuna partita trovata nei ruolini.");
 
-   // 4️⃣ Filtra i duplicati (stessa data e stesse squadre invertite)
-const uniche: any[] = [];
-const visti = new Set();
+    console.log(`📌 Totale partite grezze: ${tuttePartite.length}`);
 
-for (const p of tuttePartite) {
-  if (!p.data_match || !p.squadra_casa || !p.squadra_ospite) continue;
+    // 3️⃣ Deduplica partite (stessa data + stesse squadre)
+    const map = new Map();
 
-  // Genera chiave unica indipendente dall'ordine casa/ospite
-  const chiave = [
-    p.data_match,
-    [p.squadra_casa, p.squadra_ospite].sort().join("-"),
-    p.goal_casa ?? "x",
-    p.goal_ospite ?? "x",
-  ].join("|");
+    for (const p of tuttePartite) {
+      if (!p.data_match) continue;
 
-  if (!visti.has(chiave)) {
-    visti.add(chiave);
-    uniche.push(p);
-  }
-}
+      const chiave = [
+        p.data_match,
+        [p.squadra_casa, p.squadra_ospite].sort().join("-"),
+      ].join("|");
 
-// Ordina per data e giornata
-uniche.sort((a, b) => {
-  if (a.data_match < b.data_match) return -1;
-  if (a.data_match > b.data_match) return 1;
-  return (a.giornata || 0) - (b.giornata || 0);
-});
+      if (!map.has(chiave)) {
+        map.set(chiave, p);
+      } else {
+        const salvata = map.get(chiave);
 
-console.log(
-  `🧹 Eliminati ${tuttePartite.length - uniche.length} duplicati. Rimaste ${uniche.length} partite.`
-);
+        if (p.goal_casa !== null) salvata.goal_casa = p.goal_casa;
+        if (p.goal_ospite !== null) salvata.goal_ospite = p.goal_ospite;
+      }
+    }
 
+    let partiteUniche = Array.from(map.values());
+    console.log(`🧹 Partite dopo deduplica: ${partiteUniche.length}`);
 
-    // 5️⃣ Cancella vecchi dati e salva i nuovi
+    // 4️⃣ Ordinamento per data
+    partiteUniche = partiteUniche.filter((p) => p.data_match !== null);
+    partiteUniche.sort((a, b) => (a.data_match! < b.data_match! ? -1 : 1));
+
+    // 5️⃣ Giornate REAL CALENDAR MODE (Mercoledì→Martedì)
+    const dateToGiornata = new Map<string, number>();
+    let giornataCorrente = 1;
+
+    let currentStart = null;
+
+    for (const p of partiteUniche) {
+      const d = new Date(p.data_match!);
+
+      const startOfWeek = mercolediDiQuellaSettimana(d);
+
+      const key = startOfWeek.toISOString().substring(0, 10);
+
+      if (!dateToGiornata.has(key)) {
+        dateToGiornata.set(key, giornataCorrente++);
+      }
+
+      p.giornata = dateToGiornata.get(key);
+    }
+
+    console.log(`📌 Giornate generate: 1 → ${giornataCorrente - 1}`);
+
+    // 6️⃣ Genera i RIPOSI
+    const squadreOriginali = squadre.map((s) => s.squadra);
+    const maxGiornata = giornataCorrente - 1;
+
+    const calendarioCompleto: any[] = [];
+
+    for (let g = 1; g <= maxGiornata; g++) {
+      const partiteG = partiteUniche.filter((p) => p.giornata === g);
+
+      for (const squadra of squadreOriginali) {
+        const normale = normalizzaSquadra(squadra);
+
+        const haGiocato = partiteG.some(
+          (p) =>
+            p.squadra_casa === normale || p.squadra_ospite === normale
+        );
+
+        if (!haGiocato) {
+          calendarioCompleto.push({
+            giornata: g,
+            data_match: null,
+            squadra_casa: normale,
+            squadra_ospite: "riposo",
+            squadra_casa_originale: squadra,
+            squadra_ospite_originale: "RIPOSO",
+            goal_casa: null,
+            goal_ospite: null,
+          });
+        }
+      }
+
+      calendarioCompleto.push(...partiteG);
+    }
+
+    console.log(
+      `📌 Partite + riposi totali: ${calendarioCompleto.length}`
+    );
+
+    // 7️⃣ Salva nel DB
     await supabase
       .from("classifica_partite")
       .delete()
@@ -140,17 +198,17 @@ console.log(
 
     const { error: insErr } = await supabase
       .from("classifica_partite")
-      .insert(uniche);
+      .insert(calendarioCompleto);
 
     if (insErr) throw insErr;
 
-    console.log(`✅ Inserite ${uniche.length} partite totali.`);
+    console.log(`✅ Inserite ${calendarioCompleto.length} righe totali.`);
 
     return {
       statusCode: 200,
       body: JSON.stringify({
-        message: "Partite aggiornate correttamente",
-        totale: uniche.length,
+        message: "Partite aggiornate correttamente (Real Calendar Mode)",
+        totale: calendarioCompleto.length,
       }),
     };
   } catch (err: any) {
@@ -162,14 +220,10 @@ console.log(
   }
 };
 
-// 🔧 Funzioni di supporto
-function pulisci(txt: string): string {
-  return txt.replace(/\s+/g, " ").replace(/\n/g, "").trim();
-}
+// ——— Funzioni di supporto ———
 
-function estraiNumeroGiornata(testo: string): number | null {
-  const m = testo.match(/Giornata\s+(\d+)/i);
-  return m ? parseInt(m[1]) : null;
+function pulisci(txt: string) {
+  return txt.replace(/\s+/g, " ").replace(/\n/g, "").trim();
 }
 
 function parseData(txt: string | null): string | null {
@@ -178,4 +232,23 @@ function parseData(txt: string | null): string | null {
   if (!m) return null;
   const [, dd, mm, yyyy] = m;
   return `${yyyy}-${mm}-${dd}`;
+}
+
+function normalizzaSquadra(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+// Mercoledì della settimana della partita
+function mercolediDiQuellaSettimana(d: Date): Date {
+  const giorno = d.getDay(); // 0=Dom, 1=Lun, 2=Mar, 3=Mer, 4=Gio, 5=Ven, 6=Sab
+  const distanzaMercoledi =
+    giorno >= 3 ? giorno - 3 : giorno + 4; // distanza dal Mercoledì precedente
+  const mer = new Date(d);
+  mer.setDate(d.getDate() - distanzaMercoledi);
+  mer.setHours(0, 0, 0, 0);
+  return mer;
 }

@@ -1,5 +1,5 @@
 // src/pages/Classifica.tsx
-// Data: 06/11/2025 — versione con caricamento loghi da tabella "squadre" tramite confronto nome flessibile
+// Data: 15/11/2025 — versione corretta: aggiornamento classifica sempre via Netlify Function (anche in locale)
 
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
@@ -31,7 +31,7 @@ export default function Classifica(): JSX.Element {
   const [role, setRole] = useState<UserRole>(UserRole.Authenticated);
   const navigate = useNavigate();
 
-  // ✅ Recupera ruolo utente
+  // Recupera ruolo utente
   useEffect(() => {
     const fetchRole = async () => {
       if (!user?.id) return;
@@ -50,130 +50,79 @@ export default function Classifica(): JSX.Element {
   }, [user?.id]);
 
   const caricaClassifica = async () => {
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    // 1️⃣ Carica classifica
-    const { data, error } = await supabase
-      .from("classifica")
-      .select("*")
-      .order("punti", { ascending: false })
-      .order("differenza_reti", { ascending: false });
-    if (error) throw error;
+      // 1) Carica classifica
+      const { data, error } = await supabase
+        .from("classifica")
+        .select("*")
+        .order("punti", { ascending: false })
+        .order("differenza_reti", { ascending: false });
 
-    const dataConPosizione = (data || []).map((r, i) => ({
-      ...r,
-      posizione: i + 1,
-    }));
+      if (error) throw error;
 
-    // 2️⃣ Carica le squadre con nome, alias e logo
-    const { data: squadre, error: errSquadre } = await supabase
-      .from("squadre")
-      .select("nome, alias, logo_url");
-    if (errSquadre) throw errSquadre;
+      const dataConPosizione = (data || []).map((r, i) => ({
+        ...r,
+        posizione: i + 1,
+      }));
 
-    // 3️⃣ Funzione di normalizzazione (ignora maiuscole, spazi, punti, accenti)
-    const normalizza = (s: string) =>
-      s
-        ? s
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/[^a-z0-9]/g, "")
-        : "";
+      // 2) Carica squadre
+      const { data: squadre, error: errSquadre } = await supabase
+        .from("squadre")
+        .select("nome, alias, logo_url");
 
-    // 4️⃣ Collega il logo: prima prova con alias, poi con nome
-    const classificaConLoghi = dataConPosizione.map((r) => {
-      const squadraNome = normalizza(r.squadra);
+      if (errSquadre) throw errSquadre;
 
-      const match = squadre?.find((sq) => {
-        const nomeNorm = normalizza(sq.nome);
-        const aliasNorm = normalizza(sq.alias || "");
-        return squadraNome === aliasNorm || squadraNome === nomeNorm;
+      // 3) Normalizzazione
+      const normalizza = (s: string) =>
+        s
+          ? s
+              .toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .replace(/[^a-z0-9]/g, "")
+          : "";
+
+      // 4) Collega loghi
+      const classificaConLoghi = dataConPosizione.map((r) => {
+        const squadraNome = normalizza(r.squadra);
+
+        const match = squadre?.find((sq) => {
+          const nomeNorm = normalizza(sq.nome);
+          const aliasNorm = normalizza(sq.alias || "");
+          return squadraNome === aliasNorm || squadraNome === nomeNorm;
+        });
+
+        return { ...r, logo_url: match?.logo_url || null };
       });
 
-      return { ...r, logo_url: match?.logo_url || null };
-    });
-
-    setRighe(classificaConLoghi);
-
-   
-  } catch (err: any) {
-    console.error("❌ Errore caricamento:", err);
-    setErrore(err.message);
-  } finally {
-    setLoading(false);
-  }
-};
-
+      setRighe(classificaConLoghi);
+    } catch (err: any) {
+      console.error("❌ Errore caricamento:", err);
+      setErrore(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     caricaClassifica();
   }, []);
 
-  // ✅ Aggiorna la classifica (solo creator)
+  // Aggiorna la classifica
   const aggiornaClassifica = async () => {
     try {
       setLoading(true);
-      const isLocal = window.location.hostname === "localhost";
-      if (isLocal) {
-        console.log("🔹 Modalità locale: aggiornamento diretto da Campionando.it");
 
-        const res = await fetch("https://campionando.it/classi.php?camp=6158");
-        const html = await res.text();
-        const $ = cheerio.load(html);
+      // Sia in locale che in produzione → USA SEMPRE LA NETLIFY FUNCTION
+      console.log("🌍 Aggiornamento via Netlify Function (locale o produzione)");
 
-        const rows: any[] = [];
-        $("table tr").each((i, el) => {
-          const cols = $(el).find("td");
-          if (cols.length >= 9) {
-            const posizione = parseInt($(cols[0]).text().trim()) || 0;
-            const squadra = $(cols[1]).text().trim();
-            const partite_giocate = parseInt($(cols[2]).text().trim()) || 0;
-            const vinte = parseInt($(cols[3]).text().trim()) || 0;
-            const pareggiate = parseInt($(cols[4]).text().trim()) || 0;
-            const perse = parseInt($(cols[5]).text().trim()) || 0;
-            const goal_fatti = parseInt($(cols[6]).text().trim()) || 0;
-            const goal_subiti = parseInt($(cols[7]).text().trim()) || 0;
-            const punti = parseInt($(cols[8]).text().trim()) || 0;
+      const res = await fetch("/.netlify/functions/update-classifica");
+      const text = await res.text();
+      console.log("Risposta funzione:", text);
 
-            if (squadra) {
-              rows.push({
-                posizione,
-                squadra,
-                partite_giocate,
-                vinte,
-                pareggiate,
-                perse,
-                goal_fatti,
-                goal_subiti,
-                differenza_reti: goal_fatti - goal_subiti,
-                punti,
-              });
-            }
-          }
-        });
-
-        if (rows.length === 0)
-          throw new Error("Nessuna riga trovata su Campionando.it");
-
-        await supabase
-          .from("classifica")
-          .delete()
-          .neq("id", "00000000-0000-0000-0000-000000000000");
-        const { error: insErr } = await supabase
-          .from("classifica")
-          .insert(rows);
-        if (insErr) throw insErr;
-
-        alert(`✅ Classifica aggiornata (${rows.length} squadre)`);
-      } else {
-        console.log("🌍 Modalità produzione: chiamata Netlify Function");
-        const res = await fetch("/.netlify/functions/update-classifica");
-        const text = await res.text();
-        console.log("Risposta funzione:", text);
-        alert("✅ Aggiornamento completato (Netlify).");
-      }
+      alert("✅ Aggiornamento completato.");
 
       await caricaClassifica();
     } catch (err: any) {
@@ -205,7 +154,7 @@ export default function Classifica(): JSX.Element {
         Classifica Campionato
       </h2>
 
-      {/* Pulsante visibile solo al Creator */}
+      {/* Pulsante update visibile solo ai ROLE CREATOR */}
       {role === UserRole.Creator && (
         <div className="text-center mb-4">
           <button
@@ -217,7 +166,7 @@ export default function Classifica(): JSX.Element {
         </div>
       )}
 
-      {/* Tabella contenitore */}
+      {/* Tabella */}
       <div className="bg-white/90 rounded-lg shadow-montecarlo border-l-4 border-montecarlo-secondary overflow-hidden">
         <table className="w-full border-collapse text-[17px]">
           <thead className="bg-[#f10909] text-white font-semibold">
@@ -246,10 +195,9 @@ export default function Classifica(): JSX.Element {
                 <td className="py-3.5 pr-1 text-right">{r.posizione}</td>
 
                 <td className="text-left pl-1 pr-4 font-semibold">
-  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
 
-
-                    {/* Logo squadra */}
+                    {/* Logo */}
                     {r.logo_url ? (
                       <img
                         src={r.logo_url}
@@ -271,17 +219,16 @@ export default function Classifica(): JSX.Element {
                         textUnderlineOffset: "2px",
                       }}
                       className={`cursor-pointer text-[15px] leading-tight ${
-    r.squadra.toLowerCase().includes("montecarlo")
-      ? "text-[#e63946] font-bold"
-      : "text-black font-medium"
-  }`}
+                        r.squadra.toLowerCase().includes("montecarlo")
+                          ? "text-[#e63946] font-bold"
+                          : "text-black font-medium"
+                      }`}
                     >
                       {r.squadra}
                     </span>
                   </div>
                 </td>
 
-                {/* Colonne colorate */}
                 <td className="font-bold text-[#004aad]">{r.punti}</td>
                 <td>{r.partite_giocate}</td>
                 <td className="text-[#008000] font-semibold">{r.vinte}</td>
@@ -303,10 +250,10 @@ export default function Classifica(): JSX.Element {
               </tr>
             ))}
           </tbody>
-                </table>
+        </table>
       </div>
 
-      {/* Pulsante per aprire il grafico andamento classifica */}
+      {/* Pulsante grafico */}
       <div className="text-center mt-6 mb-10">
         <button
           onClick={() => navigate("/grafico-classifica")}
@@ -318,4 +265,3 @@ export default function Classifica(): JSX.Element {
     </div>
   );
 }
-

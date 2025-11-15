@@ -1,5 +1,5 @@
 // src/main.tsx
-// Data revisione: 01/11/2025 — Montecarlo2013 con banner elegante + log visivi + refresh immediato
+// Data revisione: 12/11/2025 — versione compatibile con disattivazione PWA in sviluppo + banner aggiornamento elegante
 
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
@@ -88,8 +88,13 @@ function ServiceWorkerManager() {
   const [buildTime, setBuildTime] = useState<string>("");
 
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      import("virtual:pwa-register").then(({ registerSW }) => {
+    // ✅ Esegui l'import solo in produzione
+    if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  // 🧩 Evita che Vite analizzi il modulo in sviluppo
+  const pwaRegister = new Function("return import('virtual:pwa-register')");
+
+  pwaRegister().then(({ registerSW }: any) => {
+
         logSW("Inizializzazione registerSW...");
 
         const updateSW = registerSW({
