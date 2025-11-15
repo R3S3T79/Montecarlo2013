@@ -1,11 +1,9 @@
 // src/pages/GraficoAndamentoClassifica.tsx
-// Data creazione chat: 07/11/2025 — Grafico andamento posizioni classifica con checkbox squadre
+// Data: 15/11/2025 — Rev4: nomi reali, stemmi, lista squadre a colonne, sfondo grafico più chiaro
 
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import {
-  Line
-} from "react-chartjs-2";
+import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   LineElement,
@@ -14,7 +12,7 @@ import {
   PointElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
 } from "chart.js";
 
 ChartJS.register(
@@ -29,19 +27,25 @@ ChartJS.register(
 
 interface RecordClassifica {
   giornata: number;
-  squadra: string;
+  squadra: string; // NOME ORIGINALE
   posizione: number;
+  logo_url?: string | null;
 }
 
 export default function GraficoAndamentoClassifica() {
   const [records, setRecords] = useState<RecordClassifica[]>([]);
-  const [squadre, setSquadre] = useState<string[]>([]);
+  const [squadre, setSquadre] = useState<RecordClassifica[]>([]);
   const [selezionate, setSelezionate] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // =====================================================
+  // 🔥 CARICA RECORD E LOGHI DELLE SQUADRE
+  // =====================================================
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
+
+      // 1️⃣ Carica andamento classifica
       const { data, error } = await supabase
         .from("v_andamento_classifica")
         .select("giornata, squadra, posizione")
@@ -49,18 +53,72 @@ export default function GraficoAndamentoClassifica() {
 
       if (error) {
         console.error("❌ Errore caricamento dati:", error);
-      } else {
-        setRecords(data || []);
-        const squadreUniche = Array.from(
-          new Set((data || []).map((r) => r.squadra))
-        );
-        setSquadre(squadreUniche);
-        setSelezionate(squadreUniche.filter((s) =>
-          s.toLowerCase().includes("montecarlo")
-        ));
+        setLoading(false);
+        return;
       }
+
+      // Rimuove RIPOSO dalle squadre
+const andamento = (data || []).filter(
+  (r) => r.squadra.toLowerCase() !== "riposo"
+);
+
+
+      // 2️⃣ Carica loghi squadre (ORA include anche alias!)
+const { data: squadreDb } = await supabase
+  .from("squadre")
+  .select("nome, alias, logo_url");
+
+// usa nomi normalizzati per trovare i loghi
+const normalize = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+
+const conLogo = andamento.map((r) => {
+  const nomeNorm = normalize(r.squadra);
+
+  const match = squadreDb?.find(
+    (sq) =>
+      normalize(sq.nome) === nomeNorm ||
+      normalize(sq.alias || "") === nomeNorm
+  );
+
+  return {
+    ...r,
+    logo_url: match?.logo_url || null,
+  };
+});
+
+
+      setRecords(conLogo);
+
+      const squadreUniche = Array.from(
+  new Map(
+    conLogo
+      .filter((r) => r.squadra.toLowerCase() !== "riposo") // 👈 FILTRO QUI
+      .map((r) => [
+        r.squadra,
+        { squadra: r.squadra, logo_url: r.logo_url }
+      ])
+  ).values()
+).sort((a, b) => a.squadra.localeCompare(b.squadra));
+
+
+
+      setSquadre(squadreUniche);
+
+      // preseleziona Montecarlo
+      setSelezionate(
+        squadreUniche
+          .filter((s) => s.squadra.toLowerCase().includes("montecarlo"))
+          .map((s) => s.squadra)
+      );
+
       setLoading(false);
     };
+
     fetchData();
   }, []);
 
@@ -71,39 +129,56 @@ export default function GraficoAndamentoClassifica() {
       </div>
     );
 
-  // ✅ Fissa le giornate del campionato da 0 a 8 (inclusa giornata iniziale)
-const giornate = Array.from({ length: 9 }, (_, i) => i);
+  // =====================================================
+  // 🔢 DINAMICO: giornate & posizioni
+  // =====================================================
+  const numeroSquadre = squadre.length;
+  const numeroGiornate = numeroSquadre - 1;
+  const maxPosizione = numeroSquadre - 1;
 
+  const giornate = Array.from({ length: numeroGiornate + 1 }, (_, i) => i);
 
-  // palette colori casuale ma stabile per ogni squadra
+  // =====================================================
+  // 🎨 COLORI SQUADRE
+  // =====================================================
   const colorForTeam = (s: string) => {
     if (s.toLowerCase().includes("montecarlo b")) return "#d62828";
     if (s.toLowerCase().includes("montecarlo")) return "#e63946";
+
     let hash = 0;
-    for (let i = 0; i < s.length; i++)
+    for (let i = 0; i < s.length; i++) {
       hash = s.charCodeAt(i) + ((hash << 5) - hash);
-    const color = `hsl(${hash % 360}, 70%, 45%)`;
-    return color;
+    }
+    return `hsl(${hash % 360}, 70%, 35%)`;
   };
 
-  // dataset per il grafico
-  const datasets = selezionate.map((s) => {
-  // per ogni squadra creo i dati giornata 0 -> 8
-  const punti = giornate.map((g) => {
-    if (g === 0) return 0; // giornata iniziale: posizione 0
-    const rec = records.find(
-      (r) => r.squadra === s && r.giornata === g
-    );
-    return rec ? rec.posizione : null;
-  });
+  // =====================================================
+  // 🔥 GENERAZIONE LINEE (gestione riposi)
+  // =====================================================
+  const datasets = selezionate.map((nomeSquadra) => {
+    let ultimaPosizione = 0;
 
+    const punti = giornate.map((g) => {
+      if (g === 0) return 0;
+
+      const rec = records.find(
+        (r) => r.squadra === nomeSquadra && r.giornata === g
+      );
+
+      if (rec) {
+        ultimaPosizione = rec.posizione;
+        return rec.posizione;
+      }
+
+      return ultimaPosizione;
+    });
 
     return {
-      label: s,
+      label: nomeSquadra,
       data: punti,
-      borderColor: colorForTeam(s),
-      backgroundColor: colorForTeam(s),
-      tension: 0.3,
+      borderColor: colorForTeam(nomeSquadra),
+      backgroundColor: colorForTeam(nomeSquadra),
+      tension: 0.35,
       pointRadius: 4,
       borderWidth: 2,
     };
@@ -114,6 +189,9 @@ const giornate = Array.from({ length: 9 }, (_, i) => i);
     datasets,
   };
 
+  // =====================================================
+  // 📊 OPZIONI GRAFICO — SFONDO PIÙ LEGGERO
+  // =====================================================
   const options = {
     responsive: true,
     maintainAspectRatio: false,
@@ -123,92 +201,82 @@ const giornate = Array.from({ length: 9 }, (_, i) => i);
         display: true,
         text: "Andamento in Classifica",
         color: "#fff",
-        font: { size: 18, weight: "bold" },
-      },
-      tooltip: {
-        callbacks: {
-          label: function (ctx: any) {
-            return `${ctx.dataset.label}: ${ctx.parsed.y}ª posizione`;
-          },
-        },
+        font: { size: 20, weight: "bold" },
       },
     },
     scales: {
       x: {
-        title: {
-          display: true,
-          text: "Giornata",
-          color: "#fff",
-        },
         ticks: { color: "#fff" },
-        grid: { color: "rgba(255,255,255,0.1)" },
+        title: { display: true, text: "Giornata", color: "#fff" },
+        grid: { color: "rgba(255,255,255,0.25)" },
       },
       y: {
-  title: {
-    display: true,
-    text: "Posizione",
-    color: "#fff",
-  },
-  ticks: {
-    color: "#fff",
-    stepSize: 1,
-    min: 0, // 👈 include lo 0 in classifica
-    max: 9,
-    reverse: true, // posizione 1 in alto
-  },
-  grid: { color: "rgba(255,255,255,0.1)" },
-},
-
-
+        ticks: { color: "#fff", stepSize: 1, min: 0, max: maxPosizione, reverse: true },
+        title: { display: true, text: "Posizione", color: "#fff" },
+        grid: { color: "rgba(255,255,255,0.25)" },
+      },
     },
   };
 
-  const toggleSquadra = (s: string) => {
+  // =====================================================
+  // ✔️ TOGGLE SQUADRE
+  // =====================================================
+  const toggleSquadra = (nome: string) => {
     setSelezionate((prev) =>
-      prev.includes(s)
-        ? prev.filter((x) => x !== s)
-        : [...prev, s]
+      prev.includes(nome)
+        ? prev.filter((x) => x !== nome)
+        : [...prev, nome]
     );
   };
 
+  // =====================================================
+  // 🖼️ UI — LOGHI + Due Colonne + Sfondo Lista
+  // =====================================================
   return (
     <div className="container mx-auto px-2 py-4 text-center">
       <h2 className="text-white text-xl font-bold mb-4">
         📈 Andamento Posizioni in Classifica
       </h2>
 
-      {/* Selettori squadre */}
-      <div className="flex flex-wrap justify-center gap-3 mb-5">
-        {squadre.map((s) => (
+      {/* Lista squadre a colonne */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5 mx-auto max-w-lg">
+        {squadre.map((sq) => (
           <label
-            key={s}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md cursor-pointer ${
-              s.toLowerCase().includes("montecarlo")
-                ? "bg-[#e63946]/30"
-                : "bg-white/10"
-            }`}
+            key={sq.squadra}
+            className="flex items-center gap-2 px-2 py-1 rounded-md bg-white/10 cursor-pointer"
           >
             <input
               type="checkbox"
-              checked={selezionate.includes(s)}
-              onChange={() => toggleSquadra(s)}
+              checked={selezionate.includes(sq.squadra)}
+              onChange={() => toggleSquadra(sq.squadra)}
               className="accent-[#e63946] cursor-pointer"
             />
-            <span
-              className={`text-sm font-medium ${
-                s.toLowerCase().includes("montecarlo")
-                  ? "text-[#e63946]"
-                  : "text-white"
-              }`}
-            >
-              {s}
-            </span>
+
+            {/* Logo squadra */}
+            {sq.logo_url ? (
+              <img
+                src={sq.logo_url}
+                alt={sq.squadra}
+                className="w-6 h-6 rounded-full object-contain bg-white border border-gray-300"
+              />
+            ) : (
+              <div className="w-6 h-6 rounded-full bg-gray-300 border border-gray-500" />
+            )}
+
+            <span className="text-sm text-white font-medium">{sq.squadra}</span>
           </label>
         ))}
       </div>
 
-      {/* Contenitore grafico */}
-      <div className="bg-white/10 rounded-lg p-4" style={{ height: "400px" }}>
+      {/* Contenitore grafico con sfondo più chiaro */}
+      <div
+        className="rounded-lg p-4"
+        style={{
+          height: "420px",
+          background: "rgba(255,255,255,0.40)",
+backdropFilter: "blur(6px)",
+        }}
+      >
         <Line data={dataChart} options={options} />
       </div>
     </div>
