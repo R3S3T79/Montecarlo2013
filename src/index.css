@@ -187,7 +187,7 @@ html, body, #root {
   position: absolute;
   left: 0;
   right: 0;
-  top: 85%;                 /* centrato meglio */
+  top: 95%;                 /* centrato meglio */
   transform: translateY(-50%);
   height: 4px;              /* riga più sottile */
   background: black;

@@ -59,7 +59,9 @@ export default function ListaSquadre() {
 
         {/* Griglia di squadre */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-          {squadre.map(squadra => (
+          {squadre
+  .filter(s => s.nome.toLowerCase() !== "da definire")
+  .map(squadra => (
             <div
               key={squadra.id}
               onClick={() => navigate(`/squadre/${squadra.id}`)}

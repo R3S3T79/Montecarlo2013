@@ -540,7 +540,12 @@ setOraPartita(`${hh}:${mm}`);
 
 
       {/* ===== LAYOUT EXPORT (screenshot) ===== */}
-      <div id="convocazione" className="bg-white font-serif text-[14pt] p-6">
+      <div
+  id="convocazione"
+  className="bg-white font-serif text-[14pt]"
+  style={{ padding: "12px 24px" }}  // <— riduce spazio verticale totale
+>
+
         {/* Header loghi */}
         <div className="convocazioni-header">
           <img src="/montecarlo.png" alt="logo Montecarlo" className="logo-montecarlo" />
@@ -585,26 +590,43 @@ setOraPartita(`${hh}:${mm}`);
           </tbody>
         </table>
 
-        {/* Convocati */}
-        <div className="convocati-list">
-          <strong>CONVOCATI:</strong>
-          <ul className="mt-3">
-            {giocatori.map((g) => (
-              <li key={g.id} className={convocati.includes(g.id) ? "" : "line-through"}>
-  <span>
-    {g.cognome.toUpperCase()} {g.nome}
-  </span>
-</li>
-            ))}
-          </ul>
-        </div>
+{/* Convocati */}
+<div
+  className="convocati-list"
+  style={{ marginBottom: "8px", paddingBottom: "0px" }}  // <-- equilibrio perfetto
+>
+  <strong>CONVOCATI:</strong>
 
-        <div className="competizione-box mt-2 export-only text-center">
-  <div className="font-bold text-xl uppercase">{competizione}</div>
-  <div className="mt-4 text-lg uppercase">{nomeTorneo}</div>
+  <ul className="mt-2" style={{ marginTop: "6px", marginBottom: "0px" }}>
+    {giocatori.map((g) => (
+      <li
+        key={g.id}
+        className={convocati.includes(g.id) ? "" : "line-through"}
+        style={{ marginBottom: "2px", lineHeight: "20px" }}  // <-- leggermente più alto
+      >
+        <span>{g.cognome.toUpperCase()} {g.nome}</span>
+      </li>
+    ))}
+  </ul>
+</div>
+
+
+
+  <div
+  className="competizione-box export-only text-center"
+  style={{ marginTop: "12px", marginBottom: "4px" }}
+>
+
+  <div className="font-bold text-xl uppercase" style={{ marginBottom: "2px" }}>
+    {competizione}
+  </div>
+
+  <div className="text-lg uppercase" style={{ marginTop: "2px" }}>
+    {nomeTorneo}
+  </div>
 
   {competizione === "Torneo" && squadreAvversarie.length > 1 && (
-    <div className="mt-2 text-sm">
+    <div className="mt-1 text-sm">
       <ul className="list-none space-y-1">
         {squadreAvversarie.map((sq, i) => (
           <li key={i} className="uppercase">{sq}</li>
@@ -615,8 +637,12 @@ setOraPartita(`${hh}:${mm}`);
 </div>
 
 
-        {/* Staff */}
-<div className="convocazioni-section">
+
+{/* Staff */}
+<div
+  className="convocazioni-section"
+  style={{ marginBottom: "6px" }}   // <--- margine ridotto FORZATO
+>
   <div>
     <span>ALLENATORE:</span> {allenatore}
   </div>
@@ -628,15 +654,20 @@ setOraPartita(`${hh}:${mm}`);
   </div>
 </div>
 
-        {/* Footer */}
-<div className="convocazioni-footer">
-  <span style={{ color: '#e60000' }}>
+{/* Footer */}
+<div
+  className="convocazioni-footer"
+  style={{ marginTop: "0px" }}      // <--- elimina margine superiore
+>
+  <span style={{ color: "#e60000" }}>
     ASSOCIAZIONE SPORTIVA DILETTANTISTICA MONTECARLO
   </span>
   <br />
   Via Provinciale di Montecarlo, 32 – 55015 Montecarlo (LU) <br />
   P.I. e C.F.: 02091460465 – Mail asdmontecarlo@gmail.com – Matricola LND 947185
 </div>
+
+
 </div>
 </div>
 
