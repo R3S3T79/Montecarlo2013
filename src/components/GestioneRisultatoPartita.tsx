@@ -59,6 +59,8 @@ export default function GestioneRisultatoPartita() {
   // tempo di riferimento interno del timer (in secondi)
   const [nowSec, setNowSec] = useState(0);
 
+  const [highlightedSubs, setHighlightedSubs] = useState<Set<string>>(new Set());
+
   // righe raw da DB (entrata/uscita in secondi)
   const [minutiRows, setMinutiRows] = useState<
     { giocatore_stagione_id: string; entrata_sec: number | null; uscita_sec: number | null }[]
@@ -248,7 +250,7 @@ useEffect(() => {
 
     // 8) Realtime partite
     subPartite = supabase
-      .channel("realtime-partite")
+      .channel(`realtime-partite-${p.id}`)
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "partite", filter: `id=eq.${p.id}` },
@@ -261,7 +263,7 @@ useEffect(() => {
 
     // 9) Realtime marcatori
     subMarcatori = supabase
-      .channel("realtime-marcatori")
+  .channel(`realtime-marcatori-${p.id}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "marcatori", filter: `partita_id=eq.${p.id}` },
@@ -288,7 +290,7 @@ useEffect(() => {
 
     // 10) Realtime timer
     subTimer = supabase
-      .channel("realtime-timer")
+  .channel(`realtime-timer-${p.id}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "partita_timer_state", filter: `partita_id=eq.${p.id}` },
@@ -1315,10 +1317,13 @@ const salvaStatoConferma = async () => {
                 )
               }
               className={`cursor-pointer flex items-center justify-between pr-2 border-b py-1 ${
-                uscenteSelezionato === gioc!.id
-                  ? "bg-montecarlo-gray-200 font-bold"
-                  : "hover:bg-montecarlo-gray-100"
-              }`}
+  highlightedSubs.has(gioc!.id)
+    ? "bg-red-200 font-bold"
+    : uscenteSelezionato === gioc!.id
+      ? "bg-montecarlo-gray-200 font-bold"
+      : "hover:bg-montecarlo-gray-100"
+}`}
+
             >
               <span>
                 {(gioc!.cognome || "").trim()} {(gioc!.nome || "").trim()}
@@ -1341,13 +1346,28 @@ const salvaStatoConferma = async () => {
             <div
               key={gioc!.id}
               onClick={() => {
-                if (uscenteSelezionato) {
-                  const minuto = Math.floor(elapsed / 1000);
-                  salvaSostituzione(uscenteSelezionato, gioc!.id, minuto);
-                  setUscenteSelezionato(null);
-                }
-              }}
-              className="cursor-pointer flex items-center justify-between pr-2 border-b py-1 hover:bg-montecarlo-gray-100"
+  if (uscenteSelezionato) {
+    const minuto = Math.floor(elapsed / 1000);
+    salvaSostituzione(uscenteSelezionato, gioc!.id, minuto);
+
+    // 🔥 EVIDENZIA entrambi
+    setHighlightedSubs(prev => {
+      const nuovo = new Set(prev);
+      nuovo.add(uscenteSelezionato);
+      nuovo.add(gioc!.id);
+      return nuovo;
+    });
+
+    setUscenteSelezionato(null);
+  }
+}}
+
+              className={`cursor-pointer flex items-center justify-between pr-2 border-b py-1 ${
+  highlightedSubs.has(gioc!.id)
+    ? "bg-red-200 font-bold"
+    : "hover:bg-montecarlo-gray-100"
+}`}
+
             >
               <span>
                 {(gioc!.cognome || "").trim()} {(gioc!.nome || "").trim()}
@@ -1360,7 +1380,12 @@ const salvaStatoConferma = async () => {
       </div>
 
       <button
-        onClick={() => setSostituzioniAperte(false)}
+        onClick={() => {
+  setHighlightedSubs(new Set());
+  setUscenteSelezionato(null);
+  setSostituzioniAperte(false);
+}}
+
         className="w-full bg-red-500 text-white py-2 rounded-lg mt-4"
       >
         Chiudi
