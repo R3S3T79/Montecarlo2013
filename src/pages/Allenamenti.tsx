@@ -1,6 +1,7 @@
 // src/pages/Allenamenti.tsx
 // Data creazione chat: 2026-02-03
-// Fix: conteggio corretto allenamenti (totale stagione basato su date distinte)
+// Fix definitivo: conteggio allenamenti identico a AllenamentiGiocatore.tsx
+// 1 riga in tabella allenamenti = 1 allenamento per giocatore
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
@@ -24,9 +25,9 @@ export default function Allenamenti(): JSX.Element {
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      const oggi = new Date().toISOString().split('T')[0];
+      const oggi = new Date().toISOString().slice(0, 10);
 
-      // Recupera stagione attiva
+      // 1️⃣ Stagione attiva
       const { data: stagione } = await supabase
         .from('stagioni')
         .select('id')
@@ -40,7 +41,7 @@ export default function Allenamenti(): JSX.Element {
         return;
       }
 
-      // Recupera giocatori stagione (view)
+      // 2️⃣ Giocatori della stagione
       const { data: gs } = await supabase
         .from('giocatori_stagioni_view')
         .select('id, giocatore_uid, nome, cognome')
@@ -52,60 +53,53 @@ export default function Allenamenti(): JSX.Element {
         return;
       }
 
-      // Ordinamento lato client
+      // Ordinamento cognome / nome
       const gsSorted = [...gs].sort((a: any, b: any) => {
         const ac = (a.cognome ?? '').localeCompare(b.cognome ?? '');
         if (ac !== 0) return ac;
         return (a.nome ?? '').localeCompare(b.nome ?? '');
       });
 
-      const giocatoreUids = gsSorted.map((r: any) => r.giocatore_uid);
-
-      // Recupera TUTTE le date allenamento della stagione (per totale reale)
-      const { data: allDates } = await supabase
+      // 3️⃣ TUTTI gli allenamenti della stagione (nessun .in)
+      const { data: allen, error: allenErr } = await supabase
         .from('allenamenti')
-        .select('data_allenamento')
+        .select('giocatore_uid, presente')
         .eq('stagione_id', stagione.id);
 
-      const totaleAllenamenti = new Set(
-        (allDates ?? []).map(a => a.data_allenamento)
-      ).size;
-
-      // Recupera presenze per giocatore
-      let allen: { giocatore_uid: string; presente: boolean | null }[] = [];
-      if (giocatoreUids.length > 0) {
-        const { data: allenData } = await supabase
-          .from('allenamenti')
-          .select('giocatore_uid, presente')
-          .in('giocatore_uid', giocatoreUids)
-          .eq('stagione_id', stagione.id);
-
-        allen = allenData ?? [];
+      if (allenErr || !allen) {
+        setRows([]);
+        setLoading(false);
+        return;
       }
 
-      // Conta presenze
-      const counts: Record<string, { presenze: number }> = {};
-      giocatoreUids.forEach(id => (counts[id] = { presenze: 0 }));
+      // 4️⃣ Conteggio IDENTICO a AllenamentiGiocatore
+      const counts: Record<
+        string,
+        { totale: number; presenze: number; assenze: number }
+      > = {};
 
-      allen.forEach(a => {
-        if (a.presente && counts[a.giocatore_uid]) {
-          counts[a.giocatore_uid].presenze += 1;
-        }
+      gsSorted.forEach((g: any) => {
+        counts[g.giocatore_uid] = { totale: 0, presenze: 0, assenze: 0 };
       });
 
-      // Risultato finale
-      const result: GiocatorePresenza[] = gsSorted.map((r: any) => {
-        const pres = counts[r.giocatore_uid]?.presenze ?? 0;
-        return {
-          record_id: r.id,
-          giocatore_uid: r.giocatore_uid,
-          nome: r.nome ?? null,
-          cognome: r.cognome ?? null,
-          totaleAll: totaleAllenamenti,
-          presenze: pres,
-          assenze: totaleAllenamenti - pres,
-        };
+      allen.forEach((a: any) => {
+        const c = counts[a.giocatore_uid];
+        if (!c) return;
+        c.totale += 1;
+        if (a.presente) c.presenze += 1;
+        else c.assenze += 1;
       });
+
+      // 5️⃣ Risultato finale
+      const result: GiocatorePresenza[] = gsSorted.map((r: any) => ({
+        record_id: r.id,
+        giocatore_uid: r.giocatore_uid,
+        nome: r.nome ?? null,
+        cognome: r.cognome ?? null,
+        totaleAll: counts[r.giocatore_uid]?.totale ?? 0,
+        presenze: counts[r.giocatore_uid]?.presenze ?? 0,
+        assenze: counts[r.giocatore_uid]?.assenze ?? 0,
+      }));
 
       setRows(result);
       setLoading(false);
