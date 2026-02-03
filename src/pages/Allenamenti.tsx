@@ -65,6 +65,7 @@ export default function Allenamenti(): JSX.Element {
         .from('allenamenti')
         .select('giocatore_uid, presente')
         .eq('stagione_id', stagione.id);
+      console.log('allenamenti frontend:', allen?.length);
 
       if (allenErr || !allen) {
         setRows([]);
@@ -175,3 +176,4 @@ export default function Allenamenti(): JSX.Element {
     </div>
   );
 }
+
