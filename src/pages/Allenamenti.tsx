@@ -1,6 +1,6 @@
 // src/pages/Allenamenti.tsx
 // Data creazione chat: 2026-02-03
-// Fix definitivo: conteggio allenamenti identico a AllenamentiGiocatore.tsx
+// Fix definitivo: test conteggio allenamenti identico a AllenamentiGiocatore.tsx
 // 1 riga in tabella allenamenti = 1 allenamento per giocatore
 
 import React, { useEffect, useState } from 'react';
@@ -176,4 +176,5 @@ export default function Allenamenti(): JSX.Element {
     </div>
   );
 }
+
 
