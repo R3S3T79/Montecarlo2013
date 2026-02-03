@@ -1,6 +1,6 @@
 // src/pages/Allenamenti.tsx
 // Data creazione chat: 2026-02-03
-// Fix definitivo: test conteggio allenamenti identico a AllenamentiGiocatore.tsx
+// Fix definitivo: conteggio allenamenti via RPC (bypass RLS)
 // 1 riga in tabella allenamenti = 1 allenamento per giocatore
 
 import React, { useEffect, useState } from 'react';
@@ -28,26 +28,28 @@ export default function Allenamenti(): JSX.Element {
       const oggi = new Date().toISOString().slice(0, 10);
 
       // 1️⃣ Stagione attiva
-      const { data: stagione } = await supabase
+      const { data: stagione, error: stagioneErr } = await supabase
         .from('stagioni')
         .select('id')
         .lte('data_inizio', oggi)
         .gte('data_fine', oggi)
         .single();
 
-      if (!stagione) {
+      if (stagioneErr || !stagione) {
+        console.error('Stagione non trovata', stagioneErr);
         setRows([]);
         setLoading(false);
         return;
       }
 
-      // 2️⃣ Giocatori della stagione
-      const { data: gs } = await supabase
+      // 2️⃣ Giocatori stagione
+      const { data: gs, error: gsErr } = await supabase
         .from('giocatori_stagioni_view')
         .select('id, giocatore_uid, nome, cognome')
         .eq('stagione_id', stagione.id);
 
-      if (!gs || gs.length === 0) {
+      if (gsErr || !gs || gs.length === 0) {
+        console.error('Giocatori stagione non trovati', gsErr);
         setRows([]);
         setLoading(false);
         return;
@@ -60,14 +62,21 @@ export default function Allenamenti(): JSX.Element {
         return (a.nome ?? '').localeCompare(b.nome ?? '');
       });
 
-      // 3️⃣ TUTTI gli allenamenti della stagione (nessun .in)
-      const { data: allen, error: allenErr } = await supabase
-        .from('allenamenti')
-        .select('giocatore_uid, presente')
-        .eq('stagione_id', stagione.id);
-      console.log('allenamenti frontend:', allen?.length);
+      // 3️⃣ RPC — TUTTI gli allenamenti della stagione (bypass RLS)
+      const { data: allen, error: allenErr } = await supabase.rpc(
+        'get_allenamenti_stagione',
+        { _stagione: stagione.id }
+      );
+
+      console.log(
+        'RPC allenamenti frontend:',
+        allen?.length,
+        'sample:',
+        allen?.[0]
+      );
 
       if (allenErr || !allen) {
+        console.error('Errore RPC allenamenti', allenErr);
         setRows([]);
         setLoading(false);
         return;
@@ -176,5 +185,3 @@ export default function Allenamenti(): JSX.Element {
     </div>
   );
 }
-
-
