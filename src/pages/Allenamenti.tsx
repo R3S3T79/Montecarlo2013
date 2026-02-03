@@ -1,5 +1,6 @@
 // src/pages/Allenamenti.tsx
-// Data creazione chat: 2025-08-03 (rev: fix view giocatori_stagioni_view + header sticky)
+// Data creazione chat: 2026-02-03
+// Fix: conteggio corretto allenamenti (totale stagione basato su date distinte)
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
@@ -39,7 +40,7 @@ export default function Allenamenti(): JSX.Element {
         return;
       }
 
-      // Query dalla view corretta con nome/cognome già inclusi
+      // Recupera giocatori stagione (view)
       const { data: gs } = await supabase
         .from('giocatori_stagioni_view')
         .select('id, giocatore_uid, nome, cognome')
@@ -51,7 +52,7 @@ export default function Allenamenti(): JSX.Element {
         return;
       }
 
-      // Ordinamento lato client: cognome, poi nome
+      // Ordinamento lato client
       const gsSorted = [...gs].sort((a: any, b: any) => {
         const ac = (a.cognome ?? '').localeCompare(b.cognome ?? '');
         if (ac !== 0) return ac;
@@ -60,7 +61,17 @@ export default function Allenamenti(): JSX.Element {
 
       const giocatoreUids = gsSorted.map((r: any) => r.giocatore_uid);
 
-      // Evita 400: non chiamare .in(...) con lista vuota
+      // Recupera TUTTE le date allenamento della stagione (per totale reale)
+      const { data: allDates } = await supabase
+        .from('allenamenti')
+        .select('data_allenamento')
+        .eq('stagione_id', stagione.id);
+
+      const totaleAllenamenti = new Set(
+        (allDates ?? []).map(a => a.data_allenamento)
+      ).size;
+
+      // Recupera presenze per giocatore
       let allen: { giocatore_uid: string; presente: boolean | null }[] = [];
       if (giocatoreUids.length > 0) {
         const { data: allenData } = await supabase
@@ -68,35 +79,38 @@ export default function Allenamenti(): JSX.Element {
           .select('giocatore_uid, presente')
           .in('giocatore_uid', giocatoreUids)
           .eq('stagione_id', stagione.id);
+
         allen = allenData ?? [];
       }
 
-      // Conta presenze/assenze
-      const counts: Record<string, { totale: number; presenze: number }> = {};
-      giocatoreUids.forEach(id => (counts[id] = { totale: 0, presenze: 0 }));
+      // Conta presenze
+      const counts: Record<string, { presenze: number }> = {};
+      giocatoreUids.forEach(id => (counts[id] = { presenze: 0 }));
+
       allen.forEach(a => {
-        const c = counts[a.giocatore_uid];
-        if (!c) return;
-        c.totale += 1;
-        if (a.presente) c.presenze += 1;
+        if (a.presente && counts[a.giocatore_uid]) {
+          counts[a.giocatore_uid].presenze += 1;
+        }
       });
 
       // Risultato finale
-      const result: GiocatorePresenza[] = gsSorted.map((r: any) => ({
-        record_id: r.id,
-        giocatore_uid: r.giocatore_uid,
-        nome: r.nome ?? null,
-        cognome: r.cognome ?? null,
-        totaleAll: counts[r.giocatore_uid]?.totale ?? 0,
-        presenze: counts[r.giocatore_uid]?.presenze ?? 0,
-        assenze:
-          (counts[r.giocatore_uid]?.totale ?? 0) -
-          (counts[r.giocatore_uid]?.presenze ?? 0),
-      }));
+      const result: GiocatorePresenza[] = gsSorted.map((r: any) => {
+        const pres = counts[r.giocatore_uid]?.presenze ?? 0;
+        return {
+          record_id: r.id,
+          giocatore_uid: r.giocatore_uid,
+          nome: r.nome ?? null,
+          cognome: r.cognome ?? null,
+          totaleAll: totaleAllenamenti,
+          presenze: pres,
+          assenze: totaleAllenamenti - pres,
+        };
+      });
 
       setRows(result);
       setLoading(false);
     }
+
     fetchData();
   }, []);
 
@@ -117,30 +131,29 @@ export default function Allenamenti(): JSX.Element {
       ) : (
         <div className="w-full">
           <div className="overflow-x-auto overflow-y-auto h-[calc(100vh-50px)]">
-  <table
-    className="table-auto w-full border-separate"
-    style={{ borderSpacing: 0 }}
-  >
-    <thead className="bg-gradient-to-br from-[#d61f1f]/90 to-[#f45e5e]/90">
-      <tr>
-        <th className="px-4 py-3 text-left text-white uppercase sticky top-0 z-10 bg-gradient-to-br from-[#d61f1f]/90 to-[#f45e5e]/90">
-          Giocatore
-        </th>
-        <th className="px-4 py-3 text-center text-white uppercase sticky top-0 z-10 bg-gradient-to-br from-[#d61f1f]/90 to-[#f45e5e]/90">
-          All.
-        </th>
-        <th className="px-4 py-3 text-center text-white uppercase sticky top-0 z-10 bg-gradient-to-br from-[#d61f1f]/90 to-[#f45e5e]/90">
-          Pres.
-        </th>
-        <th className="px-4 py-3 text-center text-white uppercase sticky top-0 z-10 bg-gradient-to-br from-[#d61f1f]/90 to-[#f45e5e]/90">
-          Ass.
-        </th>
-      </tr>
-    </thead>
+            <table
+              className="table-auto w-full border-separate"
+              style={{ borderSpacing: 0 }}
+            >
+              <thead className="bg-gradient-to-br from-[#d61f1f]/90 to-[#f45e5e]/90">
+                <tr>
+                  <th className="px-4 py-3 text-left text-white uppercase sticky top-0 z-10 bg-gradient-to-br from-[#d61f1f]/90 to-[#f45e5e]/90">
+                    Giocatore
+                  </th>
+                  <th className="px-4 py-3 text-center text-white uppercase sticky top-0 z-10 bg-gradient-to-br from-[#d61f1f]/90 to-[#f45e5e]/90">
+                    All.
+                  </th>
+                  <th className="px-4 py-3 text-center text-white uppercase sticky top-0 z-10 bg-gradient-to-br from-[#d61f1f]/90 to-[#f45e5e]/90">
+                    Pres.
+                  </th>
+                  <th className="px-4 py-3 text-center text-white uppercase sticky top-0 z-10 bg-gradient-to-br from-[#d61f1f]/90 to-[#f45e5e]/90">
+                    Ass.
+                  </th>
+                </tr>
+              </thead>
 
               <tbody>
                 {rows.map((r, idx) => {
-                  // 🎯 riga semitrasparente (alternata)
                   const rowBg = idx % 2 === 0 ? 'bg-white/90' : 'bg-white/85';
                   const rowHover = 'hover:bg-white/80';
                   const cell = `px-4 py-2 text-gray-900 border-b border-white/30 ${rowBg} ${rowHover}`;
