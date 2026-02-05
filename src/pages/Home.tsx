@@ -1014,16 +1014,27 @@ const fbPluginSrc = useMemo(() => {
         : `https://www.google.com/maps?q=${encodeURIComponent(queryFallback)}&output=embed`;
 
       return (
-        <iframe
-          title="Mappa campo"
-          src={src}
-          width="100%"
-          height="250"
-          style={{ border: 0, borderRadius: 8 }}
-          loading="lazy"
-          allowFullScreen
-        ></iframe>
-      );
+  <a
+    href={src}
+    target="_blank"
+    rel="noopener noreferrer"
+    style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      height: 250,
+      borderRadius: 8,
+      background: "#f2f2f2",
+      textDecoration: "none",
+      color: "#000",
+      fontWeight: 600,
+      gap: 8,
+    }}
+  >
+    📍 Apri il campo su Google Maps
+  </a>
+);
+
     })()}
   </div>
 )}
@@ -1623,3 +1634,4 @@ if (!styleEl) {
 `;
   document.head.appendChild(s);
 }
+
