@@ -281,7 +281,7 @@ if (allenamenti && allenamenti.length > 0) {
 
        <div className="bg-white/90 rounded-xl shadow-montecarlo p-6 flex flex-col items-center">
   <div className="w-44 h-44 rounded-[50%] overflow-hidden mb-4 border-4 border-montecarlo-accent shadow-lg bg-black flex items-center justify-center">
-  {giocatore.video_url ? (
+  {giocatore.video_url && giocatore.video_url.trim() !== "" ? (
     <video
       key={giocatore.video_url} // forza reload video se cambia
       src={giocatore.video_url}
