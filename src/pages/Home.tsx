@@ -3,7 +3,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import CountdownVeronica from "../components/CountdownVeronica";
+// import CountdownVeronica from "../components/CountdownVeronica";
 import WeatherWidget_OpenMeteo from "../components/WeatherWidget_OpenMeteo";
 import { supabase } from "../lib/supabaseClient";
 
@@ -698,7 +698,7 @@ const fbPluginSrc = useMemo(() => {
 
 
 {/* Countdown al compleanno di Veronica */}
-<CountdownVeronica />
+{/* commento */}
 
 {/* COMPLEANNO GIOCATORE */}
 <section
