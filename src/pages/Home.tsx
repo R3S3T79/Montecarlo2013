@@ -987,7 +987,7 @@ const fbPluginSrc = useMemo(() => {
 
 
 
-      {/* MAPPA CAMPO (preferisci URL già salvati) */}
+     {/* MAPPA CAMPO (preferisci URL già salvati) */}
 {match && (
   <div style={{ marginTop: 12, ...styles.wideCard }}>
 
@@ -1009,9 +1009,21 @@ const fbPluginSrc = useMemo(() => {
         match.squadra_casa_nome ||
         "Montecarlo";
 
-      const src = urlDiretto
-        ? urlDiretto // usa l’embed/url già salvato nel DB
-        : `https://www.google.com/maps?q=${encodeURIComponent(queryFallback)}&output=embed`;
+      let src: string;
+
+if (urlDiretto) {
+  if (urlDiretto.includes("/embed")) {
+    // già embed → ok
+    src = urlDiretto;
+  } else if (urlDiretto.includes("google.com/maps")) {
+    // link normale → estraggo query
+    src = `https://www.google.com/maps?q=${encodeURIComponent(queryFallback)}&output=embed`;
+  } else {
+    src = `https://www.google.com/maps?q=${encodeURIComponent(queryFallback)}&output=embed`;
+  }
+} else {
+  src = `https://www.google.com/maps?q=${encodeURIComponent(queryFallback)}&output=embed`;
+}
 
       return (
         <iframe
@@ -1027,7 +1039,6 @@ const fbPluginSrc = useMemo(() => {
     })()}
   </div>
 )}
-
 
 
 

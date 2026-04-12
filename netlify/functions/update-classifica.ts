@@ -1,7 +1,8 @@
 // netlify/functions/update-classifica.ts
-// Data: 11/11/2025 — parser definitivo Campionando + trigger automatico update-partite-classifica + scheduler 21:00
+// Data: 11/04/2026 — versione definitiva con stagione_id + fase
 
 import { Handler } from "@netlify/functions";
+import fetch from "node-fetch";
 import * as cheerio from "cheerio";
 import { createClient } from "@supabase/supabase-js";
 
@@ -10,102 +11,107 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const CAMP_URL = "https://campionando.it/classi.php?camp=6158";
+// CONFIG
+const CAMP_URL = "https://www.campionando.it/classi.php?camp=6221";
+
+const STAGIONE_ID = "37f5676e-99cb-40f9-a47c-e1b849cf4ad1";
+const STAGIONE_NOME = "2025/2026";
+const FASE = "Seconda Fase";
 
 export const handler: Handler = async () => {
   try {
-    console.log("⏰ Avvio aggiornamento classifica + partite");
+    console.log("🚀 Aggiornamento classifica Seconda Fase");
 
-    // 1️⃣ Scarica la pagina classifica
     const res = await fetch(CAMP_URL);
     const html = await res.text();
     const $ = cheerio.load(html);
 
     const rows: any[] = [];
 
-    // 2️⃣ Trova la tabella che contiene "Squadra"
-    const table = $("table").filter((_, el) =>
-      $(el).text().toLowerCase().includes("squadra")
-    ).first();
+    $("table tr").each((i, el) => {
+      const tds = $(el).find("td");
 
-    if (table.length === 0)
-      throw new Error("Tabella classifica non trovata su Campionando.it");
+      if (tds.length >= 9) {
+        const squadra = $(tds[1]).text().trim();
 
-    // 3️⃣ Parser corretto: 10 colonne (0 = logo)
-    table.find("tbody tr").each((i, el) => {
-      const cols = $(el).find("td");
-      if (cols.length >= 10) {
-        const squadra = $(cols[1]).text().trim();
-        const punti = parseInt($(cols[2]).text().trim()) || 0;
-        const partite_giocate = parseInt($(cols[3]).text().trim()) || 0;
-        const vinte = parseInt($(cols[4]).text().trim()) || 0;
-        const pareggiate = parseInt($(cols[5]).text().trim()) || 0;
-        const perse = parseInt($(cols[6]).text().trim()) || 0;
-        const goal_fatti = parseInt($(cols[7]).text().trim()) || 0;
-        const goal_subiti = parseInt($(cols[8]).text().trim()) || 0;
-        const differenza_reti =
-          parseInt($(cols[9]).text().trim()) || goal_fatti - goal_subiti;
+        if (!squadra || squadra.toLowerCase().includes("squadra")) return;
 
-        if (squadra) {
-          rows.push({
-            posizione: i + 1,
-            squadra,
-            punti,
-            partite_giocate,
-            vinte,
-            pareggiate,
-            perse,
-            goal_fatti,
-            goal_subiti,
-            differenza_reti,
-          });
-        }
+        const punti = parseInt($(tds[2]).text().trim()) || 0;
+        const giocate = parseInt($(tds[3]).text().trim()) || 0;
+        const vinte = parseInt($(tds[4]).text().trim()) || 0;
+        const pareggiate = parseInt($(tds[5]).text().trim()) || 0;
+        const perse = parseInt($(tds[6]).text().trim()) || 0;
+        const gf = parseInt($(tds[7]).text().trim()) || 0;
+        const gs = parseInt($(tds[8]).text().trim()) || 0;
+
+        rows.push({
+          squadra,
+          punti,
+          partite_giocate: giocate,
+          vinte,
+          pareggiate,
+          perse,
+          goal_fatti: gf,
+          goal_subiti: gs,
+          differenza_reti: gf - gs,
+        });
       }
     });
 
-    if (rows.length === 0) throw new Error("Nessun dato trovato nella tabella");
+    if (rows.length === 0) {
+      throw new Error("❌ Nessuna squadra trovata");
+    }
 
-    // 4️⃣ Aggiorna tabella classifica in Supabase
+    console.log("✅ Squadre trovate:", rows.length);
+
+    // 🔴 CANCELLA SOLO QUESTA FASE + STAGIONE
     await supabase
       .from("classifica")
       .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+      .eq("stagione_id", STAGIONE_ID)
+      .eq("fase", FASE);
 
-    const { error } = await supabase.from("classifica").insert(rows);
-    if (error) throw error;
+    // 🔵 PREPARA INSERT
+    const insertData = rows.map((r, index) => ({
+      posizione: index + 1,
+      squadra: r.squadra,
+      punti: r.punti,
+      partite_giocate: r.partite_giocate,
+      vinte: r.vinte,
+      pareggiate: r.pareggiate,
+      perse: r.perse,
+      goal_fatti: r.goal_fatti,
+      goal_subiti: r.goal_subiti,
+      differenza_reti: r.differenza_reti,
+      stagione_id: STAGIONE_ID,
+      stagione_nome: STAGIONE_NOME,
+      fase: FASE,
+    }));
 
-    console.log(`✅ Classifica aggiornata (${rows.length} squadre)`);
+    const { error } = await supabase
+      .from("classifica")
+      .insert(insertData);
 
-    // 5️⃣ Richiama automaticamente la function update-partite-classifica
-    try {
-      const siteUrl = process.env.URL || "https://montecarlo2013.netlify.app";
-      console.log("▶️ Avvio aggiornamento partite via:", siteUrl);
-
-      const res2 = await fetch(
-        `${siteUrl}/.netlify/functions/update-partite-classifica`
-      );
-      const result = await res2.text();
-      console.log("📄 Risposta update-partite-classifica:", result);
-    } catch (e: any) {
-      console.error("⚠️ Errore nel richiamo update-partite-classifica:", e.message);
+    if (error) {
+      console.error("❌ Errore insert:", error);
+      throw error;
     }
 
-    // 6️⃣ Fine
+    console.log("✅ Classifica salvata correttamente");
+
     return {
       statusCode: 200,
+      body: JSON.stringify({ success: true }),
+    };
+
+  } catch (err: any) {
+    console.error("❌ ERRORE:", err);
+
+    return {
+      statusCode: 500,
       body: JSON.stringify({
-        message: "Classifica e partite aggiornate correttamente",
-        totale: rows.length,
-        runAt: new Date().toLocaleString("it-IT"),
+        error: err.message,
       }),
     };
-  } catch (err: any) {
-    console.error("❌ Errore aggiornamento classifica:", err);
-    return { statusCode: 500, body: "Errore aggiornamento classifica" };
   }
-};
-
-// ⏱️ Scheduler automatico (ogni giorno alle 21:00 ora italiana)
-export const config = {
-  schedule: "@daily 21:00 Europe/Rome",
 };
