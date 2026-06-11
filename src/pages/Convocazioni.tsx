@@ -57,8 +57,10 @@ export default function Convocazioni() {
     const { data, error } = await supabase
       .from("partite")
       .select(`
-        id,
-        data_ora,
+  id,
+  data_ora,
+  stagione_id,
+  campionato_torneo,
         campionato_torneo,
         nome_torneo,
         stato,
