@@ -97,38 +97,28 @@ export default function Convocazioni() {
     fetchSquadre();
   }, []);
 
-  // Carica giocatori stagione attuale + presenze della partita
+  // Carica giocatori della stagione della partita
 useEffect(() => {
   const fetchGiocatori = async () => {
-    // stagione corrente
-    const { data: stagione } = await supabase
-      .from("stagioni")
-      .select("id")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
 
-    if (!stagione?.id) return;
+    if (!partita?.stagione_id) return;
 
-    // giocatori stagione
     const { data: giocatoriStagione, error: errGioc } = await supabase
       .from("giocatori_stagioni")
       .select("id, nome, cognome")
-      .eq("stagione_id", stagione.id);
+      .eq("stagione_id", partita.stagione_id)
+      .order("cognome", { ascending: true });
 
     if (errGioc) {
       console.error("Errore caricamento giocatori:", errGioc.message);
       return;
     }
 
-    const ordinati = (giocatoriStagione || []).sort((a, b) =>
-      (a.cognome || "").localeCompare(b.cognome || "")
-    );
-    setGiocatori(ordinati);
+    setGiocatori(giocatoriStagione || []);
   };
 
   fetchGiocatori();
-}, []);
+}, [partita]);
 
 
 
