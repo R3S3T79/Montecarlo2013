@@ -97,16 +97,19 @@ export default function Convocazioni() {
     fetchSquadre();
   }, []);
 
-  // Carica giocatori della stagione della partita
+// Carica giocatori in base alla partita selezionata
 useEffect(() => {
   const fetchGiocatori = async () => {
 
-    if (!partita?.stagione_id) return;
+    if (partiteSelezionate.length === 0) return;
+
+    const stagioneId = partiteSelezionate[0]?.stagione_id;
+    if (!stagioneId) return;
 
     const { data: giocatoriStagione, error: errGioc } = await supabase
       .from("giocatori_stagioni")
       .select("id, nome, cognome")
-      .eq("stagione_id", partita.stagione_id)
+      .eq("stagione_id", stagioneId)
       .order("cognome", { ascending: true });
 
     if (errGioc) {
@@ -118,7 +121,7 @@ useEffect(() => {
   };
 
   fetchGiocatori();
-}, [partita]);
+}, [partiteSelezionate]);
 
 
 
