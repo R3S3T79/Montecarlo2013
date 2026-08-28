@@ -26,7 +26,16 @@ interface StatisticheGiocatore {
   goalSubiti?: number;
   mediaVotoUtenti?: number;
   mediaVotoMister?: number;
-  minutiGiocatiTotali?: number;
+   minutiGiocatiTotali?: number;
+  assistTotali?: number;
+  gialliTotali?: number;
+  rossiTotali?: number;
+  rigoriTirati?: number;
+  rigoriSegnati?: number;
+  rigoriSbagliati?: number;
+  rigoriRicevuti?: number;
+rigoriParati?: number;
+rigoriSubiti?: number;
   allenamentiFatti?: number;
   allenamentiSaltati?: number;
 }
@@ -70,12 +79,34 @@ useEffect(() => {
   mediaVotoUtenti: 0,
   mediaVotoMister: 0,
   minutiGiocatiTotali: 0,
+  assistTotali: 0,
+  gialliTotali: 0,
+rossiTotali: 0,
+rigoriTirati: 0,
+rigoriSegnati: 0,
+rigoriSbagliati: 0,
+rigoriRicevuti: 0,
+rigoriParati: 0,
+rigoriSubiti: 0,
   allenamentiFatti: 0,
   allenamentiSaltati: 0,
 });
   const [stagioniDisponibili, setStagioniDisponibili] = useState<Stagione[]>([]);
   const [stagioneSelezionata, setStagioneSelezionata] = useState<string>('');
   const [loading, setLoading] = useState(true);
+
+  // 8. Dettaglio presenze
+const [mostraPresenze, setMostraPresenze] = useState(false);
+const [partitePresenze, setPartitePresenze] = useState<any[]>([]);
+// 11. Dettaglio goal fatti
+const [mostraGoal, setMostraGoal] = useState(false);
+const [partiteGoal, setPartiteGoal] = useState<any[]>([]);
+// 14. Dettaglio assist
+const [mostraAssist, setMostraAssist] = useState(false);
+const [partiteAssist, setPartiteAssist] = useState<any[]>([]);
+// 17. Dettaglio rigori tirati
+const [mostraRigoriTirati, setMostraRigoriTirati] = useState(false);
+const [partiteRigoriTirati, setPartiteRigoriTirati] = useState<any[]>([]);
 
   // Eliminazione giocatore
   const handleElimina = async () => {
@@ -127,7 +158,17 @@ useEffect(() => {
       .maybeSingle();
 
     let totaleMinuti = 0;
-    if (stagioneRow?.id) {
+let assistTotali = 0;
+let gialliTotali = 0;
+let rossiTotali = 0;
+let rigoriTirati = 0;
+let rigoriSegnati = 0;
+let rigoriSbagliati = 0;
+let rigoriRicevuti = 0;
+let rigoriParati = 0;
+let rigoriSubiti = 0;
+
+if (stagioneRow?.id) {
       const { data: minuti } = await supabase
         .from('minuti_giocati_totali')
         .select('tempo_giocato_sec')
@@ -135,7 +176,53 @@ useEffect(() => {
 
       const totaleSec = minuti?.reduce((acc, m) => acc + (m.tempo_giocato_sec || 0), 0) || 0;
       totaleMinuti = Math.floor(totaleSec / 60);
+      const { count } = await supabase
+  .from('marcatori')
+  .select('*', { count: 'exact', head: true })
+  .eq('assist_giocatore_stagione_id', stagioneRow.id)
+  .eq('stagione_id', stagioneId);
+
+assistTotali = count ?? 0;
+const { data: cartellini } = await supabase
+  .from('cartellini')
+  .select('tipo')
+  .eq('giocatore_stagione_id', stagioneRow.id)
+  .eq('stagione_id', stagioneId);
+
+gialliTotali =
+  cartellini?.filter((c) => c.tipo?.toLowerCase() === 'giallo').length ?? 0;
+
+rossiTotali =
+  cartellini?.filter((c) => c.tipo?.toLowerCase() === 'rosso').length ?? 0;
     }
+
+    const { data: rigoriPortiere } = await supabase
+  .from('rigori_partita')
+  .select('esito')
+  .eq('portiere_stagione_id', stagioneRow.id)
+  .eq('stagione_id', stagioneId);
+
+rigoriParati =
+  rigoriPortiere?.filter((r) => r.esito === 'sbagliato').length ?? 0;
+
+rigoriSubiti =
+  rigoriPortiere?.filter((r) => r.esito === 'segnato').length ?? 0;
+
+rigoriRicevuti = rigoriParati + rigoriSubiti;
+
+    const { data: rigori } = await supabase
+  .from('rigori_partita')
+  .select('esito')
+  .eq('giocatore_stagione_id', stagioneRow.id)
+  .eq('stagione_id', stagioneId);
+
+rigoriSegnati =
+  rigori?.filter((r) => r.esito === 'segnato').length ?? 0;
+
+rigoriSbagliati =
+  rigori?.filter((r) => r.esito === 'sbagliato').length ?? 0;
+
+rigoriTirati = rigoriSegnati + rigoriSbagliati;
 
 // 🔹 Allenamenti fatti e saltati
 let fatti = 0;
@@ -168,12 +255,146 @@ if (allenamenti && allenamenti.length > 0) {
       goalSubiti: stats?.goal_subiti || 0,
       mediaVotoMister: voti?.media_voto_mister || 0,
       minutiGiocatiTotali: totaleMinuti,
-      allenamentiFatti: fatti,
-      allenamentiSaltati: saltati,
+assistTotali: assistTotali,
+gialliTotali: gialliTotali,
+rossiTotali: rossiTotali,
+rigoriTirati: rigoriTirati,
+rigoriSegnati: rigoriSegnati,
+rigoriSbagliati: rigoriSbagliati,
+rigoriRicevuti: rigoriRicevuti,
+rigoriParati: rigoriParati,
+rigoriSubiti: rigoriSubiti,
+allenamentiFatti: fatti,
+allenamentiSaltati: saltati,
     });
   } catch (error) {
     console.error("Errore fetchStatistiche:", error);
   }
+};
+
+// 9. Recupera le partite in cui il giocatore risulta presente
+const fetchPartitePresenze = async (
+  giocatoreStagioneId: string,
+  stagioneId: string
+) => {
+  const { data, error } = await supabase
+    .from("presenze")
+    .select(`
+      partita_id,
+      partite (
+        id,
+        data_ora,
+        squadra_casa_id,
+        squadra_ospite_id,
+        goal_a,
+        goal_b,
+        squadre_casa:squadre!partite_squadra_casa_id_fkey (nome),
+        squadre_ospite:squadre!partite_squadra_ospite_id_fkey (nome)
+      )
+    `)
+    .eq("giocatore_stagione_id", giocatoreStagioneId)
+    .eq("stagione_id", stagioneId);
+
+  if (error) {
+    console.error("Errore caricamento partite presenze:", error);
+    setPartitePresenze([]);
+    return;
+  }
+
+  setPartitePresenze(data || []);
+};
+
+// 12. Recupera le partite in cui il giocatore ha segnato
+const fetchPartiteGoal = async (
+  giocatoreStagioneId: string,
+  stagioneId: string
+) => {
+  const { data, error } = await supabase
+    .from("marcatori")
+    .select(`
+      partita_id,
+      partite (
+        id,
+        data_ora,
+        goal_a,
+        goal_b,
+        squadre_casa:squadre!partite_squadra_casa_id_fkey (nome),
+        squadre_ospite:squadre!partite_squadra_ospite_id_fkey (nome)
+      )
+    `)
+    .eq("giocatore_stagione_id", giocatoreStagioneId)
+    .eq("stagione_id", stagioneId);
+
+  if (error) {
+    console.error("Errore caricamento partite goal:", error);
+    setPartiteGoal([]);
+    return;
+  }
+
+  setPartiteGoal(data || []);
+};
+
+// 15. Recupera le partite in cui il giocatore ha fatto assist
+const fetchPartiteAssist = async (
+  giocatoreStagioneId: string,
+  stagioneId: string
+) => {
+  const { data, error } = await supabase
+    .from("marcatori")
+    .select(`
+      partita_id,
+      partite (
+        id,
+        data_ora,
+        goal_a,
+        goal_b,
+        squadre_casa:squadre!partite_squadra_casa_id_fkey (nome),
+        squadre_ospite:squadre!partite_squadra_ospite_id_fkey (nome)
+      )
+    `)
+    .eq("assist_giocatore_stagione_id", giocatoreStagioneId)
+    .eq("stagione_id", stagioneId);
+
+  if (error) {
+    console.error("Errore caricamento partite assist:", error);
+    setPartiteAssist([]);
+    return;
+  }
+
+  setPartiteAssist(data || []);
+};
+
+// 18. Recupera i singoli rigori tirati dal giocatore
+const fetchPartiteRigoriTirati = async (
+  giocatoreStagioneId: string,
+  stagioneId: string
+) => {
+  const { data, error } = await supabase
+    .from("rigori_partita")
+    .select(`
+      id,
+      esito,
+      ordine,
+      partita_id,
+      partite (
+        id,
+        data_ora,
+        goal_a,
+        goal_b,
+        squadre_casa:squadre!partite_squadra_casa_id_fkey (nome),
+        squadre_ospite:squadre!partite_squadra_ospite_id_fkey (nome)
+      )
+    `)
+    .eq("giocatore_stagione_id", giocatoreStagioneId)
+    .eq("stagione_id", stagioneId);
+
+  if (error) {
+    console.error("Errore caricamento rigori tirati:", error);
+    setPartiteRigoriTirati([]);
+    return;
+  }
+
+  setPartiteRigoriTirati(data || []);
 };
 
   const fetchGiocatore = async (stagioneId: string) => {
@@ -185,11 +406,35 @@ if (allenamenti && allenamenti.length > 0) {
       .eq('stagione_id', stagioneId)
       .maybeSingle();
 
-    if (recordStagione) {
-      setGiocatore(recordStagione as Giocatore);
-      await fetchStatistiche(recordStagione.giocatore_uid, stagioneId);
-    }
-  };
+if (recordStagione) {
+  setGiocatore(recordStagione as Giocatore);
+
+  await fetchStatistiche(
+    recordStagione.giocatore_uid,
+    stagioneId
+  );
+
+  await fetchPartitePresenze(
+    recordStagione.giocatore_stagione_id,
+    stagioneId
+  );
+
+  await fetchPartiteGoal(
+    recordStagione.giocatore_stagione_id,
+    stagioneId
+  );
+
+  await fetchPartiteAssist(
+    recordStagione.giocatore_stagione_id,
+    stagioneId
+  );
+
+  await fetchPartiteRigoriTirati(
+    recordStagione.giocatore_stagione_id,
+    stagioneId
+  );
+}
+};
 
   useEffect(() => {
     const init = async () => {
@@ -279,8 +524,9 @@ if (allenamenti && allenamenti.length > 0) {
           </div>
         )}
 
-       <div className="bg-white/90 rounded-xl shadow-montecarlo p-6 flex flex-col items-center">
-  <div className="w-44 h-44 rounded-[50%] overflow-hidden mb-4 border-4 border-montecarlo-accent shadow-lg bg-black flex items-center justify-center">
+       <div className="bg-white/90 rounded-xl shadow-montecarlo p-6">
+  <div className="flex items-start gap-5">
+  <div className="w-36 h-44 rounded-lg overflow-hidden mb-4 border-2 border-montecarlo-accent shadow-lg bg-black flex items-center justify-center">
   {giocatore.video_url && giocatore.video_url.trim() !== "" ? (
     <video
       key={giocatore.video_url} // forza reload video se cambia
@@ -291,7 +537,7 @@ if (allenamenti && allenamenti.length > 0) {
       playsInline
       preload="auto"
       onCanPlay={(e) => e.currentTarget.play()}
-      className="w-full h-full object-contain rounded-[50%]"
+      className="w-full h-full object-contain"
       style={{
         transform: 'scale(0.9) translateY(3%)',
         transformOrigin: 'center center',
@@ -301,121 +547,435 @@ if (allenamenti && allenamenti.length > 0) {
     <img
       src={giocatore.foto_url}
       alt={`${giocatore.cognome} ${giocatore.nome}`}
-      className="w-full h-full object-cover rounded-[50%]"
+      className="w-full h-full object-cover"
     />
   ) : (
-    <div className="w-full h-full bg-montecarlo-secondary text-white flex items-center justify-center text-5xl font-bold rounded-[50%]">
-      {giocatore.cognome[0]}
+      <div className="w-full h-full bg-montecarlo-secondary text-white flex items-center justify-center text-5xl font-bold">
+    {giocatore.cognome[0]}
+  </div>
+)}
+</div>
+
+<div className="flex-1">
+  <h1 className="text-xl font-bold text-montecarlo-secondary mb-4">
+    {giocatore.cognome} {giocatore.nome}
+  </h1>
+
+  {giocatore.data_nascita && (
+    <div className="text-sm text-black mb-2">
+      <span className="font-semibold">Data di nascita:</span>{' '}
+      {formatData(giocatore.data_nascita)}
+    </div>
+  )}
+
+  {giocatore.ruolo && (
+    <div className="text-sm text-black mb-2">
+      <span className="font-semibold">Ruolo:</span>{' '}
+      {giocatore.ruolo}
+    </div>
+  )}
+
+  {giocatore.numero_cartellino != null && (
+    <div className="text-sm text-black">
+      <span className="font-semibold">Numero cartellino:</span>{' '}
+      {giocatore.numero_cartellino}
     </div>
   )}
 </div>
 
+</div>
 
+{/* 🔹 Sezione statistiche principali */}
+<div className="w-full max-w-md mx-auto mb-6">
+  {/* 1. Presenze e minuti giocati */}
+  <div className="space-y-2">
+    <button
+  type="button"
+  onClick={() => setMostraPresenze((prev) => !prev)}
+  className="w-full flex justify-between items-center text-left"
+>
+  <span className="font-semibold text-black underline">
+    Presenze
+  </span>
 
-          <h1 className="text-2xl font-bold text-montecarlo-secondary mb-4">
-            {giocatore.cognome} {giocatore.nome}
-          </h1>
+  <span className="font-bold text-montecarlo-gold-600">
+    {statistiche.presenzeTotali}
+  </span>
+</button>
 
-          {/* 🔹 Sezione statistiche principali */}
-<div className="flex flex-wrap justify-center gap-8 mb-6">
-  {/* Goal fatti */}
-  <div className="text-center">
-    <div className="text-2xl font-bold text-montecarlo-accent">
-      {statistiche.goalTotali}
+{/* 10. Lista partite delle presenze */}
+{mostraPresenze && (
+  <div className="mt-2 mb-3 pl-3 border-l-2 border-gray-300 space-y-2">
+    {partitePresenze.length === 0 ? (
+      <div className="text-sm text-gray-500">
+        Nessuna presenza in questa stagione.
+      </div>
+    ) : (
+      partitePresenze
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(a.partite.data_ora).getTime() -
+            new Date(b.partite.data_ora).getTime()
+        )
+        .map((riga) => {
+          const p = riga.partite;
+
+          return (
+            <div key={p.id} className="text-sm text-black">
+              <div className="font-semibold">
+                {new Date(p.data_ora).toLocaleDateString("it-IT")}
+              </div>
+
+              <div>
+                {p.squadre_casa?.nome} - {p.squadre_ospite?.nome}
+                {" "}
+                <span className="font-bold">
+                  {p.goal_a ?? 0} - {p.goal_b ?? 0}
+                </span>
+              </div>
+            </div>
+          );
+        })
+    )}
+  </div>
+)}
+
+    <div className="flex justify-between items-center">
+      <span className="font-semibold text-black">Minuti Giocati</span>
+      <span className="font-bold text-montecarlo-gold-600">
+        {statistiche.minutiGiocatiTotali ?? 0}
+      </span>
     </div>
-    <div className="text-sm text-black">Goal</div>
   </div>
 
-  {/* Presenze */}
-  <div className="text-center">
-    <div className="text-2xl font-bold text-montecarlo-gold-600">
-      {statistiche.presenzeTotali}
-    </div>
-    <div className="text-sm text-black">Presenze</div>
-  </div>
+  <hr className="border-t border-gray-300 my-4" />
 
-  {/* Goal Subiti solo se Portiere */}
+  {/* 2. Goal, assist e goal subiti */}
+<div className="space-y-2">
+  <button
+  type="button"
+  onClick={() => setMostraGoal((prev) => !prev)}
+  className="w-full flex justify-between items-center text-left"
+>
+  <span className="font-semibold text-black underline">
+    Goal Fatti
+  </span>
+
+  <span className="font-bold text-montecarlo-accent">
+    {statistiche.goalTotali}
+  </span>
+</button>
+
+{/* 13. Lista partite dei goal */}
+{mostraGoal && (
+  <div className="mt-2 mb-3 pl-3 border-l-2 border-gray-300 space-y-2">
+    {partiteGoal.length === 0 ? (
+      <div className="text-sm text-gray-500">
+        Nessun goal in questa stagione.
+      </div>
+    ) : (
+      Object.values(
+        partiteGoal.reduce((acc: Record<string, any>, riga: any) => {
+          const p = riga.partite;
+
+          if (!acc[p.id]) {
+            acc[p.id] = {
+              partita: p,
+              numeroGoal: 0,
+            };
+          }
+
+          acc[p.id].numeroGoal += 1;
+          return acc;
+        }, {})
+      )
+        .sort(
+          (a: any, b: any) =>
+            new Date(a.partita.data_ora).getTime() -
+            new Date(b.partita.data_ora).getTime()
+        )
+        .map((riga: any) => {
+          const p = riga.partita;
+
+          return (
+            <div key={p.id} className="text-sm text-black">
+              <div className="font-semibold">
+                {new Date(p.data_ora).toLocaleDateString("it-IT")}
+              </div>
+
+              <div>
+                {p.squadre_casa?.nome} - {p.squadre_ospite?.nome}{" "}
+                <span className="font-bold">
+                  {p.goal_a ?? 0} - {p.goal_b ?? 0}
+                </span>
+                {" — "}
+                <span className="font-bold text-montecarlo-accent">
+                  {riga.numeroGoal} {riga.numeroGoal === 1 ? "Goal" : "Goal"}
+                </span>
+              </div>
+            </div>
+          );
+        })
+    )}
+  </div>
+)}
+
+  <button
+  type="button"
+  onClick={() => setMostraAssist((prev) => !prev)}
+  className="w-full flex justify-between items-center text-left"
+>
+  <span className="font-semibold text-black underline">
+    Assist
+  </span>
+
+  <span className="font-bold text-montecarlo-green-600">
+    {statistiche.assistTotali ?? 0}
+  </span>
+</button>
+
+{/* 16. Lista partite degli assist */}
+{mostraAssist && (
+  <div className="mt-2 mb-3 pl-3 border-l-2 border-gray-300 space-y-2">
+    {partiteAssist.length === 0 ? (
+      <div className="text-sm text-gray-500">
+        Nessun assist in questa stagione.
+      </div>
+    ) : (
+      Object.values(
+        partiteAssist.reduce((acc: Record<string, any>, riga: any) => {
+          const p = riga.partite;
+
+          if (!acc[p.id]) {
+            acc[p.id] = {
+              partita: p,
+              numeroAssist: 0,
+            };
+          }
+
+          acc[p.id].numeroAssist += 1;
+          return acc;
+        }, {})
+      )
+        .sort(
+          (a: any, b: any) =>
+            new Date(a.partita.data_ora).getTime() -
+            new Date(b.partita.data_ora).getTime()
+        )
+        .map((riga: any) => {
+          const p = riga.partita;
+
+          return (
+            <div key={p.id} className="text-sm text-black">
+              <div className="font-semibold">
+                {new Date(p.data_ora).toLocaleDateString("it-IT")}
+              </div>
+
+              <div>
+                {p.squadre_casa?.nome} - {p.squadre_ospite?.nome}{" "}
+                <span className="font-bold">
+                  {p.goal_a ?? 0} - {p.goal_b ?? 0}
+                </span>
+                {" — "}
+                <span className="font-bold text-montecarlo-green-600">
+                  {riga.numeroAssist}{" "}
+                  {riga.numeroAssist === 1 ? "Assist" : "Assist"}
+                </span>
+              </div>
+            </div>
+          );
+        })
+    )}
+  </div>
+)}
+
   {giocatore.ruolo === "Portiere" && (
-    <div className="text-center">
-      <div className="text-2xl font-bold text-montecarlo-red-600">
-        {statistiche.goalSubiti}
-      </div>
-      <div className="text-sm text-black">Goal Subiti</div>
+    <div className="flex justify-between items-center">
+      <span className="font-semibold text-black">Goal Subiti</span>
+      <span className="font-bold text-montecarlo-red-600">
+        {statistiche.goalSubiti ?? 0}
+      </span>
     </div>
   )}
+</div>
 
-  {/* Media Goal solo se NON portiere */}
-  {statistiche.presenzeTotali > 0 && giocatore.ruolo !== "Portiere" && (
-    <div className="text-center">
-      <div className="text-2xl font-bold text-montecarlo-green-600">
-        {(statistiche.goalTotali / statistiche.presenzeTotali).toFixed(2)}
+<hr className="border-t border-gray-300 my-4" />
+
+{/* 3. Cartellini */}
+<div className="space-y-2">
+  <div className="flex justify-between items-center">
+    <span className="text-xl">🟨</span>
+    <span className="font-bold text-black">
+      {statistiche.gialliTotali ?? 0}
+    </span>
+  </div>
+
+  <div className="flex justify-between items-center">
+    <span className="text-xl">🟥</span>
+    <span className="font-bold text-black">
+      {statistiche.rossiTotali ?? 0}
+    </span>
+  </div>
+</div>
+
+<hr className="border-t border-gray-300 my-4" />
+
+{/* 4. Rigori tirati */}
+<div className="space-y-2">
+  <button
+  type="button"
+  onClick={() => setMostraRigoriTirati((prev) => !prev)}
+  className="w-full flex justify-between items-center text-left"
+>
+  <span className="font-semibold text-black underline">
+    Rigori Tirati
+  </span>
+
+  <span className="font-bold text-black">
+    {statistiche.rigoriTirati ?? 0}
+  </span>
+</button>
+
+{/* 19. Lista singoli rigori tirati */}
+{mostraRigoriTirati && (
+  <div className="mt-2 mb-3 pl-3 border-l-2 border-gray-300 space-y-2">
+    {partiteRigoriTirati.length === 0 ? (
+      <div className="text-sm text-gray-500">
+        Nessun rigore tirato in questa stagione.
       </div>
-      <div className="text-sm text-black">Media Goal</div>
+    ) : (
+      partiteRigoriTirati
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(a.partite.data_ora).getTime() -
+            new Date(b.partite.data_ora).getTime()
+        )
+        .map((riga) => {
+          const p = riga.partite;
+
+          return (
+            <div
+              key={riga.id}
+              className="flex justify-between items-center text-sm"
+            >
+              <div className="text-black">
+                <div className="font-semibold">
+                  {new Date(p.data_ora).toLocaleDateString("it-IT")}
+                </div>
+
+                <div>
+                  {p.squadre_casa?.nome} - {p.squadre_ospite?.nome}
+                </div>
+              </div>
+
+              <span
+                className={`text-xl font-bold ${
+                  riga.esito === "segnato"
+                    ? "text-green-600"
+                    : "text-red-600"
+                }`}
+              >
+                {riga.esito === "segnato" ? "✓" : "✕"}
+              </span>
+            </div>
+          );
+        })
+    )}
+  </div>
+)}
+
+  <div className="flex justify-between items-center">
+    <span className="text-black">Fatti</span>
+    <span className="font-bold text-green-600">
+      {statistiche.rigoriSegnati ?? 0}
+    </span>
+  </div>
+
+  <div className="flex justify-between items-center">
+    <span className="text-black">Sbagliati</span>
+    <span className="font-bold text-red-600">
+      {statistiche.rigoriSbagliati ?? 0}
+    </span>
+  </div>
+</div>
+
+<hr className="border-t border-gray-300 my-4" />
+
+{/* 5. Rigori ricevuti - solo portiere */}
+{giocatore.ruolo === "Portiere" && (
+  <>
+    <div className="space-y-2">
+      <div className="flex justify-between items-center">
+        <span className="font-semibold text-black">Rigori Ricevuti</span>
+        <span className="font-bold text-black">
+          {statistiche.rigoriRicevuti ?? 0}
+        </span>
+      </div>
+
+      <div className="flex justify-between items-center">
+        <span className="text-black">Parati</span>
+        <span className="font-bold text-green-600">
+          {statistiche.rigoriParati ?? 0}
+        </span>
+      </div>
+
+      <div className="flex justify-between items-center">
+        <span className="text-black">Subiti</span>
+        <span className="font-bold text-red-600">
+          {statistiche.rigoriSubiti ?? 0}
+        </span>
+      </div>
     </div>
-  )}
+
+    <hr className="border-t border-gray-300 my-4" />
+  </>
+)}
 </div>
 
 {/* 🔸 Separatore */}
 <hr className="w-2/3 border-t border-gray-300 my-3" />
 
-{/* 🔹 Allenamenti Fatti / Saltati */}
-<div className="flex flex-wrap justify-center gap-8 mb-6">
-  <div className="text-center">
-    <div className="text-2xl font-bold text-green-600">
-      {statistiche.allenamentiFatti}
+{/* 6. Allenamenti */}
+<div className="w-full max-w-md mx-auto mb-6">
+  <div className="space-y-2">
+    <div className="flex justify-between items-center">
+      <span className="font-semibold text-black">Allen. Fatti</span>
+      <span className="font-bold text-green-600">
+        {statistiche.allenamentiFatti ?? 0}
+      </span>
     </div>
-    <div className="text-sm text-black">Allenamenti Fatti</div>
-  </div>
 
-  <div className="text-center">
-    <div className="text-2xl font-bold text-red-600">
-      {statistiche.allenamentiSaltati}
+    <div className="flex justify-between items-center">
+      <span className="font-semibold text-black">Allen. Saltati</span>
+      <span className="font-bold text-red-600">
+        {statistiche.allenamentiSaltati ?? 0}
+      </span>
     </div>
-    <div className="text-sm text-black">Allenamenti Saltati</div>
   </div>
 </div>
 
 {/* 🔸 Separatore */}
 <hr className="w-2/3 border-t border-gray-300 my-3" />
 
-{/* 🔹 Media Voto Mister — visibile solo ad Admin o Creator */}
+{/* 7. Media Voto Mister — visibile solo ad Admin o Creator */}
 {(role === UserRole.Admin || role === UserRole.Creator) && (
-  <div className="flex justify-center mb-6">
-    <div className="text-center">
-      <div className="text-2xl font-bold text-blue-500">
+  <div className="w-full max-w-md mx-auto mb-6">
+    <hr className="border-t border-gray-300 mb-4" />
+
+    <div className="flex justify-between items-center">
+      <span className="font-semibold text-black">Media Voto Mister</span>
+      <span className="font-bold text-blue-500">
         {statistiche.mediaVotoMister?.toFixed(2) ?? "0.00"}
-      </div>
-      <div className="text-sm text-black">Media Voti Mister</div>
+      </span>
     </div>
   </div>
 )}
 
 
-
-
-          <div className="w-full max-w-md space-y-4">
-            {giocatore.data_nascita && (
-  <div className="flex justify-between items-center py-2 border-b">
-    <span className="text-black">Data di nascita</span>
-    <span className="font-medium">{formatData(giocatore.data_nascita)}</span>
-  </div>
-)}
-
-            {giocatore.ruolo && (
-              <div className="flex justify-between items-center py-2 border-b">
-                <span className="text-black">Ruolo</span>
-                <span className="font-medium">{giocatore.ruolo}</span>
-              </div>
-            )}
-            {giocatore.numero_cartellino != null && (
-              <div className="flex justify-between items-center py-2 border-b">
-                <span className="text-black">Numero Cartellino</span>
-                <span className="font-medium">{giocatore.numero_cartellino}</span>
-              </div>
-            )}
-          </div>
-        </div>
       </div>
     </div>
+  </div>
   );
 }

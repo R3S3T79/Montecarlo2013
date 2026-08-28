@@ -227,12 +227,14 @@ useEffect(() => {
     // 1) prendo stagione corrente (ultima inserita)
     let stagioneCorrente: Stagione | null = null;
     {
-      const { data: last, error: e2 } = await supabase
-        .from("stagioni")
-        .select("id, created_at")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const oggi = new Date().toISOString().slice(0, 10);
+
+const { data: last, error: e2 } = await supabase
+  .from("stagioni")
+  .select("id")
+  .lte("data_inizio", oggi)
+  .gte("data_fine", oggi)
+  .maybeSingle();
 
       if (e2) {
         console.warn("[HomePage] stagioni last warn:", e2.message);
@@ -869,11 +871,16 @@ const fbPluginSrc = useMemo(() => {
                 </div>
               ) : (
                 <div style={styles.perTimeRow}>
-                  <div>1T: {perTimeCasa[0]}</div>
-                  <div>2T: {perTimeCasa[1]}</div>
-                  <div>3T: {perTimeCasa[2]}</div>
-                  <div>4T: {perTimeCasa[3]}</div>
-                </div>
+  <div style={styles.tempoItem}>
+    <div style={styles.tempoLabel}>1° Tempo</div>
+    <div style={styles.tempoValue}>{perTimeCasa[0]}</div>
+  </div>
+
+  <div style={styles.tempoItem}>
+    <div style={styles.tempoLabel}>2° Tempo</div>
+    <div style={styles.tempoValue}>{perTimeCasa[1]}</div>
+  </div>
+</div>
               )}
             </div>
 
@@ -913,11 +920,16 @@ const fbPluginSrc = useMemo(() => {
                 </div>
               ) : (
                 <div style={styles.perTimeRow}>
-                  <div>1T: {perTimeOspite[0]}</div>
-                  <div>2T: {perTimeOspite[1]}</div>
-                  <div>3T: {perTimeOspite[2]}</div>
-                  <div>4T: {perTimeOspite[3]}</div>
-                </div>
+  <div style={styles.tempoItem}>
+    <div style={styles.tempoLabel}>1° Tempo</div>
+    <div style={styles.tempoValue}>{perTimeOspite[0]}</div>
+  </div>
+
+  <div style={styles.tempoItem}>
+    <div style={styles.tempoLabel}>2° Tempo</div>
+    <div style={styles.tempoValue}>{perTimeOspite[1]}</div>
+  </div>
+</div>
               )}
             </div>
           </div>
@@ -1269,6 +1281,23 @@ wideCard: {
   boxSizing: "border-box",
 },
 
+tempoItem: {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: 4,
+},
+
+tempoLabel: {
+  fontWeight: 700,
+  fontSize: 16,
+},
+
+tempoValue: {
+  fontWeight: 700,
+  fontSize: 17,
+},
+
 
 
 
@@ -1579,7 +1608,7 @@ timerSeparator: {
   perTimeRow: {
     marginTop: 8,
     display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0,1fr))",
+    gridTemplateColumns: "repeat(2, minmax(0,1fr))",
     gap: 6,
     fontSize: 12,
     opacity: 0.85,

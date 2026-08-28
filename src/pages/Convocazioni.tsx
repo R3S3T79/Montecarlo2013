@@ -37,8 +37,8 @@ export default function Convocazioni() {
 
 
   const allenatore = "Cesaretti Stefano";
-  const collaboratore = "Mazzoni Cristiano";
-  const accompagnatori = ["Cervetti Marco", "Marotta Simone", "Miressi Marco"].sort();
+  const collaboratore = "La Vigna Adamo";
+  const accompagnatori = ["Cervetti Marco", "Miressi Marco"].sort();
 
   const togglePartita = (p: any) => {
   setPartiteSelezionate((prev) => {
@@ -57,10 +57,8 @@ export default function Convocazioni() {
     const { data, error } = await supabase
       .from("partite")
       .select(`
-  id,
-  data_ora,
-  stagione_id,
-  campionato_torneo,
+        id,
+        data_ora,
         campionato_torneo,
         nome_torneo,
         stato,
@@ -99,31 +97,38 @@ export default function Convocazioni() {
     fetchSquadre();
   }, []);
 
-// Carica giocatori in base alla partita selezionata
+  // Carica giocatori stagione attuale + presenze della partita
 useEffect(() => {
   const fetchGiocatori = async () => {
+    // stagione corrente
+    const { data: stagione } = await supabase
+      .from("stagioni")
+      .select("id")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (partiteSelezionate.length === 0) return;
+    if (!stagione?.id) return;
 
-    const stagioneId = partiteSelezionate[0]?.stagione_id;
-    if (!stagioneId) return;
-
+    // giocatori stagione
     const { data: giocatoriStagione, error: errGioc } = await supabase
       .from("giocatori_stagioni")
       .select("id, nome, cognome")
-      .eq("stagione_id", stagioneId)
-      .order("cognome", { ascending: true });
+      .eq("stagione_id", stagione.id);
 
     if (errGioc) {
       console.error("Errore caricamento giocatori:", errGioc.message);
       return;
     }
 
-    setGiocatori(giocatoriStagione || []);
+    const ordinati = (giocatoriStagione || []).sort((a, b) =>
+      (a.cognome || "").localeCompare(b.cognome || "")
+    );
+    setGiocatori(ordinati);
   };
 
   fetchGiocatori();
-}, [partiteSelezionate]);
+}, []);
 
 
 
@@ -202,8 +207,28 @@ useEffect(() => {
   }
 }
 
+// Elimina le vecchie presenze delle partite che stiamo aggiornando
+for (const p of partiteTarget) {
+  const { error: deleteError } = await supabase
+    .from("presenze")
+    .delete()
+    .eq("partita_id", p.id)
+    .eq("stagione_id", stagione.id);
+
+  if (deleteError) {
+    console.error("Errore eliminazione vecchie presenze:", deleteError);
+    alert("Errore nell'aggiornamento dei convocati.");
+    return;
+  }
+}
+
     if (records.length > 0) {
-      const { error } = await supabase.from("presenze").insert(records);
+      const { error } = await supabase
+  .from("presenze")
+  .upsert(records, {
+    onConflict: "partita_id,giocatore_stagione_id",
+    ignoreDuplicates: true,
+  });
       if (error) {
         console.error("Errore salvataggio presenze:", error);
         alert("Errore nel salvataggio dei convocati.");

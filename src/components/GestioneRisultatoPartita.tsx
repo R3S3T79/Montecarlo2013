@@ -4,8 +4,14 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import TimerCircolare from "./TimerCircolare";
+import CronometroPartita from "./CronometroPartita";
 import CampoFormazione from "../components/CampoFormazione";
+import {
+  getElapsedCorrente,
+  getTempoAssoluto,
+  getStatoPartita,
+  StatoPartita,
+} from "../partita/partitaTimer";
 
 interface TimerState {
   partita_id: string;
@@ -13,6 +19,8 @@ interface TimerState {
   timer_offset_ms: number;
   timer_status: "running" | "paused" | "stopped";
   timer_duration_min?: number;
+  run_index: number;
+  total_elapsed_sec: number;
 }
 
 export default function GestioneRisultatoPartita() {
@@ -43,6 +51,7 @@ export default function GestioneRisultatoPartita() {
   const [convocati, setConvocati] = useState<string[]>([]);
   const [titolari, setTitolari] = useState<string[]>([]);
   const [refreshCampo, setRefreshCampo] = useState(0);
+
 
   // ========================
   // Stati sostituzioni e minuti giocati
@@ -76,23 +85,68 @@ const [manualTime, setManualTime] = useState<string>("");
   const [formazioneAperta, setFormazioneAperta] = useState(false);
   const [goalCasa, setGoalCasa] = useState([0, 0, 0, 0]);
   const [goalOspite, setGoalOspite] = useState([0, 0, 0, 0]);
+  const [rigoriCasa, setRigoriCasa] = useState(0);
+const [rigoriOspite, setRigoriOspite] = useState(0);
+const [rigoristaSelezionato, setRigoristaSelezionato] = useState("");
+// ========================
+// Stato sequenza rigori
+// ========================
+const [tiriRigori, setTiriRigori] = useState<
+  {
+    id: string;
+    squadra_id: string;
+    giocatore_stagione_id: string | null;
+    ordine: number;
+    esito: "segnato" | "sbagliato";
+  }[]
+>([]);
   const [tempo, setTempo] = useState<number | null>(null);
+  const [tipoEvento, setTipoEvento] = useState<"gol" | "giallo" | "rosso" | null>(null);
+  const [periodoCartellino, setPeriodoCartellino] = useState<number | null>(null);
+  const [minutoCartellino, setMinutoCartellino] = useState<string>("");
 
-  // ========================
-  // Stati marcatori
-  // ========================
   const [marcatori, setMarcatori] = useState<
-    Record<
-      number,
-      {
-        goal_tempo: number;
-        giocatore_stagione_id: string | null;
-        portiere_subisce_id?: string | null;
-        squadra_segnante_id?: string | null;
-        id_supabase?: string;
-      }[]
-    >
-  >({});
+  Record<
+    number,
+    {
+  goal_tempo: number;
+  tempo_sec?: number | null;
+  tipo_goal?: "azione" | "rigore";
+  giocatore_stagione_id: string | null;
+  assist_giocatore_stagione_id?: string | null;
+  portiere_subisce_id?: string | null;
+  squadra_segnante_id?: string | null;
+  id_supabase?: string;
+}[]
+  >
+>({});
+
+// ========================
+// PERIODI CARTELLINI
+// ========================
+// 1 = 1° Tempo
+// 2 = Intervallo
+// 3 = 2° Tempo
+// 4 = Intervallo prima supplementari
+// 5 = 1° Tempo Supplementare
+// 6 = Intervallo supplementari
+// 7 = 2° Tempo Supplementare
+// 8 = Rigori
+// 9 = Dopo partita
+// ========================
+
+// ========================
+// Stati cartellini
+// ========================
+const [cartellini, setCartellini] = useState<
+  {
+    id?: string;
+    giocatore_stagione_id: string;
+    tipo: "giallo" | "rosso";
+    periodo: number;
+    tempo_sec: number;
+  }[]
+>([]);
 
   // ========================
   // Timer
@@ -128,10 +182,15 @@ useEffect(() => {
   (async () => {
     // 1) Carico la partita
     const { data: p, error: errP } = await supabase
-      .from("partite")
-      .select("*")
-      .eq("id", id)
-      .single();
+  .from("partite")
+  .select(`
+    *,
+    stagione:stagione_id (
+      formato_calcio
+    )
+  `)
+  .eq("id", id)
+  .single();
     if (errP || !p) {
       console.error("Errore fetch partita:", errP?.message);
       return;
@@ -139,6 +198,11 @@ useEffect(() => {
     setPartita(p);
     setGoalCasa([p.goal_a1, p.goal_a2, p.goal_a3, p.goal_a4]);
     setGoalOspite([p.goal_b1, p.goal_b2, p.goal_b3, p.goal_b4]);
+    setRigoriCasa(p.rigori_a ?? 0);
+setRigoriOspite(p.rigori_b ?? 0);
+    setRigoriCasa(p.rigori_a ?? 0);
+setRigoriOspite(p.rigori_b ?? 0);
+   
 
     // 2) Squadre
     const [resCasa, resOspite] = await Promise.all([
@@ -214,21 +278,51 @@ useEffect(() => {
     // 6) Marcatori
     const { data: marcatoriDB } = await supabase
       .from("marcatori")
-      .select("giocatore_stagione_id, periodo, goal_tempo, portiere_subisce_id, squadra_segnante_id, id")
+      .select("giocatore_stagione_id, assist_giocatore_stagione_id, periodo, goal_tempo, tempo_sec, tipo_goal, portiere_subisce_id, squadra_segnante_id, id")
       .eq("partita_id", p.id);
 
     const perPeriodo: Record<number, any[]> = {};
     marcatoriDB?.forEach((m) => {
       perPeriodo[m.periodo] = perPeriodo[m.periodo] || [];
       perPeriodo[m.periodo].push({
-        goal_tempo: m.goal_tempo,
-        giocatore_stagione_id: m.giocatore_stagione_id,
-        portiere_subisce_id: m.portiere_subisce_id,
-        squadra_segnante_id: m.squadra_segnante_id,
-        id_supabase: m.id,
-      });
+  goal_tempo: m.goal_tempo,
+  tempo_sec: m.tempo_sec,
+  giocatore_stagione_id: m.giocatore_stagione_id,
+  assist_giocatore_stagione_id: m.assist_giocatore_stagione_id,
+  portiere_subisce_id: m.portiere_subisce_id,
+  squadra_segnante_id: m.squadra_segnante_id,
+  id_supabase: m.id,
+});
     });
     setMarcatori(perPeriodo);
+
+    // ========================
+// 7) Rigori già registrati
+// ========================
+const { data: rigoriDB, error: rigoriErr } = await supabase
+  .from("rigori_partita")
+  .select("id, squadra_id, giocatore_stagione_id, ordine, esito")
+  .eq("partita_id", p.id)
+  .order("ordine", { ascending: true });
+
+if (rigoriErr) {
+  console.error("❌ Errore fetch rigori_partita:", rigoriErr.message);
+} else {
+  setTiriRigori(rigoriDB || []);
+}
+
+    // 7) Cartellini
+const { data: cartelliniDB, error: cartelliniErr } = await supabase
+  .from("cartellini")
+  .select("id, giocatore_stagione_id, tipo, periodo, tempo_sec")
+  .eq("partita_id", p.id)
+  .order("created_at", { ascending: true });
+
+if (cartelliniErr) {
+  console.error("Errore fetch cartellini:", cartelliniErr.message);
+} else {
+  setCartellini(cartelliniDB || []);
+}
 
     // 7) Stato timer (non resetta al refresh)
     const { data: t, error: tErr } = await supabase
@@ -270,18 +364,21 @@ useEffect(() => {
         async () => {
           const { data: live } = await supabase
             .from("marcatori")
-            .select("giocatore_stagione_id, periodo, goal_tempo, portiere_subisce_id, squadra_segnante_id, id")
+            .select("giocatore_stagione_id, assist_giocatore_stagione_id, periodo, goal_tempo, tempo_sec, tipo_goal, portiere_subisce_id, squadra_segnante_id, id")
             .eq("partita_id", p.id);
           const perLive: Record<number, any[]> = {};
           live?.forEach((m) => {
             perLive[m.periodo] = perLive[m.periodo] || [];
             perLive[m.periodo].push({
-              goal_tempo: m.goal_tempo,
-              giocatore_stagione_id: m.giocatore_stagione_id,
-              portiere_subisce_id: m.portiere_subisce_id,
-              squadra_segnante_id: m.squadra_segnante_id,
-              id_supabase: m.id,
-            });
+  goal_tempo: m.goal_tempo,
+  tempo_sec: m.tempo_sec,
+  tipo_goal: m.tipo_goal,
+  giocatore_stagione_id: m.giocatore_stagione_id,
+  assist_giocatore_stagione_id: m.assist_giocatore_stagione_id,
+  portiere_subisce_id: m.portiere_subisce_id,
+  squadra_segnante_id: m.squadra_segnante_id,
+  id_supabase: m.id,
+});
           });
           setMarcatori(perLive);
         }
@@ -309,17 +406,22 @@ useEffect(() => {
 }, [id]);
 
 
-  // calcolo elapsed
-  useEffect(() => {
+// =====================
+// Calcolo elapsed tramite motore partita
+// =====================
+useEffect(() => {
   let interval: NodeJS.Timeout | null = null;
-  if (timerState?.timer_status === "running" && timerState.timer_started_at) {
-    interval = setInterval(() => {
-      const started = new Date(timerState.timer_started_at!).getTime();
-      setElapsed(timerState.timer_offset_ms + (Date.now() - started));
-    }, 1000);
-  } else if (timerState) {
-    setElapsed(timerState.timer_offset_ms);
+
+  const aggiornaElapsed = () => {
+    setElapsed(getElapsedCorrente(timerState));
+  };
+
+  aggiornaElapsed();
+
+  if (timerState?.timer_status === "running") {
+    interval = setInterval(aggiornaElapsed, 1000);
   }
+
   return () => {
     if (interval) clearInterval(interval);
   };
@@ -365,7 +467,7 @@ useEffect(() => {
 
 
   /// durata corrente "sorgente unica"
-const currentDuration = timerState?.timer_duration_min ?? 20;
+const currentDuration = timerState?.timer_duration_min ?? 35;
 
 // Avvia o riprende il timer (con debug)
 const startTimer = async () => {
@@ -442,12 +544,16 @@ const startTimer = async () => {
   setMinutiRows(minutiAggiornati || []);
 
   // 5️⃣ Aggiorna timer nel DB
-  const { error: timerErr } = await supabase.from("partita_timer_state").upsert({
+  const { error: timerErr } = await supabase
+  .from("partita_timer_state")
+  .upsert({
     partita_id: id,
     timer_duration_min: currentDuration,
     timer_started_at: now,
     timer_status: "running",
     timer_offset_ms: timerState?.timer_offset_ms || 0,
+    run_index: (timerState?.run_index ?? 0) === 0 ? 1 : timerState!.run_index,
+    total_elapsed_sec: timerState?.total_elapsed_sec ?? 0,
   });
 
   if (timerErr) console.error("❌ Errore upsert timer:", timerErr.message);
@@ -459,8 +565,13 @@ const startTimer = async () => {
     partita_id: id,
     timer_duration_min: currentDuration,
     timer_started_at: now,
-    timer_status: "running",
-    timer_offset_ms: prev?.timer_offset_ms || 0,
+timer_status: "running",
+timer_offset_ms: prev?.timer_offset_ms || 0,
+
+run_index:
+  (prev?.run_index ?? 0) === 0
+    ? 1
+    : prev!.run_index,
   }));
 
   console.log("🏁 Stato locale timer aggiornato");
@@ -490,99 +601,942 @@ const pauseTimer = async () => {
   }));
 };
 
-// 🔹 Reset Timer + chiusura delle run aperte (fine tempo)
+// Fine 1° tempo → Intervallo
+const intervallo = async () => {
+  if (!id) return;
+
+  // Calcola il tempo effettivo del 1° tempo PRIMA di fermare il timer
+  const elapsedCorrente = getElapsedCorrente(timerState);
+  const tempoGiocato = Math.floor(elapsedCorrente / 1000);
+
+  console.log("🏁 Fine 1° tempo | tempo giocato:", tempoGiocato, "secondi");
+
+  // 1. Chiude tutte le righe ancora aperte dei giocatori in campo
+  const { error: chiusuraErr } = await supabase
+    .from("minuti_giocati")
+    .update({ uscita_sec: tempoGiocato })
+    .eq("partita_id", id)
+    .is("uscita_sec", null);
+
+  if (chiusuraErr) {
+    console.error(
+      "❌ Errore chiusura minuti_giocati a fine 1° tempo:",
+      chiusuraErr.message
+    );
+    return;
+  }
+
+  // 2. Ricarica le righe aggiornate
+  const { data: minutiAggiornati, error: minutiErr } = await supabase
+    .from("minuti_giocati")
+    .select("giocatore_stagione_id, entrata_sec, uscita_sec")
+    .eq("partita_id", id);
+
+  if (minutiErr) {
+    console.error(
+      "❌ Errore rilettura minuti_giocati a fine 1° tempo:",
+      minutiErr.message
+    );
+    return;
+  }
+
+  setMinutiRows(minutiAggiornati || []);
+
+  // 3. Salva stato di intervallo
+  const { error } = await supabase
+    .from("partita_timer_state")
+    .update({
+      run_index: 1,
+      total_elapsed_sec: tempoGiocato,
+      timer_status: "stopped",
+      timer_started_at: null,
+      timer_offset_ms: 0,
+    })
+    .eq("partita_id", id);
+
+  if (error) {
+    console.error("Errore aggiornamento intervallo:", error);
+    return;
+  }
+
+  setTimerState((prev) =>
+    prev
+      ? {
+          ...prev,
+          run_index: 1,
+          total_elapsed_sec: tempoGiocato,
+          timer_status: "stopped",
+          timer_started_at: null,
+          timer_offset_ms: 0,
+        }
+      : prev
+  );
+
+  setElapsed(0);
+
+  console.log("✅ Primo tempo chiuso correttamente");
+};
+
+// Inizio 2° tempo
+const inizioSecondoTempo = async () => {
+  if (!id) return;
+
+  const now = new Date().toISOString();
+
+  // Tempo assoluto raggiunto alla fine del 1° tempo
+  const tempoInizioSecondo = timerState?.total_elapsed_sec ?? 0;
+
+  // 1. Recupera i giocatori attualmente presenti in campo
+  const { data: formazione, error: formErr } = await supabase
+    .from("formazioni_partita")
+    .select("giocatore_stagione_id")
+    .eq("partita_id", id);
+
+  if (formErr) {
+    console.error(
+      "❌ Errore lettura formazione a inizio 2° tempo:",
+      formErr.message
+    );
+    return;
+  }
+
+  let inCampoIds =
+    formazione?.map((f) => f.giocatore_stagione_id) || [];
+
+  // Fallback sui titolari se la formazione non contiene giocatori
+  if (inCampoIds.length === 0 && titolari.length > 0) {
+    inCampoIds = [...titolari];
+  }
+
+  // 2. Crea un nuovo intervallo per tutti i giocatori in campo
+ const nuoveRighe = inCampoIds.map((gid) => ({
+  partita_id: id,
+  giocatore_stagione_id: gid,
+  entrata_sec: tempoInizioSecondo,
+  uscita_sec: null,
+  run_index: 2,
+}));
+
+  if (nuoveRighe.length > 0) {
+    const { error: minutiErr } = await supabase
+      .from("minuti_giocati")
+      .insert(nuoveRighe);
+
+    if (minutiErr) {
+      console.error(
+        "❌ Errore apertura minuti 2° tempo:",
+        minutiErr.message
+      );
+      return;
+    }
+  }
+
+  // 3. Ricarica minuti_giocati
+  const { data: minutiAggiornati, error: reloadErr } = await supabase
+    .from("minuti_giocati")
+    .select("giocatore_stagione_id, entrata_sec, uscita_sec")
+    .eq("partita_id", id);
+
+  if (reloadErr) {
+    console.error(
+      "❌ Errore rilettura minuti 2° tempo:",
+      reloadErr.message
+    );
+    return;
+  }
+
+  setMinutiRows(minutiAggiornati || []);
+
+  // 4. Avvia il secondo tempo
+  const { error } = await supabase
+    .from("partita_timer_state")
+    .update({
+      timer_started_at: now,
+      timer_status: "running",
+      timer_offset_ms: 0,
+      run_index: 2,
+    })
+    .eq("partita_id", id);
+
+  if (error) {
+    console.error("Errore avvio 2° tempo:", error);
+    return;
+  }
+
+  setTimerState((prev) =>
+    prev
+      ? {
+          ...prev,
+          timer_started_at: now,
+          timer_status: "running",
+          timer_offset_ms: 0,
+          run_index: 2,
+        }
+      : prev
+  );
+
+  setElapsed(0);
+
+  console.log(
+    "▶️ Secondo tempo avviato | tempo assoluto:",
+    tempoInizioSecondo,
+    "| giocatori in campo:",
+    inCampoIds.length
+  );
+};
+
+// =====================
+// Fine tempi regolamentari
+// =====================
+const fineTempiRegolamentari = async () => {
+  if (!id) return;
+
+  // Tempo effettivamente giocato nel 2° tempo
+  const tempoSecondoTempo = Math.floor(
+    getElapsedCorrente(timerState) / 1000
+  );
+
+  // Tempo assoluto raggiunto alla fine dei tempi regolamentari
+  const tempoAssoluto =
+    (timerState?.total_elapsed_sec || 0) + tempoSecondoTempo;
+
+  console.log(
+    "🏁 Fine tempi regolamentari | tempo assoluto:",
+    tempoAssoluto
+  );
+
+  // 1. Chiude tutte le righe ancora aperte del 2° tempo
+  const { error: chiusuraErr } = await supabase
+    .from("minuti_giocati")
+    .update({ uscita_sec: tempoAssoluto })
+    .eq("partita_id", id)
+    .is("uscita_sec", null);
+
+  if (chiusuraErr) {
+    console.error(
+      "❌ Errore chiusura minuti a fine tempi regolamentari:",
+      chiusuraErr.message
+    );
+    return;
+  }
+
+  // 2. Ricarica minuti_giocati
+  const { data: minutiAggiornati, error: minutiErr } = await supabase
+    .from("minuti_giocati")
+    .select("giocatore_stagione_id, entrata_sec, uscita_sec")
+    .eq("partita_id", id);
+
+  if (minutiErr) {
+    console.error(
+      "❌ Errore rilettura minuti a fine tempi regolamentari:",
+      minutiErr.message
+    );
+    return;
+  }
+
+  setMinutiRows(minutiAggiornati || []);
+
+  // 3. Ferma il timer mantenendo run_index = 2
+  const { error: timerErr } = await supabase
+    .from("partita_timer_state")
+    .update({
+      timer_status: "stopped",
+      timer_started_at: null,
+      timer_offset_ms: 0,
+      run_index: 2,
+      total_elapsed_sec: tempoAssoluto,
+    })
+    .eq("partita_id", id);
+
+  if (timerErr) {
+    console.error(
+      "❌ Errore fine tempi regolamentari:",
+      timerErr.message
+    );
+    return;
+  }
+
+  setTimerState((prev) =>
+    prev
+      ? {
+          ...prev,
+          timer_status: "stopped",
+          timer_started_at: null,
+          timer_offset_ms: 0,
+          run_index: 2,
+          total_elapsed_sec: tempoAssoluto,
+        }
+      : prev
+  );
+
+  setElapsed(0);
+
+  console.log("✅ Tempi regolamentari terminati");
+};
+
+// Fine partita
+const finePartita = async () => {
+  if (!id) return;
+
+  // Tempo effettivamente giocato nel 2° tempo
+  const tempoSecondoTempo = Math.floor(getElapsedCorrente(timerState) / 1000);
+
+  // Tempo assoluto raggiunto alla fine della partita
+  const tempoAssoluto =
+    (timerState?.total_elapsed_sec || 0) + tempoSecondoTempo;
+
+  console.log(
+    "🏁 Fine partita | 1° tempo:",
+    timerState?.total_elapsed_sec || 0,
+    "| 2° tempo:",
+    tempoSecondoTempo,
+    "| tempo assoluto:",
+    tempoAssoluto
+  );
+
+  // 1. Chiude tutte le righe ancora aperte del 2° tempo
+  const { error: chiusuraErr } = await supabase
+    .from("minuti_giocati")
+    .update({ uscita_sec: tempoAssoluto })
+    .eq("partita_id", id)
+    .is("uscita_sec", null);
+
+  if (chiusuraErr) {
+    console.error(
+      "❌ Errore chiusura minuti_giocati a fine partita:",
+      chiusuraErr.message
+    );
+    return;
+  }
+
+  // 2. Legge tutti gli intervalli giocati della partita
+  const { data: minutiDB, error: minutiErr } = await supabase
+    .from("minuti_giocati")
+    .select("giocatore_stagione_id, entrata_sec, uscita_sec")
+    .eq("partita_id", id);
+
+  if (minutiErr) {
+    console.error(
+      "❌ Errore lettura minuti_giocati a fine partita:",
+      minutiErr.message
+    );
+    return;
+  }
+
+  setMinutiRows(minutiDB || []);
+
+  // 3. Somma tutti gli intervalli per ogni giocatore
+  const totali: Record<string, number> = {};
+
+  (minutiDB || []).forEach((m) => {
+    const entrata = m.entrata_sec ?? 0;
+    const uscita = m.uscita_sec;
+
+    if (uscita === null) return;
+
+    const diff = uscita - entrata;
+
+    if (diff > 0) {
+      totali[m.giocatore_stagione_id] =
+        (totali[m.giocatore_stagione_id] || 0) + diff;
+    }
+  });
+
+  // 4. Prepara i totali definitivi
+  const rowsTotali = Object.entries(totali).map(([gid, sec]) => ({
+    partita_id: id,
+    giocatore_stagione_id: gid,
+    tempo_giocato_sec: sec,
+  }));
+
+  // 5. Scrive una sola volta i totali definitivi
+  if (rowsTotali.length > 0) {
+    const { error: totaliErr } = await supabase
+      .from("minuti_giocati_totali")
+      .upsert(rowsTotali, {
+        onConflict: "partita_id,giocatore_stagione_id",
+      });
+
+    if (totaliErr) {
+      console.error(
+        "❌ Errore salvataggio minuti_giocati_totali:",
+        totaliErr.message
+      );
+      return;
+    }
+  }
+
+  // 6. Ferma definitivamente il timer
+  const { error: timerErr } = await supabase
+    .from("partita_timer_state")
+    .update({
+      timer_status: "stopped",
+      timer_started_at: null,
+      timer_offset_ms: 0,
+      run_index: 6,
+      total_elapsed_sec: tempoAssoluto,
+    })
+    .eq("partita_id", id);
+
+  if (timerErr) {
+    console.error("❌ Errore fine partita:", timerErr.message);
+    return;
+  }
+
+  setTimerState((prev) =>
+    prev
+      ? {
+          ...prev,
+          timer_status: "stopped",
+          timer_started_at: null,
+          timer_offset_ms: 0,
+          run_index: 6,
+          total_elapsed_sec: tempoAssoluto,
+        }
+      : prev
+  );
+
+  setElapsed(0);
+
+  console.log(
+    "✅ Partita terminata | minuti totali salvati:",
+    rowsTotali
+  );
+};
+
+// =====================
+// Inizio 1° Tempo Supplementare
+// =====================
+const inizioPrimoTempoSupplementare = async () => {
+  if (!id || !timerState) return;
+
+  const now = new Date().toISOString();
+
+  // Tempo assoluto raggiunto alla fine dei tempi regolamentari
+  const tempoInizioSupplementari = timerState.total_elapsed_sec;
+    // 1. Recupera i giocatori attualmente presenti in campo
+  const { data: formazione, error: formErr } = await supabase
+    .from("formazioni_partita")
+    .select("giocatore_stagione_id")
+    .eq("partita_id", id);
+
+  if (formErr) {
+    console.error(
+      "❌ Errore lettura formazione a inizio 1° supplementare:",
+      formErr.message
+    );
+    return;
+  }
+
+  let inCampoIds =
+    formazione?.map((f) => f.giocatore_stagione_id) || [];
+
+  // Fallback sui titolari se la formazione non contiene giocatori
+  if (inCampoIds.length === 0 && titolari.length > 0) {
+    inCampoIds = [...titolari];
+  }
+
+  // 2. Crea un nuovo intervallo per tutti i giocatori in campo
+  const nuoveRighe = inCampoIds.map((gid) => ({
+    partita_id: id,
+    giocatore_stagione_id: gid,
+    entrata_sec: tempoInizioSupplementari,
+    uscita_sec: null,
+    run_index: 3,
+  }));
+
+  if (nuoveRighe.length > 0) {
+    const { error: minutiErr } = await supabase
+      .from("minuti_giocati")
+      .insert(nuoveRighe);
+
+    if (minutiErr) {
+      console.error(
+        "❌ Errore apertura minuti 1° supplementare:",
+        minutiErr.message
+      );
+      return;
+    }
+  }
+
+  // 3. Ricarica minuti_giocati
+  const { data: minutiAggiornati, error: reloadErr } = await supabase
+    .from("minuti_giocati")
+    .select("giocatore_stagione_id, entrata_sec, uscita_sec")
+    .eq("partita_id", id);
+
+  if (reloadErr) {
+    console.error(
+      "❌ Errore rilettura minuti 1° supplementare:",
+      reloadErr.message
+    );
+    return;
+  }
+
+  setMinutiRows(minutiAggiornati || []);
+
+  const { error } = await supabase
+    .from("partita_timer_state")
+    .update({
+      timer_started_at: now,
+      timer_status: "running",
+      timer_offset_ms: 0,
+      run_index: 3,
+      total_elapsed_sec: tempoInizioSupplementari,
+    })
+    .eq("partita_id", id);
+
+  if (error) {
+    console.error(
+      "❌ Errore avvio 1° tempo supplementare:",
+      error.message
+    );
+    return;
+  }
+
+  setTimerState((prev) =>
+    prev
+      ? {
+          ...prev,
+          timer_started_at: now,
+          timer_status: "running",
+          timer_offset_ms: 0,
+          run_index: 3,
+          total_elapsed_sec: tempoInizioSupplementari,
+        }
+      : prev
+  );
+
+  setElapsed(0);
+
+  console.log(
+    "▶️ 1° Tempo Supplementare avviato | tempo assoluto:",
+    tempoInizioSupplementari
+  );
+};
+
+// =====================
+// Fine 1° Tempo Supplementare
+// =====================
+const finePrimoTempoSupplementare = async () => {
+  if (!id || !timerState) return;
+
+  const elapsedCorrente = getElapsedCorrente(timerState);
+
+  const tempoAssoluto = getTempoAssoluto(
+    timerState,
+    elapsedCorrente
+  );
+
+  // 1. Chiude tutte le righe ancora aperte
+  const { error: chiusuraErr } = await supabase
+    .from("minuti_giocati")
+    .update({ uscita_sec: tempoAssoluto })
+    .eq("partita_id", id)
+    .is("uscita_sec", null);
+
+  if (chiusuraErr) {
+    console.error(
+      "❌ Errore chiusura minuti fine 1° supplementare:",
+      chiusuraErr.message
+    );
+    return;
+  }
+
+  // 2. Ricarica minuti_giocati
+  const { data: minutiAggiornati, error: minutiErr } = await supabase
+    .from("minuti_giocati")
+    .select("giocatore_stagione_id, entrata_sec, uscita_sec")
+    .eq("partita_id", id);
+
+  if (minutiErr) {
+    console.error(
+      "❌ Errore rilettura minuti fine 1° supplementare:",
+      minutiErr.message
+    );
+    return;
+  }
+
+  setMinutiRows(minutiAggiornati || []);
+
+  // 3. Ferma il timer mantenendo run_index = 3
+  const { error: timerErr } = await supabase
+    .from("partita_timer_state")
+    .update({
+      timer_status: "stopped",
+      timer_started_at: null,
+      timer_offset_ms: 0,
+      run_index: 3,
+      total_elapsed_sec: tempoAssoluto,
+    })
+    .eq("partita_id", id);
+
+  if (timerErr) {
+    console.error(
+      "❌ Errore fine 1° tempo supplementare:",
+      timerErr.message
+    );
+    return;
+  }
+
+  setTimerState((prev) =>
+    prev
+      ? {
+          ...prev,
+          timer_status: "stopped",
+          timer_started_at: null,
+          timer_offset_ms: 0,
+          run_index: 3,
+          total_elapsed_sec: tempoAssoluto,
+        }
+      : prev
+  );
+
+  setElapsed(0);
+
+  console.log(
+    "⏸️ Fine 1° Tempo Supplementare | tempo assoluto:",
+    tempoAssoluto
+  );
+};
+
+// =====================
+// Inizio 2° Tempo Supplementare
+// =====================
+const inizioSecondoTempoSupplementare = async () => {
+  if (!id || !timerState) return;
+
+  const now = new Date().toISOString();
+
+  const tempoInizioSecondoSupplementare =
+    timerState.total_elapsed_sec;
+
+      // 1. Recupera i giocatori attualmente presenti in campo
+  const { data: formazione, error: formErr } = await supabase
+    .from("formazioni_partita")
+    .select("giocatore_stagione_id")
+    .eq("partita_id", id);
+
+  if (formErr) {
+    console.error(
+      "❌ Errore lettura formazione a inizio 2° supplementare:",
+      formErr.message
+    );
+    return;
+  }
+
+  let inCampoIds =
+    formazione?.map((f) => f.giocatore_stagione_id) || [];
+
+  // Fallback sui titolari se la formazione non contiene giocatori
+  if (inCampoIds.length === 0 && titolari.length > 0) {
+    inCampoIds = [...titolari];
+  }
+
+  // 2. Crea un nuovo intervallo per tutti i giocatori in campo
+  const nuoveRighe = inCampoIds.map((gid) => ({
+    partita_id: id,
+    giocatore_stagione_id: gid,
+    entrata_sec: tempoInizioSecondoSupplementare,
+    uscita_sec: null,
+    run_index: 4,
+  }));
+
+  if (nuoveRighe.length > 0) {
+    const { error: minutiErr } = await supabase
+      .from("minuti_giocati")
+      .insert(nuoveRighe);
+
+    if (minutiErr) {
+      console.error(
+        "❌ Errore apertura minuti 2° supplementare:",
+        minutiErr.message
+      );
+      return;
+    }
+  }
+
+  // 3. Ricarica minuti_giocati
+  const { data: minutiAggiornati, error: reloadErr } = await supabase
+    .from("minuti_giocati")
+    .select("giocatore_stagione_id, entrata_sec, uscita_sec")
+    .eq("partita_id", id);
+
+  if (reloadErr) {
+    console.error(
+      "❌ Errore rilettura minuti 2° supplementare:",
+      reloadErr.message
+    );
+    return;
+  }
+
+  setMinutiRows(minutiAggiornati || []);
+
+  const { error } = await supabase
+    .from("partita_timer_state")
+    .update({
+      timer_started_at: now,
+      timer_status: "running",
+      timer_offset_ms: 0,
+      run_index: 4,
+      total_elapsed_sec: tempoInizioSecondoSupplementare,
+    })
+    .eq("partita_id", id);
+
+  if (error) {
+    console.error(
+      "❌ Errore avvio 2° tempo supplementare:",
+      error.message
+    );
+    return;
+  }
+
+  setTimerState((prev) =>
+    prev
+      ? {
+          ...prev,
+          timer_started_at: now,
+          timer_status: "running",
+          timer_offset_ms: 0,
+          run_index: 4,
+          total_elapsed_sec: tempoInizioSecondoSupplementare,
+        }
+      : prev
+  );
+
+  setElapsed(0);
+
+  console.log(
+    "▶️ 2° Tempo Supplementare avviato | tempo assoluto:",
+    tempoInizioSecondoSupplementare
+  );
+};
+
+// =====================
+// Fine 2° Tempo Supplementare
+// =====================
+const fineSecondoTempoSupplementare = async () => {
+  if (!id || !timerState) return;
+
+  const elapsedCorrente = getElapsedCorrente(timerState);
+
+  const tempoAssoluto = getTempoAssoluto(
+    timerState,
+    elapsedCorrente
+  );
+
+  // 1. Chiude tutte le righe ancora aperte
+  const { error: chiusuraErr } = await supabase
+    .from("minuti_giocati")
+    .update({ uscita_sec: tempoAssoluto })
+    .eq("partita_id", id)
+    .is("uscita_sec", null);
+
+  if (chiusuraErr) {
+    console.error(
+      "❌ Errore chiusura minuti fine 2° supplementare:",
+      chiusuraErr.message
+    );
+    return;
+  }
+
+  // 2. Ricarica minuti_giocati
+  const { data: minutiAggiornati, error: minutiErr } = await supabase
+    .from("minuti_giocati")
+    .select("giocatore_stagione_id, entrata_sec, uscita_sec")
+    .eq("partita_id", id);
+
+  if (minutiErr) {
+    console.error(
+      "❌ Errore rilettura minuti fine 2° supplementare:",
+      minutiErr.message
+    );
+    return;
+  }
+
+  setMinutiRows(minutiAggiornati || []);
+
+  // 3. Ferma il timer e porta la partita allo stato finale
+  const { error: timerErr } = await supabase
+    .from("partita_timer_state")
+    .update({
+      timer_status: "stopped",
+      timer_started_at: null,
+      timer_offset_ms: 0,
+      run_index: 4,
+      total_elapsed_sec: tempoAssoluto,
+    })
+    .eq("partita_id", id);
+
+  if (timerErr) {
+    console.error(
+      "❌ Errore fine 2° tempo supplementare:",
+      timerErr.message
+    );
+    return;
+  }
+
+  setTimerState((prev) =>
+    prev
+      ? {
+          ...prev,
+          timer_status: "stopped",
+          timer_started_at: null,
+          timer_offset_ms: 0,
+          run_index: 4,
+          total_elapsed_sec: tempoAssoluto,
+        }
+      : prev
+  );
+
+  setElapsed(0);
+
+  console.log(
+    "🏁 Fine 2° Tempo Supplementare | tempo assoluto:",
+    tempoAssoluto
+  );
+};
+
+// =====================
+// Inizio Rigori
+// =====================
+const inizioRigori = async () => {
+  if (!id || !timerState) return;
+
+  const { error } = await supabase
+    .from("partita_timer_state")
+    .update({
+      timer_status: "stopped",
+      timer_started_at: null,
+      timer_offset_ms: 0,
+      run_index: 5,
+      total_elapsed_sec: timerState.total_elapsed_sec,
+    })
+    .eq("partita_id", id);
+
+  if (error) {
+    console.error(
+      "❌ Errore avvio fase rigori:",
+      error.message
+    );
+    return;
+  }
+
+  setTimerState((prev) =>
+    prev
+      ? {
+          ...prev,
+          timer_status: "stopped",
+          timer_started_at: null,
+          timer_offset_ms: 0,
+          run_index: 5,
+          total_elapsed_sec: prev.total_elapsed_sec,
+        }
+      : prev
+  );
+
+  setElapsed(0);
+
+  console.log("⚽ Fase rigori avviata");
+};
+
+// 🔹 Reset completo cronometro + minuti giocati
 const resetTimer = async () => {
   try {
     if (!id) return;
 
-    // Se elapsed non è ancora definito, interrompi
-    if (typeof elapsed !== "number" || isNaN(elapsed)) {
-      console.warn("⏹ resetTimer ignorato: elapsed non valido");
-      return;
-    }
+    const conferma = window.confirm(
+      "Confermi il reset della partita?\n\n" +
+      "Verranno azzerati:\n" +
+      "- Cronometro\n" +
+      "- Minuti giocati\n\n" +
+      "La formazione NON verrà modificata."
+    );
 
-    // 1️⃣ Calcola il tempo totale trascorso (in secondi)
-    const nowSec = Math.floor(elapsed / 1000);
-    console.log("⏱️ Chiusura run aperte al secondo:", nowSec);
+    if (!conferma) return;
 
-    // 2️⃣ Chiudi tutte le run ancora aperte in minuti_giocati
-    const { error: closeErr } = await supabase
+    // 1️⃣ Elimina completamente i minuti giocati
+    const { error: deleteErr } = await supabase
       .from("minuti_giocati")
-      .update({ uscita_sec: nowSec })
-      .eq("partita_id", id)
-      .is("uscita_sec", null);
+      .delete()
+      .eq("partita_id", id);
 
-    if (closeErr) {
-      console.error("❌ Errore chiusura run aperte al reset:", closeErr.message);
-    } else {
-      console.log("✅ Tutte le run aperte chiuse correttamente a", nowSec);
-    }
+    // 2️⃣ Elimina anche i minuti giocati totali
+const { error: deleteTotaliErr } = await supabase
+  .from("minuti_giocati_totali")
+  .delete()
+  .eq("partita_id", id);
 
-    // 3️⃣ Aggiorna lo stato del timer nel DB
+if (deleteTotaliErr) {
+  console.error(
+    "❌ Errore eliminazione minuti_giocati_totali:",
+    deleteTotaliErr.message
+  );
+  return;
+}
+
+    // 2️⃣ Reset timer
     const { error: timerErr } = await supabase
       .from("partita_timer_state")
       .update({
         timer_offset_ms: 0,
         timer_started_at: null,
         timer_status: "stopped",
+        run_index: 0,
+        total_elapsed_sec: 0,
       })
       .eq("partita_id", id);
 
     if (timerErr) {
-      console.error("⚠️ Errore aggiornamento timer_state:", timerErr.message);
-    } else {
-      console.log("🕒 Timer resettato correttamente");
+      console.error("❌ Errore reset timer:", timerErr.message);
+      return;
     }
 
-    // 4️⃣ Aggiorna stato locale del timer
+    // 3️⃣ Stato locale timer
     setTimerState((prev) => ({
       ...(prev || {}),
       timer_offset_ms: 0,
       timer_started_at: null,
       timer_status: "stopped",
+      run_index: 0,
+      total_elapsed_sec: 0,
     }));
 
-    // 5️⃣ Azzera cronometro visivo
+    // 4️⃣ Azzera cronometro
     setElapsed(0);
 
-    // 6️⃣ Ricarica righe aggiornate (per sicurezza)
-    const { data: aggiornate, error: reloadErr } = await supabase
-      .from("minuti_giocati")
-      .select("giocatore_stagione_id, entrata_sec, uscita_sec")
-      .eq("partita_id", id);
-
-    if (reloadErr) {
-      console.warn("⚠️ Errore reload minuti_giocati:", reloadErr.message);
-    } else {
-      setMinutiRows(aggiornate || []);
-      console.log("♻️ minuti_giocati ricaricati dopo reset:", aggiornate);
-    }
-  } catch (err) {
-    console.error("💥 Errore imprevisto in resetTimer:", err);
-  }
-};
-
-
-// 🔹 Quando resetti il timer, azzera anche il conteggio minuti
-useEffect(() => {
-  if (timerState?.timer_status === "stopped") {
+    // 5️⃣ Svuota dati locali minuti
+    setMinutiRows([]);
     setMinutiGiocati({});
     setNowSec(0);
-  }
-}, [timerState?.timer_status]);
 
+    console.log("✅ Reset partita completato");
+
+  } catch (err) {
+    console.error("💥 Errore resetTimer:", err);
+  }
+};
 
 // Cambia la durata (minuti)
 const changeDuration = async (minutes: number) => {
   if (!id) return;
 
-  await supabase.from("partita_timer_state").upsert({
-    partita_id: id,
-    timer_duration_min: minutes,
-    timer_offset_ms: 0,
-    timer_started_at: null,
-    timer_status: "stopped",
-  });
+  const { error } = await supabase
+    .from("partita_timer_state")
+    .update({
+      timer_duration_min: minutes,
+      timer_offset_ms: 0,
+      timer_started_at: null,
+      timer_status: "stopped",
+      run_index: 0,
+      total_elapsed_sec: 0,
+    })
+    .eq("partita_id", id);
+
+  if (error) {
+    console.error("Errore cambio durata:", error.message);
+    return;
+  }
 
   setTimerState((prev) => ({
     ...(prev || {}),
@@ -590,11 +1544,12 @@ const changeDuration = async (minutes: number) => {
     timer_offset_ms: 0,
     timer_started_at: null,
     timer_status: "stopped",
+    run_index: 0,
+    total_elapsed_sec: 0,
   }));
 
   setElapsed(0);
 };
-
   // =====================
   // MARCATORI / PORTIERI – helper locali & DB
   // =====================
@@ -621,10 +1576,253 @@ const changeDuration = async (minutes: number) => {
       .eq("id", partita.id);
   };
 
+  // =====================
+// Aggiornamento risultato rigori
+// =====================
+const aggiornaRigori = async (
+  squadra: "casa" | "ospite",
+  delta: number
+) => {
+  if (!id) return;
+
+  const valoreAttuale =
+    squadra === "casa" ? rigoriCasa : rigoriOspite;
+
+  const nuovoValore = Math.max(0, valoreAttuale + delta);
+
+  const campo =
+    squadra === "casa" ? "rigori_a" : "rigori_b";
+
+  const { error } = await supabase
+    .from("partite")
+    .update({
+      [campo]: nuovoValore,
+    })
+    .eq("id", id);
+
+  if (error) {
+    console.error(
+      "❌ Errore aggiornamento rigori:",
+      error.message
+    );
+    return;
+  }
+
+  if (squadra === "casa") {
+    setRigoriCasa(nuovoValore);
+  } else {
+    setRigoriOspite(nuovoValore);
+  }
+};
+
+// =====================
+// Registrazione tiro rigore Montecarlo
+// =====================
+const registraTiroRigore = async (
+  esito: "segnato" | "sbagliato"
+) => {
+  if (!partita || !rigoristaSelezionato) return false;
+
+  const { data: rigoriEsistenti, error: letturaErr } = await supabase
+    .from("rigori_partita")
+    .select("ordine")
+    .eq("partita_id", partita.id)
+    .eq("squadra_id", MONTECARLO_ID);
+
+  if (letturaErr) {
+    console.error(
+      "❌ Errore lettura rigori:",
+      letturaErr.message
+    );
+    return false;
+  }
+
+  const ordine = (rigoriEsistenti?.length || 0) + 1;
+
+  const { data: tiroSalvato, error } = await supabase
+  .from("rigori_partita")
+  .insert({
+    partita_id: partita.id,
+    stagione_id: partita.stagione_id,
+    giocatore_stagione_id: rigoristaSelezionato,
+    squadra_id: MONTECARLO_ID,
+    ordine,
+    esito,
+  })
+  .select("id, squadra_id, giocatore_stagione_id, ordine, esito")
+  .single();
+
+  if (tiroSalvato) {
+  setTiriRigori((prev) => [...prev, tiroSalvato]);
+}
+
+  setRigoristaSelezionato("");
+
+  console.log(
+    esito === "segnato"
+      ? "⚽ Rigore segnato"
+      : "❌ Rigore sbagliato"
+  );
+
+  return true;
+};
+
+// =====================
+// Registrazione tiro rigore avversario
+// =====================
+const registraTiroRigoreAvversario = async (
+  esito: "segnato" | "sbagliato"
+) => {
+if (!partita) return false;
+
+  const squadraAvversariaId =
+    isMontecarlo(squadraCasa?.id, squadraCasa?.nome)
+      ? squadraOspite?.id
+      : squadraCasa?.id;
+
+ if (!squadraAvversariaId) return false;
+
+  const { data: rigoriEsistenti, error: letturaErr } = await supabase
+    .from("rigori_partita")
+    .select("ordine")
+    .eq("partita_id", partita.id)
+    .eq("squadra_id", squadraAvversariaId);
+
+  if (letturaErr) {
+    console.error(
+      "❌ Errore lettura rigori avversario:",
+      letturaErr.message
+    );
+    return false;
+  }
+
+  const ordine = (rigoriEsistenti?.length || 0) + 1;
+
+  const { data: tiroSalvato, error } = await supabase
+  .from("rigori_partita")
+  .insert({
+    partita_id: partita.id,
+    stagione_id: partita.stagione_id,
+    giocatore_stagione_id: null,
+    squadra_id: squadraAvversariaId,
+    ordine,
+    esito,
+  })
+  .select("id, squadra_id, giocatore_stagione_id, ordine, esito")
+  .single();
+
+ if (error) {
+  console.error(
+    "❌ Errore registrazione tiro rigore avversario:",
+    error.message
+  );
+  return false;
+}
+if (tiroSalvato) {
+  setTiriRigori((prev) => [...prev, tiroSalvato]);
+}
+
+console.log(
+  esito === "segnato"
+    ? "⚽ Rigore avversario segnato"
+    : "❌ Rigore avversario sbagliato"
+);
+
+return true;
+};
+
+// =====================
+// Eliminazione tiro rigore
+// =====================
+const eliminaTiroRigore = async (
+  tiro: {
+    id: string;
+    squadra_id: string;
+    giocatore_stagione_id: string | null;
+    ordine: number;
+    esito: "segnato" | "sbagliato";
+  }
+) => {
+  if (!partita) return;
+
+  const { error } = await supabase
+    .from("rigori_partita")
+    .delete()
+    .eq("id", tiro.id);
+
+  if (error) {
+    console.error(
+      "❌ Errore eliminazione tiro rigore:",
+      error.message
+    );
+    return;
+  }
+
+  setTiriRigori((prev) =>
+    prev.filter((r) => r.id !== tiro.id)
+  );
+
+    const rigoriRimanenti = tiriRigori
+    .filter(
+      (r) =>
+        r.id !== tiro.id &&
+        r.squadra_id === tiro.squadra_id
+    )
+    .sort((a, b) => a.ordine - b.ordine);
+
+  for (let i = 0; i < rigoriRimanenti.length; i++) {
+    const nuovoOrdine = i + 1;
+
+    if (rigoriRimanenti[i].ordine !== nuovoOrdine) {
+      const { error: ordineError } = await supabase
+        .from("rigori_partita")
+        .update({ ordine: nuovoOrdine })
+        .eq("id", rigoriRimanenti[i].id);
+
+      if (ordineError) {
+        console.error(
+          "❌ Errore riordino rigori:",
+          ordineError.message
+        );
+        return;
+      }
+    }
+  }
+
+  setTiriRigori((prev) =>
+    prev
+      .filter((r) => r.id !== tiro.id)
+      .map((r) => {
+        if (r.squadra_id !== tiro.squadra_id) return r;
+
+        const posizione = rigoriRimanenti.findIndex(
+          (x) => x.id === r.id
+        );
+
+        return posizione >= 0
+          ? { ...r, ordine: posizione + 1 }
+          : r;
+      })
+  );
+
+  if (tiro.esito === "segnato") {
+    if (tiro.squadra_id === squadraCasa?.id) {
+      await aggiornaRigori("casa", -1);
+    } else if (tiro.squadra_id === squadraOspite?.id) {
+      await aggiornaRigori("ospite", -1);
+    }
+  }
+};
+
   // Inserisce una riga "gol segnato da Montecarlo" (marcatore da scegliere)
   const aggiungiMarcatore = async (periodo: number) => {
     if (!partita) return;
     const goal_tempo = (marcatori[periodo]?.length || 0) + 1;
+
+    const tempoSec = getTempoAssoluto(
+  timerState,
+  getElapsedCorrente(timerState)
+);
 
     const { data, error } = await supabase
       .from("marcatori")
@@ -633,14 +1831,15 @@ const changeDuration = async (minutes: number) => {
         stagione_id: partita.stagione_id,
         periodo,
         goal_tempo,
+        tempo_sec: tempoSec,
         giocatore_stagione_id: null,
         giocatore_uid: null,
         portiere_subisce_id: null,
         squadra_segnante_id: MONTECARLO_ID,
       })
       .select(
-        "id, periodo, goal_tempo, giocatore_stagione_id, portiere_subisce_id, squadra_segnante_id"
-      )
+  "id, periodo, goal_tempo, tempo_sec, tipo_goal, giocatore_stagione_id, portiere_subisce_id, squadra_segnante_id"
+)
       .single();
 
     if (!error && data) {
@@ -648,8 +1847,10 @@ const changeDuration = async (minutes: number) => {
       aggiornaMarcatoriLocal(periodo, [
         ...attuali,
         {
-          goal_tempo: data.goal_tempo,
-          giocatore_stagione_id: data.giocatore_stagione_id,
+  goal_tempo: data.goal_tempo,
+  tempo_sec: data.tempo_sec,
+  tipo_goal: data.tipo_goal,
+  giocatore_stagione_id: data.giocatore_stagione_id,
           portiere_subisce_id: data.portiere_subisce_id,
           squadra_segnante_id: data.squadra_segnante_id,
           id_supabase: data.id,
@@ -662,6 +1863,10 @@ const changeDuration = async (minutes: number) => {
   const aggiungiGolSubito = async (periodo: number, side: "casa" | "ospite") => {
     if (!partita) return;
     const goal_tempo = (marcatori[periodo]?.length || 0) + 1;
+    const tempoSec = getTempoAssoluto(
+  timerState,
+  getElapsedCorrente(timerState)
+);
     const squadraSegnanteId =
       side === "casa" ? partita.squadra_casa_id : partita.squadra_ospite_id;
 
@@ -670,16 +1875,17 @@ const changeDuration = async (minutes: number) => {
       .insert({
         partita_id: partita.id,
         stagione_id: partita.stagione_id,
-        periodo,
+                periodo,
         goal_tempo,
+        tempo_sec: tempoSec,
         giocatore_stagione_id: null, // non è un marcatore MC
         giocatore_uid: null,
         portiere_subisce_id: null, // lo scegli dopo
         squadra_segnante_id: squadraSegnanteId,
       })
       .select(
-        "id, periodo, goal_tempo, giocatore_stagione_id, portiere_subisce_id, squadra_segnante_id"
-      )
+  "id, periodo, goal_tempo, tempo_sec, tipo_goal, giocatore_stagione_id, portiere_subisce_id, squadra_segnante_id"
+)
       .single();
 
     if (!error && data) {
@@ -687,8 +1893,10 @@ const changeDuration = async (minutes: number) => {
       aggiornaMarcatoriLocal(periodo, [
         ...attuali,
         {
-          goal_tempo: data.goal_tempo,
-          giocatore_stagione_id: data.giocatore_stagione_id,
+  goal_tempo: data.goal_tempo,
+  tempo_sec: data.tempo_sec,
+  tipo_goal: data.tipo_goal,
+  giocatore_stagione_id: data.giocatore_stagione_id,
           portiere_subisce_id: data.portiere_subisce_id,
           squadra_segnante_id: data.squadra_segnante_id,
           id_supabase: data.id,
@@ -813,58 +2021,254 @@ const changeDuration = async (minutes: number) => {
     }
   };
 
-  const salvaSostituzione = async (uscente: string, entrante: string, _minutoIgnored: number) => {
+  // Assegna assist (solo per gol segnati da Montecarlo)
+const selezionaAssist = async (
+  periodo: number,
+  goal_tempo: number,
+  gStagioneId: string
+) => {
   if (!partita) return;
 
-  const nowSec = Math.floor(elapsed / 1000);
+  const assistId = gStagioneId || null;
 
-  // Chi esce → chiudi la sua riga aperta nei minuti
-  await supabase
-    .from("minuti_giocati")
-    .update({ uscita_sec: nowSec })
-    .eq("partita_id", partita.id)
-    .eq("giocatore_stagione_id", uscente)
-    .is("uscita_sec", null);
+  // Update locale
+  setMarcatori((prev) => {
+    const aggiornata = (prev[periodo] || []).map((m) =>
+      m.goal_tempo === goal_tempo
+        ? { ...m, assist_giocatore_stagione_id: assistId }
+        : m
+    );
 
-  // Chi entra → nuova riga nei minuti
-  await supabase.from("minuti_giocati").insert({
-    partita_id: partita.id,
-    giocatore_stagione_id: entrante,
-    entrata_sec: nowSec,
-    uscita_sec: null,
+    return { ...prev, [periodo]: aggiornata };
   });
 
-  // 🔹 Aggiorna anche formazioni_partita (sostituzione sul campo)
+  // Update DB
+  const entry = (marcatori[periodo] || []).find(
+    (m) => m.goal_tempo === goal_tempo
+  );
+
+  if (entry?.id_supabase) {
+    await supabase
+      .from("marcatori")
+      .update({
+        assist_giocatore_stagione_id: assistId,
+      })
+      .eq("id", entry.id_supabase);
+  } else {
+    await supabase
+      .from("marcatori")
+      .update({
+        assist_giocatore_stagione_id: assistId,
+      })
+      .eq("partita_id", partita.id)
+      .eq("periodo", periodo)
+      .eq("goal_tempo", goal_tempo);
+  }
+};
+
+// =====================
+// MARCATORI - Modifica tempo goal
+// =====================
+const modificaTempoGoal = async (
+  periodo: number,
+  goal_tempo: number,
+  tempoSec: number
+) => {
+  if (!partita) return;
+
+  setMarcatori((prev) => {
+    const aggiornata = (prev[periodo] || []).map((m) =>
+      m.goal_tempo === goal_tempo
+        ? { ...m, tempo_sec: tempoSec }
+        : m
+    );
+
+    return { ...prev, [periodo]: aggiornata };
+  });
+
+  const entry = (marcatori[periodo] || []).find(
+    (m) => m.goal_tempo === goal_tempo
+  );
+
+  if (entry?.id_supabase) {
+    const { error } = await supabase
+      .from("marcatori")
+      .update({ tempo_sec: tempoSec })
+      .eq("id", entry.id_supabase);
+
+    if (error) {
+      console.error("❌ Errore modifica tempo goal:", error.message);
+    }
+  } else {
+    const { error } = await supabase
+      .from("marcatori")
+      .update({ tempo_sec: tempoSec })
+      .eq("partita_id", partita.id)
+      .eq("periodo", periodo)
+      .eq("goal_tempo", goal_tempo);
+
+    if (error) {
+      console.error("❌ Errore modifica tempo goal:", error.message);
+    }
+  }
+};
+
+// =====================
+// MARCATORI - Modifica tipo goal
+// =====================
+const modificaTipoGoal = async (
+  periodo: number,
+  goal_tempo: number,
+  tipoGoal: "azione" | "rigore"
+) => {
+  if (!partita) return;
+
+  setMarcatori((prev) => {
+    const aggiornata = (prev[periodo] || []).map((m) =>
+      m.goal_tempo === goal_tempo
+        ? { ...m, tipo_goal: tipoGoal }
+        : m
+    );
+
+    return { ...prev, [periodo]: aggiornata };
+  });
+
+  const entry = (marcatori[periodo] || []).find(
+    (m) => m.goal_tempo === goal_tempo
+  );
+
+  if (entry?.id_supabase) {
+    const { error } = await supabase
+      .from("marcatori")
+      .update({ tipo_goal: tipoGoal })
+      .eq("id", entry.id_supabase);
+
+    if (error) {
+      console.error("❌ Errore modifica tipo goal:", error.message);
+    }
+  } else {
+    const { error } = await supabase
+      .from("marcatori")
+      .update({ tipo_goal: tipoGoal })
+      .eq("partita_id", partita.id)
+      .eq("periodo", periodo)
+      .eq("goal_tempo", goal_tempo);
+
+    if (error) {
+      console.error("❌ Errore modifica tipo goal:", error.message);
+    }
+  }
+};
+
+  // =====================
+// CARTELLINI - Salvataggio
+// =====================
+const salvaCartellino = async (
+  giocatoreStagioneId: string,
+  tipo: "giallo" | "rosso"
+) => {
+  if (!partita || periodoCartellino === null) return;
+
+  const minuto = Number(minutoCartellino);
+
+  if (!Number.isFinite(minuto) || minuto < 1) {
+    alert("Inserisci un minuto valido.");
+    return;
+  }
+
+  const tempoSec = minuto * 60;
+
+  const { data, error } = await supabase
+    .from("cartellini")
+    .insert({
+      partita_id: partita.id,
+      stagione_id: partita.stagione_id,
+      giocatore_stagione_id: giocatoreStagioneId,
+      tipo,
+      periodo: periodoCartellino,
+      tempo_sec: tempoSec,
+    })
+    .select("id, giocatore_stagione_id, tipo, periodo, tempo_sec")
+    .single();
+
+  if (error) {
+    console.error("❌ Errore salvataggio cartellino:", error.message);
+    return;
+  }
+
+  if (data) {
+    setCartellini((prev) => [...prev, data]);
+  }
+
+  console.log(
+    tipo === "giallo" ? "🟨 Cartellino giallo salvato" : "🟥 Cartellino rosso salvato",
+    data
+  );
+};
+
+const salvaSostituzione = async (uscente: string, entrante: string, _minutoIgnored: number) => {
+  if (!partita) return;
+
+  const statoCorrente = getStatoPartita(timerState);
+  const nowSec = getTempoAssoluto(timerState, elapsed);
+
+  // Se la sostituzione avviene durante un tempo di gioco
+  if (
+    statoCorrente === StatoPartita.PRIMO_TEMPO ||
+    statoCorrente === StatoPartita.SECONDO_TEMPO
+  ) {
+    // Chi esce → chiudi la sua riga aperta nei minuti
+    await supabase
+      .from("minuti_giocati")
+      .update({ uscita_sec: nowSec })
+      .eq("partita_id", partita.id)
+      .eq("giocatore_stagione_id", uscente)
+      .is("uscita_sec", null);
+
+    // Chi entra → nuova riga nei minuti
+    await supabase.from("minuti_giocati").insert({
+      partita_id: partita.id,
+      giocatore_stagione_id: entrante,
+      entrata_sec: nowSec,
+      uscita_sec: null,
+      run_index: timerState?.run_index ?? 1,
+    });
+
+    // Stato locale minuti
+    setMinutiRows((prev) => {
+      const updated = prev.map((r) =>
+        r.giocatore_stagione_id === uscente && r.uscita_sec === null
+          ? { ...r, uscita_sec: nowSec }
+          : r
+      );
+
+      updated.push({
+        giocatore_stagione_id: entrante,
+        entrata_sec: nowSec,
+        uscita_sec: null,
+      });
+
+      return updated;
+    });
+  }
+
+  // Durante l'INTERVALLO non tocchiamo minuti_giocati.
+  // Il nuovo giocatore verrà aperto da inizioSecondoTempo()
+  // con run_index = 2.
+
+  // Aggiorna formazioni_partita (sostituzione sul campo)
   await supabase
     .from("formazioni_partita")
     .update({ giocatore_stagione_id: entrante })
     .eq("partita_id", partita.id)
     .eq("giocatore_stagione_id", uscente);
 
-  // Stato locale minuti
-  setMinutiRows((prev) => {
-    const updated = prev.map((r) =>
-      r.giocatore_stagione_id === uscente && r.uscita_sec === null
-        ? { ...r, uscita_sec: nowSec }
-        : r
-    );
-    updated.push({
-      giocatore_stagione_id: entrante,
-      entrata_sec: nowSec,
-      uscita_sec: null,
-    });
-    return updated;
-  });
-
-  // Aggiorna elenco titolari (logica interna)
+  // Aggiorna elenco giocatori attualmente in campo
   setTitolari((prev) => {
     const senzaUscente = prev.filter((id) => id !== uscente);
     return [...senzaUscente, entrante];
   });
 };
-
-
-
 
 
   // Assegna portiere che subisce (solo per gol NON MC)
@@ -917,20 +2321,111 @@ const changeDuration = async (minutes: number) => {
     return (
       <div className="container mx-auto px-0">
         {lista.map((m) => (
-          <select
-            key={m.goal_tempo}
-            value={m.giocatore_stagione_id || ""}
-            onChange={(e) => selezionaMarcatore(tempo, m.goal_tempo, e.target.value)}
-            className="w-full border rounded px-2 py-1"
-          >
-            <option value="">-- Seleziona marcatore --</option>
-            {opzioni.map((g) => (
-              <option key={g.id} value={g.id}>
-                {(g.cognome || "").trim()} {(g.nome || "").trim()}
-              </option>
-            ))}
-          </select>
-        ))}
+  <div key={m.goal_tempo} className="space-y-1 mb-2">
+
+    {/* Tempo del goal */}
+    <div className="flex items-center gap-2">
+      <span className="text-sm font-medium">Minuto:</span>
+
+      <input
+        type="text"
+        value={
+  m.tempo_sec == null
+    ? ""
+    : Math.max(1, Math.ceil(m.tempo_sec / 60))
+}
+        onChange={(e) => {
+          const valore = e.target.value.trim();
+          const parti = valore.split(":");
+
+          let secondi = 0;
+
+          if (parti.length === 2) {
+            const minuti = Number(parti[0]);
+            const sec = Number(parti[1]);
+
+            if (
+              Number.isFinite(minuti) &&
+              Number.isFinite(sec) &&
+              minuti >= 0 &&
+              sec >= 0 &&
+              sec <= 59
+            ) {
+              secondi = minuti * 60 + sec;
+            } else {
+              return;
+            }
+          } else {
+            const minuti = Number(valore);
+
+            if (!Number.isFinite(minuti) || minuti < 0) return;
+
+            secondi = minuti * 60;
+          }
+
+          modificaTempoGoal(
+            tempo,
+            m.goal_tempo,
+            secondi
+          );
+        }}
+        className="w-24 border rounded px-2 py-1"
+      />
+    </div>
+
+    {/* Tipo goal */}
+<div className="flex items-center gap-2">
+  <span className="text-sm font-medium">Tipo:</span>
+
+  <select
+    value={m.tipo_goal || "azione"}
+    onChange={(e) =>
+      modificaTipoGoal(
+        tempo,
+        m.goal_tempo,
+        e.target.value as "azione" | "rigore"
+      )
+    }
+    className="border rounded px-2 py-1"
+  >
+    <option value="azione">⚽ Azione</option>
+    <option value="rigore">🥅 Rigore</option>
+  </select>
+</div>
+
+        {/* Marcatore */}
+    <select
+      value={m.giocatore_stagione_id || ""}
+      onChange={(e) =>
+        selezionaMarcatore(tempo, m.goal_tempo, e.target.value)
+      }
+      className="w-full border rounded px-2 py-1"
+    >
+      <option value="">-- Seleziona marcatore --</option>
+      {opzioni.map((g) => (
+        <option key={g.id} value={g.id}>
+          {(g.cognome || "").trim()} {(g.nome || "").trim()}
+        </option>
+      ))}
+    </select>
+
+    {/* Assist */}
+    <select
+      value={m.assist_giocatore_stagione_id || ""}
+      onChange={(e) =>
+        selezionaAssist(tempo, m.goal_tempo, e.target.value)
+      }
+      className="w-full border rounded px-2 py-1"
+    >
+      <option value="">-- Nessun assist --</option>
+      {opzioni.map((g) => (
+        <option key={g.id} value={g.id}>
+          {(g.cognome || "").trim()} {(g.nome || "").trim()}
+        </option>
+      ))}
+    </select>
+  </div>
+))}
       </div>
     );
   };
@@ -958,20 +2453,50 @@ const changeDuration = async (minutes: number) => {
     return (
       <div className="container mx-auto px-0">
         {lista.map((m) => (
-          <select
-            key={m.goal_tempo}
-            value={m.portiere_subisce_id || ""}
-            onChange={(e) => selezionaPortiereSubisce(tempo, m.goal_tempo, e.target.value)}
-            className="w-full border rounded px-2 py-1"
-          >
-            <option value="">-- Seleziona portiere --</option>
-            {opzioniPortieri.map((g) => (
-              <option key={g.id} value={g.id}>
-                {(g.cognome || "").trim()} {(g.nome || "").trim()}
-              </option>
-            ))}
-          </select>
-        ))}
+  <div key={m.goal_tempo} className="space-y-1 mb-2">
+
+    {/* Tipo goal subito */}
+    <div className="flex items-center gap-2">
+      <span className="text-sm font-medium">Tipo:</span>
+
+      <select
+        value={m.tipo_goal || "azione"}
+        onChange={(e) =>
+          modificaTipoGoal(
+            tempo,
+            m.goal_tempo,
+            e.target.value as "azione" | "rigore"
+          )
+        }
+        className="border rounded px-2 py-1"
+      >
+        <option value="azione">⚽ Azione</option>
+        <option value="rigore">🥅 Rigore</option>
+      </select>
+    </div>
+
+    {/* Portiere che subisce */}
+    <select
+      value={m.portiere_subisce_id || ""}
+      onChange={(e) =>
+        selezionaPortiereSubisce(
+          tempo,
+          m.goal_tempo,
+          e.target.value
+        )
+      }
+      className="w-full border rounded px-2 py-1"
+    >
+      <option value="">-- Seleziona portiere --</option>
+      {opzioniPortieri.map((g) => (
+        <option key={g.id} value={g.id}>
+          {(g.cognome || "").trim()} {(g.nome || "").trim()}
+        </option>
+      ))}
+    </select>
+
+  </div>
+))}
       </div>
     );
   };
@@ -985,57 +2510,21 @@ const changeDuration = async (minutes: number) => {
     setPartita({ ...partita, stato: "InCorso" });
   };
 
-  const salvaStato = async () => {
+ const salvaStato = async () => {
   if (!partita) return;
 
-  const nowSec = Math.floor(elapsed / 1000);
+  // 1. Aggiorna lo stato della partita
+  const { error } = await supabase
+    .from("partite")
+    .update({ stato: "Giocata" })
+    .eq("id", partita.id);
 
-  // 1. Chiudi eventuali righe aperte in minuti_giocati
-  await supabase
-    .from("minuti_giocati")
-    .update({ uscita_sec: nowSec })
-    .eq("partita_id", partita.id)
-    .is("uscita_sec", null);
-
-  // 2. Ricarica minuti_giocati per calcolare i totali
-  const { data: minutiDB } = await supabase
-    .from("minuti_giocati")
-    .select("giocatore_stagione_id, entrata_sec, uscita_sec")
-    .eq("partita_id", partita.id);
-
-  if (minutiDB) {
-    const totali: Record<string, number> = {};
-
-    minutiDB.forEach((m) => {
-      const inSec = m.entrata_sec ?? 0;
-      const outSec = m.uscita_sec ?? nowSec;
-      const diff = outSec - inSec;
-      if (diff > 0) {
-        totali[m.giocatore_stagione_id] =
-          (totali[m.giocatore_stagione_id] || 0) + diff;
-      }
-    });
-
-    // 3. Inserisci/aggiorna i totali nella nuova tabella
-    const rows = Object.entries(totali).map(([gid, sec]) => ({
-      partita_id: partita.id,
-      giocatore_stagione_id: gid,
-      tempo_giocato_sec: sec,
-    }));
-
-    if (rows.length > 0) {
-      await supabase.from("minuti_giocati_totali").upsert(rows, {
-        onConflict: "partita_id,giocatore_stagione_id",
-      });
-    }
+  if (error) {
+    console.error("❌ Errore salvataggio stato partita:", error.message);
+    return;
   }
 
-  // 4. Svuota la tabella minuti_giocati per questa partita
-  await supabase.from("minuti_giocati").delete().eq("partita_id", partita.id);
-
-  // 5. Aggiorna lo stato della partita
-  await supabase.from("partite").update({ stato: "Giocata" }).eq("id", partita.id);
-
+  // 2. Vai alla pagina risultati
   navigate("/risultati");
 };
 
@@ -1045,8 +2534,61 @@ const salvaStatoConferma = async () => {
   }
   await salvaStato();
 };
+const statoPartita = getStatoPartita(timerState);
 
+let timerLabel = "PRONTO PER IL 1° TEMPO";
 
+if (statoPartita === StatoPartita.PRIMO_TEMPO) {
+  timerLabel =
+    timerState?.timer_status === "paused"
+      ? "1° TEMPO (IN PAUSA)"
+      : "1° TEMPO";
+}
+
+if (statoPartita === StatoPartita.INTERVALLO) {
+  timerLabel = "INTERVALLO";
+}
+
+if (statoPartita === StatoPartita.SECONDO_TEMPO) {
+  timerLabel =
+    timerState?.timer_status === "paused"
+      ? "2° TEMPO (IN PAUSA)"
+      : "2° TEMPO";
+}
+
+if (statoPartita === StatoPartita.FINE_TEMPI_REGOLAMENTARI) {
+  timerLabel = "FINE TEMPI REGOLAMENTARI";
+}
+
+if (statoPartita === StatoPartita.PRIMO_TEMPO_SUPPLEMENTARE) {
+  timerLabel =
+    timerState?.timer_status === "paused"
+      ? "1° TEMPO SUPPLEMENTARE (IN PAUSA)"
+      : "1° TEMPO SUPPLEMENTARE";
+}
+
+if (statoPartita === StatoPartita.INTERVALLO_SUPPLEMENTARI) {
+  timerLabel = "INTERVALLO SUPPLEMENTARI";
+}
+
+if (statoPartita === StatoPartita.SECONDO_TEMPO_SUPPLEMENTARE) {
+  timerLabel =
+    timerState?.timer_status === "paused"
+      ? "2° TEMPO SUPPLEMENTARE (IN PAUSA)"
+      : "2° TEMPO SUPPLEMENTARE";
+}
+
+if (statoPartita === StatoPartita.FINE_TEMPI_SUPPLEMENTARI) {
+  timerLabel = "FINE TEMPI SUPPLEMENTARI";
+}
+
+if (statoPartita === StatoPartita.RIGORI) {
+  timerLabel = "RIGORI";
+}
+
+if (statoPartita === StatoPartita.FINE_PARTITA) {
+  timerLabel = "PARTITA TERMINATA";
+}
 
     // =====================
   // RENDER
@@ -1070,20 +2612,432 @@ const salvaStatoConferma = async () => {
           )}
         </div>
 
+        
+
         <div className="p-6 space-y-6">
           {/* TIMER */}
           <div className="flex flex-col items-center space-y-2">
-            <TimerCircolare
-              elapsed={elapsed}
-              initialDuration={currentDuration}
-              onDurationChange={changeDuration}
-            />
-            <div className="flex space-x-2">
-              <button onClick={startTimer} className="bg-green-500 text-white px-3 py-1 rounded">Avvia</button>
-              <button onClick={pauseTimer} className="bg-yellow-500 text-white px-3 py-1 rounded">Pausa</button>
-              <button onClick={resetTimer} className="bg-red-500 text-white px-3 py-1 rounded">Reset</button>
+            <CronometroPartita
+  elapsed={elapsed}
+  initialDuration={currentDuration}
+  onDurationChange={changeDuration}
+  label={timerLabel}
+/>
+
+ <div className="flex flex-wrap gap-2 justify-center">
+
+{/* Prepartita */}
+{statoPartita === StatoPartita.PREPARTITA && (
+  <button
+    onClick={startTimer}
+    className="bg-green-600 text-white px-3 py-1 rounded"
+  >
+    ▶ Inizio 1° Tempo
+  </button>
+)}
+
+{/* Primo tempo */}
+{statoPartita === StatoPartita.PRIMO_TEMPO && (
+  <>
+    {timerState?.timer_status === "running" ? (
+      <button
+        onClick={pauseTimer}
+        className="bg-yellow-500 text-white px-3 py-1 rounded"
+      >
+        ⏸ Pausa
+      </button>
+    ) : (
+      <button
+        onClick={startTimer}
+        className="bg-green-600 text-white px-3 py-1 rounded"
+      >
+        ▶ Riprendi
+      </button>
+    )}
+
+    <button
+      onClick={intervallo}
+      className="bg-blue-600 text-white px-3 py-1 rounded"
+    >
+      🏁 Fine 1° Tempo
+    </button>
+  </>
+)}
+
+{/* Intervallo */}
+{statoPartita === StatoPartita.INTERVALLO && (
+  <button
+    onClick={inizioSecondoTempo}
+    className="bg-green-600 text-white px-3 py-1 rounded"
+  >
+    ▶ Inizio 2° Tempo
+  </button>
+)}
+
+{/* Secondo tempo */}
+{statoPartita === StatoPartita.SECONDO_TEMPO && (
+  <>
+    {timerState?.timer_status === "running" ? (
+      <button
+        onClick={pauseTimer}
+        className="bg-yellow-500 text-white px-3 py-1 rounded"
+      >
+        ⏸ Pausa
+      </button>
+    ) : (
+      <button
+        onClick={startTimer}
+        className="bg-green-600 text-white px-3 py-1 rounded"
+      >
+        ▶ Riprendi
+      </button>
+    )}
+
+    <button
+  onClick={fineTempiRegolamentari}
+  className="bg-blue-600 text-white px-3 py-1 rounded"
+>
+  🏁 Fine Tempi Regolamentari
+</button>
+  </>
+)}
+
+{/* Fine tempi regolamentari */}
+{statoPartita === StatoPartita.FINE_TEMPI_REGOLAMENTARI && (
+  <>
+    <button
+      onClick={finePartita}
+      className="bg-blue-600 text-white px-3 py-1 rounded"
+    >
+      🏁 Termina Partita
+    </button>
+
+    <button
+      onClick={inizioPrimoTempoSupplementare}
+      className="bg-green-600 text-white px-3 py-1 rounded"
+    >
+      ▶ Tempi Supplementari
+    </button>
+
+    <button
+  onClick={inizioRigori}
+  className="bg-orange-600 text-white px-3 py-1 rounded"
+>
+  ⚽ Rigori
+</button>
+  </>
+)}
+
+{/* Primo tempo supplementare */}
+{statoPartita === StatoPartita.PRIMO_TEMPO_SUPPLEMENTARE && (
+  <>
+    {timerState?.timer_status === "running" && (
+      <button
+       onClick={pauseTimer}
+        className="bg-yellow-500 text-white px-3 py-1 rounded"
+      >
+        ⏸ Pausa
+      </button>
+    )}
+
+    {timerState?.timer_status === "paused" && (
+      <button
+        onClick={startTimer}
+        className="bg-green-600 text-white px-3 py-1 rounded"
+      >
+        ▶ Riprendi
+      </button>
+    )}
+
+    <button
+      onClick={finePrimoTempoSupplementare}
+      className="bg-blue-600 text-white px-3 py-1 rounded"
+    >
+      ⏹ Fine 1° Tempo Supplementare
+    </button>
+  </>
+)}
+
+{/* Intervallo supplementari */}
+{statoPartita === StatoPartita.INTERVALLO_SUPPLEMENTARI && (
+  <button
+    onClick={inizioSecondoTempoSupplementare}
+    className="bg-green-600 text-white px-3 py-1 rounded"
+  >
+    ▶ Inizia 2° Tempo Supplementare
+  </button>
+)}
+
+{/* Secondo tempo supplementare */}
+{statoPartita === StatoPartita.SECONDO_TEMPO_SUPPLEMENTARE && (
+  <>
+    {timerState?.timer_status === "running" && (
+      <button
+        onClick={pauseTimer}
+        className="bg-yellow-500 text-white px-3 py-1 rounded"
+      >
+        ⏸ Pausa
+      </button>
+    )}
+
+    {timerState?.timer_status === "paused" && (
+      <button
+        onClick={startTimer}
+        className="bg-green-600 text-white px-3 py-1 rounded"
+      >
+        ▶ Riprendi
+      </button>
+    )}
+
+    <button
+      onClick={fineSecondoTempoSupplementare}
+      className="bg-blue-600 text-white px-3 py-1 rounded"
+    >
+      🏁 Fine 2° Tempo Supplementare
+    </button>
+  </>
+)}
+
+{/* Fine tempi supplementari */}
+{statoPartita === StatoPartita.FINE_TEMPI_SUPPLEMENTARI && (
+  <>
+    <button
+      onClick={finePartita}
+      className="bg-blue-600 text-white px-3 py-1 rounded"
+    >
+      🏁 Termina Partita
+    </button>
+
+    <button
+  onClick={inizioRigori}
+  className="bg-green-600 text-white px-3 py-1 rounded"
+>
+  ⚽ Rigori
+</button>
+  </>
+)}
+
+{/* Rigori */}
+{statoPartita === StatoPartita.RIGORI && (
+  <div className="w-full space-y-3">
+
+        {/* Scelta rigorista Montecarlo */}
+    <div className="space-y-1">
+      <label className="block text-sm font-medium">
+        Rigorista Montecarlo
+      </label>
+
+      <select
+        value={rigoristaSelezionato}
+        onChange={(e) => setRigoristaSelezionato(e.target.value)}
+        className="w-full border rounded px-2 py-1"
+      >
+        <option value="">-- Seleziona rigorista --</option>
+
+        {giocatori
+  .filter((g) => convocati.includes(g.id))
+  .map((g) => (
+    <option key={g.id} value={g.id}>
+      {(g.cognome || "").trim()} {(g.nome || "").trim()}
+    </option>
+  ))}
+      </select>
+    </div>
+
+        {/* Esito rigore Montecarlo */}
+    <div className="flex justify-center gap-3">
+      <button
+        onClick={async () => {
+  if (!rigoristaSelezionato) return;
+
+  const salvato = await registraTiroRigore("segnato");
+
+  if (!salvato) return;
+
+  if (isMontecarlo(squadraCasa?.id, squadraCasa?.nome)) {
+    await aggiornaRigori("casa", 1);
+  } else {
+    await aggiornaRigori("ospite", 1);
+  }
+}}
+        disabled={!rigoristaSelezionato}
+        className="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
+      >
+        ⚽ Segnato
+      </button>
+
+      <button
+        onClick={async () => {
+          if (!rigoristaSelezionato) return;
+
+          await registraTiroRigore("sbagliato");
+        }}
+        disabled={!rigoristaSelezionato}
+        className="bg-red-600 text-white px-4 py-2 rounded disabled:opacity-50"
+      >
+        ❌ Sbagliato
+      </button>
+    </div>
+
+        {/* Esito rigore avversario */}
+    <div className="space-y-2">
+      <div className="text-sm font-medium text-center">
+        Rigore {isMontecarlo(squadraCasa?.id, squadraCasa?.nome)
+          ? squadraOspite?.nome
+          : squadraCasa?.nome}
+      </div>
+
+      <div className="flex justify-center gap-3">
+        <button
+          onClick={async () => {
+  const salvato = await registraTiroRigoreAvversario("segnato");
+
+  if (!salvato) return;
+
+  if (isMontecarlo(squadraCasa?.id, squadraCasa?.nome)) {
+    await aggiornaRigori("ospite", 1);
+  } else {
+    await aggiornaRigori("casa", 1);
+  }
+}}
+          className="bg-green-600 text-white px-4 py-2 rounded"
+        >
+          ⚽ Segnato
+        </button>
+
+        <button
+          onClick={() => registraTiroRigoreAvversario("sbagliato")}
+          className="bg-red-600 text-white px-4 py-2 rounded"
+        >
+          ❌ Sbagliato
+        </button>
+      </div>
+    </div>
+
+        {/* ========================
+        Sequenza rigori
+    ======================== */}
+    {tiriRigori.length > 0 && (
+      <div className="border rounded p-3 space-y-2">
+        <div className="font-bold text-center">
+          Sequenza rigori
+        </div>
+
+        {tiriRigori.map((tiro) => {
+          const montecarlo = tiro.squadra_id === MONTECARLO_ID;
+
+          const giocatore = montecarlo
+            ? giocatori.find(
+                (g) => g.id === tiro.giocatore_stagione_id
+              )
+            : null;
+
+          const nome = montecarlo
+            ? `${(giocatore?.cognome || "").trim()} ${(giocatore?.nome || "").trim()}`.trim()
+            : isMontecarlo(squadraCasa?.id, squadraCasa?.nome)
+              ? squadraOspite?.nome
+              : squadraCasa?.nome;
+
+          return (
+            <div
+              key={tiro.id}
+              className="flex items-center justify-between border-b pb-1"
+            >
+              <span>
+                {tiro.ordine}. {nome || "Giocatore"}
+              </span>
+
+              <div className="flex items-center gap-2">
+  <span className="font-bold">
+    {tiro.esito === "segnato" ? "⚽ Segnato" : "❌ Sbagliato"}
+  </span>
+
+  <button
+    onClick={() => eliminaTiroRigore(tiro)}
+    className="text-red-600 font-bold px-2"
+    title="Elimina tiro"
+  >
+    🗑️
+  </button>
+</div>
             </div>
-          </div>
+          );
+        })}
+      </div>
+    )}
+
+    <div className="flex items-center justify-between gap-4">
+      <span className="font-bold">
+        {squadraCasa?.nome}
+      </span>
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => aggiornaRigori("casa", -1)}
+          className="text-3xl"
+        >
+          −
+        </button>
+
+        <span className="text-xl font-bold">
+          {rigoriCasa}
+        </span>
+
+        <button
+          onClick={() => aggiornaRigori("casa", 1)}
+          className="text-3xl"
+        >
+          +
+        </button>
+      </div>
+    </div>
+
+    <div className="flex items-center justify-between gap-4">
+      <span className="font-bold">
+        {squadraOspite?.nome}
+      </span>
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => aggiornaRigori("ospite", -1)}
+          className="text-3xl"
+        >
+          −
+        </button>
+
+        <span className="text-xl font-bold">
+          {rigoriOspite}
+        </span>
+
+        <button
+          onClick={() => aggiornaRigori("ospite", 1)}
+          className="text-3xl"
+        >
+          +
+        </button>
+      </div>
+    </div>
+
+    <button
+      onClick={finePartita}
+      className="bg-blue-600 text-white px-3 py-1 rounded"
+    >
+      🏁 Termina Partita
+    </button>
+
+  </div>
+)}
+
+<button
+  onClick={resetTimer}
+  className="bg-red-600 text-white px-3 py-1 rounded"
+>
+  🔄 Reset Partita
+</button>
+
+</div>
+
+</div>
 
           {/* Pulsante apertura formazione */}
           <button
@@ -1192,6 +3146,13 @@ const salvaStatoConferma = async () => {
   <button
     onClick={async () => {
       if (!partita) return;
+
+      if (titolari.length !== 11) {
+        alert(
+          `Devi selezionare esattamente 11 titolari.\nAttualmente ne hai selezionati ${titolari.length}.`
+        );
+        return;
+      }
 
       // pulizia vecchi dati
       await supabase.from("presenze").delete().eq("partita_id", id);
@@ -1395,29 +3356,161 @@ const salvaStatoConferma = async () => {
 )}
 
 
-{/* Bottoni tempi + parziali */}
+{/* Pulsanti eventi partita */}
 <div className="flex justify-center space-x-4">
-  {[1, 2, 3, 4].map((t) => (
-    <div key={t} className="flex flex-col items-center">
-      <button
-  onClick={() => setTempo((prev) => (prev === t ? null : t))}
-  className={`px-7 py-2 rounded-full font-medium ${
-    tempo === t
-      ? "bg-montecarlo-secondary text-white"
-      : "bg-montecarlo-gray-50 text-gray-900 hover:bg-montecarlo-gray-100"
-  }`}
->
-  {t}T
-</button>
-      <span className="text-sm text-gray-900 mt-1">
-        {goalCasa[t - 1]} – {goalOspite[t - 1]}
-      </span>
-    </div>
-  ))}
+  <button
+    onClick={() => {
+  setTipoEvento((prev) => (prev === "gol" ? null : "gol"));
+  setTempo(null);
+}}
+    className={`px-5 py-2 rounded-full text-2xl ${
+      tipoEvento === "gol"
+        ? "bg-montecarlo-secondary text-white"
+        : "bg-montecarlo-gray-50 hover:bg-montecarlo-gray-100"
+    }`}
+    title="Gol"
+  >
+    ⚽
+  </button>
+
+  <button
+    onClick={() =>
+      setTipoEvento((prev) => (prev === "giallo" ? null : "giallo"))
+    }
+    className={`px-5 py-2 rounded-full text-2xl ${
+      tipoEvento === "giallo"
+        ? "bg-montecarlo-secondary text-white"
+        : "bg-montecarlo-gray-50 hover:bg-montecarlo-gray-100"
+    }`}
+    title="Cartellino giallo"
+  >
+    🟨
+  </button>
+
+    <button
+    onClick={() =>
+      setTipoEvento((prev) => (prev === "rosso" ? null : "rosso"))
+    }
+    className={`px-5 py-2 rounded-full text-2xl ${
+      tipoEvento === "rosso"
+        ? "bg-montecarlo-secondary text-white"
+        : "bg-montecarlo-gray-50 hover:bg-montecarlo-gray-100"
+    }`}
+    title="Cartellino rosso"
+  >
+    🟥
+  </button>
 </div>
 
+{/* Scelta manuale tempo per goal */}
+{tipoEvento === "gol" && (
+  <div className="flex justify-center space-x-4">
+    <button
+      onClick={() => setTempo(1)}
+      className={`px-5 py-2 rounded-full font-medium ${
+        tempo === 1
+          ? "bg-montecarlo-secondary text-white"
+          : "bg-montecarlo-gray-50 text-gray-900 hover:bg-montecarlo-gray-100"
+      }`}
+    >
+      1° Tempo
+    </button>
+
+    <button
+      onClick={() => setTempo(2)}
+      className={`px-5 py-2 rounded-full font-medium ${
+        tempo === 2
+          ? "bg-montecarlo-secondary text-white"
+          : "bg-montecarlo-gray-50 text-gray-900 hover:bg-montecarlo-gray-100"
+      }`}
+    >
+      2° Tempo
+    </button>
+  </div>
+)}
+
+{/* Sezione gestione cartellini */}
+{(tipoEvento === "giallo" || tipoEvento === "rosso") && (
+  <div className="space-y-3">
+        {/* Scelta periodo cartellino */}
+    <select
+      value={periodoCartellino ?? ""}
+      onChange={(e) =>
+        setPeriodoCartellino(
+          e.target.value === "" ? null : Number(e.target.value)
+        )
+      }
+      className="w-full border rounded px-2 py-2"
+    >
+      <option value="">-- Seleziona periodo --</option>
+      <option value={1}>1° Tempo</option>
+      <option value={2}>Intervallo</option>
+      <option value={3}>2° Tempo</option>
+      <option value={4}>Intervallo prima supplementari</option>
+      <option value={5}>1° Tempo Supplementare</option>
+      <option value={6}>Intervallo supplementari</option>
+      <option value={7}>2° Tempo Supplementare</option>
+      <option value={8}>Rigori</option>
+      <option value={9}>Dopo partita</option>
+    </select>
+        {/* Minuto cartellino */}
+    <div className="flex items-center gap-2">
+      <span className="text-sm font-medium">Minuto:</span>
+
+      <input
+        type="number"
+        min="1"
+        value={minutoCartellino}
+        onChange={(e) => setMinutoCartellino(e.target.value)}
+        placeholder="es. 35"
+        className="w-24 border rounded px-2 py-1"
+      />
+    </div>
+    <div className="text-center font-bold text-montecarlo-secondary">
+      {tipoEvento === "giallo"
+        ? "🟨 Seleziona giocatore ammonito"
+        : "🟥 Seleziona giocatore espulso"}
+    </div>
+
+    <select
+      value=""
+      disabled={
+  periodoCartellino === null ||
+  !minutoCartellino ||
+  Number(minutoCartellino) < 1
+}
+      onChange={async (e) => {
+        const giocatoreId = e.target.value;
+
+        if (!giocatoreId) return;
+
+        await salvaCartellino(giocatoreId, tipoEvento);
+
+        setTipoEvento(null);
+      }}
+      className={`w-full border rounded px-2 py-2 ${
+  periodoCartellino === null ||
+  !minutoCartellino ||
+  Number(minutoCartellino) < 1
+    ? "bg-gray-100 cursor-not-allowed"
+    : ""
+}`}
+    >
+      <option value="">-- Seleziona giocatore --</option>
+
+      {giocatori
+        .filter((g) => convocati.includes(g.id))
+        .map((g) => (
+          <option key={g.id} value={g.id}>
+            {(g.cognome || "").trim()} {(g.nome || "").trim()}
+          </option>
+        ))}
+    </select>
+  </div>
+)}
+
 {/* Sezione gestione goal */}
-{tempo && (
+{tipoEvento === "gol" && tempo && (
   <div className="space-y-6">
     {/* Squadra Casa */}
     <div>
@@ -1435,6 +3528,8 @@ const salvaStatoConferma = async () => {
         ? renderMarcatori(squadraCasa?.id)
         : renderPortieriSubiti(squadraCasa?.id)}
     </div>
+
+    
 
     {/* Squadra Ospite */}
     <div>
