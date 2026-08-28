@@ -280,23 +280,23 @@ const canCreator = role === UserRole.Creator;
     if (!error) navigate('/calendario', { replace: true });
   };
 
-  const handleDetailDelete = async () => {
+ const handleDetailDelete = async () => {
   const id = matchDetail?.params.id;
   if (!id || !window.confirm("Eliminare definitivamente questa partita e tutti i dati collegati?")) return;
 
   try {
-    // 🔹 Elimina tutti i dati correlati PRIMA della partita
-    await Promise.all([
-      supabase.from("minuti_giocati").delete().eq("partita_id", id),
-      supabase.from("minuti_giocati_totali").delete().eq("partita_id", id),
-      supabase.from("marcatori").delete().eq("partita_id", id),
-      supabase.from("presenze").delete().eq("partita_id", id),
-      supabase.from("formazioni_partita").delete().eq("partita_id", id),
-      supabase.from("partita_timer_state").delete().eq("partita_id", id),
-    ]);
+    // 🔹 Elimina la partita.
+    // Tutti i dati collegati vengono eliminati automaticamente dal DB tramite ON DELETE CASCADE.
+    const { error } = await supabase
+      .from("partite")
+      .delete()
+      .eq("id", id);
 
-    // 🔹 Poi elimina la partita vera e propria
-    await supabase.from("partite").delete().eq("id", id);
+    if (error) {
+      console.error("❌ Errore eliminazione partita:", error);
+      alert("Errore durante l'eliminazione della partita.");
+      return;
+    }
 
     alert("✅ Partita e dati collegati eliminati con successo.");
     navigate("/calendario", { replace: true });

@@ -14,6 +14,17 @@ interface MarcatoriEntry {
   periodo: number
   giocatore: { nome: string; cognome: string }
 }
+interface TiroRigore {
+  id: string
+  giocatore_stagione_id: string | null
+  squadra_id: string
+  ordine: number
+  esito: 'segnato' | 'sbagliato'
+  giocatore?: {
+    nome: string
+    cognome: string
+  } | null
+}
 
 interface SquadraInfo {
   id: string
@@ -33,8 +44,10 @@ interface PartitaDettaglio {
   goal_a4: number
   goal_b1: number
   goal_b2: number
-  goal_b3: number
+    goal_b3: number
   goal_b4: number
+  rigori_a: number
+  rigori_b: number
   commento?: string | null
   marcatori: MarcatoriEntry[]
 }
@@ -47,7 +60,9 @@ export default function DettaglioPartita() {
   const containerRef = useRef<HTMLDivElement>(null)
 
   const [partita, setPartita] = useState<PartitaDettaglio | null>(null)
+  const [tiriRigori, setTiriRigori] = useState<TiroRigore[]>([])
   const [loading, setLoading] = useState(true)
+  const [supplementariGiocati, setSupplementariGiocati] = useState(false)
 
   const [editing, setEditing] = useState(false)
   const [commento, setCommento] = useState<string>('')
@@ -124,8 +139,9 @@ const canEdit = role === "admin" || role === "creator";
           stagione_id,
           data_ora,
           goal_a1, goal_a2, goal_a3, goal_a4,
-          goal_b1, goal_b2, goal_b3, goal_b4,
-          commento,
+goal_b1, goal_b2, goal_b3, goal_b4,
+rigori_a, rigori_b,
+commento,
           casa: squadra_casa_id ( id, nome, logo_url ),
           ospite: squadra_ospite_id ( id, nome, logo_url )
         `)
@@ -144,6 +160,81 @@ const canEdit = role === "admin" || role === "creator";
         .eq('partita_id', id)
 
       if (errMd) console.error(errMd)
+
+              const { data: rigoriData, error: errRigori } = await supabase
+        .from('rigori_partita')
+        .select(`
+          id,
+          giocatore_stagione_id,
+          squadra_id,
+          ordine,
+          esito
+        `)
+        .eq('partita_id', id)
+        .order('ordine', { ascending: true })
+
+      if (errRigori) {
+  console.error('Errore caricamento dettaglio rigori:', errRigori)
+} else {
+  const rigori = (rigoriData || []) as TiroRigore[]
+
+  const giocatoriIds = rigori
+    .map(r => r.giocatore_stagione_id)
+    .filter((gid): gid is string => !!gid)
+
+  let giocatoriRigori: {
+    id: string
+    nome: string | null
+    cognome: string | null
+  }[] = []
+
+  if (giocatoriIds.length > 0) {
+    const { data: giocatoriData, error: errGiocatori } = await supabase
+      .from('giocatori_stagioni')
+      .select('id, nome, cognome')
+      .in('id', giocatoriIds)
+
+    if (errGiocatori) {
+      console.error(
+        'Errore caricamento rigoristi:',
+        errGiocatori
+      )
+    } else {
+      giocatoriRigori = giocatoriData || []
+    }
+  }
+
+  const rigoriConGiocatore = rigori.map(r => {
+    const giocatore = giocatoriRigori.find(
+      g => g.id === r.giocatore_stagione_id
+    )
+
+    return {
+      ...r,
+      giocatore: giocatore
+        ? {
+            nome: giocatore.nome || '',
+            cognome: giocatore.cognome || ''
+          }
+        : null
+    }
+  })
+
+  setTiriRigori(rigoriConGiocatore)
+}
+
+              const { data: supplementariData, error: errSupplementari } = await supabase
+        .from('minuti_giocati')
+        .select('id')
+        .eq('partita_id', id)
+        .in('run_index', [3, 4])
+        .limit(1)
+
+      if (errSupplementari) {
+        console.error('Errore verifica supplementari:', errSupplementari)
+      } else {
+        setSupplementariGiocati((supplementariData || []).length > 0)
+      }
 
       const marcatori: MarcatoriEntry[] = (marcatoriData || [])
         .filter(m => m.giocatore_nome || m.giocatore_cognome)
@@ -217,8 +308,19 @@ const canEdit = role === "admin" || role === "creator";
     })
     .replace(/^./, ch => ch.toUpperCase())
 
-  const goalCasaArr = [partita.goal_a1, partita.goal_a2, partita.goal_a3, partita.goal_a4]
-  const goalOspiteArr = [partita.goal_b1, partita.goal_b2, partita.goal_b3, partita.goal_b4]
+  const goalCasaArr = [
+  partita.goal_a1,
+  partita.goal_a2,
+  partita.goal_a3,
+  partita.goal_a4
+]
+
+const goalOspiteArr = [
+  partita.goal_b1,
+  partita.goal_b2,
+  partita.goal_b3,
+  partita.goal_b4
+]
 
   const renderSezione = (squadra: SquadraInfo | null | undefined, goals: number[]) => {
   if (!squadra || !squadra.nome) return null; // 👈 protezione doppia: oggetto o nome mancante
@@ -258,13 +360,19 @@ const canEdit = role === "admin" || role === "creator";
       </div>
 
       <div className="p-4 space-y-4">
-        {[1, 2, 3, 4].map(tempo => (
+        {(supplementariGiocati ? [1, 2, 3, 4] : [1, 2]).map(tempo => (
           <div key={tempo}>
             <div className="flex justify-between">
               <span
                 className={`font-medium ${isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'}`}
               >
-                {tempo}° Tempo
+               {tempo === 1
+  ? '1° Tempo'
+  : tempo === 2
+    ? '2° Tempo'
+    : tempo === 3
+      ? '1° Supplementare'
+      : '2° Supplementare'}
               </span>
               <span
                 className={`font-semibold ${isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'}`}
@@ -304,6 +412,62 @@ const canEdit = role === "admin" || role === "creator";
           <div className="p-6 space-y-6">
             {partita?.casa && renderSezione(partita.casa, goalCasaArr)}
 {partita?.ospite && renderSezione(partita.ospite, goalOspiteArr)}
+
+            {((partita.rigori_a ?? 0) > 0 || (partita.rigori_b ?? 0) > 0) && (
+              <div className="bg-white/90 rounded-lg shadow-montecarlo p-4">
+                <div className="font-bold text-center mb-3">
+                  Rigori
+                </div>
+
+                                <div className="space-y-2 mb-4">
+                  {tiriRigori.map((tiro) => {
+                    const isCasa = tiro.squadra_id === partita.casa.id
+                    const isMontecarlo =
+                      tiro.squadra_id === partita.casa.id
+                        ? partita.casa.nome === 'Montecarlo'
+                        : partita.ospite.nome === 'Montecarlo'
+
+                    const nomeRigorista =
+                      isMontecarlo && tiro.giocatore
+                        ? `${tiro.giocatore.cognome} ${tiro.giocatore.nome}`.trim()
+                        : `Rigore ${tiro.ordine}`
+
+                    return (
+                      <div
+                        key={tiro.id}
+                        className={`flex ${
+                          isCasa ? 'justify-start' : 'justify-end'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">
+                            {nomeRigorista}
+                          </span>
+
+                          <span className="font-bold">
+                            {tiro.esito === 'segnato' ? '⚽' : '❌'}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="grid grid-cols-[2fr_auto_2fr] items-center gap-4">
+                  <span className="text-montecarlo-secondary font-semibold text-right">
+                    {partita.casa.nome}
+                  </span>
+
+                  <span className="text-montecarlo-secondary font-bold text-lg">
+                    {partita.rigori_a ?? 0} - {partita.rigori_b ?? 0}
+                  </span>
+
+                  <span className="font-semibold">
+                    {partita.ospite.nome}
+                  </span>
+                </div>
+              </div>
+            )}
 
 
             {/* Riepilogo / Telecronaca */}

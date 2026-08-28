@@ -6,6 +6,10 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { Calendar, Clock, Plus, History } from "lucide-react";
 import CampoFormazione from "../components/CampoFormazione";
+import {
+  getStatoPartita,
+  StatoPartita,
+} from "../partita/partitaTimer";
 
 interface SquadraInfo {
   id: string;
@@ -49,6 +53,7 @@ interface Marcatore {
   id: string;
   periodo: number;
   giocatore_uid: string;
+  assist_giocatore_stagione_id: string | null;
   partita_id: string;
   stagione_id: string;
   squadra_segnante_id: string | null;
@@ -234,8 +239,9 @@ const mapped: Giocatore[] = (gs || []).map((r: any) => ({
 }));
 setGiocatoriStagione(mapped);
 
-// 👇 Popola titolari coi primi 9
-setTitolari(mapped.slice(0, 9).map((g) => g.giocatore_uid));
+
+// 👇 Popola titolari coi primi 11
+setTitolari(mapped.slice(0, 11).map((g) => g.giocatore_uid));
 
     })(); // 👈 importante: chiudere subito la funzione async
   }, [partita]); // 👈 dipendenza corretta
@@ -246,6 +252,7 @@ setTitolari(mapped.slice(0, 9).map((g) => g.giocatore_uid));
     id: row.id,
     periodo: Number(row.periodo ?? row.goal_tempo ?? 1),
     giocatore_uid: String(row.giocatore_uid ?? row.giocatore_stagione_id ?? ""),
+    assist_giocatore_stagione_id: row.assist_giocatore_stagione_id ?? null,
     partita_id: row.partita_id,
     stagione_id: row.stagione_id,
     squadra_segnante_id: row.squadra_segnante_id ?? null,
@@ -257,7 +264,7 @@ setTitolari(mapped.slice(0, 9).map((g) => g.giocatore_uid));
     (async () => {
       const { data } = await supabase
         .from("marcatori")
-        .select("id,periodo,goal_tempo,giocatore_uid,giocatore_stagione_id,partita_id,stagione_id,squadra_segnante_id")
+        .select("id,periodo,goal_tempo,giocatore_uid,giocatore_stagione_id,assist_giocatore_stagione_id,partita_id,stagione_id,squadra_segnante_id")
         .eq("partita_id", partita.id)
         .order("periodo", { ascending: true });
 
@@ -406,13 +413,11 @@ setTitolari(mapped.slice(0, 9).map((g) => g.giocatore_uid));
 
   // Parziali per tempi: sempre usato sotto la squadra che NON è Montecarlo
   const renderParziali = (vals: number[]) => (
-    <div className="w-full grid grid-cols-4 text-center text-sm">
-      <div>1°T: {vals[0]}</div>
-      <div>2°T: {vals[1]}</div>
-      <div>3°T: {vals[2]}</div>
-      <div>4°T: {vals[3]}</div>
-    </div>
-  );
+  <div className="w-full grid grid-cols-2 text-center text-sm">
+    <div>1° Tempo: {vals[0]}</div>
+    <div>2° Tempo: {vals[1]}</div>
+  </div>
+);
 
   // SOLO marcatori di Montecarlo
   const mcMarcatoriByPeriodo = useMemo(() => {
@@ -474,20 +479,38 @@ setTitolari(mapped.slice(0, 9).map((g) => g.giocatore_uid));
     return pl ? `${pl.cognome} ${pl.nome}` : m.giocatore_uid;
   };
 
+
+  // 10. Nome giocatore autore dell'assist
+const renderNomeAssist = (giocatoreStagioneId: string | null) => {
+  if (!giocatoreStagioneId) return null;
+
+  const pl = giocatoriStagione.find(
+    (g) => g.record_id === giocatoreStagioneId
+  );
+
+  return pl ? `${pl.cognome} ${pl.nome}` : null;
+};
+
+const statoPartita = getStatoPartita(timerState);
+const testoPeriodo =
+  statoPartita === StatoPartita.PRIMO_TEMPO
+    ? "1° Tempo"
+    : statoPartita === StatoPartita.SECONDO_TEMPO
+    ? "2° Tempo"
+    : statoPartita === StatoPartita.PRIMO_SUPPLEMENTARE
+    ? "1° Suppl."
+    : statoPartita === StatoPartita.SECONDO_SUPPLEMENTARE
+    ? "2° Suppl."
+    : statoPartita === StatoPartita.RIGORI
+    ? "Rigori"
+    : "";
   const timerIsNegative = totalSeconds < 0;
   const absMinutes = Math.floor(Math.abs(totalSeconds) / 60);
   const absSeconds = Math.abs(totalSeconds) % 60;
   const minDisplay = `${timerIsNegative ? "-" : ""}${String(absMinutes).padStart(2, "0")}`;
   const secDisplay = String(absSeconds).padStart(2, "0");
   const timerClass = timerIsNegative ? "border-red-500 text-red-500" : "border-green-500 text-green-500";
-  // Posizioni modulo base 4-4-2 (percentuali rispetto al campo)
-const posizione = [
-  { x: 50, y: 95 }, // Portiere
-  { x: 50, y: 75 }, { x: 20, y: 70 }, { x: 80, y: 70 }, // Difensori
-  { x: 50, y: 55 }, { x: 20, y: 50 }, { x: 80, y: 50 }, // Centrocampisti
-  { x: 35, y: 35 }, { x: 65, y: 35 }, // Attaccanti
-];
-
+  
 
   return (
     <div className="mx-auto w-full pl-[2px] pr-[4px] box-border">
@@ -556,38 +579,51 @@ const posizione = [
                       <div key={periodo} className="text-sm">
                         <h4 className="font-medium">{`${periodo}° Tempo`}</h4>
                         <ul className="list-disc list-inside">
-                          {lista.map((m) => (
-                            <li key={m.id}>{renderNomeMarcatore(m)}</li>
-                          ))}
+                          {lista.map((m) => {
+  const nomeAssist = renderNomeAssist(m.assist_giocatore_stagione_id);
+
+  return (
+    <li key={m.id}>
+      {renderNomeMarcatore(m)}
+      {nomeAssist && (
+        <span className="text-gray-500">
+          {" "}— Assist: {nomeAssist}
+        </span>
+      )}
+    </li>
+  );
+})}
                         </ul>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  renderParziali(perTimeCasa)
+                  partita.stato !== "DaGiocare"
+  ? renderParziali(perTimeCasa)
+  : null
                 )}
               </div>
 
-              {/* VS + timer */}
-              <div className="flex items-center justify-center space-x-4">
-                {partita.stato === "InCorso" && (
-                  <div
-                    className={`w-12 h-12 rounded-full border-2 flex items-center justify-center font-bold ${timerClass}`}
-                  >
-                    {minDisplay}
-                  </div>
-                )}
-                <div className="bg-gradient-montecarlo text-white px-6 py-2 rounded-full font-bold text-lg shadow-montecarlo">
-                  VS
-                </div>
-                {partita.stato === "InCorso" && (
-                  <div
-                    className={`w-14 h-14 rounded-full border-2 flex items-center justify-center font-bold ${timerClass}`}
-                  >
-                    {secDisplay}
-                  </div>
-                )}
-              </div>
+             {/* VS + timer */}
+<div className="flex items-center justify-center gap-3">
+  {partita.stato === "InCorso" && testoPeriodo && (
+    <div className="font-bold text-montecarlo-secondary whitespace-nowrap">
+      {testoPeriodo}
+    </div>
+  )}
+
+  <div className="bg-gradient-montecarlo text-white px-6 py-2 rounded-full font-bold text-lg shadow-montecarlo">
+    VS
+  </div>
+
+  {partita.stato === "InCorso" && (
+    <div
+      className={`px-4 py-2 rounded-full border-2 flex items-center justify-center font-bold text-xl tabular-nums ${timerClass}`}
+    >
+      {minDisplay}:{secDisplay}
+    </div>
+  )}
+</div>
 
               {/* Squadra Ospite */}
               <div
@@ -631,15 +667,28 @@ const posizione = [
                       <div key={periodo} className="text-sm">
                         <h4 className="font-medium">{`${periodo}° Tempo`}</h4>
                         <ul className="list-disc list-inside">
-                          {lista.map((m) => (
-                            <li key={m.id}>{renderNomeMarcatore(m)}</li>
-                          ))}
+                          {lista.map((m) => {
+  const nomeAssist = renderNomeAssist(m.assist_giocatore_stagione_id);
+
+  return (
+    <li key={m.id}>
+      {renderNomeMarcatore(m)}
+      {nomeAssist && (
+        <span className="text-gray-500">
+          {" "}— Assist: {nomeAssist}
+        </span>
+      )}
+    </li>
+  );
+})}
                         </ul>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  renderParziali(perTimeOspite)
+                  partita.stato !== "DaGiocare"
+  ? renderParziali(perTimeOspite)
+  : null
                 )}
               </div>
 
@@ -658,7 +707,7 @@ const posizione = [
 
       {/* Campo Formazione: visibile solo se partita In Corso */}
 {partita?.stato === "InCorso" ? (
-  <CampoFormazione partitaId={partita.id} editable={true} />
+  <CampoFormazione partitaId={partita.id} editable={false} />
 ) : (
   <div
   className="rounded-xl shadow-montecarlo p-10 mt-6 text-center italic font-medium text-xl"

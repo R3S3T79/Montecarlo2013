@@ -53,19 +53,28 @@ export default function Classifica(): JSX.Element {
     fetchRole();
   }, [user?.id]);
 
-  // 🔹 CARICA STAGIONI
-  useEffect(() => {
-    const loadStagioni = async () => {
-      const { data } = await supabase
-        .from("stagioni")
-        .select("id, nome")
-        .order("created_at", { ascending: false });
+// 🔹 CARICA STAGIONI
+useEffect(() => {
+  const loadStagioni = async () => {
+    const { data, error } = await supabase
+      .from("stagioni")
+      .select("id, nome")
+      .order("data_inizio", { ascending: false });
 
-      setStagioni(data || []);
-      if (data?.length) setStagioneSelezionata(data[0].id);
-    };
-    loadStagioni();
-  }, []);
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    setStagioni(data || []);
+
+    if (data?.length) {
+      setStagioneSelezionata(data[0].id);
+    }
+  };
+
+  loadStagioni();
+}, []);
 
   // 🔹 CARICA FASI
   useEffect(() => {
@@ -79,8 +88,15 @@ export default function Classifica(): JSX.Element {
 
       const uniche = [...new Set((data || []).map((d) => d.fase).filter(Boolean))];
 
-      setFasi(uniche);
-      if (uniche.length) setFaseSelezionata(uniche[0]);
+setFasi(uniche);
+
+if (uniche.length > 0) {
+  setFaseSelezionata(uniche[0]);
+} else {
+  setFaseSelezionata("");
+  setRighe([]);
+  setLoading(false);
+}
     };
 
     loadFasi();
@@ -90,13 +106,18 @@ export default function Classifica(): JSX.Element {
     try {
       setLoading(true);
 
-      const { data, error } = await supabase
-        .from("classifica")
-        .select("*")
-        .eq("stagione_id", stagioneSelezionata)
-        .eq("fase", faseSelezionata)
-        .order("punti", { ascending: false })
-        .order("differenza_reti", { ascending: false });
+      let query = supabase
+  .from("classifica")
+  .select("*")
+  .eq("stagione_id", stagioneSelezionata);
+
+if (faseSelezionata) {
+  query = query.eq("fase", faseSelezionata);
+}
+
+const { data, error } = await query
+  .order("punti", { ascending: false })
+  .order("differenza_reti", { ascending: false });
 
       if (error) throw error;
 
@@ -134,10 +155,10 @@ export default function Classifica(): JSX.Element {
   };
 
   useEffect(() => {
-    if (stagioneSelezionata && faseSelezionata) {
-      caricaClassifica();
-    }
-  }, [stagioneSelezionata, faseSelezionata]);
+  if (stagioneSelezionata) {
+    caricaClassifica();
+  }
+}, [stagioneSelezionata, faseSelezionata]);
 
   // 🔹 UPDATE
   const aggiornaClassifica = async () => {
@@ -150,8 +171,17 @@ export default function Classifica(): JSX.Element {
     await caricaClassifica();
   };
 
-  if (loading)
-    return <div className="text-center mt-10 text-white">⏳ Caricamento classifica...</div>;
+  if (loading) {
+  console.log("loading:", loading);
+  console.log("stagione:", stagioneSelezionata);
+  console.log("fase:", faseSelezionata);
+
+  return (
+    <div className="text-center mt-10 text-white">
+      ⏳ Caricamento classifica...
+    </div>
+  );
+}
 
   return (
     <div className="container mx-auto px-0">

@@ -253,9 +253,17 @@ export default function Risultati() {
                 <span className="text-montecarlo-secondary font-semibold text-right">
                   {p.casa.nome}
                 </span>
-                <span className="text-montecarlo-secondary font-bold text-lg">
-                  {p.goal_a} - {p.goal_b}
-                </span>
+                <div className="flex flex-col items-center">
+  <span className="text-montecarlo-secondary font-bold text-lg">
+    {p.goal_a} - {p.goal_b}
+  </span>
+
+  {((p.rigori_a ?? 0) > 0 || (p.rigori_b ?? 0) > 0) && (
+    <span className="text-xs text-montecarlo-secondary font-semibold whitespace-nowrap">
+      ({p.rigori_a ?? 0} - {p.rigori_b ?? 0} d.c.r.)
+    </span>
+  )}
+</div>
                 <span className="text-montecarlo-secondary font-semibold">
                   {p.ospite.nome}
                 </span>

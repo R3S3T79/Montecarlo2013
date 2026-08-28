@@ -12,6 +12,22 @@ interface Giocatore {
   ruolo?: string | null;
 }
 
+interface TiroRigore {
+  id: string;
+  giocatore_stagione_id: string | null;
+  portiere_stagione_id: string | null;
+  squadra_id: string;
+  ordine: number;
+  esito: "segnato" | "sbagliato";
+}
+
+interface Cartellino {
+  id: string;
+  giocatore_stagione_id: string;
+  tipo: "giallo" | "rosso";
+  periodo: number;
+}
+
 export default function EditPartitaGiocata() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -23,14 +39,26 @@ export default function EditPartitaGiocata() {
   const [squadraOspite, setSquadraOspite] = useState("");
   const [squadre, setSquadre] = useState<{ id: string; nome: string }[]>([]);
   const [formazione, setFormazione] = useState<string[]>([]);
-  const [goalCasa, setGoalCasa] = useState<number[]>([0, 0, 0, 0]);
-  const [goalOspite, setGoalOspite] = useState<number[]>([0, 0, 0, 0]);
-  const [marcatoriPerTempo, setMarcatoriPerTempo] = useState<string[][]>([[], [], [], []]);
-  const [portieriPerTempo, setPortieriPerTempo] = useState<string[][]>([[], [], [], []]);
+const [goalCasa, setGoalCasa] = useState<number[]>([0, 0, 0, 0]);
+const [goalOspite, setGoalOspite] = useState<number[]>([0, 0, 0, 0]);
+const [marcatoriPerTempo, setMarcatoriPerTempo] = useState<string[][]>([[], [], [], []]);
+// 1. Assist per ogni goal e per ogni tempo
+const [assistPerTempo, setAssistPerTempo] = useState<string[][]>([[], [], [], []]);
+const [portieriPerTempo, setPortieriPerTempo] = useState<string[][]>([[], [], [], []]);
   const [giocatoriStagione, setGiocatoriStagione] = useState<Giocatore[]>([]);
   const [portieriStagione, setPortieriStagione] = useState<Giocatore[]>([]);
   const [showFormazione, setShowFormazione] = useState(false);
   const [minutiGiocati, setMinutiGiocati] = useState<Record<string, number>>({});
+  const [haSupplementari, setHaSupplementari] = useState(false);
+  const [rigoriCasa, setRigoriCasa] = useState(0);
+const [rigoriOspite, setRigoriOspite] = useState(0);
+const [haRigori, setHaRigori] = useState(false);
+const [mostraRigori, setMostraRigori] = useState(false);
+const [tiriRigori, setTiriRigori] = useState<TiroRigore[]>([]);
+const [rigoriDaEliminare, setRigoriDaEliminare] = useState<string[]>([]);
+const [cartellini, setCartellini] = useState<Cartellino[]>([]);
+const [cartelliniDaEliminare, setCartelliniDaEliminare] = useState<string[]>([]);
+  
 
 
   const [tipoCompetizione, setTipoCompetizione] = useState<string>("");
@@ -53,8 +81,22 @@ export default function EditPartitaGiocata() {
         setOra(dt.toTimeString().slice(0, 5));
         setSquadraCasa(p.squadra_casa_id);
         setSquadraOspite(p.squadra_ospite_id);
-        setGoalCasa([p.goal_a1, p.goal_a2, p.goal_a3, p.goal_a4]);
-        setGoalOspite([p.goal_b1, p.goal_b2, p.goal_b3, p.goal_b4]);
+        setGoalCasa([
+  p.goal_a1 || 0,
+  p.goal_a2 || 0,
+  p.goal_a3 || 0,
+  p.goal_a4 || 0,
+]);
+
+setGoalOspite([
+  p.goal_b1 || 0,
+  p.goal_b2 || 0,
+  p.goal_b3 || 0,
+  p.goal_b4 || 0,
+]);
+
+setRigoriCasa(p.rigori_a || 0);
+setRigoriOspite(p.rigori_b || 0);
         setTipoCompetizione(p.campionato_torneo || "");
         setNomeTorneo(p.nome_torneo || "");
       }
@@ -112,22 +154,56 @@ if (min) {
   );
 }
 
+const { data: minutiSupplementari } = await supabase
+  .from("minuti_giocati")
+  .select("run_index")
+  .eq("partita_id", id)
+  .in("run_index", [3, 4])
+  .limit(1);
+
+  // 🔹 Carico i cartellini già registrati nella partita
+const { data: cartelliniPartita } = await supabase
+  .from("cartellini")
+  .select("id, giocatore_stagione_id, tipo, periodo")
+  .eq("partita_id", id);
+
+if (cartelliniPartita) {
+  setCartellini(cartelliniPartita as Cartellino[]);
+}
+
+setHaSupplementari(!!minutiSupplementari?.length);
+const { data: rigoriPartita } = await supabase
+  .from("rigori_partita")
+  .select("id, giocatore_stagione_id, portiere_stagione_id, squadra_id, ordine, esito")
+  .eq("partita_id", id)
+  .order("ordine", { ascending: true });
+
+if (rigoriPartita) {
+  setTiriRigori(rigoriPartita as TiroRigore[]);
+  setHaRigori(rigoriPartita.length > 0);
+}
+
 
       const { data: md } = await supabase
         .from("marcatori")
-        .select("periodo, giocatore_stagione_id, portiere_subisce_id")
-        .eq("partita_id", id);
+.select("periodo, giocatore_stagione_id, assist_giocatore_stagione_id, portiere_subisce_id")
+.eq("partita_id", id);
       if (md) {
-        const marcArr: string[][] = [[], [], [], []];
-        const portArr: string[][] = [[], [], [], []];
+  const marcArr: string[][] = [[], [], [], []];
+  const assistArr: string[][] = [[], [], [], []];
+  const portArr: string[][] = [[], [], [], []];
         md.forEach((m) => {
           if (m.periodo >= 1 && m.periodo <= 4) {
-            if (m.giocatore_stagione_id) marcArr[m.periodo - 1].push(m.giocatore_stagione_id);
+            if (m.giocatore_stagione_id) {
+  marcArr[m.periodo - 1].push(m.giocatore_stagione_id);
+  assistArr[m.periodo - 1].push(m.assist_giocatore_stagione_id || "");
+}
             if (m.portiere_subisce_id) portArr[m.periodo - 1].push(m.portiere_subisce_id);
           }
         });
         setMarcatoriPerTempo(marcArr);
-        setPortieriPerTempo(portArr);
+setAssistPerTempo(assistArr);
+setPortieriPerTempo(portArr);
       }
     }
     fetchData();
@@ -163,6 +239,14 @@ if (min) {
         while (up[t].length < v) up[t].push("");
         return up;
       });
+
+      setAssistPerTempo((prev) => {
+  const up = prev.map((arr) => [...arr]);
+  up[t] = up[t].slice(0, v);
+  while (up[t].length < v) up[t].push("");
+  return up;
+});
+
     } else {
       setPortieriPerTempo((prev) => {
         const up = prev.map((arr) => [...arr]);
@@ -181,11 +265,90 @@ if (min) {
     });
   };
 
+  const handleChangeRigori = (
+  lato: "casa" | "ospite",
+  valore: string
+) => {
+  const nuovoTotale = Math.max(0, parseInt(valore) || 0);
+  const squadraId = lato === "casa" ? squadraCasa : squadraOspite;
+
+  setTiriRigori((prev) => {
+    const tiriSquadra = prev.filter(
+      (r) => r.squadra_id === squadraId
+    );
+
+    // Aggiungo i tiri mancanti
+    if (nuovoTotale > tiriSquadra.length) {
+      const quantiAggiungere = nuovoTotale - tiriSquadra.length;
+      const nuovoArray = [...prev];
+
+      for (let i = 0; i < quantiAggiungere; i++) {
+        const ordineMassimo = nuovoArray
+          .filter((r) => r.squadra_id === squadraId)
+          .reduce((max, r) => Math.max(max, r.ordine), 0);
+
+        nuovoArray.push({
+  id: `nuovo-${squadraId}-${ordineMassimo + 1}-${Date.now()}-${i}`,
+  giocatore_stagione_id: null,
+  portiere_stagione_id: null,
+  squadra_id: squadraId,
+  ordine: ordineMassimo + 1,
+  esito: "segnato",
+});
+      }
+
+      return nuovoArray;
+    }
+
+    // Elimino gli ultimi tiri, indipendentemente dall'esito
+    if (nuovoTotale < tiriSquadra.length) {
+      const quantiRimuovere = tiriSquadra.length - nuovoTotale;
+
+      const idsDaRimuovere = [...tiriSquadra]
+        .sort((a, b) => b.ordine - a.ordine)
+        .slice(0, quantiRimuovere)
+        .map((r) => r.id);
+
+      const idsEsistentiDaRimuovere = idsDaRimuovere.filter(
+        (rid) => !rid.startsWith("nuovo-")
+      );
+
+      if (idsEsistentiDaRimuovere.length > 0) {
+        setRigoriDaEliminare((prevIds) => [
+          ...prevIds,
+          ...idsEsistentiDaRimuovere.filter(
+            (rid) => !prevIds.includes(rid)
+          ),
+        ]);
+      }
+
+      return prev.filter(
+        (r) => !idsDaRimuovere.includes(r.id)
+      );
+    }
+
+    return prev;
+  });
+};
+
+
   const handleAnnulla = () => navigate(`/partita/${id}`);
 
   const handleSalva = async () => {
     const totalA = goalCasa.reduce((a, b) => a + b, 0);
     const totalB = goalOspite.reduce((a, b) => a + b, 0);
+        const totaleRigoriCasa = haRigori
+      ? tiriRigori.filter(
+          (r) => r.squadra_id === squadraCasa && r.esito === "segnato"
+        ).length
+      : rigoriCasa;
+
+    const totaleRigoriOspite = haRigori
+      ? tiriRigori.filter(
+          (r) => r.squadra_id === squadraOspite && r.esito === "segnato"
+        ).length
+      : rigoriOspite;
+    
 
     await supabase
       .from("partite")
@@ -205,6 +368,8 @@ if (min) {
         goal_b4: goalOspite[3],
         goal_a: totalA,
         goal_b: totalB,
+        rigori_a: totaleRigoriCasa,
+rigori_b: totaleRigoriOspite,
       })
       .eq("id", id);
 
@@ -214,7 +379,7 @@ if (min) {
     for (let i = 0; i < 4; i++) {
       const periodo = i + 1;
 
-      for (const gid of marcatoriPerTempo[i]) {
+      for (const [idx, gid] of marcatoriPerTempo[i].entries()) {
         if (!gid) continue;
         const { data: info } = await supabase
           .from("giocatori_stagioni_view")
@@ -224,14 +389,15 @@ if (min) {
         if (!info) continue;
         const squadraSegnante = isMontecarlo(squadraCasa) ? squadraCasa : squadraOspite;
         nuoviMarc.push({
-          partita_id: id!,
-          giocatore_stagione_id: gid,
-          giocatore_uid: info.giocatore_uid,
-          periodo,
-          stagione_id: stagioneId,
-          squadra_segnante_id: squadraSegnante,
-          portiere_subisce_id: null,
-        });
+  partita_id: id!,
+  giocatore_stagione_id: gid,
+  giocatore_uid: info.giocatore_uid,
+  assist_giocatore_stagione_id: assistPerTempo[i][idx] || null,
+  periodo,
+  stagione_id: stagioneId,
+  squadra_segnante_id: squadraSegnante,
+  portiere_subisce_id: null,
+});
       }
 
       for (const pid of portieriPerTempo[i]) {
@@ -271,7 +437,72 @@ const nuoviMinuti = Object.entries(minutiGiocati).map(([gid, min]) => ({
 }));
 if (nuoviMinuti.length)
   await supabase.from("minuti_giocati_totali").insert(nuoviMinuti);
+// 🔹 Elimino i tiri dei rigori rimossi
+if (rigoriDaEliminare.length > 0) {
+  await supabase
+    .from("rigori_partita")
+    .delete()
+    .in("id", rigoriDaEliminare);
+}
 
+// 🔹 Aggiorno o inserisco i singoli tiri dei rigori
+for (const tiro of tiriRigori) {
+  if (tiro.id.startsWith("nuovo-")) {
+    await supabase
+      .from("rigori_partita")
+      .insert({
+        partita_id: id!,
+        stagione_id: stagioneId,
+        giocatore_stagione_id: tiro.giocatore_stagione_id,
+        portiere_stagione_id: tiro.portiere_stagione_id,
+        squadra_id: tiro.squadra_id,
+        ordine: tiro.ordine,
+               esito: tiro.esito,
+      });
+  } else {
+    await supabase
+      .from("rigori_partita")
+      .update({
+        giocatore_stagione_id: tiro.giocatore_stagione_id,
+        portiere_stagione_id: tiro.portiere_stagione_id,
+        esito: tiro.esito,
+      })
+      .eq("id", tiro.id);
+  }
+}
+
+// 1. Elimino i cartellini rimossi
+if (cartelliniDaEliminare.length > 0) {
+  await supabase
+    .from("cartellini")
+    .delete()
+    .in("id", cartelliniDaEliminare);
+}
+
+// 2. Aggiorno o inserisco i cartellini
+for (const cartellino of cartellini) {
+  if (!cartellino.giocatore_stagione_id) continue;
+
+  if (cartellino.id.startsWith("nuovo-")) {
+    await supabase
+      .from("cartellini")
+.insert({
+  partita_id: id!,
+  stagione_id: stagioneId,
+  giocatore_stagione_id: cartellino.giocatore_stagione_id,
+  tipo: cartellino.tipo,
+  periodo: cartellino.periodo,
+});
+  } else {
+    await supabase
+      .from("cartellini")
+      .update({
+        giocatore_stagione_id: cartellino.giocatore_stagione_id,
+        tipo: cartellino.tipo,
+      })
+      .eq("id", cartellino.id);
+  }
+}
 
     navigate(`/partita/${id}`);
   };
@@ -443,9 +674,17 @@ if (nuoviMinuti.length)
         )}
 
         {/* Tempi */}
-        {[0, 1, 2, 3].map((t) => (
+        {(haSupplementari ? [0, 1, 2, 3] : [0, 1]).map((t) => (
           <div key={t} className="bg-gray-50 p-4 rounded mb-4 border border-gray-200">
-            <h3 className="font-semibold text-gray-800 mb-2">{t + 1}° Tempo</h3>
+            <h3 className="font-semibold text-gray-800 mb-2">
+  {t === 0
+    ? "1° Tempo"
+    : t === 1
+    ? "2° Tempo"
+    : t === 2
+    ? "1° Tempo Supplementare"
+    : "2° Tempo Supplementare"}
+</h3>
 
             {/* Casa */}
             <div className="grid grid-cols-[180px_1fr] items-center mb-2">
@@ -459,21 +698,47 @@ if (nuoviMinuti.length)
               />
             </div>
             {isMontecarlo(squadraCasa) &&
-              marcatoriPerTempo[t].map((m, i) => (
-                <select
-                  key={i}
-                  value={m}
-                  onChange={(e) => handleMarcatore(t, i, e.target.value)}
-                  className="w-full sm:w-60 mb-2 p-2 border border-gray-300 rounded text-sm"
-                >
-                  <option value="">-- Seleziona marcatore --</option>
-                  {giocatoriStagione
-                    .filter((g) => formazione.includes(g.id))
-                    .map((pl) => (
-                      <option key={pl.id} value={pl.id}>{pl.cognome} {pl.nome}</option>
-                    ))}
-                </select>
-              ))}
+  marcatoriPerTempo[t].map((m, i) => (
+    <div key={i} className="flex flex-col sm:flex-row gap-2 mb-2">
+      <select
+        value={m}
+        onChange={(e) => handleMarcatore(t, i, e.target.value)}
+        className="w-full sm:w-60 p-2 border border-gray-300 rounded text-sm"
+      >
+        <option value="">-- Seleziona marcatore --</option>
+        {giocatoriStagione
+          .filter((g) => formazione.includes(g.id))
+          .map((pl) => (
+            <option key={pl.id} value={pl.id}>
+              {pl.cognome} {pl.nome}
+            </option>
+          ))}
+      </select>
+
+      <select
+        value={assistPerTempo[t][i] || ""}
+        onChange={(e) => {
+          const gid = e.target.value;
+
+          setAssistPerTempo((prev) => {
+            const up = prev.map((arr) => [...arr]);
+            up[t][i] = gid;
+            return up;
+          });
+        }}
+        className="w-full sm:w-60 p-2 border border-gray-300 rounded text-sm"
+      >
+        <option value="">-- Nessun assist --</option>
+        {giocatoriStagione
+          .filter((g) => formazione.includes(g.id))
+          .map((pl) => (
+            <option key={pl.id} value={pl.id}>
+              {pl.cognome} {pl.nome}
+            </option>
+          ))}
+      </select>
+    </div>
+  ))}
             {!isMontecarlo(squadraCasa) &&
               portieriPerTempo[t].map((pid, i) => (
                 <select
@@ -508,21 +773,47 @@ if (nuoviMinuti.length)
               />
             </div>
             {isMontecarlo(squadraOspite) &&
-              marcatoriPerTempo[t].map((m, i) => (
-                <select
-                  key={i}
-                  value={m}
-                  onChange={(e) => handleMarcatore(t, i, e.target.value)}
-                  className="w-full sm:w-60 mb-2 p-2 border border-gray-300 rounded text-sm"
-                >
-                  <option value="">-- Seleziona marcatore --</option>
-                  {giocatoriStagione
-                    .filter((g) => formazione.includes(g.id))
-                    .map((pl) => (
-                      <option key={pl.id} value={pl.id}>{pl.cognome} {pl.nome}</option>
-                    ))}
-                </select>
-              ))}
+  marcatoriPerTempo[t].map((m, i) => (
+    <div key={i} className="flex flex-col sm:flex-row gap-2 mb-2">
+      <select
+        value={m}
+        onChange={(e) => handleMarcatore(t, i, e.target.value)}
+        className="w-full sm:w-60 p-2 border border-gray-300 rounded text-sm"
+      >
+        <option value="">-- Seleziona marcatore --</option>
+        {giocatoriStagione
+          .filter((g) => formazione.includes(g.id))
+          .map((pl) => (
+            <option key={pl.id} value={pl.id}>
+              {pl.cognome} {pl.nome}
+            </option>
+          ))}
+      </select>
+
+      <select
+        value={assistPerTempo[t][i] || ""}
+        onChange={(e) => {
+          const gid = e.target.value;
+
+          setAssistPerTempo((prev) => {
+            const up = prev.map((arr) => [...arr]);
+            up[t][i] = gid;
+            return up;
+          });
+        }}
+        className="w-full sm:w-60 p-2 border border-gray-300 rounded text-sm"
+      >
+        <option value="">-- Nessun assist --</option>
+        {giocatoriStagione
+          .filter((g) => formazione.includes(g.id))
+          .map((pl) => (
+            <option key={pl.id} value={pl.id}>
+              {pl.cognome} {pl.nome}
+            </option>
+          ))}
+      </select>
+    </div>
+  ))}
             {!isMontecarlo(squadraOspite) &&
               portieriPerTempo[t].map((pid, i) => (
                 <select
@@ -546,6 +837,281 @@ if (nuoviMinuti.length)
               ))}
           </div>
         ))}
+
+        {/* 1. Cartellini */}
+<div className="flex justify-center mb-4">
+  <button
+    type="button"
+    onClick={() =>
+      setCartellini((prev) => [
+        ...prev,
+        {
+  id: `nuovo-${Date.now()}`,
+  giocatore_stagione_id: "",
+  tipo: "giallo",
+  periodo: 1,
+},
+      ])
+    }
+    className="bg-yellow-500 text-black px-4 py-2 rounded"
+  >
+    🟨 Aggiungi Cartellino
+  </button>
+</div>
+
+{cartellini.length > 0 && (
+  <div className="bg-gray-50 p-4 rounded mb-4 border border-gray-200">
+    <h3 className="font-semibold text-gray-800 mb-3">Cartellini</h3>
+
+    <div className="space-y-2">
+      {cartellini.map((cartellino) => (
+        <div
+          key={cartellino.id}
+          className="flex items-center gap-2"
+        >
+          <select
+            value={cartellino.giocatore_stagione_id}
+            onChange={(e) => {
+              const gid = e.target.value;
+
+              setCartellini((prev) =>
+                prev.map((c) =>
+                  c.id === cartellino.id
+                    ? { ...c, giocatore_stagione_id: gid }
+                    : c
+                )
+              );
+            }}
+            className="flex-1 p-2 border border-gray-300 rounded text-sm"
+          >
+            <option value="">-- Seleziona giocatore --</option>
+
+            {giocatoriStagione
+              .filter((g) => formazione.includes(g.id))
+              .map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.cognome} {g.nome}
+                </option>
+              ))}
+          </select>
+
+          <select
+            value={cartellino.tipo}
+            onChange={(e) => {
+              const tipo = e.target.value as "giallo" | "rosso";
+
+              setCartellini((prev) =>
+                prev.map((c) =>
+                  c.id === cartellino.id
+                    ? { ...c, tipo }
+                    : c
+                )
+              );
+            }}
+            className="p-2 border border-gray-300 rounded text-sm"
+          >
+            <option value="giallo">🟨 Giallo</option>
+            <option value="rosso">🟥 Rosso</option>
+          </select>
+          <select
+  value={cartellino.periodo}
+  onChange={(e) => {
+    const periodo = Number(e.target.value);
+
+    setCartellini((prev) =>
+      prev.map((c) =>
+        c.id === cartellino.id
+          ? { ...c, periodo }
+          : c
+      )
+    );
+  }}
+  className="p-2 border border-gray-300 rounded text-sm"
+>
+  <option value={1}>1° Tempo</option>
+  <option value={2}>2° Tempo</option>
+
+  {haSupplementari && (
+    <>
+      <option value={3}>1° Supplementare</option>
+      <option value={4}>2° Supplementare</option>
+    </>
+  )}
+</select>
+          <button
+  type="button"
+  onClick={() => {
+    if (!cartellino.id.startsWith("nuovo-")) {
+      setCartelliniDaEliminare((prev) =>
+        prev.includes(cartellino.id)
+          ? prev
+          : [...prev, cartellino.id]
+      );
+    }
+
+    setCartellini((prev) =>
+      prev.filter((c) => c.id !== cartellino.id)
+    );
+  }}
+  className="p-2 text-red-600 hover:text-red-800"
+  aria-label="Elimina Cartellino"
+>
+  🗑️
+</button>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
+                {!haRigori && !mostraRigori && (
+          <div className="flex justify-center mb-4">
+            <button
+              type="button"
+              onClick={() => setMostraRigori(true)}
+              className="bg-orange-600 text-white px-4 py-2 rounded"
+            >
+              ⚽ Aggiungi Rigori
+            </button>
+          </div>
+        )}
+
+                {/* Rigori */}
+        {(haRigori || mostraRigori) && (
+          <div className="bg-gray-50 p-4 rounded mb-4 border border-gray-200">
+            <h3 className="font-semibold text-gray-800 mb-2">Rigori</h3>
+                        <div className="mb-4 space-y-2">
+              {tiriRigori.map((tiro) => {
+                const squadraMontecarlo = isMontecarlo(tiro.squadra_id);
+
+                return (
+                  <div
+                    key={tiro.id}
+                    className="grid grid-cols-[180px_1fr] items-center gap-2"
+                  >
+                    <label
+  className={`text-sm font-bold ${
+    isMontecarlo(tiro.squadra_id)
+      ? "text-green-600"
+      : "text-red-600"
+  }`}
+>
+  {getNomeSquadra(tiro.squadra_id)} - Rigore {tiro.ordine}
+</label>
+
+                    <div className="flex gap-2">
+                      {squadraMontecarlo && (
+                        
+                        <select
+                          value={tiro.giocatore_stagione_id || ""}
+                          onChange={(e) => {
+                            const gid = e.target.value;
+
+                            setTiriRigori((prev) =>
+                              prev.map((r) =>
+                                r.id === tiro.id
+                                  ? {
+                                      ...r,
+                                      giocatore_stagione_id: gid || null,
+                                    }
+                                  : r
+                              )
+                            );
+                          }}
+                          className="p-1 border border-gray-300 rounded text-sm"
+                        >
+                          <option value="">-- Rigorista --</option>
+
+                          {giocatoriStagione.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.cognome} {g.nome}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+{!squadraMontecarlo && (
+  <select
+    value={tiro.portiere_stagione_id || ""}
+    onChange={(e) => {
+      const pid = e.target.value;
+
+      setTiriRigori((prev) =>
+        prev.map((r) =>
+          r.id === tiro.id
+            ? {
+                ...r,
+                portiere_stagione_id: pid || null,
+              }
+            : r
+        )
+      );
+    }}
+    className="p-1 border border-gray-300 rounded text-sm"
+  >
+    <option value="">-- Portiere --</option>
+
+    {portieriStagione.map((g) => (
+      <option key={g.id} value={g.id}>
+        {g.cognome} {g.nome}
+      </option>
+    ))}
+  </select>
+)}
+                      <select
+                        value={tiro.esito}
+                        onChange={(e) => {
+                          const esito = e.target.value as
+                            | "segnato"
+                            | "sbagliato";
+
+                          setTiriRigori((prev) =>
+                            prev.map((r) =>
+                              r.id === tiro.id
+                                ? { ...r, esito }
+                                : r
+                            )
+                          );
+                        }}
+                        className="p-1 border border-gray-300 rounded text-sm"
+                      >
+                        <option value="segnato">⚽ Segnato</option>
+                        <option value="sbagliato">❌ Sbagliato</option>
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="grid grid-cols-[180px_1fr] items-center mb-2">
+              <label className="font-bold text-gray-800">
+                {getNomeSquadra(squadraCasa)}:
+              </label>
+              <input
+                type="number"
+                value={tiriRigori.filter((r) => r.squadra_id === squadraCasa).length}
+                onChange={(e) => handleChangeRigori("casa", e.target.value)}
+                className="w-20 p-1 border border-gray-300 rounded text-sm"
+                onFocus={(e) => e.target.select()}
+              />
+            </div>
+
+            <div className="grid grid-cols-[180px_1fr] items-center">
+              <label className="font-bold text-gray-800">
+                {getNomeSquadra(squadraOspite)}:
+              </label>
+              <input
+                type="number"
+                value={tiriRigori.filter((r) => r.squadra_id === squadraOspite).length}
+                onChange={(e) => handleChangeRigori("ospite", e.target.value)}
+                className="w-20 p-1 border border-gray-300 rounded text-sm"
+                onFocus={(e) => e.target.select()}
+              />
+            </div>
+          </div>
+        )}
+
+      
 
         {/* Azioni */}
         <div className="flex justify-between mt-6">

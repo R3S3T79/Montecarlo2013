@@ -13,8 +13,11 @@ interface PartitaEstesa {
   id: string;
   squadra_casa_id: string;
   squadra_ospite_id: string;
-  goal_a: number;
-  goal_b: number;
+  
+    rigori_a: number;
+  rigori_b: number;
+  rigori_a: number;
+  rigori_b: number;
   casa: { nome: string };
   ospite: { nome: string };
 }
@@ -94,6 +97,8 @@ export default function StatisticheSquadra() {
             squadra_ospite_id,
             goal_a,
             goal_b,
+            rigori_a,
+            rigori_b,
             campionato_torneo,
             casa:squadra_casa_id(nome),
             ospite:squadra_ospite_id(nome)
@@ -132,24 +137,51 @@ export default function StatisticheSquadra() {
           tot.giocate++;
           tot.gol_fatti += goalFatti;
           tot.gol_subiti += goalSubiti;
-          if (goalFatti > goalSubiti) tot.vittorie++;
-          else if (goalFatti === goalSubiti) tot.pareggi++;
-          else tot.sconfitte++;
+            const rigoriFatti = èCasa ? p.rigori_a : p.rigori_b;
+          const rigoriSubiti = èCasa ? p.rigori_b : p.rigori_a;
+
+          if (goalFatti > goalSubiti) {
+            tot.vittorie++;
+          } else if (goalFatti < goalSubiti) {
+            tot.sconfitte++;
+          } else if (rigoriFatti > rigoriSubiti) {
+            tot.vittorie++;
+          } else if (rigoriFatti < rigoriSubiti) {
+            tot.sconfitte++;
+          } else {
+            tot.pareggi++;
+          }
 
           if (èCasa) {
             casa.giocate++;
             casa.gol_fatti += goalFatti;
             casa.gol_subiti += goalSubiti;
-            if (goalFatti > goalSubiti) casa.vittorie++;
-            else if (goalFatti === goalSubiti) casa.pareggi++;
-            else casa.sconfitte++;
+            if (goalFatti > goalSubiti) {
+  casa.vittorie++;
+} else if (goalFatti < goalSubiti) {
+  casa.sconfitte++;
+} else if (rigoriFatti > rigoriSubiti) {
+  casa.vittorie++;
+} else if (rigoriFatti < rigoriSubiti) {
+  casa.sconfitte++;
+} else {
+  casa.pareggi++;
+}
           } else {
             trasf.giocate++;
             trasf.gol_fatti += goalFatti;
             trasf.gol_subiti += goalSubiti;
-            if (goalFatti > goalSubiti) trasf.vittorie++;
-            else if (goalFatti === goalSubiti) trasf.pareggi++;
-            else trasf.sconfitte++;
+            if (goalFatti > goalSubiti) {
+  trasf.vittorie++;
+} else if (goalFatti < goalSubiti) {
+  trasf.sconfitte++;
+} else if (rigoriFatti > rigoriSubiti) {
+  trasf.vittorie++;
+} else if (rigoriFatti < rigoriSubiti) {
+  trasf.sconfitte++;
+} else {
+  trasf.pareggi++;
+}
           }
 
           if (!maxF || goalFatti > (maxF.squadra_casa_id === montecarloId ? maxF.goal_a : maxF.goal_b)) maxF = p;

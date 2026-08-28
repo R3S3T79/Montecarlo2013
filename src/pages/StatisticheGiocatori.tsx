@@ -27,6 +27,9 @@ interface Statistica {
   subiti: number;
   media: number;
   media_voti_mister: number;
+    gialli: number;
+  rossi: number;
+    assist: number;
 }
 
 export default function StatisticheGiocatori(): JSX.Element {
@@ -58,8 +61,8 @@ useEffect(() => {
   const [rows, setRows] = useState<Statistica[]>([]);
 
   const [sortField, setSortField] = useState<
-    'giocatore' | 'gol' | 'presenze' | 'media' | 'media_voti_mister'
-  >('giocatore');
+  'giocatore' | 'gol' | 'presenze' | 'media' | 'media_voti_mister' | 'assist' | 'gialli' | 'rossi'
+>('giocatore');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Carica stagioni
@@ -118,7 +121,62 @@ if (!vErr && voti) {
   });
 }
 
+// 3) Carico cartellini della stagione
+const { data: cartellini, error: cErr } = await supabase
+  .from('cartellini')
+  .select('giocatore_stagione_id, tipo')
+  .eq('stagione_id', stagioneSelezionata);
 
+  const cartelliniMap: Record<string, { gialli: number; rossi: number }> = {};
+
+if (!cErr && cartellini) {
+  cartellini.forEach((c: any) => {
+    if (!cartelliniMap[c.giocatore_stagione_id]) {
+      cartelliniMap[c.giocatore_stagione_id] = {
+        gialli: 0,
+        rossi: 0,
+      };
+    }
+
+    if (c.tipo?.toLowerCase() === 'giallo') {
+      cartelliniMap[c.giocatore_stagione_id].gialli++;
+    }
+
+    if (c.tipo?.toLowerCase() === 'rosso') {
+      cartelliniMap[c.giocatore_stagione_id].rossi++;
+    }
+  });
+}
+
+const { data: giocatoriStagioneIds, error: gsErr } = await supabase
+  .from('giocatori_stagioni_view')
+  .select('id, giocatore_uid')
+  .eq('stagione_id', stagioneSelezionata);
+
+  const giocatoreStagioneMap: Record<string, string> = {};
+
+if (!gsErr && giocatoriStagioneIds) {
+  giocatoriStagioneIds.forEach((g: any) => {
+    giocatoreStagioneMap[g.giocatore_uid] = g.id;
+  });
+}
+
+// 4) Carico gli assist della stagione
+const { data: assistData, error: assistErr } = await supabase
+  .from('marcatori')
+  .select('assist_giocatore_stagione_id')
+  .eq('stagione_id', stagioneSelezionata);
+
+const assistMap: Record<string, number> = {};
+
+if (!assistErr && assistData) {
+  assistData.forEach((a: any) => {
+    if (!a.assist_giocatore_stagione_id) return;
+
+    assistMap[a.assist_giocatore_stagione_id] =
+      (assistMap[a.assist_giocatore_stagione_id] ?? 0) + 1;
+  });
+}
 
 
         // 3) Mappiamo dati finali
@@ -126,6 +184,18 @@ if (!vErr && voti) {
           const presenze = r.presenze_totali ?? 0;
           const gol = r.goal_totali ?? 0;
           const subiti = r.goal_subiti ?? 0;
+          const giocatoreStagioneId = giocatoreStagioneMap[r.giocatore_uid];
+          const assist = giocatoreStagioneId
+  ? assistMap[giocatoreStagioneId] ?? 0
+  : 0;
+
+const gialli = giocatoreStagioneId
+  ? cartelliniMap[giocatoreStagioneId]?.gialli ?? 0
+  : 0;
+
+const rossi = giocatoreStagioneId
+  ? cartelliniMap[giocatoreStagioneId]?.rossi ?? 0
+  : 0;
           let media = 0;
 
           if (presenze > 0) {
@@ -147,6 +217,9 @@ if (!vErr && voti) {
             subiti,
             media,
             media_voti_mister: medieMap[r.giocatore_uid]?.mister ?? 0,
+            gialli,
+            rossi,
+            assist,
           };
         });
 
@@ -157,10 +230,12 @@ if (!vErr && voti) {
     })();
   }, [stagioneSelezionata]);
 
+ 
+
   // Ordinamento
   const sortData = (
-    field: 'giocatore' | 'gol' | 'presenze' | 'media' | 'media_voti_mister'
-  ) => {
+  field: 'giocatore' | 'gol' | 'presenze' | 'media' | 'media_voti_mister' | 'assist' | 'gialli' | 'rossi'
+) => {
     if (sortField === field) {
       setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -190,10 +265,16 @@ if (!vErr && voti) {
       } else if (sortField === 'presenze') {
         cmp = a.presenze - b.presenze;
       } else if (sortField === 'media') {
-        cmp = a.media - b.media;
-      } else {
-        cmp = a.media_voti_mister - b.media_voti_mister;
-      }
+  cmp = a.media - b.media;
+} else if (sortField === 'assist') {
+  cmp = a.assist - b.assist;
+} else if (sortField === 'gialli') {
+  cmp = a.gialli - b.gialli;
+} else if (sortField === 'rossi') {
+  cmp = a.rossi - b.rossi;
+} else {
+  cmp = a.media_voti_mister - b.media_voti_mister;
+}
       return sortOrder === 'asc' ? cmp : -cmp;
     });
     return out;
@@ -234,7 +315,8 @@ if (!vErr && voti) {
 <div className="grid grid-cols-2 gap-y-1 gap-x-4 text-sm text-gray-600 pt-2 px-2 text-white">
   <div><strong>G</strong> = Fatti/Subiti</div>
   <div><strong>P</strong> = Presenze</div>
-  <div className="col-span-2"><strong>M</strong> = Media Goal fatti/subiti</div>
+  <div><strong>A</strong> = Assist</div>
+  <div><strong>M</strong> = Media Goal fatti/subiti</div>
 </div>
 
 
@@ -259,11 +341,14 @@ if (!vErr && voti) {
 
         {[
           ["gol", "G"],
-["presenze", "P"],
+["assist", "A"],
 ["media", "M"],
-...(role === 'admin' || role === 'creator'
-  ? [["media_voti_mister", "M.V.A"]]
-  : []),
+["gialli", "🟨"],
+["rossi", "🟥"],
+["presenze", "P"],
+// ...(role === 'admin' || role === 'creator'
+//   ? [["media_voti_mister", "M.V.A"]]
+//   : []),
 
         ].map(([field, label]) => (
           <th
@@ -309,22 +394,37 @@ if (!vErr && voti) {
       </td>
 
       {/* G */}
-      <td className="py-1 px-[4px] text-center">
-        {st.ruolo?.toLowerCase() === "portiere" ? st.subiti : st.gol}
-      </td>
+<td className="py-1 px-[4px] text-center">
+  {st.ruolo?.toLowerCase() === "portiere" ? st.subiti : st.gol}
+</td>
 
-      {/* P */}
-      <td className="py-1 px-[4px] text-center">{st.presenze}</td>
+{/* A - Assist */}
+<td className="py-1 px-[4px] text-center">
+  {st.assist}
+</td>
 
-      {/* M */}
-      <td className="py-1 px-[4px] text-center">{st.media.toFixed(2)}</td>
+{/* M */}
+<td className="py-1 px-[4px] text-center">{st.media.toFixed(2)}</td>
+
+{/* 🟨 Gialli */}
+<td className="py-1 px-[4px] text-center">
+  {st.gialli}
+</td>
+
+{/* 🟥 Rossi */}
+<td className="py-1 px-[4px] text-center">
+  {st.rossi}
+</td>
+
+{/* P */}
+<td className="py-1 px-[4px] text-center">{st.presenze}</td>
 
 
-      {(role === 'admin' || role === 'creator') && (
+      {/* {(role === 'admin' || role === 'creator') && (
   <td className="py-1 px-[4px] text-center">
     {st.media_voti_mister.toFixed(2)}
   </td>
-)}
+)} */}
 
     </tr>
   ))}

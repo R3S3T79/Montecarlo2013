@@ -1,32 +1,20 @@
-// src/components/TimerCircolare.tsx
+// src/components/CronometroPartita.tsx
 // Data creazione: 16/08/2025
 
 import React, { useEffect, useRef, useState } from "react";
 
 interface Props {
-  /**
-   * Millisecondi trascorsi (provenienti dal timer sincronizzato su Supabase).
-   * Il componente calcola il countdown: remaining = (duration * 60) - elapsedSec
-   */
   elapsed: number;
-
-  /**
-   * Durata iniziale in minuti da cui partire (default 20).
-   * È la SORGENTE DI VERITÀ esterna (dalla tabella partita_timer_state).
-   */
   initialDuration?: number;
-
-  /**
-   * Callback invocata quando l’utente cambia la durata nell’input centrale.
-   * Qui il padre salva su Supabase e (consigliato) resetta/ferma il timer.
-   */
   onDurationChange?: (minutes: number) => void;
+  label?: string;
 }
 
-export default function TimerCircolare({
+export default function CronometroPartita({
   elapsed,
   initialDuration = 20,
   onDurationChange,
+  label,
 }: Props) {
   const [duration, setDuration] = useState<number>(initialDuration);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -36,21 +24,17 @@ export default function TimerCircolare({
     setDuration(initialDuration);
   }, [initialDuration]);
 
-  // ---- Calcoli countdown (con overrun negativo) ----
-  const totalInitialSeconds = Math.max(0, Math.floor(duration * 60));
-  const elapsedSeconds = Math.max(0, Math.floor(elapsed / 1000));
-  // RIMOSSA la clamp a 0: permettiamo valori negativi per l’overrun
-  const remaining = totalInitialSeconds - elapsedSeconds; // può essere < 0
-  const isOvertime = remaining < 0;
+// ---- Calcoli cronometro ----
+const elapsedSeconds = Math.max(0, Math.floor(elapsed / 1000));
 
-  const absRemaining = Math.abs(remaining);
-  const dispMinNum = Math.floor(absRemaining / 60);
-  const dispSecNum = absRemaining % 60;
+const dispMinNum = Math.floor(elapsedSeconds / 60);
+const dispSecNum = elapsedSeconds % 60;
 
-  const dispMinStr =
-    (isOvertime ? "-" : "") + dispMinNum.toString().padStart(2, "0");
-  const dispSecStr =
-    (isOvertime ? "-" : "") + dispSecNum.toString().padStart(2, "0");
+const dispMinStr = dispMinNum.toString().padStart(2, "0");
+const dispSecStr = dispSecNum.toString().padStart(2, "0");
+
+// Diventa rosso quando supera la durata impostata
+const isOvertime = dispMinNum >= duration;
 
   // ---- Grafica cerchi ----
   const size = 100;
@@ -59,15 +43,14 @@ export default function TimerCircolare({
   const center = size / 2;
   const circumference = 2 * Math.PI * radius;
 
-  // percentuali: minuti rispetto alla durata, secondi rispetto a 60
-  // In overtime il cerchio minuti resta pieno e rosso.
-  const pctMin =
-    isOvertime || duration <= 0
-      ? 100
-      : 100 - Math.min(100, (dispMinNum / duration) * 100);
+ // Percentuale avanzamento minuti
+const pctMin =
+  duration <= 0
+    ? 100
+    : Math.min(100, (dispMinNum / duration) * 100);
 
-  // Per i secondi usiamo sempre il valore assoluto entro il minuto corrente
-  const pctSec = 100 - (dispSecNum / 60) * 100;
+// Percentuale avanzamento secondi nel minuto corrente
+const pctSec = (dispSecNum / 60) * 100;
 
   // ---- Colori dinamici: verde in countdown, rosso in overtime ----
   const trackColor = isOvertime ? "rgba(255,0,0,0.2)" : "rgba(0,128,0,0.2)";
@@ -90,7 +73,14 @@ export default function TimerCircolare({
   };
 
   // ---- Render ----
-  return (
+  // ---- Render ----
+return (
+  <div className="flex flex-col items-center space-y-3">
+
+    <div className="text-lg font-bold text-gray-700">
+  {label}
+</div>
+
     <div className="flex items-center space-x-6">
       {/* Cerchio minuti */}
       <div className="relative" style={{ width: size, height: size }}>
@@ -116,7 +106,9 @@ export default function TimerCircolare({
             strokeWidth={strokeWidth}
             fill="transparent"
             strokeDasharray={circumference}
-            strokeDashoffset={(circumference * pctMin) / 100}
+            strokeDashoffset={
+  circumference - (circumference * pctMin) / 100
+}
             strokeLinecap="round"
           />
         </svg>
@@ -171,16 +163,21 @@ export default function TimerCircolare({
             strokeWidth={strokeWidth}
             fill="transparent"
             strokeDasharray={circumference}
-            strokeDashoffset={(circumference * pctSec) / 100}
+            strokeDashoffset={
+  circumference - (circumference * pctSec) / 100
+}
             strokeLinecap="round"
           />
         </svg>
-        <div
+                <div
           className={`absolute inset-0 flex items-center justify-center text-2xl font-bold ${textColor}`}
         >
           {dispSecStr}
         </div>
       </div>
+
     </div>
-  );
+
+  </div>
+);
 }
