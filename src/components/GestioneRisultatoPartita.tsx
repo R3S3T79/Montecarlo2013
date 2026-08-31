@@ -61,6 +61,7 @@ export default function GestioneRisultatoPartita() {
     { uscente: string; entrante: string; minuto: number }[]
   >([]);
   const [uscenteSelezionato, setUscenteSelezionato] = useState<string | null>(null);
+  const [entranteSelezionato, setEntranteSelezionato] = useState<string | null>(null);
 
   // minuti giocati calcolati (secondi)
   const [minutiGiocati, setMinutiGiocati] = useState<Record<string, number>>({});
@@ -479,7 +480,7 @@ const startTimer = async () => {
   console.log("▶️ startTimer avviato | partitaId:", id, " | titolari:", titolari);
 
   const now = new Date().toISOString();
-  const nowSec = Math.floor(elapsed / 1000);
+  const nowSec = getTempoAssoluto(timerState, elapsed);
 
   // 1️⃣ Recupera giocatori attualmente in campo dalla formazione
   const { data: formazione, error: formErr } = await supabase
@@ -708,14 +709,29 @@ const inizioSecondoTempo = async () => {
     inCampoIds = [...titolari];
   }
 
-  // 2. Crea un nuovo intervallo per tutti i giocatori in campo
- const nuoveRighe = inCampoIds.map((gid) => ({
-  partita_id: id,
-  giocatore_stagione_id: gid,
-  entrata_sec: tempoInizioSecondo,
-  uscita_sec: null,
-  run_index: 2,
-}));
+    // 2. Chiude eventuali righe rimaste aperte dal 1° tempo
+  const { error: chiusuraResidueErr } = await supabase
+    .from("minuti_giocati")
+    .update({ uscita_sec: tempoInizioSecondo })
+    .eq("partita_id", id)
+    .is("uscita_sec", null);
+
+  if (chiusuraResidueErr) {
+    console.error(
+      "❌ Errore chiusura righe residue a inizio 2° tempo:",
+      chiusuraResidueErr.message
+    );
+    return;
+  }
+
+  // 3. Crea un nuovo intervallo per tutti i giocatori in campo
+  const nuoveRighe = inCampoIds.map((gid) => ({
+    partita_id: id,
+    giocatore_stagione_id: gid,
+    entrata_sec: tempoInizioSecondo,
+    uscita_sec: null,
+    run_index: 2,
+  }));
 
   if (nuoveRighe.length > 0) {
     const { error: minutiErr } = await supabase
@@ -1036,8 +1052,29 @@ const inizioPrimoTempoSupplementare = async () => {
     inCampoIds = [...titolari];
   }
 
-  // 2. Crea un nuovo intervallo per tutti i giocatori in campo
-  const nuoveRighe = inCampoIds.map((gid) => ({
+   // 2. Recupera eventuali righe ancora aperte
+  const { data: righeAperte, error: righeAperteErr } = await supabase
+    .from("minuti_giocati")
+    .select("giocatore_stagione_id")
+    .eq("partita_id", id)
+    .is("uscita_sec", null);
+
+  if (righeAperteErr) {
+    console.error(
+      "❌ Errore controllo righe aperte a inizio 1° supplementare:",
+      righeAperteErr.message
+    );
+    return;
+  }
+
+  const apertiSet = new Set(
+    righeAperte?.map((r) => r.giocatore_stagione_id) || []
+  );
+
+  // 3. Crea un nuovo intervallo solo per chi non ne ha già uno aperto
+  const nuoveRighe = inCampoIds
+    .filter((gid) => !apertiSet.has(gid))
+    .map((gid) => ({
     partita_id: id,
     giocatore_stagione_id: gid,
     entrata_sec: tempoInizioSupplementari,
@@ -1233,8 +1270,29 @@ const inizioSecondoTempoSupplementare = async () => {
     inCampoIds = [...titolari];
   }
 
-  // 2. Crea un nuovo intervallo per tutti i giocatori in campo
-  const nuoveRighe = inCampoIds.map((gid) => ({
+  // 2. Recupera eventuali righe ancora aperte
+  const { data: righeAperte, error: righeAperteErr } = await supabase
+    .from("minuti_giocati")
+    .select("giocatore_stagione_id")
+    .eq("partita_id", id)
+    .is("uscita_sec", null);
+
+  if (righeAperteErr) {
+    console.error(
+      "❌ Errore controllo righe aperte a inizio 2° supplementare:",
+      righeAperteErr.message
+    );
+    return;
+  }
+
+  const apertiSet = new Set(
+    righeAperte?.map((r) => r.giocatore_stagione_id) || []
+  );
+
+  // 3. Crea un nuovo intervallo solo per chi non ne ha già uno aperto
+  const nuoveRighe = inCampoIds
+    .filter((gid) => !apertiSet.has(gid))
+    .map((gid) => ({
     partita_id: id,
     giocatore_stagione_id: gid,
     entrata_sec: tempoInizioSecondoSupplementare,
@@ -1509,7 +1567,12 @@ if (deleteTotaliErr) {
     setMinutiRows([]);
     setMinutiGiocati({});
     setNowSec(0);
-
+// 6️⃣ Azzera sostituzioni
+setSostituzioni([]);
+setUscenteSelezionato(null);
+setEntranteSelezionato(null);
+setHighlightedSubs(new Set());
+setSostituzioniAperte(false);
     console.log("✅ Reset partita completato");
 
   } catch (err) {
@@ -2225,14 +2288,27 @@ const salvaSostituzione = async (uscente: string, entrante: string, _minutoIgnor
       .eq("giocatore_stagione_id", uscente)
       .is("uscita_sec", null);
 
-    // Chi entra → nuova riga nei minuti
-    await supabase.from("minuti_giocati").insert({
-      partita_id: partita.id,
-      giocatore_stagione_id: entrante,
-      entrata_sec: nowSec,
-      uscita_sec: null,
-      run_index: timerState?.run_index ?? 1,
-    });
+          const { data: righeEntranteAperte } = await supabase
+      .from("minuti_giocati")
+      .select("id")
+      .eq("partita_id", partita.id)
+      .eq("giocatore_stagione_id", entrante)
+      .is("uscita_sec", null)
+      .limit(1);
+
+    const rigaEntranteAperta =
+      righeEntranteAperte && righeEntranteAperte.length > 0;
+
+    // Chi entra → nuova riga nei minuti solo se non ne ha già una aperta
+    if (!rigaEntranteAperta) {
+      await supabase.from("minuti_giocati").insert({
+        partita_id: partita.id,
+        giocatore_stagione_id: entrante,
+        entrata_sec: nowSec,
+        uscita_sec: null,
+        run_index: timerState?.run_index ?? 1,
+      });
+    }
 
     // Stato locale minuti
     setMinutiRows((prev) => {
@@ -2242,11 +2318,13 @@ const salvaSostituzione = async (uscente: string, entrante: string, _minutoIgnor
           : r
       );
 
-      updated.push({
-        giocatore_stagione_id: entrante,
-        entrata_sec: nowSec,
-        uscita_sec: null,
-      });
+           if (!rigaEntranteAperta) {
+        updated.push({
+          giocatore_stagione_id: entrante,
+          entrata_sec: nowSec,
+          uscita_sec: null,
+        });
+      }
 
       return updated;
     });
@@ -2268,6 +2346,7 @@ const salvaSostituzione = async (uscente: string, entrante: string, _minutoIgnor
     const senzaUscente = prev.filter((id) => id !== uscente);
     return [...senzaUscente, entrante];
   });
+  
 };
 
 
@@ -3295,7 +3374,7 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
             </div>
           ))}
 
-        {/* PANCHINA */}
+              {/* PANCHINA */}
         <h3 className="text-lg font-bold text-gray-600 mt-4 mb-1">
           A disposizione
         </h3>
@@ -3307,28 +3386,19 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
             <div
               key={gioc!.id}
               onClick={() => {
-  if (uscenteSelezionato) {
-    const minuto = Math.floor(elapsed / 1000);
-    salvaSostituzione(uscenteSelezionato, gioc!.id, minuto);
-
-    // 🔥 EVIDENZIA entrambi
-    setHighlightedSubs(prev => {
-      const nuovo = new Set(prev);
-      nuovo.add(uscenteSelezionato);
-      nuovo.add(gioc!.id);
-      return nuovo;
-    });
-
-    setUscenteSelezionato(null);
-  }
-}}
-
+                if (uscenteSelezionato) {
+                  setEntranteSelezionato((prev) =>
+                    prev === gioc!.id ? null : gioc!.id
+                  );
+                }
+              }}
               className={`cursor-pointer flex items-center justify-between pr-2 border-b py-1 ${
-  highlightedSubs.has(gioc!.id)
-    ? "bg-red-200 font-bold"
-    : "hover:bg-montecarlo-gray-100"
-}`}
-
+                entranteSelezionato === gioc!.id
+                  ? "bg-green-200 font-bold"
+                  : highlightedSubs.has(gioc!.id)
+                    ? "bg-red-200 font-bold"
+                    : "hover:bg-montecarlo-gray-100"
+              }`}
             >
               <span>
                 {(gioc!.cognome || "").trim()} {(gioc!.nome || "").trim()}
@@ -3341,14 +3411,44 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
       </div>
 
       <button
-        onClick={() => {
-  setHighlightedSubs(new Set());
+  onClick={() => {
   setUscenteSelezionato(null);
+  setEntranteSelezionato(null);
   setSostituzioniAperte(false);
 }}
 
         className="w-full bg-red-500 text-white py-2 rounded-lg mt-4"
+
+        
       >
+      <button
+        onClick={async () => {
+          if (!uscenteSelezionato || !entranteSelezionato) return;
+
+          const minuto = Math.floor(elapsed / 1000);
+
+          await salvaSostituzione(
+            uscenteSelezionato,
+            entranteSelezionato,
+            minuto
+          );
+
+          setHighlightedSubs((prev) => {
+            const nuovo = new Set(prev);
+            nuovo.add(uscenteSelezionato);
+            nuovo.add(entranteSelezionato);
+            return nuovo;
+          });
+
+          setUscenteSelezionato(null);
+          setEntranteSelezionato(null);
+        }}
+        disabled={!uscenteSelezionato || !entranteSelezionato}
+        className="w-full bg-green-600 text-white py-2 rounded-lg mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Sostituisci
+      </button>
+
         Chiudi
       </button>
     </div>
