@@ -26,8 +26,8 @@ type Notizia = {
 
 type GiocatoreView = {
   giocatore_uid: string; // <— necessario per filtrare per stagione
-  giocatore_nome: string | null;
-  giocatore_cognome: string | null;
+  nome: string | null;
+  cognome: string | null;
   data_nascita: string | null; // date
   foto_url: string | null;
 };
@@ -78,6 +78,10 @@ type PartitaLite = {
   ospitante_mappa_url?: string | null;
   ospitante_nome_stadio?: string | null;
   ospitante_indirizzo?: string | null;
+    ospitante_lat?: number | null;
+  ospitante_lon?: number | null;
+  casa_lat?: number | null;
+  casa_lon?: number | null;
 };
 
 
@@ -87,16 +91,12 @@ type Marcatore = {
   giocatore_uid: string;
   partita_id: string;
   stagione_id: string;
+  squadra_segnante_id?: string | null;
   nome?: string;
   cognome?: string;
 };
 
-type GiocatoreStagione = {
-  record_id: string;
-  giocatore_uid: string;
-  nome: string;
-  cognome: string;
-};
+
 
 type Stagione = {
   id: string;
@@ -116,9 +116,7 @@ type NewsMarqueeItem = {
 // ========================
 // CONFIG SEZIONE FACEBOOK
 // ========================
-const PAGE_URL: string = "https://www.facebook.com/sansalvatore.calcio/?locale=it_IT";
-const SEARCH_URL =
-  "https://www.facebook.com/search/top?q=montecarlo%20calcio%202018&locale=it_IT";
+
 const MONTECARLO_NAME_INCLUDES = "montecarlo";
 
 // ========================
@@ -329,7 +327,7 @@ const { data: last, error: e2 } = await supabase
   const [loadingMatch, setLoadingMatch] = useState<boolean>(true);
 
   const [marcatoriLive, setMarcatoriLive] = useState<Marcatore[]>([]);
-  const [giocatoriStagione, setGiocatoriStagione] = useState<GiocatoreStagione[]>([]);
+ 
 
   const [perTimeCasa, setPerTimeCasa] = useState<number[]>([0, 0, 0, 0]);
   const [perTimeOspite, setPerTimeOspite] = useState<number[]>([0, 0, 0, 0]);
@@ -610,22 +608,7 @@ const renderNomeMarcatore = (m: Marcatore) => {
   return `${m.cognome} ${m.nome}`.trim();
 };
 
-const fbPluginSrc = useMemo(() => {
-  if (!PAGE_URL) return null;
-  const base = "https://www.facebook.com/plugins/page.php";
-  const params = new URLSearchParams({
-    href: PAGE_URL,
-    tabs: "timeline",
-    width: "100%",                // ⬅️ responsive
-    height: "560",
-    small_header: "true",
-    adapt_container_width: "true", // ⬅️ lascia attivo
-    hide_cover: "true",
-    show_facepile: "false",
-    appId: "",
-  });
-  return `${base}?${params.toString()}`;
-}, []);
+
 
 
   // --------------------------------

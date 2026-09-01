@@ -464,7 +464,7 @@ const canCreator = role === UserRole.Creator;
         {(matchDetail || matchDetailAlt) && (canAdmin || canCreator) && (
           <>
             <button
-              onClick={() => navigate(`/modifica-partita-giocata/${matchDetail.params.id}`)}
+              onClick={() => navigate(`/modifica-partita-giocata/${(matchDetail || matchDetailAlt)!.params.id}`)}
               aria-label="Modifica Partita Giocata"
               className="mx-2 hover:scale-105 transition"
             >

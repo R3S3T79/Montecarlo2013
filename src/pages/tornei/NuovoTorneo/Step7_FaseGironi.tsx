@@ -76,7 +76,7 @@ export default function Step7_FaseGironi() {
   useEffect(() => {
     if (!torneoId) return;
     supabase
-      .from<Fase>("fasi_torneo")
+      .from("fasi_torneo")
       .select("id,tipo_fase")
       .eq("torneo_id", torneoId)
       .then(({ data, error }) => {
@@ -128,7 +128,7 @@ const creaSecondaFase = useCallback(async () => {
 
   // Recupera partite della fase precedente
   const { data: raw } = await supabase
-    .from<PartitaRaw>("tornei_fasegironi")
+    .from("tornei_fasegironi")
     .select(`
       girone, giocata,
       squadra_casa(id,nome),
@@ -149,8 +149,8 @@ const creaSecondaFase = useCallback(async () => {
   raw.forEach((m) => {
     const gir = m.girone;
     if (!statsByGroup[gir]) statsByGroup[gir] = {};
-    const h = m.squadra_casa!;
-    const a = m.squadra_ospite!;
+    const h = Array.isArray(m.squadra_casa) ? m.squadra_casa[0] : m.squadra_casa;
+const a = Array.isArray(m.squadra_ospite) ? m.squadra_ospite[0] : m.squadra_ospite;
     [h, a].forEach((s) => {
       if (!statsByGroup[gir][s.id]) {
         statsByGroup[gir][s.id] = { id: s.id, nome: s.nome, GF: 0, GS: 0, Pt: 0 };
@@ -256,7 +256,7 @@ const creaSecondaFase = useCallback(async () => {
     if (!torneoId || !faseId) return;
     setLoading(true);
     supabase
-      .from<PartitaRaw>("tornei_fasegironi")
+      .from("tornei_fasegironi")
       .select(
         `id,girone,match_number,
          gol_casa,gol_ospite,rigori_vincitore,
@@ -270,7 +270,13 @@ const creaSecondaFase = useCallback(async () => {
       .order("match_number", { ascending: true })
       .then(({ data, error }) => {
         if (error) console.error(error);
-        else setPartite(data || []);
+        else setPartite(
+  (data || []).map((p) => ({
+    ...p,
+    squadra_casa: Array.isArray(p.squadra_casa) ? p.squadra_casa[0] : p.squadra_casa,
+    squadra_ospite: Array.isArray(p.squadra_ospite) ? p.squadra_ospite[0] : p.squadra_ospite,
+  }))
+);
         setLoading(false);
       });
   }, [torneoId, groupPhaseId, secondPhaseId, location.key]);

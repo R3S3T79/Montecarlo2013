@@ -1,11 +1,10 @@
 // Data creazione chat: 2025-07-30
 // src/pages/ListaSquadre.tsx
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { UserRole } from '../lib/roles';
 
 interface Squadra {
   id: string;
@@ -20,18 +19,13 @@ export default function ListaSquadre() {
   const [squadre, setSquadre] = useState<Squadra[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+ const { loading: authLoading } = useAuth();
 
-  // Ruolo non più necessario per il + interno
-  const role =
-    (user?.user_metadata?.role as UserRole) ||
-    (user?.app_metadata?.role as UserRole) ||
-    UserRole.Authenticated;
-
+  
   useEffect(() => {
     const fetchSquadre = async () => {
      const { data, error } = await supabase
-  .from<Squadra>('squadre')
+  .from("squadre")
   .select('*')
   .eq('visibile', true)       // 👈 mostra solo squadre visibili
   .order('nome');

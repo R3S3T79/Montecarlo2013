@@ -183,8 +183,8 @@ export default function Bracket({ teams, matches, onEditResult }: BracketProps) 
                   const name1 = teamCasa?.nome || (parents[0]?.displayLabel ? `Vincente ${parents[0].displayLabel}` : "");
                   const name2 = teamOspite?.nome || (parents[1]?.displayLabel ? `Vincente ${parents[1].displayLabel}` : "");
 
-                  const dot1 = m.goal_casa === m.goal_ospite && m.rigori_vincitore === m.squadra_casa_id ? "." : "";
-                  const dot2 = m.goal_casa === m.goal_ospite && m.rigori_vincitore === m.squadra_ospite_id ? "." : "";
+                  const dot1 = m.gol_casa === m.gol_ospite && m.rigori_vincitore === m.squadra_casa_id ? "." : "";
+                  const dot2 = m.gol_casa === m.gol_ospite && m.rigori_vincitore === m.squadra_ospite_id ? "." : "";
 
                   return (
                     <g
@@ -208,7 +208,7 @@ export default function Bracket({ teams, matches, onEditResult }: BracketProps) 
                         {name1}
                       </text>
                       <text x={BOX_W - 8} y={46} textAnchor="end" className="text-base font-bold text-blue-600">
-                        {m.goal_casa}{dot1}
+                        {m.gol_casa}{dot1}
                       </text>
 
                       {teamOspite?.logo_url && (
@@ -218,7 +218,7 @@ export default function Bracket({ teams, matches, onEditResult }: BracketProps) 
                         {name2}
                       </text>
                       <text x={BOX_W - 8} y={72} textAnchor="end" className="text-base font-bold text-blue-600">
-                        {m.goal_ospite}{dot2}
+                        {m.gol_ospite}{dot2}
                       </text>
                     </g>
                   );
@@ -229,8 +229,8 @@ export default function Bracket({ teams, matches, onEditResult }: BracketProps) 
             {/* LOGO VINCITORE */}
             {(() => {
               const last = rounds[rounds.length - 1][0];
-              if (!last || !last.winner_id) return null;
-              const winner = getTeam(teams, last.winner_id);
+              if (!last || !last.vincitore_id) return null;
+const winner = getTeam(teams, last.vincitore_id);
               if (!winner?.logo_url) return null;
               const top = getTop(last.id, rounds.length - 1);
               const left = (rounds.length - 1) * COL_W + BOX_W + 10;

@@ -64,7 +64,7 @@ export default function Step6_FaseGironi() {
   useEffect(() => {
     if (!torneoId) return;
     supabase
-      .from<Fase>("fasi_torneo")
+      .from("fasi_torneo")
       .select("id,tipo_fase")
       .eq("torneo_id", torneoId)
       .in("tipo_fase", ["multi_gironi", "gironi"])
@@ -114,7 +114,7 @@ useEffect(() => {
   if (!torneoId || !groupPhaseId) return;
   setLoading(true);
   supabase
-    .from<Partita>("tornei_fasegironi")
+    .from("tornei_fasegironi")
     .select(`
       id,girone,match_number,
       gol_casa,gol_ospite,rigori_vincitore,
@@ -141,7 +141,15 @@ useEffect(() => {
               }
             : m;
         });
-        setPartite(adjusted);
+        setPartite(adjusted.map((m) => ({
+          ...m,
+          squadra_casa: Array.isArray(m.squadra_casa)
+            ? m.squadra_casa[0] ?? null
+            : m.squadra_casa,
+          squadra_ospite: Array.isArray(m.squadra_ospite)
+            ? m.squadra_ospite[0] ?? null
+            : m.squadra_ospite,
+        })));
       }
       setLoading(false);
     });

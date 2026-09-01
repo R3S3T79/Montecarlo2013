@@ -1,7 +1,7 @@
 // src/pages/Risultati.tsx
 // Data creazione chat: 2025-08-01 (rev: layout testata 2 righe + giorno maiuscolo + sticky filtro + scroll restore fix + anchor restore)
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -10,6 +10,9 @@ import type { Partita } from "../types/database";
 interface PartitaWithTeams extends Partita {
   casa: { nome: string };
   ospite: { nome: string };
+  nome_torneo: string | null;
+  rigori_a: number | null;
+  rigori_b: number | null;
 }
 
 interface Stagione {
@@ -30,11 +33,8 @@ export default function Risultati() {
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const role =
-    (user?.user_metadata?.role as string) ||
-    (user?.app_metadata?.role as string) ||
-    null;
-  const canAddPartita = role === "admin" || role === "creator";
+ 
+ 
 
   useEffect(() => {
     if (!loading && !user) {

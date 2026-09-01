@@ -18,7 +18,7 @@ interface TimerState {
   timer_started_at: string | null;
   timer_offset_ms: number;
   timer_status: "running" | "paused" | "stopped";
-  timer_duration_min?: number;
+  timer_duration_min: number;
   run_index: number;
   total_elapsed_sec: number;
 }
@@ -62,6 +62,8 @@ export default function GestioneRisultatoPartita() {
   >([]);
   const [uscenteSelezionato, setUscenteSelezionato] = useState<string | null>(null);
   const [entranteSelezionato, setEntranteSelezionato] = useState<string | null>(null);
+  const [ordineUsciti, setOrdineUsciti] = useState<string[]>([]);
+  const [ordineEntrati, setOrdineEntrati] = useState<string[]>([]);
 
   // minuti giocati calcolati (secondi)
   const [minutiGiocati, setMinutiGiocati] = useState<Record<string, number>>({});
@@ -568,6 +570,7 @@ const startTimer = async () => {
     timer_started_at: now,
 timer_status: "running",
 timer_offset_ms: prev?.timer_offset_ms || 0,
+total_elapsed_sec: prev?.total_elapsed_sec ?? 0,
 
 run_index:
   (prev?.run_index ?? 0) === 0
@@ -594,12 +597,16 @@ const pauseTimer = async () => {
     })
     .eq("partita_id", id);
 
-  setTimerState((prev) => ({
-    ...(prev || {}),
-    timer_offset_ms: (prev?.timer_offset_ms || 0) + diff,
+ setTimerState((prev) => {
+  if (!prev) return prev;
+
+  return {
+    ...prev,
+    timer_offset_ms: prev.timer_offset_ms + diff,
     timer_started_at: null,
     timer_status: "paused",
-  }));
+  };
+});
 };
 
 // Fine 1° tempo → Intervallo
@@ -805,7 +812,7 @@ const inizioSecondoTempo = async () => {
 // Fine tempi regolamentari
 // =====================
 const fineTempiRegolamentari = async () => {
-  if (!id) return;
+  if (!id || !timerState) return;
 
   // Tempo effettivamente giocato nel 2° tempo
   const tempoSecondoTempo = Math.floor(
@@ -1550,15 +1557,20 @@ if (deleteTotaliErr) {
       return;
     }
 
-    // 3️⃣ Stato locale timer
-    setTimerState((prev) => ({
-      ...(prev || {}),
-      timer_offset_ms: 0,
-      timer_started_at: null,
-      timer_status: "stopped",
-      run_index: 0,
-      total_elapsed_sec: 0,
-    }));
+   // 3️⃣ Stato locale timer
+
+setTimerState((prev) => {
+  if (!prev) return prev;
+
+  return {
+    ...prev,
+    timer_offset_ms: 0,
+    timer_started_at: null,
+    timer_status: "stopped",
+    run_index: 0,
+    total_elapsed_sec: 0,
+  };
+});
 
     // 4️⃣ Azzera cronometro
     setElapsed(0);
@@ -1571,8 +1583,11 @@ if (deleteTotaliErr) {
 setSostituzioni([]);
 setUscenteSelezionato(null);
 setEntranteSelezionato(null);
+setOrdineUsciti([]);
+setOrdineEntrati([]);
 setHighlightedSubs(new Set());
 setSostituzioniAperte(false);
+
     console.log("✅ Reset partita completato");
 
   } catch (err) {
@@ -1601,15 +1616,19 @@ const changeDuration = async (minutes: number) => {
     return;
   }
 
-  setTimerState((prev) => ({
-    ...(prev || {}),
+ setTimerState((prev) => {
+  if (!prev) return prev;
+
+  return {
+    ...prev,
     timer_duration_min: minutes,
     timer_offset_ms: 0,
     timer_started_at: null,
     timer_status: "stopped",
     run_index: 0,
     total_elapsed_sec: 0,
-  }));
+  };
+});
 
   setElapsed(0);
 };
@@ -2346,6 +2365,16 @@ const salvaSostituzione = async (uscente: string, entrante: string, _minutoIgnor
     const senzaUscente = prev.filter((id) => id !== uscente);
     return [...senzaUscente, entrante];
   });
+
+  setOrdineUsciti((prev) => [
+  ...prev.filter((id) => id !== uscente),
+  uscente,
+]);
+
+setOrdineEntrati((prev) => [
+  ...prev.filter((id) => id !== entrante),
+  entrante,
+]);
   
 };
 
@@ -3345,8 +3374,11 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
         <h3 className="text-lg font-bold text-montecarlo-secondary mt-2 mb-1">
           Schierati
         </h3>
-        {[...titolari]
-          .map((tid) => giocatori.find((g) => g.id === tid))
+        {[
+  ...titolari.filter((tid) => !ordineEntrati.includes(tid)),
+  ...ordineEntrati.filter((tid) => titolari.includes(tid)),
+]
+  .map((tid) => giocatori.find((g) => g.id === tid))
           .filter(Boolean)
           .map((gioc) => (
             <div
@@ -3378,9 +3410,15 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
         <h3 className="text-lg font-bold text-gray-600 mt-4 mb-1">
           A disposizione
         </h3>
-        {convocati
-          .filter((cid) => !titolari.includes(cid))
-          .map((cid) => giocatori.find((g) => g.id === cid))
+        {[
+  ...convocati.filter(
+    (cid) => !titolari.includes(cid) && !ordineUsciti.includes(cid)
+  ),
+  ...ordineUsciti.filter(
+    (cid) => convocati.includes(cid) && !titolari.includes(cid)
+  ),
+]
+  .map((cid) => giocatori.find((g) => g.id === cid))
           .filter(Boolean)
           .map((gioc) => (
             <div

@@ -23,8 +23,8 @@ interface PartitaDaGestire {
   goal_a: number;
   goal_b: number;
   // Eventuali altri campi
-  casa: SquadraMin;
-  ospite: SquadraMin;
+  casa: SquadraMin[];
+ospite: SquadraMin[];
 }
 
 export default function MatchHandler() {
@@ -46,7 +46,7 @@ export default function MatchHandler() {
 
       try {
         const { data, error } = await supabase
-          .from<PartitaDaGestire>("partite")
+          .from("partite")
           .select(`
             id,
             data_ora,
@@ -58,8 +58,8 @@ export default function MatchHandler() {
             luogo_torneo,
             goal_a,
             goal_b,
-            casa:squadra_casa_id(nome, logo_url),
-            ospite:squadra_ospite_id(nome, logo_url)
+            casa:squadra_casa_id(id, nome, logo_url),
+ospite:squadra_ospite_id(id, nome, logo_url)
           `)
           .eq("id", id)
           .single();
@@ -98,7 +98,7 @@ export default function MatchHandler() {
 
   return (
     <div className="p-4">
-      <GestioneRisultatoPartita partita={partita} />
+      <GestioneRisultatoPartita />
     </div>
   );
 }

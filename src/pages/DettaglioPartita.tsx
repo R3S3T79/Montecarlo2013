@@ -2,7 +2,7 @@
 // Data creazione chat: 2025-08-03 
 // rev3: aggiunto editor Rich Text (ReactQuill) per il campo commento, editabile da Admin/Creator
 
-import React, { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import html2canvas from 'html2canvas'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
@@ -68,7 +68,7 @@ export default function DettaglioPartita() {
   const [commento, setCommento] = useState<string>('')
 
 const [role, setRole] = useState<string | null>(null);
-const [roleLoading, setRoleLoading] = useState(true);
+const [, setRoleLoading] = useState(true);
 
 useEffect(() => {
   (async () => {

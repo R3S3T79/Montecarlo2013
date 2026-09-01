@@ -1,7 +1,7 @@
 // src/pages/UserProfile.tsx
 // Data creazione chat: 05/08/2025 (rev: allineamento tabelle + cambio password)
 
-import React, { useEffect, useState, ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 

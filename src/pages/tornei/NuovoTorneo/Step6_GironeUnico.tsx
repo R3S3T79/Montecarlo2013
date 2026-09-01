@@ -54,7 +54,7 @@ export default function Step6_GironeUnico() {
       if (tData?.nome_torneo) setTorneoNome(tData.nome_torneo);
 
       const { data: partiteData } = await supabase
-        .from<Partita>("tornei_gironeunico")
+        .from("tornei_gironeunico")
         .select(
           "id, squadra_casa, squadra_ospite, gol_casa, gol_ospite, data_match, giocata, rigori_vincitore"
         )
@@ -72,7 +72,7 @@ export default function Step6_GironeUnico() {
         new Set(ordered.flatMap((m) => [m.squadra_casa, m.squadra_ospite]))
       );
       const { data: sData } = await supabase
-        .from<Squadra>("squadre")
+        .from("squadre")
         .select("id, nome, logo_url")
         .in("id", ids);
       setSquadreMap(Object.fromEntries((sData || []).map((s) => [s.id, s])));

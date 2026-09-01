@@ -33,7 +33,7 @@ export default function Step6_Eliminazione() {
 
         // Carica squadre
         const { data: sq, error: sqErr } = await supabase
-          .from<Team>("squadre")
+          .from("squadre")
           .select("id, nome, logo_url");
         if (sqErr) console.error("❌ Errore squadre:", sqErr);
         else console.log("✅ Squadre caricate:", sq?.length);
@@ -65,14 +65,19 @@ export default function Step6_Eliminazione() {
 
         const formatted: MatchData[] = uniq.map(m => ({
           id: m.id,
+          torneo_id: torneoId,
+          round_number: m.round_number,
+          fase_torneo: "",
           squadra_casa_id: m.squadra_casa,
           squadra_ospite_id: m.squadra_ospite,
           data_ora: m.data_match,
           ordine_fase: m.round_number,
           match_number: m.match_number,
-          winner_id: m.vincitore,
-          goal_casa: m.gol_casa ?? 0,
-          goal_ospite: m.gol_ospite ?? 0,
+          vincitore_id: m.vincitore,
+          rigori_vincitore: null,
+          lettera: null,
+          gol_casa: m.gol_casa ?? 0,
+          gol_ospite: m.gol_ospite ?? 0,
           next_match_id: m.next_match_id,
         }));
         console.log("✅ Match formattati:", formatted.length);

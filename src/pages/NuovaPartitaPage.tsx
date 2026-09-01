@@ -85,10 +85,7 @@ if (!error && gs) {
   const isMCcasa = formData.squadra_casa_id === MONTE_ID;
 
   // nomi estesi
-  const MC_NAME = useMemo(
-    () => squadre.find(s => s.id === MONTE_ID)?.nome || 'Montecarlo',
-    [squadre]
-  );
+ 
   const homeName = useMemo(
     () => squadre.find(s => s.id === formData.squadra_casa_id)?.nome || '',
     [squadre, formData.squadra_casa_id]

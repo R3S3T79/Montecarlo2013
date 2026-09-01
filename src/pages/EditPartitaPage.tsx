@@ -1,7 +1,7 @@
 // src/pages/EditPartitaPage.tsx
 // Data creazione chat: 2025-07-26 (rev: aggiunta gestione convocati con toggle seleziona/deseleziona tutti)
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 
@@ -272,7 +272,7 @@ export default function EditPartitaPage() {
 
           {['Torneo', 'Amichevole', 'Allenamento'].includes(formData.campionato_torneo) && (
             <select
-              value={formData.squadra_ospitante_id}
+              value={formData.squadra_ospitante_id ?? ''}
               onChange={e =>
                 setFormData({ ...formData, squadra_ospitante_id: e.target.value })
               }
@@ -290,7 +290,7 @@ export default function EditPartitaPage() {
           <input
             type="text"
             placeholder="Luogo (opzionale)"
-            value={formData.luogo_torneo}
+            value={formData.luogo_torneo ?? ''}
             onChange={e =>
               setFormData({ ...formData, luogo_torneo: e.target.value })
             }

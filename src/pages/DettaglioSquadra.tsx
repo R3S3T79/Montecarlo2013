@@ -1,9 +1,9 @@
 // src/pages/DettaglioSquadra.tsx
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
-import { Trash2, ArrowLeft } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface Squadra {
@@ -30,7 +30,7 @@ export default function DettaglioSquadra(): JSX.Element {
     (async () => {
       setLoading(true);
       const { data, error } = await supabase
-        .from<Squadra>('squadre')
+        .from('squadre')
         .select('*')
         .eq('id', id)
         .single();
@@ -73,7 +73,7 @@ export default function DettaglioSquadra(): JSX.Element {
         >
           
         </button>
-        {(user?.ruolo === 'admin' || user?.ruolo === 'creator') && (
+        {(user?.user_metadata?.role === 'admin' || user?.user_metadata?.role === 'creator') && (
           <button
             onClick={handleDelete}
             className="flex items-center text-red-600 hover:text-red-800"
