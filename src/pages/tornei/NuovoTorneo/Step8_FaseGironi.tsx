@@ -47,7 +47,7 @@ export default function Step8_FaseGironi() {
   useEffect(() => {
     if (!torneoId) return;
     supabase
-      .from<{ id: string }>("fasi_torneo")
+      .from("fasi_torneo")
       .select("id")
       .eq("torneo_id", torneoId)
       .eq("tipo_fase", "eliminazione")
@@ -62,7 +62,7 @@ export default function Step8_FaseGironi() {
     if (!torneoId || !elimPhaseId) return;
     setLoading(true);
     supabase
-      .from<PartitaRaw>("tornei_fasegironi")
+      .from("tornei_fasegironi")
       .select(`
         id,match_number,giocata,
         gol_casa,gol_ospite,rigori_vincitore,
@@ -74,16 +74,22 @@ export default function Step8_FaseGironi() {
       .order("match_number", { ascending: true })
       .then(({ data }) => {
         const matches = data || [];
-        setElimMatches(matches);
+        setElimMatches(
+  matches.map((m) => ({
+    ...m,
+    squadra_casa: Array.isArray(m.squadra_casa) ? m.squadra_casa[0] : m.squadra_casa,
+    squadra_ospite: Array.isArray(m.squadra_ospite) ? m.squadra_ospite[0] : m.squadra_ospite,
+  }))
+);
 
         // classifica finale in base al numero match
         const entries: ClassificaEntry[] = [];
         matches.forEach((m) => {
           if (!m.giocata || !m.squadra_casa || !m.squadra_ospite) return;
-          const casa = m.squadra_casa,
-            ospite = m.squadra_ospite;
-          const cGol = m.gol_casa!,
-            oGol = m.gol_ospite!;
+          const casa = Array.isArray(m.squadra_casa) ? m.squadra_casa[0] : m.squadra_casa,
+      ospite = Array.isArray(m.squadra_ospite) ? m.squadra_ospite[0] : m.squadra_ospite,
+      cGol = m.gol_casa!,
+      oGol = m.gol_ospite!;
           let vincitore = casa,
             perdente = ospite;
           if (cGol > oGol) {

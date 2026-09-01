@@ -10,18 +10,6 @@ interface Stagione {
   stagione_nome: string;
 }
 
-interface GiocatoreView {
-  giocatore_stagione_id: string;
-  giocatore_uid: string;
-  stagione_id: string;
-  stagione_nome: string;
-  nome: string;
-  cognome: string;
-  data_nascita: string | null;
-  ruolo: string | null;
-  numero_cartellino: number | null;
-  foto_url: string | null;
-}
 
 export default function EditGiocatore() {
   const { id } = useParams<{ id: string }>();
@@ -62,7 +50,7 @@ export default function EditGiocatore() {
 
     (async () => {
       const { data, error } = await supabase
-        .from<GiocatoreView>('v_giocatori_completo')
+        .from('v_giocatori_completo')
         .select('*')
         .eq('giocatore_uid', id)
         .order('stagione_id', { ascending: false });

@@ -2,7 +2,7 @@
 // Data: 15/11/2025 — versione corretta: aggiornamento classifica sempre via Netlify Function (anche in locale)
 // REV: 12/04/2026 — aggiunti dropdown stagione + fase
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext";
 import { UserRole } from "../lib/roles";
@@ -27,7 +27,7 @@ export default function Classifica(): JSX.Element {
   const { user } = useAuth();
   const [righe, setRighe] = useState<RigaClassifica[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errore, setErrore] = useState<string | null>(null);
+  const [, setErrore] = useState<string | null>(null);
   const [role, setRole] = useState<UserRole>(UserRole.Authenticated);
 
   const [stagioni, setStagioni] = useState<any[]>([]);

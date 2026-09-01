@@ -1,7 +1,7 @@
 // src/pages/DettaglioScontri.tsx
 // Data: 15/11/2025 — Rev12: compatibile Real Calendar Mode + fix date + nomi originali
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 

@@ -1,6 +1,6 @@
 // src/pages/EditSquadra.tsx
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { Save, X } from 'lucide-react';
@@ -44,7 +44,7 @@ export default function EditSquadra(): JSX.Element {
     (async () => {
       setLoading(true);
       const { data, error } = await supabase
-        .from<Squadra>('squadre')
+        .from('squadre')
         .select('*')
         .eq('id', id)
         .single();

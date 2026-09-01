@@ -28,6 +28,8 @@ export interface MatchData {
   match_number: number;
   /** Nome della fase, es. "Ottavi di Finale", "Quarti di Finale", etc. */
   fase_torneo: string;
+    /** Ordine della fase nel torneo */
+  ordine_fase?: number | null;
   /** UUID della squadra di casa, o null se non ancora definita */
   squadra_casa_id: string | null;
   /** UUID della squadra ospite, o null se non ancora definita */

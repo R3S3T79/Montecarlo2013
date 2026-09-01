@@ -1,7 +1,7 @@
 // src/pages/GraficoAndamentoClassifica.tsx
 // Data: 15/11/2025 — Rev4: nomi reali, stemmi, lista squadre a colonne, sfondo grafico più chiaro
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { Line } from "react-chartjs-2";
 import {
@@ -34,7 +34,9 @@ interface RecordClassifica {
 
 export default function GraficoAndamentoClassifica() {
   const [records, setRecords] = useState<RecordClassifica[]>([]);
-  const [squadre, setSquadre] = useState<RecordClassifica[]>([]);
+  const [squadre, setSquadre] = useState<
+  Pick<RecordClassifica, "squadra" | "logo_url">[]
+>([]);
   const [selezionate, setSelezionate] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -201,7 +203,7 @@ const conLogo = andamento.map((r) => {
         display: true,
         text: "Andamento in Classifica",
         color: "#fff",
-        font: { size: 20, weight: "bold" },
+        font: { size: 20, weight: "bold" as const },
       },
     },
     scales: {

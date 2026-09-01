@@ -1,7 +1,7 @@
 // src/pages/Convocazioni.tsx
 // Data creazione: 11/09/2025 (rev: gestione torneo multi-avversarie + input più visibili)
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 import { supabase } from "../lib/supabaseClient";
 import html2canvas from "html2canvas";
 
@@ -156,9 +156,7 @@ useEffect(() => {
     return `${g} ${gg}/${mm}/${aa}`;
   };
 
-  const handleCheckbox = (id: string) => {
-    setConvocati((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
+  
 
   const toggleAll = () => {
   if (convocati.length === giocatori.length) {

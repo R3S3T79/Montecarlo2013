@@ -55,8 +55,11 @@ export default function EditFaseGironiPartita() {
         setLoading(false);
         return;
       }
-      setPartita(data);
-      setScoreCasa(data.gol_casa ?? 0);
+      setPartita({
+  ...data,
+  squadra_casa: data.squadra_casa[0],
+  squadra_ospite: data.squadra_ospite[0],
+});
       setScoreOspite(data.gol_ospite ?? 0);
       setRigoriVincitore(data.rigori_vincitore);
       setDataOra(data.data_match ? data.data_match.slice(0, 16) : '');

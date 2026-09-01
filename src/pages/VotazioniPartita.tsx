@@ -5,7 +5,7 @@
 // =======================================
 // 1. Import
 // =======================================
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext";
@@ -42,7 +42,7 @@ export default function VotazioniPartita(): JSX.Element {
   const [errore, setErrore] = useState<string | null>(null);
 
   const [statoPartita, setStatoPartita] = useState<string | null>(null);
-  const [stagioneId, setStagioneId] = useState<string | null>(null);
+  const [, setStagioneId] = useState<string | null>(null);
   const [convocati, setConvocati] = useState<Convocato[]>([]);
   const [voti, setVoti] = useState<Record<string, number>>({});
   const [doppieMedie, setDoppieMedie] = useState<
@@ -207,11 +207,11 @@ if (ruolo === "admin") {
     setVoti((prev) => ({ ...prev, [giocatoreId]: v }));
   };
 
-  const onSalva = async () => {
-    
+ const onSalva = async () => {
+    if (!user) return;
+
     setErrore(null);
     setSalvando(true);
-
     try {
       const payload = convocati
   .filter((g) => typeof voti[g.giocatore_uid] === "number")

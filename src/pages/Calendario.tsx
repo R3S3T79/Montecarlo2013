@@ -2,7 +2,7 @@
 // src/pages/Calendario.tsx
 // Basato sul file originale con aggiunta di campionato_torneo, nome_torneo e modifica header cellule 
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -21,13 +21,10 @@ export default function Calendario(): JSX.Element {
   const [partite, setPartite] = useState<Partita[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { loading: authLoading } = useAuth();
 
-  const role =
-    (user?.user_metadata?.role as UserRole) ||
-    (user?.app_metadata?.role as UserRole) ||
-    UserRole.Authenticated;
-  const canAdd = role === UserRole.Admin || role === UserRole.Creator;
+  
+ 
 
   useEffect(() => {
     async function fetchPartite() {
@@ -45,7 +42,13 @@ export default function Calendario(): JSX.Element {
         .order('data_ora', { ascending: true });
 
       if (error) console.error('Errore fetch partite:', error);
-      else setPartite(data ?? []);
+      else setPartite(
+  (data ?? []).map((p) => ({
+    ...p,
+    casa: Array.isArray(p.casa) ? p.casa[0] : p.casa,
+    ospite: Array.isArray(p.ospite) ? p.ospite[0] : p.ospite,
+  }))
+);
       setLoading(false);
     }
     fetchPartite();

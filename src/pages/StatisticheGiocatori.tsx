@@ -1,12 +1,12 @@
 // src/pages/StatisticheGiocatori.tsx
 // Data creazione chat: 18/08/2025 (rev: doppia colonna Media Voti Utenti + Mister)
 
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { useAuth } from '../context/AuthContext';
-import { UserRole } from '../lib/roles';
+
 
 
 interface Stagione {
@@ -35,7 +35,7 @@ interface Statistica {
 export default function StatisticheGiocatori(): JSX.Element {
   const navigate = useNavigate();
   const { user } = useAuth();
-const [role, setRole] = useState<string | null>(null);
+const [, setRole] = useState<string | null>(null);
 
 useEffect(() => {
   if (!user) return;
@@ -47,8 +47,10 @@ useEffect(() => {
       .eq('user_id', user.id)
       .single();
 
-    if (!error && data) setRole(data.role);
-    console.log("[StatisticheGiocatori] Ruolo utente:", data.role);
+    if (!error && data) {
+  setRole(data.role);
+  console.log("[StatisticheGiocatori] Ruolo utente:", data.role);
+}
   })();
 }, [user]);
 

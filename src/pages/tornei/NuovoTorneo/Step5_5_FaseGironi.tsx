@@ -1,5 +1,5 @@
 // src/pages/tornei/NuovoTorneo/Step5_5_FaseGironi.tsx
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabaseClient';
 import { ArrowLeftRight } from 'lucide-react';

@@ -17,13 +17,13 @@ interface FormazioneGiocatore {
   giocatore_stagione_id: string;
   posizione_x: number | null;
   posizione_y: number | null;
-  giocatori_stagioni_view: {
+    giocatori_stagioni_view: {
     id: string;
     nome: string | null;
     cognome: string | null;
     ruolo: string | null;
     foto_url: string | null;
-  } | null;
+  }[];
 }
 
 interface SlotPos {
@@ -472,7 +472,7 @@ const occupante = formazione.find(
 
 if (occupante) {
   const occupantePortiere =
-    occupante.giocatori_stagioni_view?.ruolo?.toLowerCase() === "portiere";
+  occupante.giocatori_stagioni_view?.[0]?.ruolo?.toLowerCase() === "portiere";
 
   // Se lo slot è occupato dal portiere, annulla lo spostamento
   if (occupantePortiere) {
@@ -494,13 +494,13 @@ aggiornaPosizione(g.id, closest.x, closest.y);
 
                   <img
                     src={
-                      g.giocatori_stagioni_view?.foto_url || "/placeholder.png"
+                      g.giocatori_stagioni_view?.[0]?.foto_url || "/placeholder.png"
                     }
-                    alt={g.giocatori_stagioni_view?.nome || "Giocatore"}
+                    alt={g.giocatori_stagioni_view?.[0]?.nome || "Giocatore"}
                     className="w-10 h-10 rounded-full border-2 border-white shadow-md bg-montecarlo-secondary/40"
                   />
                   <div className="text-xs text-center mt-1 text-white font-bold drop-shadow">
-                    {g.giocatori_stagioni_view?.cognome || "Gioc"}
+                    {g.giocatori_stagioni_view?.[0]?.cognome || "Gioc"}
                   </div>
                 </div>
               </Draggable>

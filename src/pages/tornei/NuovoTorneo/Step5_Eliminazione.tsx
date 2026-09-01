@@ -1,5 +1,5 @@
 // src/pages/tornei/NuovoTorneo/Step5_Eliminazione.tsx
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../../lib/supabaseClient';
 import { v4 as uuidv4 } from 'uuid';

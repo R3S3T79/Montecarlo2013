@@ -1,5 +1,5 @@
 // src/pages/tornei/NuovoTorneo/Step4_FaseGironi.tsx
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../../lib/supabaseClient';
 

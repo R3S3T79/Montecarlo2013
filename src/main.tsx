@@ -111,7 +111,7 @@ function ServiceWorkerManager() {
             logSW("App pronta per uso offline");
           },
 
-          onRegistered(registration) {
+          onRegistered(registration: ServiceWorkerRegistration) {
             if (registration) {
               logSW("Service Worker registrato con scope:", registration.scope);
 
@@ -140,7 +140,7 @@ function ServiceWorkerManager() {
             }
           },
 
-          onRegisterError(error) {
+          onRegisterError(error: Error) {
             logSW("❌ Errore nella registrazione SW:", error);
           },
         });

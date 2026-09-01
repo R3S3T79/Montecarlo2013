@@ -1,11 +1,10 @@
 // src/pages/RosaGiocatori.tsx
 // Data creazione chat: 2025-08-14 (rev: passaggio stagione a DettaglioGiocatore)
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { UserRole } from '../lib/roles';
+
 
 interface Giocatore {
   giocatore_uid: string;
@@ -28,13 +27,8 @@ export default function RosaGiocatori(): JSX.Element {
   const [stagioneSelezionata, setStagioneSelezionata] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const navigate = useNavigate();
-  const { user } = useAuth();
-
-  const canEdit =
-    user?.app_metadata?.role === UserRole.Admin ||
-    user?.app_metadata?.role === UserRole.Creator ||
-    user?.user_metadata?.role === UserRole.Admin ||
-    user?.user_metadata?.role === UserRole.Creator;
+  
+ 
 
   // Carica stagioni e imposta quella corrente di default
   useEffect(() => {

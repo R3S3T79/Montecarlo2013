@@ -1,7 +1,7 @@
 // src/pages/DettaglioGiocatore.tsx
 // Data creazione chat: 14/08/2025 (rev: aggiunto campo Goal Subiti per portieri + medie voti utenti/mister + minuti giocati totali)
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
@@ -16,7 +16,8 @@ interface Giocatore {
   cognome: string;
   ruolo: string | null;
   foto_url: string | null;
-  data_nascita: string | null;
+video_url: string | null;
+data_nascita: string | null;
   numero_cartellino: number | null;
 }
 
@@ -194,7 +195,7 @@ gialliTotali =
 
 rossiTotali =
   cartellini?.filter((c) => c.tipo?.toLowerCase() === 'rosso').length ?? 0;
-    }
+    
 
     const { data: rigoriPortiere } = await supabase
   .from('rigori_partita')
@@ -223,6 +224,7 @@ rigoriSbagliati =
   rigori?.filter((r) => r.esito === 'sbagliato').length ?? 0;
 
 rigoriTirati = rigoriSegnati + rigoriSbagliati;
+}
 
 // 🔹 Allenamenti fatti e saltati
 let fatti = 0;
@@ -459,8 +461,10 @@ if (recordStagione) {
           setStagioniDisponibili(stagioniUniche);
 
           // 🔹 priorità: stagione passata da navigate → ultima stagione disponibile
-          if (location.state?.stagioneId && stagioniUniche.find(s => s.id === location.state.stagioneId)) {
-            setStagioneSelezionata(location.state.stagioneId);
+          const stagioneIdDaState = location.state?.stagioneId;
+
+if (stagioneIdDaState && stagioniUniche.find(s => s.id === stagioneIdDaState)) {
+  setStagioneSelezionata(stagioneIdDaState);
           } else if (stagioniUniche.length > 0) {
             setStagioneSelezionata(stagioniUniche[stagioniUniche.length - 1].id);
           }
@@ -564,7 +568,7 @@ if (recordStagione) {
   {giocatore.data_nascita && (
     <div className="text-sm text-black mb-2">
       <span className="font-semibold">Data di nascita:</span>{' '}
-      {formatData(giocatore.data_nascita)}
+      {formatData(giocatore.data_nascita)} ({eta} anni)
     </div>
   )}
 

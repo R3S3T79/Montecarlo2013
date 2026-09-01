@@ -2,7 +2,7 @@
 // Data creazione chat: 03/02/2026
 // Versione definitiva con RPC + paginazione (supera limite 1000 Supabase)
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 

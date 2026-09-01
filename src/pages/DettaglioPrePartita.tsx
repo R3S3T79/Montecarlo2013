@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { UserRole } from '../lib/roles';
+
 
 interface Squadra {
   id: string;
@@ -45,16 +45,12 @@ interface Resoconto {
 export default function DettaglioPrePartita(): JSX.Element {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { loading: authLoading } = useAuth();
 
   const [partita, setPartita] = useState<Partita | null>(null);
   const [precedenti, setPrecedenti] = useState<Resoconto[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const role =
-    (user?.user_metadata?.role as UserRole) ||
-    (user?.app_metadata?.role as UserRole) ||
-    UserRole.Authenticated;
 
   useEffect(() => {
     if (!id) {
@@ -66,7 +62,7 @@ export default function DettaglioPrePartita(): JSX.Element {
 
       // partita corrente
       const { data: d, error: err } = await supabase
-        .from<Partita>('partite')
+        .from('partite')
         .select(`
           id,
           data_ora,
@@ -84,22 +80,38 @@ export default function DettaglioPrePartita(): JSX.Element {
         setLoading(false);
         return;
       }
-      setPartita(d);
+     setPartita({
+  ...d,
+  squadra_casa_id: Array.isArray(d.squadra_casa_id)
+    ? d.squadra_casa_id[0]
+    : d.squadra_casa_id,
+  squadra_ospite_id: Array.isArray(d.squadra_ospite_id)
+    ? d.squadra_ospite_id[0]
+    : d.squadra_ospite_id,
+});
 
       // precedenti SOLO con stato = Giocata
-      const { data: prev, error: errPrev } = await supabase
-        .from<Resoconto>('resocontopartita')
-        .select('*')
-        .or(
-          `and(squadra_casa.eq.${d.squadra_casa_id.nome},squadra_ospite.eq.${d.squadra_ospite_id.nome}),and(squadra_casa.eq.${d.squadra_ospite_id.nome},squadra_ospite.eq.${d.squadra_casa_id.nome})`
-        )
-        .eq('stato', 'Giocata') // 👈 filtro qui
-        .order('data_ora', { ascending: false })
-        .limit(5);
+const squadraCasa = Array.isArray(d.squadra_casa_id)
+  ? d.squadra_casa_id[0]
+  : d.squadra_casa_id;
 
-      if (!errPrev && prev) {
-        setPrecedenti(prev);
-      }
+const squadraOspite = Array.isArray(d.squadra_ospite_id)
+  ? d.squadra_ospite_id[0]
+  : d.squadra_ospite_id;
+
+const { data: prev, error: errPrev } = await supabase
+  .from('resocontopartita')
+  .select('*')
+  .or(
+    `and(squadra_casa.eq.${squadraCasa.nome},squadra_ospite.eq.${squadraOspite.nome}),and(squadra_casa.eq.${squadraOspite.nome},squadra_ospite.eq.${squadraCasa.nome})`
+  )
+  .eq('stato', 'Giocata') // 👈 filtro qui
+  .order('data_ora', { ascending: false })
+  .limit(5);
+
+if (!errPrev && prev) {
+  setPrecedenti(prev);
+}
       setLoading(false);
     })();
   }, [id]);

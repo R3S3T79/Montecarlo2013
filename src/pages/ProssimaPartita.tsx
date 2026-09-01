@@ -1,7 +1,7 @@
 // src/pages/ProssimaPartita.tsx
 // Data creazione chat: 03/08/2025
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { Calendar, Clock, Plus, History } from "lucide-react";
@@ -74,6 +74,8 @@ interface TimerState {
   timer_status: "running" | "paused" | "stopped";
   updated_at?: string;
   timer_duration_min: number;
+  run_index: number;
+  total_elapsed_sec: number;
 }
 
 export default function ProssimaPartita() {
@@ -172,7 +174,7 @@ useEffect(() => {
     }
 
     if (nextData?.length) {
-      const next = nextData[0] as PartitaProssima;
+      const next = nextData[0] as unknown as PartitaProssima;
       setPartita(next);
       setPerTimeCasa([next.goal_a1, next.goal_a2, next.goal_a3, next.goal_a4]);
       setPerTimeOspite([next.goal_b1, next.goal_b2, next.goal_b3, next.goal_b4]);
@@ -201,7 +203,7 @@ useEffect(() => {
         .order("data_ora", { ascending: false })
         .limit(5);
 
-      setPrecedenti((prevData || []) as ScontroPrecedente[]);
+      setPrecedenti((prevData || []) as unknown as ScontroPrecedente[]);
     } else {
       // nessuna partita trovata
       setPartita(null);
@@ -304,7 +306,9 @@ setTitolari(mapped.slice(0, 11).map((g) => g.giocatore_uid));
         }
       )
       .subscribe();
-    return () => supabase.removeChannel(ch1);
+    return () => {
+  supabase.removeChannel(ch1);
+};
   }, [partita]);
 
   // 6) realtime marcatori
@@ -342,7 +346,9 @@ setTitolari(mapped.slice(0, 11).map((g) => g.giocatore_uid));
         }
       )
       .subscribe();
-    return () => supabase.removeChannel(ch2);
+    return () => {
+  supabase.removeChannel(ch2);
+};
   }, [partita]);
 
   // 7) realtime timer + poll (2s)
@@ -497,9 +503,9 @@ const testoPeriodo =
     ? "1° Tempo"
     : statoPartita === StatoPartita.SECONDO_TEMPO
     ? "2° Tempo"
-    : statoPartita === StatoPartita.PRIMO_SUPPLEMENTARE
+    : statoPartita === StatoPartita.PRIMO_TEMPO_SUPPLEMENTARE
     ? "1° Suppl."
-    : statoPartita === StatoPartita.SECONDO_SUPPLEMENTARE
+    : statoPartita === StatoPartita.SECONDO_TEMPO_SUPPLEMENTARE
     ? "2° Suppl."
     : statoPartita === StatoPartita.RIGORI
     ? "Rigori"
