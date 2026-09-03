@@ -83,28 +83,31 @@ export default function RosaGiocatori(): JSX.Element {
   };
 
   return (
-    <div className="min-h-screen">
-      <div className="w-full px-[2px] pt-2 pb-6 box-border">
+    <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b]">
+      <div className="w-full px-3 pt-3 pb-8 box-border">
 
-        {/* Selettore stagione */}
-        <div className="mb-4">
+        {/* 1. Selettore stagione */}
+        <div className="mb-5">
           <select
-            className="bg-white/90 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
+            className="w-full rounded-xl border border-red-600/60 bg-[#242424] px-4 py-3 text-sm font-semibold text-white shadow-lg outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-600/30"
             value={stagioneSelezionata || ''}
             onChange={(e) => setStagioneSelezionata(e.target.value)}
           >
             {stagioni.map((s) => (
-              <option key={s.id} value={s.id}>
+              <option key={s.id} value={s.id} className="bg-[#242424] text-white">
                 {s.nome}
               </option>
             ))}
           </select>
         </div>
 
+        {/* 2. Elenco giocatori */}
         {loading ? (
-          <div className="text-center text-montecarlo-secondary">Caricamento...</div>
+          <div className="py-8 text-center font-semibold text-red-500">
+            Caricamento...
+          </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-3">
             {giocatori.map((g) => (
               <div
                 key={g.giocatore_uid}
@@ -113,29 +116,50 @@ export default function RosaGiocatori(): JSX.Element {
                     state: { stagioneId: stagioneSelezionata } // 🔹 passaggio stagione
                   })
                 }
-                className="bg-white/90 rounded-lg shadow p-4 cursor-pointer hover:shadow-lg transition"
+                className="group relative overflow-hidden rounded-2xl border border-gray-200/80 bg-gradient-to-r from-white via-[#f8f8f8] to-[#ededed] shadow-[0_6px_18px_rgba(0,0,0,0.35)] cursor-pointer transition duration-200 hover:-translate-y-[1px] hover:shadow-[0_9px_24px_rgba(0,0,0,0.45)]"
               >
-                <div className="flex items-center space-x-3">
-                  <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-montecarlo-accent">
-                    {g.foto_url ? (
-                      <img
-                        src={g.foto_url}
-                        alt={`${g.cognome || ''} ${g.nome || ''}`}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-montecarlo-secondary flex items-center justify-center text-white font-bold">
-                        {getInitial(g)}
-                      </div>
+                <div className="absolute left-0 top-0 h-full w-[4px] bg-red-600" />
+
+                <div className="flex min-h-[96px] items-center px-4 py-3">
+                  <div className="flex shrink-0 items-center">
+                    <div className="h-[72px] w-[72px] overflow-hidden rounded-full border-[3px] border-red-600 bg-gray-300 shadow-md">
+                      {g.foto_url ? (
+                        <img
+                          src={g.foto_url}
+                          alt={`${g.cognome || ''} ${g.nome || ''}`}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-[#2b2b2b] text-xl font-bold text-white">
+                          {getInitial(g)}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="ml-4 h-14 w-px bg-gray-300" />
+                  </div>
+
+                  <div className="min-w-0 flex-1 px-4">
+                    <h3 className="truncate text-[17px] font-extrabold uppercase leading-tight tracking-wide">
+                      <span className="text-red-600">
+                        {g.cognome || ''}
+                      </span>
+                      {g.nome && (
+                        <span className="ml-2 text-[#222222]">
+                          {g.nome}
+                        </span>
+                      )}
+                    </h3>
+
+                    {g.ruolo && (
+                      <p className="mt-1 text-[12px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        {g.ruolo}
+                      </p>
                     )}
                   </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-montecarlo-secondary">
-                      {g.cognome || ''} {g.nome || ''}
-                    </h3>
-                    {g.ruolo && (
-                      <p className="text-sm text-gray-800">{g.ruolo}</p>
-                    )}
+
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white/80 text-red-600 shadow-sm transition group-hover:border-red-500 group-hover:bg-red-50">
+                    <span className="text-2xl font-light leading-none">›</span>
                   </div>
                 </div>
               </div>

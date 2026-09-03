@@ -34,8 +34,10 @@ interface PartitaProssima {
   goal_a4: number;
   goal_b1: number;
   goal_b2: number;
-  goal_b3: number;
+    goal_b3: number;
   goal_b4: number;
+  rigori_a: number;
+  rigori_b: number;
   casa: SquadraInfo;
   ospite: SquadraInfo;
 }
@@ -90,7 +92,11 @@ export default function ProssimaPartita() {
   const [roleLoading, setRoleLoading] = useState(true);
   const [perTimeCasa, setPerTimeCasa] = useState<number[]>([0, 0, 0, 0]);
   const [perTimeOspite, setPerTimeOspite] = useState<number[]>([0, 0, 0, 0]);
-  const [titolari, setTitolari] = useState<string[]>([]);
+  
+    // ========================
+  // 11. Serie rigori live
+  // ========================
+  const [rigoriSerie, setRigoriSerie] = useState<any[]>([]);
 
 
   // TIMER
@@ -145,8 +151,9 @@ useEffect(() => {
       squadra_casa_id, squadra_ospite_id,
       campionato_torneo, luogo_torneo,
       goal_a, goal_b,
-      goal_a1, goal_a2, goal_a3, goal_a4,
+            goal_a1, goal_a2, goal_a3, goal_a4,
       goal_b1, goal_b2, goal_b3, goal_b4,
+      rigori_a, rigori_b,
       casa:squadra_casa_id(id,nome,logo_url),
       ospite:squadra_ospite_id(id,nome,logo_url)
     `;
@@ -242,8 +249,7 @@ const mapped: Giocatore[] = (gs || []).map((r: any) => ({
 setGiocatoriStagione(mapped);
 
 
-// 👇 Popola titolari coi primi 11
-setTitolari(mapped.slice(0, 11).map((g) => g.giocatore_uid));
+
 
     })(); // 👈 importante: chiudere subito la funzione async
   }, [partita]); // 👈 dipendenza corretta
@@ -350,6 +356,68 @@ setTitolari(mapped.slice(0, 11).map((g) => g.giocatore_uid));
   supabase.removeChannel(ch2);
 };
   }, [partita]);
+
+    // ========================
+  // 12. Caricamento e Realtime serie rigori
+  // ========================
+  useEffect(() => {
+    if (!partita) return;
+
+    let channel: any = null;
+    let active = true;
+
+    const loadRigori = async () => {
+      const { data, error } = await supabase
+        .from("rigori_partita")
+        .select(`
+          id,
+          partita_id,
+          squadra_id,
+          ordine,
+          esito
+        `)
+        .eq("partita_id", partita.id)
+        .order("ordine", { ascending: true });
+
+      if (!active) return;
+
+      if (error) {
+        console.error(
+          "[ProssimaPartita] Errore caricamento serie rigori:",
+          error.message
+        );
+        return;
+      }
+
+      setRigoriSerie(data || []);
+    };
+
+    loadRigori();
+
+    channel = supabase
+      .channel(`prossima-partita-rigori-${partita.id}-${Date.now()}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "rigori_partita",
+          filter: `partita_id=eq.${partita.id}`,
+        },
+        () => {
+          loadRigori();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [partita?.id]);
 
   // 7) realtime timer + poll (2s)
   useEffect(() => {
@@ -519,13 +587,13 @@ const testoPeriodo =
   
 
   return (
-    <div className="mx-auto w-full pl-[2px] pr-[4px] box-border">
+    <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b] mx-auto w-full pl-[2px] pr-[4px] pt-2 pb-4 box-border">
 
       <div className="max-w-md mx-auto space-y-6 ">
         {/* Card prossima partita */}
-        <div className="bg-white/90 rounded-xl shadow-montecarlo overflow-hidden">
-          <div className="bg-montecarlo-red-50 p-4 border-l-4 border-montecarlo-secondary">
-            <div className="flex justify-center items-center space-x-4 text-montecarlo-secondary">
+        <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-white via-[#fafafa] to-[#eeeeee] shadow-[0_8px_24px_rgba(0,0,0,0.40)]">
+  <div className="border-l-4 border-red-600 bg-gradient-to-r from-red-600 via-red-700 to-[#454545] p-4">
+            <div className="flex justify-center items-center space-x-4 text-white">
               <div className="flex items-center">
                 <Calendar className="mr-2" size={18} />
                 <span className="font-semibold">{formatData(partita.data_ora)}</span>
@@ -536,27 +604,27 @@ const testoPeriodo =
               </div>
             </div>
             <div className="text-center mt-2">
-              <span className="bg-montecarlo-accent text-montecarlo-secondary px-3 py-1 rounded-full text-sm font-medium">
-                {partita.campionato_torneo}
-              </span>
+              <span className="border border-white/30 bg-black/20 text-white px-3 py-1 rounded-full text-sm font-semibold">
+  {partita.campionato_torneo}
+</span>
             </div>
           </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-4 space-y-4">
               {/* Squadra Casa */}
               <div
-                className={`flex flex-col items-center p-4 rounded-lg border ${
-                  isMontecarloCasa
-                    ? "bg-montecarlo-red-50 border-montecarlo-red-200"
-                    : "bg-montecarlo-gray-50 border-montecarlo-gray-200"
-                }`}
+                className={`flex flex-col items-center p-3 rounded-xl border-l-4 shadow-sm ${
+  isMontecarloCasa
+    ? "bg-white border-red-600"
+    : "bg-[#f7f7f7] border-[#454545]"
+}`}
               >
                 <div className="flex items-center space-x-4 mb-2">
                   {partita.casa.logo_url ? (
                     <img
                       src={partita.casa.logo_url}
                       alt={`${partita.casa.nome} logo`}
-                      className="w-12 h-12 rounded-full border-2 border-montecarlo-accent"
+                      className="w-14 h-14 object-contain"
                     />
                   ) : (
                     <div className="w-12 h-12 bg-montecarlo-secondary rounded-full flex items-center justify-center text-white font-bold">
@@ -580,29 +648,55 @@ const testoPeriodo =
                 </div>
 
                 {isMontecarloCasa ? (
-                  <div className="w-full grid grid-cols-2 gap-4">
-                    {Object.entries(mcMarcatoriByPeriodo).map(([periodo, lista]) => (
-                      <div key={periodo} className="text-sm">
-                        <h4 className="font-medium">{`${periodo}° Tempo`}</h4>
-                        <ul className="list-disc list-inside">
-                          {lista.map((m) => {
-  const nomeAssist = renderNomeAssist(m.assist_giocatore_stagione_id);
+                  <div className="w-full grid grid-cols-2 gap-2">
+  {[1, 2, 3, 4].map((periodo) => {
+    const lista = mcMarcatoriByPeriodo[periodo] || [];
 
-  return (
-    <li key={m.id}>
-      {renderNomeMarcatore(m)}
-      {nomeAssist && (
-        <span className="text-gray-500">
-          {" "}— Assist: {nomeAssist}
-        </span>
-      )}
-    </li>
-  );
-})}
-                        </ul>
-                      </div>
-                    ))}
+    if (!lista.length) return null;
+
+    const titoloPeriodo =
+      periodo === 1
+        ? "1° Tempo"
+        : periodo === 2
+        ? "2° Tempo"
+        : periodo === 3
+        ? "1° T Suppl."
+        : "2° T Suppl.";
+
+    return (
+      <div
+        key={periodo}
+        className="rounded-xl border-l-2 border-red-600 bg-[#f7f7f7] px-3 py-2 shadow-sm"
+      >
+        <h4 className="mb-1 text-center text-[12px] font-extrabold text-[#202020]">
+          {titoloPeriodo}
+        </h4>
+
+        <ul className="space-y-1">
+          {lista.map((m) => {
+            const nomeAssist = renderNomeAssist(
+              m.assist_giocatore_stagione_id
+            );
+
+            return (
+              <li key={m.id} className="text-[12px] leading-tight">
+                <div className="font-bold text-[#202020]">
+                  {renderNomeMarcatore(m)}
+                </div>
+
+                {nomeAssist && (
+                  <div className="text-[10px] text-gray-500">
+                    Assist: {nomeAssist}
                   </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  })}
+</div>
                 ) : (
                   partita.stato !== "DaGiocare"
   ? renderParziali(perTimeCasa)
@@ -610,41 +704,163 @@ const testoPeriodo =
                 )}
               </div>
 
-             {/* VS + timer */}
-<div className="flex items-center justify-center gap-3">
-  {partita.stato === "InCorso" && testoPeriodo && (
-    <div className="font-bold text-montecarlo-secondary whitespace-nowrap">
-      {testoPeriodo}
+            {/* 13. VS + timer / Serie rigori */}
+{statoPartita === StatoPartita.RIGORI ? (
+  <div className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+    <div className="mb-3 text-center text-[13px] font-extrabold uppercase tracking-wide text-red-600">
+      Rigori
     </div>
-  )}
 
-  <div className="bg-gradient-montecarlo text-white px-6 py-2 rounded-full font-bold text-lg shadow-montecarlo">
-    VS
+    {(() => {
+      const rigoriCasa = rigoriSerie
+        .filter(
+          (r) =>
+            String(r.squadra_id) ===
+            String(partita.squadra_casa_id)
+        )
+        .sort(
+          (a, b) =>
+            Number(a.ordine) - Number(b.ordine)
+        );
+
+      const rigoriOspite = rigoriSerie
+        .filter(
+          (r) =>
+            String(r.squadra_id) ===
+            String(partita.squadra_ospite_id)
+        )
+        .sort(
+          (a, b) =>
+            Number(a.ordine) - Number(b.ordine)
+        );
+
+      const numeroTiri = Math.max(
+        rigoriCasa.length,
+        rigoriOspite.length
+      );
+
+      return (
+        <>
+          <div className="mb-2 grid grid-cols-[1fr_40px_1fr] items-center">
+            <div className="text-center text-[12px] font-extrabold text-[#202020]">
+              {partita.casa.nome}
+            </div>
+
+            <div className="text-center text-[10px] font-extrabold text-gray-400">
+              VS
+            </div>
+
+            <div className="text-center text-[12px] font-extrabold text-[#202020]">
+              {partita.ospite.nome}
+            </div>
+          </div>
+
+          {Array.from({ length: numeroTiri }).map(
+            (_, index) => {
+              const ordine = index + 1;
+
+              const tiroCasa = rigoriCasa.find(
+                (r) => Number(r.ordine) === ordine
+              );
+
+              const tiroOspite = rigoriOspite.find(
+                (r) => Number(r.ordine) === ordine
+              );
+
+              return (
+                <div
+                  key={ordine}
+                  className="grid min-h-[28px] grid-cols-[1fr_40px_1fr] items-center"
+                >
+                  <div
+                    className={`text-center text-[19px] font-black ${
+                      tiroCasa?.esito === "segnato"
+                        ? "text-green-600"
+                        : tiroCasa
+                        ? "text-red-600"
+                        : "text-gray-300"
+                    }`}
+                  >
+                    {tiroCasa
+                      ? tiroCasa.esito === "segnato"
+                        ? "V"
+                        : "X"
+                      : ""}
+                  </div>
+
+                  <div />
+
+                  <div
+                    className={`text-center text-[19px] font-black ${
+                      tiroOspite?.esito === "segnato"
+                        ? "text-green-600"
+                        : tiroOspite
+                        ? "text-red-600"
+                        : "text-gray-300"
+                    }`}
+                  >
+                    {tiroOspite
+                      ? tiroOspite.esito === "segnato"
+                        ? "V"
+                        : "X"
+                      : ""}
+                  </div>
+                </div>
+              );
+            }
+          )}
+
+          <div className="mt-2 grid grid-cols-[1fr_40px_1fr] items-center border-t border-gray-200 pt-2">
+            <div className="text-center text-[22px] font-black text-red-600">
+              {partita.rigori_a ?? 0}
+            </div>
+
+            <div />
+
+            <div className="text-center text-[22px] font-black text-red-600">
+              {partita.rigori_b ?? 0}
+            </div>
+          </div>
+        </>
+      );
+    })()}
   </div>
+) : (
+  <div className="flex items-center justify-center gap-3">
+    {partita.stato === "InCorso" && testoPeriodo && (
+      <div className="font-bold text-montecarlo-secondary whitespace-nowrap">
+        {testoPeriodo}
+      </div>
+    )}
 
-  {partita.stato === "InCorso" && (
-    <div
-      className={`px-4 py-2 rounded-full border-2 flex items-center justify-center font-bold text-xl tabular-nums ${timerClass}`}
-    >
-      {minDisplay}:{secDisplay}
+    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#202020] to-[#454545] text-[11px] font-extrabold text-white shadow-md">
+      VS
     </div>
-  )}
-</div>
+
+    {partita.stato === "InCorso" && (
+      <div
+        className={`px-4 py-2 rounded-full border-2 flex items-center justify-center font-bold text-xl tabular-nums ${timerClass}`}
+      >
+        {minDisplay}:{secDisplay}
+      </div>
+    )}
+  </div>
+)}
 
               {/* Squadra Ospite */}
               <div
-                className={`flex flex-col items-center p-4 rounded-lg border ${
-                  isMontecarloOspite
-                    ? "bg-montecarlo-red-50 border-montecarlo-red-200"
-                    : "bg-montecarlo-gray-50 border-montecarlo-gray-200"
-                }`}
+                className={`flex flex-col items-center p-3 rounded-xl border-l-4 shadow-sm ${
+  isMontecarloOspite
+    ? "bg-white border-red-600"
+    : "bg-[#f7f7f7] border-[#454545]"
+}`}
               >
                 <div className="flex items-center space-x-4 mb-2">
                   {partita.ospite.logo_url ? (
                     <img
                       src={partita.ospite.logo_url}
                       alt={`${partita.ospite.nome} logo`}
-                      className="w-12 h-12 rounded-full border-2 border-montecarlo-accent"
+                      className="w-14 h-14 object-contain"
                     />
                   ) : (
                     <div className="w-12 h-12 bg-montecarlo-secondary rounded-full flex items-center justify-center text-white font-bold">
@@ -668,29 +884,55 @@ const testoPeriodo =
                 </div>
 
                 {isMontecarloOspite ? (
-                  <div className="w-full grid grid-cols-2 gap-4">
-                    {Object.entries(mcMarcatoriByPeriodo).map(([periodo, lista]) => (
-                      <div key={periodo} className="text-sm">
-                        <h4 className="font-medium">{`${periodo}° Tempo`}</h4>
-                        <ul className="list-disc list-inside">
-                          {lista.map((m) => {
-  const nomeAssist = renderNomeAssist(m.assist_giocatore_stagione_id);
+                 <div className="w-full grid grid-cols-2 gap-2">
+  {[1, 2, 3, 4].map((periodo) => {
+    const lista = mcMarcatoriByPeriodo[periodo] || [];
 
-  return (
-    <li key={m.id}>
-      {renderNomeMarcatore(m)}
-      {nomeAssist && (
-        <span className="text-gray-500">
-          {" "}— Assist: {nomeAssist}
-        </span>
-      )}
-    </li>
-  );
-})}
-                        </ul>
-                      </div>
-                    ))}
+    if (!lista.length) return null;
+
+    const titoloPeriodo =
+      periodo === 1
+        ? "1° Tempo"
+        : periodo === 2
+        ? "2° Tempo"
+        : periodo === 3
+        ? "1° T Suppl."
+        : "2° T Suppl.";
+
+    return (
+      <div
+        key={periodo}
+        className="rounded-xl border-l-2 border-red-600 bg-[#f7f7f7] px-3 py-2 shadow-sm"
+      >
+        <h4 className="mb-1 text-center text-[12px] font-extrabold text-[#202020]">
+          {titoloPeriodo}
+        </h4>
+
+        <ul className="space-y-1">
+          {lista.map((m) => {
+            const nomeAssist = renderNomeAssist(
+              m.assist_giocatore_stagione_id
+            );
+
+            return (
+              <li key={m.id} className="text-[12px] leading-tight">
+                <div className="font-bold text-[#202020]">
+                  {renderNomeMarcatore(m)}
+                </div>
+
+                {nomeAssist && (
+                  <div className="text-[10px] text-gray-500">
+                    Assist: {nomeAssist}
                   </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  })}
+</div>
                 ) : (
                   partita.stato !== "DaGiocare"
   ? renderParziali(perTimeOspite)
@@ -736,98 +978,145 @@ const testoPeriodo =
 
         {/* Scontri precedenti */}
 {precedenti.length > 0 && (
-  <div className="bg-white/90 rounded-xl shadow-montecarlo p-6 mt-6">
-    <h3 className="text-lg font-bold mb-2 text-center">Scontri precedenti</h3>
-    <hr className="border-t border-gray-300 mb-3" />
+  <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-white via-[#fafafa] to-[#eeeeee] shadow-[0_8px_24px_rgba(0,0,0,0.40)] mt-6">
 
-    {/* Statistiche automatiche */}
-    {(() => {
-      let vittorie = 0;
-      let pareggi = 0;
-      let sconfitte = 0;
+    <div className="border-l-4 border-red-600 bg-gradient-to-r from-red-600 via-red-700 to-[#454545] px-4 py-3">
+      <h3 className="text-center text-[15px] font-extrabold uppercase tracking-wide text-white">
+        Scontri precedenti
+      </h3>
+    </div>
 
-      precedenti.forEach((p) => {
-        const montecarloCasa = p.casa.nome.toLowerCase().includes("montecarlo");
-        const mcGoal = montecarloCasa ? p.goal_a : p.goal_b;
-        const avvGoal = montecarloCasa ? p.goal_b : p.goal_a;
+    <div className="p-4">
 
-        if (mcGoal > avvGoal) vittorie++;
-        else if (mcGoal === avvGoal) pareggi++;
-        else sconfitte++;
-      });
+      {/* Statistiche automatiche */}
+      {(() => {
+        let vittorie = 0;
+        let pareggi = 0;
+        let sconfitte = 0;
 
-      return (
-        <>
-          <div className="flex justify-center gap-6 text-sm text-gray-700 mb-4">
-            <div>
-              <span className="font-semibold text-green-600">Vittorie:</span> {vittorie}
+        precedenti.forEach((p) => {
+          const montecarloCasa = p.casa.nome.toLowerCase().includes("montecarlo");
+          const mcGoal = montecarloCasa ? p.goal_a : p.goal_b;
+          const avvGoal = montecarloCasa ? p.goal_b : p.goal_a;
+
+          if (mcGoal > avvGoal) vittorie++;
+          else if (mcGoal === avvGoal) pareggi++;
+          else sconfitte++;
+        });
+
+        return (
+          <>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+
+              <div className="rounded-xl border border-gray-200 bg-white p-3 text-center shadow-sm">
+                <div className="text-[10px] font-extrabold uppercase tracking-wide text-gray-500">
+                  Vittorie
+                </div>
+                <div className="mt-1 text-2xl font-black text-green-600">
+                  {vittorie}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-3 text-center shadow-sm">
+                <div className="text-[10px] font-extrabold uppercase tracking-wide text-gray-500">
+                  Pareggi
+                </div>
+                <div className="mt-1 text-2xl font-black text-gray-500">
+                  {pareggi}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-3 text-center shadow-sm">
+                <div className="text-[10px] font-extrabold uppercase tracking-wide text-gray-500">
+                  Sconfitte
+                </div>
+                <div className="mt-1 text-2xl font-black text-red-600">
+                  {sconfitte}
+                </div>
+              </div>
+
             </div>
-            <div>
-              <span className="font-semibold text-gray-700">Pareggi:</span> {pareggi}
+
+            {/* Pronostico dinamico */}
+            <div className="mb-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+              <div className="border-l-4 border-red-600 px-4 py-3 text-center">
+                <div className="text-[10px] font-extrabold uppercase tracking-wide text-gray-400">
+                  Pronostico del match attuale
+                </div>
+
+                <div className="mt-1 text-[13px] font-extrabold">
+                  {vittorie > sconfitte ? (
+                    <span className="text-green-700">
+                      Montecarlo favorito
+                    </span>
+                  ) : vittorie < sconfitte ? (
+                    <span className="text-red-700">
+                      {precedenti[0]?.casa.nome.toLowerCase().includes("montecarlo")
+                        ? precedenti[0]?.ospite.nome
+                        : precedenti[0]?.casa.nome}{" "}
+                      favorito
+                    </span>
+                  ) : (
+                    <span className="text-gray-600">
+                      Match equilibrato
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
-            <div>
-              <span className="font-semibold text-red-600">Sconfitte:</span> {sconfitte}
+          </>
+        );
+      })()}
+
+      {/* Lista scontri precedenti */}
+      <ul className="space-y-2">
+        {precedenti.map((p) => (
+          <li
+            key={p.id}
+            onClick={() => navigate(`/partita/${p.id}`)}
+            className="
+              cursor-pointer overflow-hidden rounded-xl
+              border border-gray-200 bg-white
+              shadow-sm transition-all duration-200
+              hover:-translate-y-[1px] hover:shadow-md
+              active:scale-[0.98]
+              select-none
+            "
+          >
+            <div className="grid grid-cols-[58px_1fr_auto] items-center gap-2 px-3 py-3">
+
+              <div className="text-center text-[10px] font-bold leading-tight text-gray-500">
+                {new Date(p.data_ora).toLocaleDateString("it-IT", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "2-digit",
+                })}
+              </div>
+
+              <div className="min-w-0 text-center">
+                <div className="truncate text-[12px] font-bold uppercase leading-tight text-[#252525]">
+                  {p.casa.nome}
+                </div>
+
+                <div className="my-1 text-[9px] font-extrabold text-gray-300">
+                  VS
+                </div>
+
+                <div className="truncate text-[12px] font-bold uppercase leading-tight text-[#252525]">
+                  {p.ospite.nome}
+                </div>
+              </div>
+
+              <div className="flex min-w-[58px] items-center justify-center rounded-lg bg-gradient-to-br from-[#202020] to-[#454545] px-3 py-2 text-[17px] font-extrabold text-white shadow-sm">
+                {p.goal_a} - {p.goal_b}
+              </div>
+
             </div>
-          </div>
+          </li>
+        ))}
+      </ul>
 
-          {/* Pronostico dinamico */}
-          <div className="text-center mb-3">
-            <span className="font-semibold text-montecarlo-secondary">
-              Pronostico del match attuale:
-            </span>{" "}
-            {vittorie > sconfitte ? (
-  <span className="italic text-green-700">Montecarlo favorito</span>
-) : vittorie < sconfitte ? (
-  <span className="italic text-red-700">
-    {precedenti[0]?.casa.nome.toLowerCase().includes("montecarlo")
-      ? precedenti[0]?.ospite.nome
-      : precedenti[0]?.casa.nome}{" "}
-    favorito
-  </span>
-) : (
-  <span className="italic text-gray-700">Match equilibrato</span>
-)}
-          </div>
-
-          {/* Riga divisoria */}
-          <hr className="border-t border-gray-300 mb-5" />
-        </>
-      );
-    })()}
-
-    {/* Lista scontri precedenti */}
-<ul className="space-y-4">
-  {precedenti.map((p) => (
-    <li
-  key={p.id}
-  onClick={() => navigate(`/partita/${p.id}`)}
-  className="
-    text-gray-700 text-sm
-    transition-transform active:scale-[0.98]
-    hover:scale-[1.02] hover:bg-montecarlo-red-50
-    rounded-lg p-2 select-none
-    shadow-sm active:shadow-inner
-  "
->
-
-      <div className="flex justify-center mb-2">
-        <span className="bg-[#E8C547] text-[#B30000] px-3 py-1 rounded-full text-xs font-semibold">
-          {formatData(p.data_ora)}
-        </span>
-      </div>
-
-      <div className="flex items-center justify-between text-center">
-        <span className="text-left w-1/3 truncate">{p.casa.nome}</span>
-        <span className="w-1/3 font-bold text-lg text-gray-900">
-          {p.goal_a} - {p.goal_b}
-        </span>
-        <span className="text-right w-1/3 truncate">{p.ospite.nome}</span>
-      </div>
-    </li>
-  ))}
-</ul>
-
-
+    </div>
   </div>
 )}
 

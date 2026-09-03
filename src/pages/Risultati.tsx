@@ -148,130 +148,148 @@ export default function Risultati() {
 
   if (loading || loadingData) {
     return (
-      <div className="container mx-auto px-0">
-        <span>Caricamento…</span>
+      <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b]">
+        <div className="container mx-auto px-3 py-8">
+          <span className="font-semibold text-red-500">Caricamento…</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-0.5">
-      {/* ✅ Box filtro sticky */}
-      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm mb-4 mt-2">
-        <div className="rounded-xl shadow-montecarlo p-2 space-y-2">
-          {/* Input di ricerca */}
-          <input
-            type="text"
-            placeholder="Cerca Nome Squadra"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full border-2 border-montecarlo-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
-          />
+    <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b]">
+      <div className="container mx-auto px-2 pb-8">
 
-          {/* Dropdown Stagione e Competizioni */}
-          <div className="flex gap-2">
-            <select
-              value={stagioneSelezionata}
-              onChange={(e) => setStagioneSelezionata(e.target.value)}
-              className="flex-1 border-2 border-montecarlo-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
-            >
-              <option value="">Stagione</option>
-              {stagioni.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nome}
-                </option>
-              ))}
-            </select>
+        {/* 1. Box filtro sticky */}
+        <div className="sticky top-0 z-10 mb-5 pt-2">
+          <div className="space-y-2 rounded-2xl border border-white/10 bg-[#202020]/95 p-3 shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur-md">
 
-            <select
-              value={tipoCompetizione}
-              onChange={(e) => setTipoCompetizione(e.target.value)}
-              className="flex-1 border-2 border-montecarlo-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-montecarlo-secondary focus:ring-2 focus:ring-montecarlo-secondary/20"
-            >
-              <option value="">Tutti</option>
-              <option value="Campionato">Campionato</option>
-              <option value="Torneo">Torneo</option>
-              <option value="Amichevole">Amichevole</option>
-              <option value="Allenamento">Allenamento</option>
-            </select>
+            {/* Input di ricerca */}
+            <input
+              type="text"
+              placeholder="Cerca Nome Squadra"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full rounded-xl border border-gray-600 bg-[#2b2b2b] px-3 py-2.5 text-sm font-medium text-white placeholder:text-gray-400 outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-600/30"
+            />
+
+            {/* Dropdown Stagione e Competizioni */}
+            <div className="flex gap-2">
+              <select
+                value={stagioneSelezionata}
+                onChange={(e) => setStagioneSelezionata(e.target.value)}
+                className="min-w-0 flex-1 rounded-xl border border-gray-600 bg-[#2b2b2b] px-2 py-2.5 text-sm font-semibold text-white outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-600/30"
+              >
+                <option value="">Stagione</option>
+                {stagioni.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nome}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={tipoCompetizione}
+                onChange={(e) => setTipoCompetizione(e.target.value)}
+                className="min-w-0 flex-1 rounded-xl border border-gray-600 bg-[#2b2b2b] px-2 py-2.5 text-sm font-semibold text-white outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-600/30"
+              >
+                <option value="">Tutti</option>
+                <option value="Campionato">Campionato</option>
+                <option value="Torneo">Torneo</option>
+                <option value="Amichevole">Amichevole</option>
+                <option value="Allenamento">Allenamento</option>
+              </select>
+            </div>
           </div>
         </div>
-      </div>
 
-      {error && (
-        <div className="bg-montecarlo-red-50 border-montecarlo-red-200 rounded-lg p-4 text-montecarlo-red-800">
-          {error}
-        </div>
-      )}
+        {/* 2. Messaggi di stato */}
+        {error && (
+          <div className="rounded-xl border border-red-500/40 bg-red-950/50 p-4 text-red-200 shadow-lg">
+            {error}
+          </div>
+        )}
 
-      {!error && filteredPartite.length === 0 && (
-        <div className="bg-white rounded-lg shadow-montecarlo p-8 text-center">
-          {searchTerm ? "Nessuna partita trovata" : "Nessuna partita giocata"}
-        </div>
-      )}
+        {!error && filteredPartite.length === 0 && (
+          <div className="rounded-2xl border border-gray-200/80 bg-gradient-to-r from-white via-[#f8f8f8] to-[#ededed] p-8 text-center font-semibold text-gray-700 shadow-[0_6px_18px_rgba(0,0,0,0.35)]">
+            {searchTerm ? "Nessuna partita trovata" : "Nessuna partita giocata"}
+          </div>
+        )}
 
-      {!error && filteredPartite.length > 0 && (
-        <div className="space-y-3">
-          {filteredPartite.map((p) => (
-            <div
-              key={p.id}
-              id={`p-${p.id}`}
-              style={{ scrollMarginTop: "100px" }}
-              onClick={() => {
-                sessionStorage.setItem("risultati-anchor", p.id as string);
-                navigate(`/partita/${p.id}`);
-              }}
-              className="bg-white/90 rounded-lg shadow-montecarlo hover:shadow-montecarlo-lg cursor-pointer transition-transform hover:scale-[1.02] border-l-4 border-montecarlo-secondary"
-            >
-              {/* Testata: 2 righe, sx giorno+data, dx competizione+nome_torneo */}
-              <div className="bg-gradient-montecarlo text-white px-4 py-2 rounded-t-lg">
-                <div className="flex justify-between">
-                  {/* Colonna sinistra */}
-                  <div className="flex flex-col text-left">
-                    <span className="text-sm sm:text-base font-bold">
-                      {formatGiorno(p.data_ora)}
-                    </span>
-                    <span className="text-sm sm:text-base font-semibold">
-                      {formatData(p.data_ora)}
-                    </span>
-                  </div>
+        {/* 3. Elenco risultati */}
+        {!error && filteredPartite.length > 0 && (
+          <div className="space-y-4">
+            {filteredPartite.map((p) => (
+              <div
+                key={p.id}
+                id={`p-${p.id}`}
+                style={{ scrollMarginTop: "100px" }}
+                onClick={() => {
+                  sessionStorage.setItem("risultati-anchor", p.id as string);
+                  navigate(`/partita/${p.id}`);
+                }}
+                className="group relative overflow-hidden rounded-2xl border border-gray-200/80 bg-gradient-to-r from-white via-[#f8f8f8] to-[#ededed] shadow-[0_6px_18px_rgba(0,0,0,0.38)] cursor-pointer transition duration-200 hover:-translate-y-[1px] hover:shadow-[0_9px_24px_rgba(0,0,0,0.48)]"
+              >
+                <div className="absolute left-0 top-0 z-10 h-full w-[4px] bg-red-600" />
 
-                  {/* Colonna destra */}
-                  <div className="flex flex-col text-right">
-                    <span className="text-sm sm:text-base font-bold">
-                      {p.campionato_torneo}
-                    </span>
-                    <span className="text-sm sm:text-base font-semibold">
-                      {p.nome_torneo || ""}
-                    </span>
+                {/* Testata: 2 righe, sx giorno+data, dx competizione+nome_torneo */}
+                <div className="border-b border-white/10 bg-gradient-to-r from-[#171717] via-[#242424] to-[#303030] px-4 py-3 text-white">
+                  <div className="flex justify-between gap-4">
+
+                    {/* Colonna sinistra */}
+                    <div className="flex flex-col text-left">
+                      <span className="text-[14px] font-extrabold tracking-wide text-white">
+                        {formatGiorno(p.data_ora)}
+                      </span>
+                      <span className="mt-0.5 text-[12px] font-semibold tracking-wide text-gray-300">
+                        {formatData(p.data_ora)}
+                      </span>
+                    </div>
+
+                    {/* Colonna destra */}
+                    <div className="flex min-w-0 flex-col text-right">
+                      <span className="text-[14px] font-extrabold uppercase tracking-wide text-red-500">
+                        {p.campionato_torneo}
+                      </span>
+                      <span className="mt-0.5 truncate text-[12px] font-semibold text-gray-300">
+                        {p.nome_torneo || ""}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Corpo: squadre e risultato */}
-              <div className="p-4 grid grid-cols-[2fr_auto_2fr] items-center gap-4">
-                <span className="text-montecarlo-secondary font-semibold text-right">
-                  {p.casa.nome}
-                </span>
-                <div className="flex flex-col items-center">
-  <span className="text-montecarlo-secondary font-bold text-lg">
-    {p.goal_a} - {p.goal_b}
-  </span>
+                {/* Corpo: squadre e risultato */}
+                <div className="grid min-h-[88px] grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-4">
 
-  {((p.rigori_a ?? 0) > 0 || (p.rigori_b ?? 0) > 0) && (
-    <span className="text-xs text-montecarlo-secondary font-semibold whitespace-nowrap">
-      ({p.rigori_a ?? 0} - {p.rigori_b ?? 0} d.c.r.)
-    </span>
-  )}
-</div>
-                <span className="text-montecarlo-secondary font-semibold">
-                  {p.ospite.nome}
-                </span>
+                  <span className="text-right text-[14px] font-extrabold uppercase leading-tight text-[#222222]">
+                    {p.casa.nome}
+                  </span>
+
+                  <div className="flex min-w-[72px] flex-col items-center justify-center">
+                    <div className="rounded-lg bg-[#1d1d1d] px-3 py-1.5 shadow-md">
+                      <span className="whitespace-nowrap text-xl font-extrabold tracking-wide text-white">
+                        {p.goal_a} <span className="text-red-500">-</span> {p.goal_b}
+                      </span>
+                    </div>
+
+                    {((p.rigori_a ?? 0) > 0 || (p.rigori_b ?? 0) > 0) && (
+                      <span className="mt-1.5 whitespace-nowrap text-[11px] font-bold text-red-600">
+                        ({p.rigori_a ?? 0} - {p.rigori_b ?? 0} d.c.r.)
+                      </span>
+                    )}
+                  </div>
+
+                  <span className="text-left text-[14px] font-extrabold uppercase leading-tight text-[#222222]">
+                    {p.ospite.nome}
+                  </span>
+                </div>
+
+                <div className="h-[3px] w-full bg-gradient-to-r from-red-700 via-red-500 to-transparent" />
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

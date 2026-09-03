@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { UserRole } from '../lib/roles';
+
 
 interface Partita {
   id: string;
@@ -58,98 +58,138 @@ export default function Calendario(): JSX.Element {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen">
-        Caricamento…
+      <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b]">
+        <div className="px-3 py-8 font-semibold text-red-500">
+          Caricamento…
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen pt-2 pb-2 ">
-      <div className="w-full px-[2px]">
+    <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b] pt-2 pb-4">
+      <div className="w-full px-2">
 
-
-
-        {/* Contenuto Partite */}
+        {/* 1. Contenuto Partite */}
         {loading ? (
           <div className="min-h-screen">
-            <div className="text-montecarlo-secondary">Caricamento...</div>
+            <div className="px-2 py-8 font-semibold text-red-500">
+              Caricamento...
+            </div>
           </div>
         ) : partite.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-montecarlo p-8 text-center">
-            <div className="text-montecarlo-neutral">
+          <div className="rounded-2xl border border-gray-200/80 bg-gradient-to-r from-white via-[#f8f8f8] to-[#ededed] p-8 text-center shadow-[0_6px_18px_rgba(0,0,0,0.35)]">
+            <div className="font-semibold text-gray-700">
               Nessuna partita da giocare trovata.
             </div>
           </div>
         ) : (
-          <ul className="space-y-4 w-full">
+          <ul className="w-full space-y-4">
 
             {partite.map((partita) => (
-              <li
-                key={partita.id}
-                onClick={() => handleClick(partita.id)}
-                className="cursor-pointer transform transition-all duration-300 hover:scale-[1.02]"
-              >
-                {/* Header cella: tipo competizione + nome torneo opzionale */}
-                <div className="bg-gradient-montecarlo text-white px-4 py-2 rounded-t-lg flex flex-col">
-                  <div className="flex items-center">
-                    <div className="text-sm font-medium">
-                      {partita.campionato_torneo}
-                    </div>
-                    <div className="flex-1 text-sm font-medium text-center">
-                      {new Date(partita.data_ora).toLocaleString(undefined, {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </div>
-                  </div>
-                  {partita.nome_torneo && partita.nome_torneo.trim() !== '' && (
-                    <div className="text-sm text-left font-light italic mt-1">
-                      {partita.nome_torneo}
-                    </div>
-                  )}
-                </div>
+  <li
+    key={partita.id}
+    onClick={() => handleClick(partita.id)}
+    className="cursor-pointer transition duration-200 hover:-translate-y-[1px]"
+  >
+    <div className="relative overflow-hidden rounded-2xl bg-white shadow-[0_8px_24px_rgba(0,0,0,0.40)]">
 
-                {/* Corpo cella con squadre */}
-                <div className="bg-white rounded-b-lg shadow-montecarlo hover:shadow-montecarlo-lg border-l-4 border-montecarlo-secondary p-4 space-y-2 bg-white/90 rounded-lg">
-                  <div className="flex items-center justify-start space-x-3">
-                    {partita.casa.logo_url ? (
-                      <img
-                        src={partita.casa.logo_url}
-                        alt={`${partita.casa.nome} logo`}
-                        className="w-10 h-10 object-contain rounded-full border-2 border-montecarlo-accent"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 bg-montecarlo-secondary rounded-full flex items-center justify-center text-white font-bold">
-                        {partita.casa.nome.charAt(0)}
-                      </div>
-                    )}
-                    <span className="font-semibold text-montecarlo-secondary">
-                      {partita.casa.nome}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-end space-x-3">
-                    <span className="font-semibold text-montecarlo-secondary">
-                      {partita.ospite.nome}
-                    </span>
-                    {partita.ospite.logo_url ? (
-                      <img
-                        src={partita.ospite.logo_url}
-                        alt={`${partita.ospite.nome} logo`}
-                        className="w-10 h-10 object-contain rounded-full border-2 border-montecarlo-accent"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 bg-montecarlo-secondary rounded-full flex items-center justify-center text-white font-bold">
-                        {partita.ospite.nome.charAt(0)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </li>
-            ))}
+      {/* 2. Header cella: tipo competizione + data */}
+      <div className="flex min-h-[58px] items-center justify-between bg-gradient-to-r from-red-600 via-red-700 to-[#454545] px-4 text-white">
+
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="text-xl">▣</span>
+
+          <div className="flex min-w-0 flex-col">
+            <span className="text-[16px] font-semibold">
+              {partita.campionato_torneo}
+            </span>
+
+            {partita.nome_torneo && partita.nome_torneo.trim() !== '' && (
+              <span className="truncate text-[11px] font-medium italic text-white/80">
+                {partita.nome_torneo}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="text-xl">◷</span>
+
+          <span className="text-[15px] font-semibold">
+            {new Date(partita.data_ora).toLocaleDateString('it-IT', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+            })}
+            ,{' '}
+            {new Date(partita.data_ora).toLocaleTimeString('it-IT', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+        </div>
+      </div>
+
+      {/* 3. Corpo cella con squadre */}
+      <div className="relative min-h-[170px] bg-gradient-to-br from-white via-[#fafafa] to-[#eeeeee] px-5 py-5">
+
+        {/* Squadra casa */}
+        <div className="absolute left-6 top-4 flex items-center gap-4">
+          {partita.casa.logo_url ? (
+            <img
+              src={partita.casa.logo_url}
+              alt={`${partita.casa.nome} logo`}
+              className="h-[58px] w-[58px] object-contain"
+            />
+          ) : (
+            <div className="flex h-[58px] w-[58px] items-center justify-center rounded-full border-2 border-red-600 bg-[#2b2b2b] text-xl font-bold text-white">
+              {partita.casa.nome.charAt(0)}
+            </div>
+          )}
+
+          <div>
+            <span className="text-[15px] font-extrabold uppercase leading-tight text-[#191919]">
+              {partita.casa.nome}
+            </span>
+            <div className="mt-2 h-[2px] w-12 bg-red-600" />
+          </div>
+        </div>
+
+        {/* VS centrale */}
+        <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center">
+          <div className="h-8 w-px bg-gray-300" />
+          <span className="mx-3 text-[13px] font-extrabold text-gray-300">
+            VS
+          </span>
+          <div className="h-8 w-px bg-gray-300" />
+        </div>
+
+        {/* Squadra ospite */}
+        <div className="absolute bottom-4 right-6 flex items-center gap-4">
+          <div className="text-right">
+            <span className="text-[15px] font-extrabold uppercase leading-tight text-red-600">
+              {partita.ospite.nome}
+            </span>
+            <div className="ml-auto mt-2 h-[2px] w-12 bg-red-600" />
+          </div>
+
+          {partita.ospite.logo_url ? (
+            <img
+              src={partita.ospite.logo_url}
+              alt={`${partita.ospite.nome} logo`}
+              className="h-[58px] w-[58px] object-contain"
+            />
+          ) : (
+            <div className="flex h-[58px] w-[58px] items-center justify-center rounded-full border-2 border-red-600 bg-[#2b2b2b] text-xl font-bold text-white">
+              {partita.ospite.nome.charAt(0)}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  </li>
+))}
           </ul>
         )}
       </div>
