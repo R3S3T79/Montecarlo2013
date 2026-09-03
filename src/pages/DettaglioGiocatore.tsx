@@ -506,480 +506,706 @@ if (stagioneIdDaState && stagioniUniche.find(s => s.id === stagioneIdDaState)) {
   const eta = calcolaEta(giocatore?.data_nascita || null);
 
   if (authLoading || loading || !giocatore) {
-    return <div className="p-4 text-center">Caricamento...</div>;
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b] flex items-center justify-center">
+        <div className="rounded-xl bg-white px-6 py-4 font-bold text-[#222] shadow-xl">
+          Caricamento...
+        </div>
+      </div>
+    );
   }
 
+  const dettaglioClass =
+    "w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-[0_4px_14px_rgba(0,0,0,0.16)]";
+
+  const dettaglioHeaderClass =
+    "w-full flex items-center justify-between gap-3 px-4 py-4 text-left";
+
   return (
-    <div className="min-h-screen">
-      <div className="container mx-auto pt-2 px-2 py-6">
+    <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b] px-[2px] pt-2 pb-6 box-border">
+      <div className="w-full">
+
+        {/* 20. Scheda giocatore */}
+        <section className="overflow-hidden rounded-2xl bg-white shadow-[0_8px_26px_rgba(0,0,0,0.42)]">
+
+          <div className="bg-gradient-to-r from-red-600 via-red-700 to-[#373737] px-4 py-3">
+            <h1 className="text-center text-[17px] font-extrabold uppercase tracking-wide text-white">
+              Dettaglio Giocatore
+            </h1>
+          </div>
+
+          <div className="relative overflow-hidden p-4">
+
+            <div className="pointer-events-none absolute -right-12 top-5 text-[145px] font-black leading-none text-gray-100">
+              M
+            </div>
+
+            <div className="relative flex items-center gap-4">
+
+              <div className="relative flex-shrink-0">
+                <div className="flex h-[126px] w-[108px] items-center justify-center overflow-hidden rounded-2xl border-2 border-red-600 bg-black shadow-lg">
+                  {giocatore.video_url && giocatore.video_url.trim() !== "" ? (
+                    <video
+                      key={giocatore.video_url} // forza reload video se cambia
+                      src={giocatore.video_url}
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      preload="auto"
+                      onCanPlay={(e) => e.currentTarget.play()}
+                      className="h-full w-full object-contain"
+                      style={{
+                        transform: 'scale(0.9) translateY(3%)',
+                        transformOrigin: 'center center',
+                      }}
+                    />
+                  ) : giocatore.foto_url ? (
+                    <img
+                      src={giocatore.foto_url}
+                      alt={`${giocatore.cognome} ${giocatore.nome}`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-[#262626] text-5xl font-bold text-white">
+                      {giocatore.cognome[0]}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="relative min-w-0 flex-1">
+                <div className="text-[17px] font-extrabold uppercase leading-none text-[#252525]">
+                  {giocatore.nome}
+                </div>
+
+                <div className="mt-1 break-words text-[25px] font-black uppercase leading-none text-red-600">
+                  {giocatore.cognome}
+                </div>
+
+                {giocatore.ruolo && (
+                  <div className="mt-3 flex items-center gap-2 text-[12px] font-extrabold uppercase text-[#333]">
+                    <span>⚽</span>
+                    <span>{giocatore.ruolo}</span>
+                  </div>
+                )}
+
+                {giocatore.data_nascita && (
+                  <div className="mt-2 flex items-start gap-2 text-[11px] font-semibold text-gray-600">
+                    <span>📅</span>
+                    <span>
+                      {formatData(giocatore.data_nascita)}
+                      {eta != null ? ` (${eta} anni)` : ''}
+                    </span>
+                  </div>
+                )}
+
+                {giocatore.numero_cartellino != null && (
+                  <div className="mt-2 flex items-start gap-2 text-[11px] font-semibold text-gray-600">
+                    <span>▣</span>
+                    <span>
+                      N. Cartellino:{" "}
+                      <strong className="text-[#222]">
+                        {giocatore.numero_cartellino}
+                      </strong>
+                    </span>
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        {/* 21. Selettore stagione */}
         {stagioniDisponibili.length > 0 && (
-          <div className="mb-4">
-            <select
-              value={stagioneSelezionata}
-              onChange={(e) => setStagioneSelezionata(e.target.value)}
-              className="bg-white/90 border rounded px-3 py-2 w-full"
-            >
-              {stagioniDisponibili.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.stagione_nome}
-                </option>
-              ))}
-            </select>
+          <div className="mt-4 overflow-hidden rounded-xl border border-red-500 bg-white shadow-[0_4px_14px_rgba(0,0,0,0.22)]">
+            <div className="flex items-center gap-3 px-4">
+              <span className="text-lg">📅</span>
+
+              <select
+                value={stagioneSelezionata}
+                onChange={(e) => setStagioneSelezionata(e.target.value)}
+                className="w-full appearance-none bg-white py-3 text-[14px] font-extrabold uppercase text-[#252525] outline-none"
+              >
+                {stagioniDisponibili.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    Stagione {s.stagione_nome}
+                  </option>
+                ))}
+              </select>
+
+              <span className="text-lg font-bold text-[#333]">⌄</span>
+            </div>
           </div>
         )}
 
-       <div className="bg-white/90 rounded-xl shadow-montecarlo p-6">
-  <div className="flex items-start gap-5">
-  <div className="w-36 h-44 rounded-lg overflow-hidden mb-4 border-2 border-montecarlo-accent shadow-lg bg-black flex items-center justify-center">
-  {giocatore.video_url && giocatore.video_url.trim() !== "" ? (
-    <video
-      key={giocatore.video_url} // forza reload video se cambia
-      src={giocatore.video_url}
-      autoPlay
-      muted
-      loop
-      playsInline
-      preload="auto"
-      onCanPlay={(e) => e.currentTarget.play()}
-      className="w-full h-full object-contain"
-      style={{
-        transform: 'scale(0.9) translateY(3%)',
-        transformOrigin: 'center center',
-      }}
-    />
-  ) : giocatore.foto_url ? (
-    <img
-      src={giocatore.foto_url}
-      alt={`${giocatore.cognome} ${giocatore.nome}`}
-      className="w-full h-full object-cover"
-    />
-  ) : (
-      <div className="w-full h-full bg-montecarlo-secondary text-white flex items-center justify-center text-5xl font-bold">
-    {giocatore.cognome[0]}
-  </div>
-)}
-</div>
+        {/* 22. Statistiche principali */}
+        <section className="mt-4">
+          <div className="grid grid-cols-3 gap-2">
 
-<div className="flex-1">
-  <h1 className="text-xl font-bold text-montecarlo-secondary mb-4">
-    {giocatore.cognome} {giocatore.nome}
-  </h1>
-
-  {giocatore.data_nascita && (
-    <div className="text-sm text-black mb-2">
-      <span className="font-semibold">Data di nascita:</span>{' '}
-      {formatData(giocatore.data_nascita)} ({eta} anni)
-    </div>
-  )}
-
-  {giocatore.ruolo && (
-    <div className="text-sm text-black mb-2">
-      <span className="font-semibold">Ruolo:</span>{' '}
-      {giocatore.ruolo}
-    </div>
-  )}
-
-  {giocatore.numero_cartellino != null && (
-    <div className="text-sm text-black">
-      <span className="font-semibold">Numero cartellino:</span>{' '}
-      {giocatore.numero_cartellino}
-    </div>
-  )}
-</div>
-
-</div>
-
-{/* 🔹 Sezione statistiche principali */}
-<div className="w-full max-w-md mx-auto mb-6">
-  {/* 1. Presenze e minuti giocati */}
-  <div className="space-y-2">
-    <button
-  type="button"
-  onClick={() => setMostraPresenze((prev) => !prev)}
-  className="w-full flex justify-between items-center text-left"
->
-  <span className="font-semibold text-black underline">
-    Presenze
-  </span>
-
-  <span className="font-bold text-montecarlo-gold-600">
-    {statistiche.presenzeTotali}
-  </span>
-</button>
-
-{/* 10. Lista partite delle presenze */}
-{mostraPresenze && (
-  <div className="mt-2 mb-3 pl-3 border-l-2 border-gray-300 space-y-2">
-    {partitePresenze.length === 0 ? (
-      <div className="text-sm text-gray-500">
-        Nessuna presenza in questa stagione.
-      </div>
-    ) : (
-      partitePresenze
-        .slice()
-        .sort(
-          (a, b) =>
-            new Date(a.partite.data_ora).getTime() -
-            new Date(b.partite.data_ora).getTime()
-        )
-        .map((riga) => {
-          const p = riga.partite;
-
-          return (
-            <div key={p.id} className="text-sm text-black">
-              <div className="font-semibold">
-                {new Date(p.data_ora).toLocaleDateString("it-IT")}
+            <div className="flex min-h-[103px] flex-col items-center justify-center rounded-xl bg-gradient-to-br from-[#454545] to-[#171717] px-2 py-3 text-center shadow-lg">
+              <div className="text-[22px]">🎯</div>
+              <div className="mt-1 text-[25px] font-black leading-none text-red-500">
+                {statistiche.goalTotali}
               </div>
-
-              <div>
-                {p.squadre_casa?.nome} - {p.squadre_ospite?.nome}
-                {" "}
-                <span className="font-bold">
-                  {p.goal_a ?? 0} - {p.goal_b ?? 0}
-                </span>
+              <div className="mt-2 text-[10px] font-extrabold uppercase text-white">
+                Goal
               </div>
             </div>
-          );
-        })
-    )}
-  </div>
-)}
 
-    <div className="flex justify-between items-center">
-      <span className="font-semibold text-black">Minuti Giocati</span>
-      <span className="font-bold text-montecarlo-gold-600">
-        {statistiche.minutiGiocatiTotali ?? 0}
-      </span>
-    </div>
-  </div>
-
-  <hr className="border-t border-gray-300 my-4" />
-
-  {/* 2. Goal, assist e goal subiti */}
-<div className="space-y-2">
-  <button
-  type="button"
-  onClick={() => setMostraGoal((prev) => !prev)}
-  className="w-full flex justify-between items-center text-left"
->
-  <span className="font-semibold text-black underline">
-    Goal Fatti
-  </span>
-
-  <span className="font-bold text-montecarlo-accent">
-    {statistiche.goalTotali}
-  </span>
-</button>
-
-{/* 13. Lista partite dei goal */}
-{mostraGoal && (
-  <div className="mt-2 mb-3 pl-3 border-l-2 border-gray-300 space-y-2">
-    {partiteGoal.length === 0 ? (
-      <div className="text-sm text-gray-500">
-        Nessun goal in questa stagione.
-      </div>
-    ) : (
-      Object.values(
-        partiteGoal.reduce((acc: Record<string, any>, riga: any) => {
-          const p = riga.partite;
-
-          if (!acc[p.id]) {
-            acc[p.id] = {
-              partita: p,
-              numeroGoal: 0,
-            };
-          }
-
-          acc[p.id].numeroGoal += 1;
-          return acc;
-        }, {})
-      )
-        .sort(
-          (a: any, b: any) =>
-            new Date(a.partita.data_ora).getTime() -
-            new Date(b.partita.data_ora).getTime()
-        )
-        .map((riga: any) => {
-          const p = riga.partita;
-
-          return (
-            <div key={p.id} className="text-sm text-black">
-              <div className="font-semibold">
-                {new Date(p.data_ora).toLocaleDateString("it-IT")}
+            <div className="flex min-h-[103px] flex-col items-center justify-center rounded-xl bg-gradient-to-br from-[#454545] to-[#171717] px-2 py-3 text-center shadow-lg">
+              <div className="text-[22px]">👕</div>
+              <div className="mt-1 text-[25px] font-black leading-none text-red-500">
+                {statistiche.presenzeTotali}
               </div>
-
-              <div>
-                {p.squadre_casa?.nome} - {p.squadre_ospite?.nome}{" "}
-                <span className="font-bold">
-                  {p.goal_a ?? 0} - {p.goal_b ?? 0}
-                </span>
-                {" — "}
-                <span className="font-bold text-montecarlo-accent">
-                  {riga.numeroGoal} {riga.numeroGoal === 1 ? "Goal" : "Goal"}
-                </span>
+              <div className="mt-2 text-[10px] font-extrabold uppercase text-white">
+                Presenze
               </div>
             </div>
-          );
-        })
-    )}
-  </div>
-)}
 
-  <button
-  type="button"
-  onClick={() => setMostraAssist((prev) => !prev)}
-  className="w-full flex justify-between items-center text-left"
->
-  <span className="font-semibold text-black underline">
-    Assist
-  </span>
-
-  <span className="font-bold text-montecarlo-green-600">
-    {statistiche.assistTotali ?? 0}
-  </span>
-</button>
-
-{/* 16. Lista partite degli assist */}
-{mostraAssist && (
-  <div className="mt-2 mb-3 pl-3 border-l-2 border-gray-300 space-y-2">
-    {partiteAssist.length === 0 ? (
-      <div className="text-sm text-gray-500">
-        Nessun assist in questa stagione.
-      </div>
-    ) : (
-      Object.values(
-        partiteAssist.reduce((acc: Record<string, any>, riga: any) => {
-          const p = riga.partite;
-
-          if (!acc[p.id]) {
-            acc[p.id] = {
-              partita: p,
-              numeroAssist: 0,
-            };
-          }
-
-          acc[p.id].numeroAssist += 1;
-          return acc;
-        }, {})
-      )
-        .sort(
-          (a: any, b: any) =>
-            new Date(a.partita.data_ora).getTime() -
-            new Date(b.partita.data_ora).getTime()
-        )
-        .map((riga: any) => {
-          const p = riga.partita;
-
-          return (
-            <div key={p.id} className="text-sm text-black">
-              <div className="font-semibold">
-                {new Date(p.data_ora).toLocaleDateString("it-IT")}
+            <div className="flex min-h-[103px] flex-col items-center justify-center rounded-xl bg-gradient-to-br from-[#454545] to-[#171717] px-2 py-3 text-center shadow-lg">
+              <div className="text-[22px]">⏱️</div>
+              <div className="mt-1 text-[22px] font-black leading-none text-red-500">
+                {statistiche.minutiGiocatiTotali ?? 0}'
               </div>
-
-              <div>
-                {p.squadre_casa?.nome} - {p.squadre_ospite?.nome}{" "}
-                <span className="font-bold">
-                  {p.goal_a ?? 0} - {p.goal_b ?? 0}
-                </span>
-                {" — "}
-                <span className="font-bold text-montecarlo-green-600">
-                  {riga.numeroAssist}{" "}
-                  {riga.numeroAssist === 1 ? "Assist" : "Assist"}
-                </span>
+              <div className="mt-2 text-[10px] font-extrabold uppercase leading-tight text-white">
+                Minuti
               </div>
             </div>
-          );
-        })
-    )}
-  </div>
-)}
 
-  {giocatore.ruolo === "Portiere" && (
-    <div className="flex justify-between items-center">
-      <span className="font-semibold text-black">Goal Subiti</span>
-      <span className="font-bold text-montecarlo-red-600">
-        {statistiche.goalSubiti ?? 0}
-      </span>
-    </div>
-  )}
-</div>
+            <div className="flex min-h-[103px] flex-col items-center justify-center rounded-xl bg-gradient-to-br from-[#454545] to-[#171717] px-2 py-3 text-center shadow-lg">
+              <div className="text-[22px]">👟</div>
+              <div className="mt-1 text-[25px] font-black leading-none text-red-500">
+                {statistiche.assistTotali ?? 0}
+              </div>
+              <div className="mt-2 text-[10px] font-extrabold uppercase text-white">
+                Assist
+              </div>
+            </div>
 
-<hr className="border-t border-gray-300 my-4" />
+            <div className="flex min-h-[103px] flex-col items-center justify-center rounded-xl bg-gradient-to-br from-[#454545] to-[#171717] px-2 py-3 text-center shadow-lg">
+              <div className="text-[22px]">🟨</div>
+              <div className="mt-1 text-[25px] font-black leading-none text-red-500">
+                {statistiche.gialliTotali ?? 0}
+              </div>
+              <div className="mt-2 text-[10px] font-extrabold uppercase text-white">
+                Ammonizioni
+              </div>
+            </div>
 
-{/* 3. Cartellini */}
-<div className="space-y-2">
-  <div className="flex justify-between items-center">
-    <span className="text-xl">🟨</span>
-    <span className="font-bold text-black">
-      {statistiche.gialliTotali ?? 0}
-    </span>
-  </div>
+            <div className="flex min-h-[103px] flex-col items-center justify-center rounded-xl bg-gradient-to-br from-[#454545] to-[#171717] px-2 py-3 text-center shadow-lg">
+              <div className="text-[22px]">🟥</div>
+              <div className="mt-1 text-[25px] font-black leading-none text-red-500">
+                {statistiche.rossiTotali ?? 0}
+              </div>
+              <div className="mt-2 text-[10px] font-extrabold uppercase text-white">
+                Espulsioni
+              </div>
+            </div>
 
-  <div className="flex justify-between items-center">
-    <span className="text-xl">🟥</span>
-    <span className="font-bold text-black">
-      {statistiche.rossiTotali ?? 0}
-    </span>
-  </div>
-</div>
+            <div className="flex min-h-[103px] flex-col items-center justify-center rounded-xl bg-gradient-to-br from-[#454545] to-[#171717] px-2 py-3 text-center shadow-lg">
+              <div className="text-[22px]">🥅</div>
+              <div className="mt-1 text-[22px] font-black leading-none text-red-500">
+                {statistiche.rigoriSegnati ?? 0}/{statistiche.rigoriTirati ?? 0}
+              </div>
+              <div className="mt-2 text-[10px] font-extrabold uppercase leading-tight text-white">
+                Rigori
+              </div>
+            </div>
 
-<hr className="border-t border-gray-300 my-4" />
+            <div className="flex min-h-[103px] flex-col items-center justify-center rounded-xl bg-gradient-to-br from-[#454545] to-[#171717] px-2 py-3 text-center shadow-lg">
+              <div className="text-[22px]">🏋️</div>
+              <div className="mt-1 text-[20px] font-black leading-none text-red-500">
+                {statistiche.allenamentiFatti ?? 0}/{statistiche.allenamentiSaltati ?? 0}
+              </div>
+              <div className="mt-2 text-[9px] font-extrabold uppercase leading-tight text-white">
+                Allenamenti
+              </div>
+            </div>
 
-{/* 4. Rigori tirati */}
-<div className="space-y-2">
-  <button
-  type="button"
-  onClick={() => setMostraRigoriTirati((prev) => !prev)}
-  className="w-full flex justify-between items-center text-left"
->
-  <span className="font-semibold text-black underline">
-    Rigori Tirati
-  </span>
+            {giocatore.ruolo === "Portiere" ? (
+              <div className="flex min-h-[103px] flex-col items-center justify-center rounded-xl bg-gradient-to-br from-[#454545] to-[#171717] px-2 py-3 text-center shadow-lg">
+                <div className="text-[22px]">🧤</div>
+                <div className="mt-1 text-[25px] font-black leading-none text-red-500">
+                  {statistiche.goalSubiti ?? 0}
+                </div>
+                <div className="mt-2 text-[10px] font-extrabold uppercase text-white">
+                  Goal subiti
+                </div>
+              </div>
+            ) : (
+              <div className="flex min-h-[103px] flex-col items-center justify-center rounded-xl bg-gradient-to-br from-[#454545] to-[#171717] px-2 py-3 text-center shadow-lg">
+                <div className="text-[22px]">⚽</div>
+                <div className="mt-1 text-[25px] font-black leading-none text-red-500">
+                  {statistiche.rigoriSbagliati ?? 0}
+                </div>
+                <div className="mt-2 text-[10px] font-extrabold uppercase text-white">
+                  Rigori sbagliati
+                </div>
+              </div>
+            )}
 
-  <span className="font-bold text-black">
-    {statistiche.rigoriTirati ?? 0}
-  </span>
-</button>
+          </div>
+        </section>
 
-{/* 19. Lista singoli rigori tirati */}
-{mostraRigoriTirati && (
-  <div className="mt-2 mb-3 pl-3 border-l-2 border-gray-300 space-y-2">
-    {partiteRigoriTirati.length === 0 ? (
-      <div className="text-sm text-gray-500">
-        Nessun rigore tirato in questa stagione.
-      </div>
-    ) : (
-      partiteRigoriTirati
-        .slice()
-        .sort(
-          (a, b) =>
-            new Date(a.partite.data_ora).getTime() -
-            new Date(b.partite.data_ora).getTime()
-        )
-        .map((riga) => {
-          const p = riga.partite;
+        {/* 23. Dettagli statistiche */}
+        <section className="mt-4 space-y-2">
 
-          return (
-            <div
-              key={riga.id}
-              className="flex justify-between items-center text-sm"
+          <div className={dettaglioClass}>
+            <button
+              type="button"
+              onClick={() => setMostraPresenze((prev) => !prev)}
+              className={dettaglioHeaderClass}
             >
-              <div className="text-black">
-                <div className="font-semibold">
-                  {new Date(p.data_ora).toLocaleDateString("it-IT")}
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-600 text-lg text-white">
+                  📅
                 </div>
 
-                <div>
-                  {p.squadre_casa?.nome} - {p.squadre_ospite?.nome}
+                <div className="min-w-0">
+                  <div className="text-[13px] font-extrabold uppercase text-[#252525]">
+                    Dettaglio Presenze
+                  </div>
+                  <div className="text-[11px] text-gray-500">
+                    Visualizza tutte le partite giocate
+                  </div>
                 </div>
               </div>
 
-              <span
-                className={`text-xl font-bold ${
-                  riga.esito === "segnato"
-                    ? "text-green-600"
-                    : "text-red-600"
-                }`}
-              >
-                {riga.esito === "segnato" ? "✓" : "✕"}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-lg font-black text-red-600">
+                  {statistiche.presenzeTotali}
+                </span>
+                <span className="text-xl text-gray-500">
+                  {mostraPresenze ? "⌃" : "›"}
+                </span>
+              </div>
+            </button>
+
+            {mostraPresenze && (
+              <div className="border-t border-gray-200 bg-[#f7f7f7] px-4 py-3 space-y-2">
+                {partitePresenze.length === 0 ? (
+                  <div className="text-sm text-gray-500">
+                    Nessuna presenza in questa stagione.
+                  </div>
+                ) : (
+                  partitePresenze
+                    .slice()
+                    .sort(
+                      (a, b) =>
+                        new Date(a.partite.data_ora).getTime() -
+                        new Date(b.partite.data_ora).getTime()
+                    )
+                    .map((riga) => {
+                      const p = riga.partite;
+
+                      return (
+                        <div
+                          key={p.id}
+                          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-black"
+                        >
+                          <div className="font-bold text-red-600">
+                            {new Date(p.data_ora).toLocaleDateString("it-IT")}
+                          </div>
+
+                          <div className="mt-1">
+                            {p.squadre_casa?.nome} - {p.squadre_ospite?.nome}
+                            {" "}
+                            <span className="font-extrabold">
+                              {p.goal_a ?? 0} - {p.goal_b ?? 0}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className={dettaglioClass}>
+            <button
+              type="button"
+              onClick={() => setMostraGoal((prev) => !prev)}
+              className={dettaglioHeaderClass}
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-600 text-lg text-white">
+                  🎯
+                </div>
+
+                <div className="min-w-0">
+                  <div className="text-[13px] font-extrabold uppercase text-[#252525]">
+                    Dettaglio Goal Fatti
+                  </div>
+                  <div className="text-[11px] text-gray-500">
+                    Visualizza tutti i goal segnati
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-lg font-black text-red-600">
+                  {statistiche.goalTotali}
+                </span>
+                <span className="text-xl text-gray-500">
+                  {mostraGoal ? "⌃" : "›"}
+                </span>
+              </div>
+            </button>
+
+            {mostraGoal && (
+              <div className="border-t border-gray-200 bg-[#f7f7f7] px-4 py-3 space-y-2">
+                {partiteGoal.length === 0 ? (
+                  <div className="text-sm text-gray-500">
+                    Nessun goal in questa stagione.
+                  </div>
+                ) : (
+                  Object.values(
+                    partiteGoal.reduce((acc: Record<string, any>, riga: any) => {
+                      const p = riga.partite;
+
+                      if (!acc[p.id]) {
+                        acc[p.id] = {
+                          partita: p,
+                          numeroGoal: 0,
+                        };
+                      }
+
+                      acc[p.id].numeroGoal += 1;
+                      return acc;
+                    }, {})
+                  )
+                    .sort(
+                      (a: any, b: any) =>
+                        new Date(a.partita.data_ora).getTime() -
+                        new Date(b.partita.data_ora).getTime()
+                    )
+                    .map((riga: any) => {
+                      const p = riga.partita;
+
+                      return (
+                        <div
+                          key={p.id}
+                          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-black"
+                        >
+                          <div className="font-bold text-red-600">
+                            {new Date(p.data_ora).toLocaleDateString("it-IT")}
+                          </div>
+
+                          <div className="mt-1">
+                            {p.squadre_casa?.nome} - {p.squadre_ospite?.nome}{" "}
+                            <span className="font-extrabold">
+                              {p.goal_a ?? 0} - {p.goal_b ?? 0}
+                            </span>
+                            {" — "}
+                            <span className="font-extrabold text-red-600">
+                              {riga.numeroGoal} {riga.numeroGoal === 1 ? "Goal" : "Goal"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className={dettaglioClass}>
+            <button
+              type="button"
+              onClick={() => setMostraAssist((prev) => !prev)}
+              className={dettaglioHeaderClass}
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#292929] text-lg text-white">
+                  👟
+                </div>
+
+                <div className="min-w-0">
+                  <div className="text-[13px] font-extrabold uppercase text-[#252525]">
+                    Dettaglio Assist
+                  </div>
+                  <div className="text-[11px] text-gray-500">
+                    Visualizza tutti gli assist forniti
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-lg font-black text-red-600">
+                  {statistiche.assistTotali ?? 0}
+                </span>
+                <span className="text-xl text-gray-500">
+                  {mostraAssist ? "⌃" : "›"}
+                </span>
+              </div>
+            </button>
+
+            {mostraAssist && (
+              <div className="border-t border-gray-200 bg-[#f7f7f7] px-4 py-3 space-y-2">
+                {partiteAssist.length === 0 ? (
+                  <div className="text-sm text-gray-500">
+                    Nessun assist in questa stagione.
+                  </div>
+                ) : (
+                  Object.values(
+                    partiteAssist.reduce((acc: Record<string, any>, riga: any) => {
+                      const p = riga.partite;
+
+                      if (!acc[p.id]) {
+                        acc[p.id] = {
+                          partita: p,
+                          numeroAssist: 0,
+                        };
+                      }
+
+                      acc[p.id].numeroAssist += 1;
+                      return acc;
+                    }, {})
+                  )
+                    .sort(
+                      (a: any, b: any) =>
+                        new Date(a.partita.data_ora).getTime() -
+                        new Date(b.partita.data_ora).getTime()
+                    )
+                    .map((riga: any) => {
+                      const p = riga.partita;
+
+                      return (
+                        <div
+                          key={p.id}
+                          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-black"
+                        >
+                          <div className="font-bold text-red-600">
+                            {new Date(p.data_ora).toLocaleDateString("it-IT")}
+                          </div>
+
+                          <div className="mt-1">
+                            {p.squadre_casa?.nome} - {p.squadre_ospite?.nome}{" "}
+                            <span className="font-extrabold">
+                              {p.goal_a ?? 0} - {p.goal_b ?? 0}
+                            </span>
+                            {" — "}
+                            <span className="font-extrabold text-red-600">
+                              {riga.numeroAssist}{" "}
+                              {riga.numeroAssist === 1 ? "Assist" : "Assist"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className={dettaglioClass}>
+            <button
+              type="button"
+              onClick={() => setMostraRigoriTirati((prev) => !prev)}
+              className={dettaglioHeaderClass}
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#292929] text-lg text-white">
+                  🥅
+                </div>
+
+                <div className="min-w-0">
+                  <div className="text-[13px] font-extrabold uppercase text-[#252525]">
+                    Dettaglio Rigori Tirati
+                  </div>
+                  <div className="text-[11px] text-gray-500">
+                    Visualizza tutti i rigori tirati
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-lg font-black text-red-600">
+                  {statistiche.rigoriTirati ?? 0}
+                </span>
+                <span className="text-xl text-gray-500">
+                  {mostraRigoriTirati ? "⌃" : "›"}
+                </span>
+              </div>
+            </button>
+
+            {mostraRigoriTirati && (
+              <div className="border-t border-gray-200 bg-[#f7f7f7] px-4 py-3 space-y-2">
+                {partiteRigoriTirati.length === 0 ? (
+                  <div className="text-sm text-gray-500">
+                    Nessun rigore tirato in questa stagione.
+                  </div>
+                ) : (
+                  partiteRigoriTirati
+                    .slice()
+                    .sort(
+                      (a, b) =>
+                        new Date(a.partite.data_ora).getTime() -
+                        new Date(b.partite.data_ora).getTime()
+                    )
+                    .map((riga) => {
+                      const p = riga.partite;
+
+                      return (
+                        <div
+                          key={riga.id}
+                          className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                        >
+                          <div className="text-black">
+                            <div className="font-bold text-red-600">
+                              {new Date(p.data_ora).toLocaleDateString("it-IT")}
+                            </div>
+
+                            <div className="mt-1">
+                              {p.squadre_casa?.nome} - {p.squadre_ospite?.nome}
+                            </div>
+                          </div>
+
+                          <span
+                            className={`text-xl font-black ${
+                              riga.esito === "segnato"
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {riga.esito === "segnato" ? "✓" : "✕"}
+                          </span>
+                        </div>
+                      );
+                    })
+                )}
+
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-lg bg-white px-3 py-2 text-center">
+                    <div className="text-[10px] font-bold uppercase text-gray-500">
+                      Fatti
+                    </div>
+                    <div className="text-lg font-black text-green-600">
+                      {statistiche.rigoriSegnati ?? 0}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg bg-white px-3 py-2 text-center">
+                    <div className="text-[10px] font-bold uppercase text-gray-500">
+                      Sbagliati
+                    </div>
+                    <div className="text-lg font-black text-red-600">
+                      {statistiche.rigoriSbagliati ?? 0}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 24. Statistiche portiere */}
+          {giocatore.ruolo === "Portiere" && (
+            <div className={dettaglioClass}>
+              <div className={dettaglioHeaderClass}>
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#292929] text-lg text-white">
+                    🧤
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-extrabold uppercase text-[#252525]">
+                      Dettaglio Portiere
+                    </div>
+                    <div className="text-[11px] text-gray-500">
+                      Goal subiti, rigori parati e subiti
+                    </div>
+                  </div>
+                </div>
+
+                <span className="text-xl text-gray-500">›</span>
+              </div>
+
+              <div className="grid grid-cols-3 border-t border-gray-200 bg-[#f7f7f7]">
+                <div className="px-2 py-3 text-center">
+                  <div className="text-[10px] font-bold uppercase text-gray-500">
+                    Ricevuti
+                  </div>
+                  <div className="mt-1 text-lg font-black text-[#222]">
+                    {statistiche.rigoriRicevuti ?? 0}
+                  </div>
+                </div>
+
+                <div className="border-x border-gray-200 px-2 py-3 text-center">
+                  <div className="text-[10px] font-bold uppercase text-gray-500">
+                    Parati
+                  </div>
+                  <div className="mt-1 text-lg font-black text-green-600">
+                    {statistiche.rigoriParati ?? 0}
+                  </div>
+                </div>
+
+                <div className="px-2 py-3 text-center">
+                  <div className="text-[10px] font-bold uppercase text-gray-500">
+                    Subiti
+                  </div>
+                  <div className="mt-1 text-lg font-black text-red-600">
+                    {statistiche.rigoriSubiti ?? 0}
+                  </div>
+                </div>
+              </div>
             </div>
-          );
-        })
-    )}
-  </div>
-)}
+          )}
 
-  <div className="flex justify-between items-center">
-    <span className="text-black">Fatti</span>
-    <span className="font-bold text-green-600">
-      {statistiche.rigoriSegnati ?? 0}
-    </span>
-  </div>
+        </section>
 
-  <div className="flex justify-between items-center">
-    <span className="text-black">Sbagliati</span>
-    <span className="font-bold text-red-600">
-      {statistiche.rigoriSbagliati ?? 0}
-    </span>
-  </div>
-</div>
+        {/* 25. Allenamenti */}
+        <section className="mt-4 overflow-hidden rounded-xl bg-white shadow-[0_4px_14px_rgba(0,0,0,0.22)]">
+          <div className="bg-gradient-to-r from-red-600 to-[#3b3b3b] px-4 py-2.5">
+            <div className="text-[12px] font-extrabold uppercase tracking-wide text-white">
+              Allenamenti
+            </div>
+          </div>
 
-<hr className="border-t border-gray-300 my-4" />
+          <div className="grid grid-cols-2 divide-x divide-gray-200">
+            <div className="px-4 py-3 text-center">
+              <div className="text-[10px] font-bold uppercase text-gray-500">
+                Fatti
+              </div>
+              <div className="mt-1 text-xl font-black text-green-600">
+                {statistiche.allenamentiFatti ?? 0}
+              </div>
+            </div>
 
-{/* 5. Rigori ricevuti - solo portiere */}
-{giocatore.ruolo === "Portiere" && (
-  <>
-    <div className="space-y-2">
-      <div className="flex justify-between items-center">
-        <span className="font-semibold text-black">Rigori Ricevuti</span>
-        <span className="font-bold text-black">
-          {statistiche.rigoriRicevuti ?? 0}
-        </span>
-      </div>
+            <div className="px-4 py-3 text-center">
+              <div className="text-[10px] font-bold uppercase text-gray-500">
+                Saltati
+              </div>
+              <div className="mt-1 text-xl font-black text-red-600">
+                {statistiche.allenamentiSaltati ?? 0}
+              </div>
+            </div>
+          </div>
+        </section>
 
-      <div className="flex justify-between items-center">
-        <span className="text-black">Parati</span>
-        <span className="font-bold text-green-600">
-          {statistiche.rigoriParati ?? 0}
-        </span>
-      </div>
+        {/* 26. Media Voto Mister — visibile solo ad Admin o Creator */}
+        {(role === UserRole.Admin || role === UserRole.Creator) && (
+          <section className="mt-4 overflow-hidden rounded-xl bg-white shadow-[0_4px_14px_rgba(0,0,0,0.22)]">
+            <div className="flex items-center justify-between px-4 py-4">
+              <div>
+                <div className="text-[12px] font-extrabold uppercase text-[#252525]">
+                  Media Voto Mister
+                </div>
+                <div className="mt-1 text-[10px] text-gray-500">
+                  Valutazione riservata
+                </div>
+              </div>
 
-      <div className="flex justify-between items-center">
-        <span className="text-black">Subiti</span>
-        <span className="font-bold text-red-600">
-          {statistiche.rigoriSubiti ?? 0}
-        </span>
-      </div>
-    </div>
-
-    <hr className="border-t border-gray-300 my-4" />
-  </>
-)}
-</div>
-
-{/* 🔸 Separatore */}
-<hr className="w-2/3 border-t border-gray-300 my-3" />
-
-{/* 6. Allenamenti */}
-<div className="w-full max-w-md mx-auto mb-6">
-  <div className="space-y-2">
-    <div className="flex justify-between items-center">
-      <span className="font-semibold text-black">Allen. Fatti</span>
-      <span className="font-bold text-green-600">
-        {statistiche.allenamentiFatti ?? 0}
-      </span>
-    </div>
-
-    <div className="flex justify-between items-center">
-      <span className="font-semibold text-black">Allen. Saltati</span>
-      <span className="font-bold text-red-600">
-        {statistiche.allenamentiSaltati ?? 0}
-      </span>
-    </div>
-  </div>
-</div>
-
-{/* 🔸 Separatore */}
-<hr className="w-2/3 border-t border-gray-300 my-3" />
-
-{/* 7. Media Voto Mister — visibile solo ad Admin o Creator */}
-{(role === UserRole.Admin || role === UserRole.Creator) && (
-  <div className="w-full max-w-md mx-auto mb-6">
-    <hr className="border-t border-gray-300 mb-4" />
-
-    <div className="flex justify-between items-center">
-      <span className="font-semibold text-black">Media Voto Mister</span>
-      <span className="font-bold text-blue-500">
-        {statistiche.mediaVotoMister?.toFixed(2) ?? "0.00"}
-      </span>
-    </div>
-  </div>
-)}
-
+              <div className="rounded-lg bg-[#292929] px-4 py-2 text-xl font-black text-red-500">
+                {statistiche.mediaVotoMister?.toFixed(2) ?? "0.00"}
+              </div>
+            </div>
+          </section>
+        )}
 
       </div>
     </div>
-  </div>
   );
 }

@@ -2643,6 +2643,15 @@ const salvaStatoConferma = async () => {
   await salvaStato();
 };
 const statoPartita = getStatoPartita(timerState);
+// ========================
+// Minuto complessivo partita
+// ========================
+const minutoPartita = Math.max(
+  0,
+  Math.floor(
+    ((timerState?.total_elapsed_sec || 0) + Math.floor(elapsed / 1000)) / 60
+  )
+);
 
 let timerLabel = "PRONTO PER IL 1° TEMPO";
 
@@ -2723,26 +2732,34 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
         
 
         <div className="p-6 space-y-6">
-          {/* TIMER */}
-          <div className="flex flex-col items-center space-y-2">
-            <CronometroPartita
-  elapsed={elapsed}
-  initialDuration={currentDuration}
-  onDurationChange={changeDuration}
-  label={timerLabel}
-/>
+  {/* TIMER */}
+  <div className="flex flex-col items-center space-y-2">
+    <CronometroPartita
+      elapsed={elapsed}
+      initialDuration={currentDuration}
+      onDurationChange={changeDuration}
+      label={timerLabel}
+    />
 
- <div className="flex flex-wrap gap-2 justify-center">
+    <div
+      className="w-[74px] h-[38px] flex items-center justify-center border border-gray-300 rounded text-lg font-bold bg-white"
+      style={{ marginTop: "-12px" }}
+    >
+      {minutoPartita}'
+    </div>
+  
 
-{/* Prepartita */}
-{statoPartita === StatoPartita.PREPARTITA && (
-  <button
-    onClick={startTimer}
-    className="bg-green-600 text-white px-3 py-1 rounded"
-  >
-    ▶ Inizio 1° Tempo
-  </button>
-)}
+  <div className="flex flex-wrap gap-2 justify-center">
+
+    {/* Prepartita */}
+    {statoPartita === StatoPartita.PREPARTITA && (
+      <button
+        onClick={startTimer}
+        className="bg-green-600 text-white px-3 py-1 rounded"
+      >
+        ▶ Inizio 1° Tempo
+      </button>
+    )}
 
 {/* Primo tempo */}
 {statoPartita === StatoPartita.PRIMO_TEMPO && (
@@ -3542,7 +3559,7 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
 
 {/* Scelta manuale tempo per goal */}
 {tipoEvento === "gol" && (
-  <div className="flex justify-center space-x-4">
+  <div className="flex flex-wrap justify-center gap-2">
     <button
       onClick={() => setTempo(1)}
       className={`px-5 py-2 rounded-full font-medium ${
@@ -3563,6 +3580,28 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
       }`}
     >
       2° Tempo
+    </button>
+
+    <button
+      onClick={() => setTempo(3)}
+      className={`px-5 py-2 rounded-full font-medium ${
+        tempo === 3
+          ? "bg-montecarlo-secondary text-white"
+          : "bg-montecarlo-gray-50 text-gray-900 hover:bg-montecarlo-gray-100"
+      }`}
+    >
+      1° Suppl.
+    </button>
+
+    <button
+      onClick={() => setTempo(4)}
+      className={`px-5 py-2 rounded-full font-medium ${
+        tempo === 4
+          ? "bg-montecarlo-secondary text-white"
+          : "bg-montecarlo-gray-50 text-gray-900 hover:bg-montecarlo-gray-100"
+      }`}
+    >
+      2° Suppl.
     </button>
   </div>
 )}

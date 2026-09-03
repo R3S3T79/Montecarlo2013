@@ -80,10 +80,12 @@ export default function WeatherWidget_OpenMeteo_Daily({
   const backgroundGradient = getGradientByWeather(now?.weathercode);
 
   return (
-    <div style={{ 
-  ...styles.card, 
-  background: backgroundGradient || "linear-gradient(145deg, #0052d4 0%, #4364f7 50%, #6fb1fc 100%)"
-}}>
+    <div
+  style={{
+    ...styles.card,
+    background: "rgba(255,255,255,0.50)",
+  }}
+>
 
       <h3 style={styles.title}>🌤 Meteo {nomeLuogo}</h3>
 

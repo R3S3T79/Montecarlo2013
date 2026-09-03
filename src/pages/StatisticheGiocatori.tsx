@@ -284,60 +284,90 @@ const rossi = giocatoreStagioneId
 
   return (
     <div className="min-h-screen">
-      <div className="w-full px-[2px] pt-2 box-border">
+      <div className="w-full px-[2px] pt-2 pb-6 box-border">
 
-        {/* 🔹 Filtri Stagione + Ruolo */}
-        <div className="flex gap-2 mb-2">
-          <select
-            className="flex-1 border rounded-md px-3 py-2 text-sm"
-            value={stagioneSelezionata}
-            onChange={(e) => setStagioneSelezionata(e.target.value)}
-          >
-            {stagioni.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nome}
-              </option>
-            ))}
-          </select>
+        {/* 1. Filtri Stagione + Ruolo */}
+        <div className="flex gap-2 mb-4">
 
-          <select
-            className="flex-1 border rounded-md px-3 py-2 text-sm"
-            value={ruoloSelezionato}
-            onChange={(e) => setRuoloSelezionato(e.target.value)}
-          >
-            <option value="">Tutti i ruoli</option>
-            <option value="Portiere">Portiere</option>
-            <option value="Difensore">Difensore</option>
-            <option value="Centrocampista">Centrocampista</option>
-            <option value="Attaccante">Attaccante</option>
-          </select>
+          <div className="relative flex-1 overflow-hidden rounded-xl shadow-[0_5px_14px_rgba(0,0,0,0.35)]">
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-12 items-center justify-center bg-gradient-to-br from-red-500 to-red-700 text-[20px] text-white">
+              📅
+            </div>
+
+            <select
+              className="w-full appearance-none rounded-xl border border-white/60 bg-white/90 py-3 pl-[58px] pr-8 text-[14px] font-semibold text-[#171717] outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-500/30"
+              value={stagioneSelezionata}
+              onChange={(e) => setStagioneSelezionata(e.target.value)}
+            >
+              {stagioni.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nome}
+                </option>
+              ))}
+            </select>
+
+            <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-lg font-bold text-black">
+              ⌄
+            </div>
+          </div>
+
+          <div className="relative flex-1 overflow-hidden rounded-xl shadow-[0_5px_14px_rgba(0,0,0,0.35)]">
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-12 items-center justify-center bg-gradient-to-br from-red-500 to-red-700 text-[20px] text-white">
+              🏆
+            </div>
+
+            <select
+              className="w-full appearance-none rounded-xl border border-white/60 bg-white/90 py-3 pl-[58px] pr-8 text-[14px] font-semibold text-[#171717] outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-500/30"
+              value={ruoloSelezionato}
+              onChange={(e) => setRuoloSelezionato(e.target.value)}
+            >
+              <option value="">Tutti i ruoli</option>
+              <option value="Portiere">Portiere</option>
+              <option value="Difensore">Difensore</option>
+              <option value="Centrocampista">Centrocampista</option>
+              <option value="Attaccante">Attaccante</option>
+            </select>
+
+            <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-lg font-bold text-black">
+              ⌄
+            </div>
+          </div>
+
         </div>
 
-        {/* Legenda */}
-<div className="grid grid-cols-2 gap-y-1 gap-x-4 text-sm text-gray-600 pt-2 px-2 text-white">
-  <div><strong>G</strong> = Fatti/Subiti</div>
-  <div><strong>P</strong> = Presenze</div>
-  <div><strong>A</strong> = Assist</div>
-  <div><strong>M</strong> = Media Goal fatti/subiti</div>
-</div>
+        {/* 2. Legenda */}
+        <div className="grid grid-cols-2 gap-y-2 gap-x-4 mb-4 px-3 text-[14px] font-medium text-white drop-shadow-md">
+          <div><strong>G</strong> = Fatti/Subiti</div>
+          <div><strong>P</strong> = Presenze</div>
+          <div><strong>A</strong> = Assist</div>
+          <div><strong>M</strong> = Media Goal fatti/subiti</div>
+        </div>
 
 
         {loading ? (
-          <div className="text-center text-montecarlo-secondary">Caricamento...</div>
+          <div className="rounded-xl border border-white/30 bg-white/85 px-4 py-8 text-center font-semibold text-red-600 shadow-md">
+            Caricamento...
+          </div>
         ) : (
-         <div className="overflow-x-auto mt-2">
-  <table className="w-full bg-white/90 rounded-lg overflow-hidden border-collapse text-sm">
-    <thead className="bg-montecarlo-red-600 text-white">
+
+         /* 3. Tabella giocatori */
+         <div className="overflow-x-auto rounded-2xl border border-white/50 bg-white/90 shadow-[0_8px_24px_rgba(0,0,0,0.38)]">
+  <table className="w-full border-collapse text-sm">
+
+    <thead className="bg-gradient-to-r from-red-600 via-red-600 to-red-700 text-white">
       <tr className="text-center">
         <th
-          className="px-2 py-2 text-left cursor-pointer whitespace-nowrap"
+          className="px-3 py-3 text-left cursor-pointer whitespace-nowrap"
           onClick={() => sortData('giocatore')}
         >
-          Giocatore{" "}
+          <span className="text-[15px] font-extrabold">
+            Giocatore{" "}
+          </span>
+
           {sortField === "giocatore" ? (
-            sortOrder === "asc" ? <ArrowUp size={13} className="inline ml-0.5" /> : <ArrowDown size={13} className="inline ml-0.5" />
+            sortOrder === "asc" ? <ArrowUp size={14} className="inline ml-0.5" /> : <ArrowDown size={14} className="inline ml-0.5" />
           ) : (
-            <ArrowUpDown size={13} className="inline ml-0.5 opacity-70" />
+            <ArrowUpDown size={14} className="inline ml-0.5 opacity-70" />
           )}
         </th>
 
@@ -355,7 +385,7 @@ const rossi = giocatoreStagioneId
         ].map(([field, label]) => (
           <th
             key={field}
-            className="px-1 py-2 cursor-pointer whitespace-nowrap"
+            className="px-1 py-3 cursor-pointer whitespace-nowrap font-extrabold"
             onClick={() => sortData(field as any)}
           >
             {label}{" "}
@@ -370,56 +400,63 @@ const rossi = giocatoreStagioneId
     </thead>
 
     <tbody>
-  {sortedRows.map((st) => (
+  {sortedRows.map((st, index) => (
     <tr
       key={st.giocatore_uid}
-      className="border-b border-red-200 hover:bg-red-50 cursor-pointer transition-colors"
+      className={`border-b border-red-200 cursor-pointer transition-colors hover:bg-red-50 ${
+        index % 2 === 0 ? "bg-white/80" : "bg-white/65"
+      }`}
       onClick={() => navigate(`/giocatore/${st.giocatore_uid}`)}
     >
       {/* Giocatore */}
-      <td className="py-1 pl-3 pr-2 flex items-center gap-2 text-left whitespace-nowrap">
+      <td className="py-2 pl-3 pr-2 flex items-center gap-3 text-left whitespace-nowrap">
         {st.foto_url ? (
           <img
             src={st.foto_url}
             alt="foto"
-            className="w-12 h-12 rounded-full object-cover"
+            className="w-12 h-12 rounded-full object-cover border-2 border-red-500 shadow-[0_3px_8px_rgba(0,0,0,0.25)]"
           />
         ) : (
-          <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center text-sm text-white">
+          <div className="w-12 h-12 rounded-full bg-[#333333] border-2 border-red-500 flex items-center justify-center text-sm text-white shadow-[0_3px_8px_rgba(0,0,0,0.25)]">
             ?
           </div>
         )}
+
         <div className="flex flex-col leading-tight">
-          <span className="font-medium text-[14px]">{st.giocatore_cognome}</span>
-          <span className="text-[12px] text-gray-600">{st.giocatore_nome}</span>
+          <span className="font-extrabold text-[14px] text-[#181818]">
+            {st.giocatore_cognome}
+          </span>
+          <span className="mt-[2px] text-[12px] font-medium text-gray-600">
+            {st.giocatore_nome}
+          </span>
         </div>
       </td>
 
       {/* G */}
-<td className="py-1 px-[4px] text-center">
+<td className="py-2 px-[4px] text-center font-medium text-[#202020]">
   {st.ruolo?.toLowerCase() === "portiere" ? st.subiti : st.gol}
 </td>
 
 {/* A - Assist */}
-<td className="py-1 px-[4px] text-center">
+<td className="py-2 px-[4px] text-center font-medium text-[#202020]">
   {st.assist}
 </td>
 
 {/* M */}
-<td className="py-1 px-[4px] text-center">{st.media.toFixed(2)}</td>
+<td className="py-2 px-[4px] text-center font-medium text-[#202020]">{st.media.toFixed(2)}</td>
 
 {/* 🟨 Gialli */}
-<td className="py-1 px-[4px] text-center">
+<td className="py-2 px-[4px] text-center font-medium text-[#202020]">
   {st.gialli}
 </td>
 
 {/* 🟥 Rossi */}
-<td className="py-1 px-[4px] text-center">
+<td className="py-2 px-[4px] text-center font-medium text-[#202020]">
   {st.rossi}
 </td>
 
 {/* P */}
-<td className="py-1 px-[4px] text-center">{st.presenze}</td>
+<td className="py-2 px-[4px] text-center font-medium text-[#202020]">{st.presenze}</td>
 
 
       {/* {(role === 'admin' || role === 'creator') && (

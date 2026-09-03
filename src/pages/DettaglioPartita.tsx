@@ -44,7 +44,7 @@ interface PartitaDettaglio {
   goal_a4: number
   goal_b1: number
   goal_b2: number
-    goal_b3: number
+  goal_b3: number
   goal_b4: number
   rigori_a: number
   rigori_b: number
@@ -286,15 +286,19 @@ commento,
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#6B7280] to-[#bfb9b9]">
-        <div className="text-white text-lg">Caricamento…</div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="rounded-xl border border-white/20 bg-black/60 px-6 py-4 text-lg font-semibold text-white shadow-xl">
+          Caricamento…
+        </div>
       </div>
     )
   }
   if (!partita) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#6B7280] to-[#bfb9b9]">
-        <div className="text-white text-lg">Partita non trovata</div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="rounded-xl border border-white/20 bg-black/60 px-6 py-4 text-lg font-semibold text-white shadow-xl">
+          Partita non trovata
+        </div>
       </div>
     )
   }
@@ -307,6 +311,12 @@ commento,
       year: 'numeric',
     })
     .replace(/^./, ch => ch.toUpperCase())
+
+  const oraFormatted = new Date(partita.data_ora)
+    .toLocaleTimeString('it-IT', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
 
   const goalCasaArr = [
   partita.goal_a1,
@@ -322,221 +332,417 @@ const goalOspiteArr = [
   partita.goal_b4
 ]
 
-  const renderSezione = (squadra: SquadraInfo | null | undefined, goals: number[]) => {
-  if (!squadra || !squadra.nome) return null; // 👈 protezione doppia: oggetto o nome mancante
-
-  const total = goals.reduce((a, b) => a + b, 0);
-  const isMonte = squadra?.nome === 'Montecarlo';
-  const marcatoriByTempo = (t: number) => partita?.marcatori?.filter(m => m.periodo === t) || [];
+  const totaleCasa = goalCasaArr.reduce((a, b) => a + b, 0)
+  const totaleOspite = goalOspiteArr.reduce((a, b) => a + b, 0)
 
   return (
-    <div className="bg-white/90 rounded-lg shadow-montecarlo overflow-hidden">
-      <div
-        className={`p-4 flex items-center justify-between ${
-          isMonte
-            ? 'bg-montecarlo-red-50 border border-montecarlo-red-200'
-            : 'bg-montecarlo-gray-50 border border-montecarlo-gray-200'
-        }`}
-      >
-        <div className="flex items-center gap-2">
-          {squadra?.logo_url && (
-            <img src={squadra.logo_url} alt={squadra.nome} className="w-8 h-8 object-contain" />
-          )}
-          <span
-            className={`font-bold text-lg ${
-              isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'
-            }`}
-          >
-            {squadra?.nome}
-          </span>
-        </div>
-        <span
-          className={`font-bold text-2xl ${
-            isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'
-          }`}
-        >
-          {total}
-        </span>
-      </div>
+    <div className="min-h-screen w-full px-[2px] pb-4 box-border">
+      <div className="w-full max-w-md mx-auto" ref={containerRef}>
 
-      <div className="p-4 space-y-4">
-        {(supplementariGiocati ? [1, 2, 3, 4] : [1, 2]).map(tempo => (
-          <div key={tempo}>
-            <div className="flex justify-between">
-              <span
-                className={`font-medium ${isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'}`}
-              >
-               {tempo === 1
-  ? '1° Tempo'
-  : tempo === 2
-    ? '2° Tempo'
-    : tempo === 3
-      ? '1° Supplementare'
-      : '2° Supplementare'}
+        {/* 1. Data partita */}
+        <div className="mb-3 flex items-center rounded-xl border border-white/20 bg-black/65 px-4 py-3 shadow-[0_6px_18px_rgba(0,0,0,0.35)]">
+          <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-lg bg-red-600 text-lg text-white">
+            📅
+          </div>
+
+          <div className="text-[14px] font-semibold text-white">
+            {dataFormatted} - {oraFormatted}
+          </div>
+        </div>
+
+        {/* 2. Risultato principale */}
+        <div className="mb-4 overflow-hidden rounded-2xl border border-white/60 bg-white/95 shadow-[0_10px_28px_rgba(0,0,0,0.42)]">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-5">
+
+            <div className="flex min-w-0 flex-col items-center">
+              {partita.casa.logo_url && (
+                <img
+                  src={partita.casa.logo_url}
+                  alt={partita.casa.nome}
+                  className="mb-2 h-16 w-16 object-contain"
+                />
+              )}
+
+              <div className="w-full truncate text-center text-[15px] font-extrabold text-[#181818]">
+                {partita.casa.nome}
+              </div>
+
+              <div className="mt-2 h-1 w-[80%] rounded-full bg-red-600" />
+            </div>
+
+            <div className="flex items-center gap-3 px-2">
+              <span className="text-[48px] font-black leading-none text-[#151515]">
+                {totaleCasa}
               </span>
-              <span
-                className={`font-semibold ${isMonte ? 'text-montecarlo-secondary' : 'text-gray-900'}`}
-              >
-                {goals[tempo - 1]}
+
+              <span className="h-12 w-[2px] bg-red-500" />
+
+              <span className="text-[48px] font-black leading-none text-[#151515]">
+                {totaleOspite}
               </span>
             </div>
 
-            {isMonte && (
-              <ul className="list-disc list-inside text-gray-700 text-lg mt-2">
-                {marcatoriByTempo(tempo).map((m, i) => (
-                  <li key={i}>
-                    {m.giocatore?.cognome || ''} {m.giocatore?.nome || ''}
-                  </li>
-                ))}
-              </ul>
-            )}
+            <div className="flex min-w-0 flex-col items-center">
+              {partita.ospite.logo_url && (
+                <img
+                  src={partita.ospite.logo_url}
+                  alt={partita.ospite.nome}
+                  className="mb-2 h-16 w-16 object-contain"
+                />
+              )}
+
+              <div className="w-full truncate text-center text-[15px] font-extrabold text-[#181818]">
+                {partita.ospite.nome}
+              </div>
+
+              <div className="mt-2 h-1 w-[80%] rounded-full bg-[#244fa3]" />
+            </div>
           </div>
-        ))}
-      </div>
-    </div>
-  );
-};
 
+          <div className="flex justify-center pb-4">
+            <div className="rounded-full border border-gray-300 bg-white px-4 py-1 text-xs font-semibold text-gray-700 shadow-sm">
+              ⏱ Terminata
+            </div>
+          </div>
+        </div>
 
-  return (
-    <div className="min-h-screen px-2 pb-2">
-      <div className="max-w-md mx-auto text-xl" ref={containerRef}>
-        <div className="bg-white/20 rounded-xl shadow-montecarlo -mt-2">
-          {/* header: solo data */}
-          <div className="bg-montecarlo-red-10/20 border-l-4 border-montecarlo-secondary flex justify-end px-6 py-4 rounded-t-xl">
-            <span className="bg-montecarlo-accent text-montecarlo-secondary px-3 py-1 rounded-full text-sm font-medium shadow-gold">
-              {dataFormatted}
+        {/* 3. Marcatori */}
+        <div className="mb-4 overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_22px_rgba(0,0,0,0.38)]">
+
+          <div className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 text-white">
+            <span className="text-xl">⚽</span>
+            <span className="font-extrabold uppercase tracking-wide">
+              Marcatori
             </span>
           </div>
 
-          <div className="p-6 space-y-6">
-            {partita?.casa && renderSezione(partita.casa, goalCasaArr)}
-{partita?.ospite && renderSezione(partita.ospite, goalOspiteArr)}
+          <div className="p-4">
+            {partita.marcatori.length > 0 ? (
+              <div className="space-y-3">
+                {partita.marcatori.map((m, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 border-b border-gray-200 pb-3 last:border-b-0 last:pb-0"
+                  >
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-base shadow-sm">
+                      ⚽
+                    </div>
 
-            {((partita.rigori_a ?? 0) > 0 || (partita.rigori_b ?? 0) > 0) && (
-              <div className="bg-white/90 rounded-lg shadow-montecarlo p-4">
-                <div className="font-bold text-center mb-3">
-                  Rigori
-                </div>
-
-                                <div className="space-y-2 mb-4">
-                  {tiriRigori.map((tiro) => {
-                    const isCasa = tiro.squadra_id === partita.casa.id
-                    const isMontecarlo =
-                      tiro.squadra_id === partita.casa.id
-                        ? partita.casa.nome === 'Montecarlo'
-                        : partita.ospite.nome === 'Montecarlo'
-
-                    const nomeRigorista =
-                      isMontecarlo && tiro.giocatore
-                        ? `${tiro.giocatore.cognome} ${tiro.giocatore.nome}`.trim()
-                        : `Rigore ${tiro.ordine}`
-
-                    return (
-                      <div
-                        key={tiro.id}
-                        className={`flex ${
-                          isCasa ? 'justify-start' : 'justify-end'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">
-                            {nomeRigorista}
-                          </span>
-
-                          <span className="font-bold">
-                            {tiro.esito === 'segnato' ? '⚽' : '❌'}
-                          </span>
-                        </div>
+                    <div>
+                      <div className="text-[12px] font-medium text-gray-500">
+                        {m.periodo === 1
+                          ? '1° Tempo'
+                          : m.periodo === 2
+                            ? '2° Tempo'
+                            : m.periodo === 3
+                              ? '1° Supplementare'
+                              : '2° Supplementare'}
                       </div>
-                    )
-                  })}
-                </div>
 
-                <div className="grid grid-cols-[2fr_auto_2fr] items-center gap-4">
-                  <span className="text-montecarlo-secondary font-semibold text-right">
-                    {partita.casa.nome}
-                  </span>
-
-                  <span className="text-montecarlo-secondary font-bold text-lg">
-                    {partita.rigori_a ?? 0} - {partita.rigori_b ?? 0}
-                  </span>
-
-                  <span className="font-semibold">
-                    {partita.ospite.nome}
-                  </span>
-                </div>
+                      <div className="text-[14px] font-bold text-[#181818]">
+                        {m.giocatore?.cognome || ''} {m.giocatore?.nome || ''}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-2 text-center text-sm text-gray-500">
+                Nessun marcatore registrato
               </div>
             )}
-
-
-            {/* Riepilogo / Telecronaca */}
-            <div className="mt-6 bg-white/90 rounded-lg shadow-montecarlo p-4 relative">
-              {canEdit && !editing && (
-                <div className="absolute top-2 right-2 flex gap-2">
-                  <button
-                    onClick={() => setEditing(true)}
-                    className="text-gray-600 hover:text-montecarlo-secondary"
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    className="text-gray-600 hover:text-red-600"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              )}
-
-              {editing ? (
-                <div>
-                  <ReactQuill
-                    theme="snow"
-                    value={commento}
-                    onChange={setCommento}
-                    modules={{
-                      toolbar: [
-                        [{ 'font': [] }, { 'size': [] }],
-                        ['bold', 'italic', 'underline', 'strike'],
-                        [{ 'color': [] }, { 'background': [] }],
-                        [{ 'align': [] }],
-                        ['clean']
-                      ]
-                    }}
-                  />
-                  <div className="flex justify-end mt-2 gap-2">
-                    <button
-                      onClick={() => {
-                        setEditing(false)
-                        setCommento(partita.commento || '')
-                      }}
-                      className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
-                    >
-                      Annulla
-                    </button>
-                    <button
-                      onClick={handleSave}
-                      className="px-3 py-1 rounded bg-montecarlo-accent text-white hover:bg-montecarlo-secondary"
-                    >
-                      Salva
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className="text-sm text-gray-800 prose max-w-none"
-                  dangerouslySetInnerHTML={{
-                    __html:
-                      partita.commento && partita.commento.trim() !== ''
-                        ? partita.commento
-                        : 'Riepilogo Partita'
-                  }}
-                />
-              )}
-            </div>
           </div>
         </div>
+
+        {/* 4. Parziali */}
+        <div className="mb-4 overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_22px_rgba(0,0,0,0.38)]">
+
+          <div className="bg-gradient-to-r from-[#242424] to-[#3b3b3b] px-4 py-3 text-center font-extrabold text-white">
+            Parziali
+          </div>
+
+          <div className="divide-y divide-gray-200">
+
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 py-3">
+              <div className="text-left text-sm font-semibold text-[#222]">
+                {partita.casa.nome}
+              </div>
+              <div className="px-4 text-xs font-bold uppercase text-gray-500">
+                1° Tempo
+              </div>
+              <div className="text-right text-sm font-semibold text-[#222]">
+                {partita.ospite.nome}
+              </div>
+
+              <div className="mt-1 text-left text-xl font-black text-red-600">
+                {partita.goal_a1}
+              </div>
+              <div />
+              <div className="mt-1 text-right text-xl font-black text-[#244fa3]">
+                {partita.goal_b1}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 py-3">
+              <div className="text-left text-sm font-semibold text-[#222]">
+                {partita.casa.nome}
+              </div>
+              <div className="px-4 text-xs font-bold uppercase text-gray-500">
+                2° Tempo
+              </div>
+              <div className="text-right text-sm font-semibold text-[#222]">
+                {partita.ospite.nome}
+              </div>
+
+              <div className="mt-1 text-left text-xl font-black text-red-600">
+                {partita.goal_a2}
+              </div>
+              <div />
+              <div className="mt-1 text-right text-xl font-black text-[#244fa3]">
+                {partita.goal_b2}
+              </div>
+            </div>
+
+            {supplementariGiocati && (
+              <>
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 py-3">
+                  <div className="text-left text-sm font-semibold text-[#222]">
+                    {partita.casa.nome}
+                  </div>
+                  <div className="px-4 text-xs font-bold uppercase text-gray-500">
+                    1° Suppl.
+                  </div>
+                  <div className="text-right text-sm font-semibold text-[#222]">
+                    {partita.ospite.nome}
+                  </div>
+
+                  <div className="mt-1 text-left text-xl font-black text-red-600">
+                    {partita.goal_a3}
+                  </div>
+                  <div />
+                  <div className="mt-1 text-right text-xl font-black text-[#244fa3]">
+                    {partita.goal_b3}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 py-3">
+                  <div className="text-left text-sm font-semibold text-[#222]">
+                    {partita.casa.nome}
+                  </div>
+                  <div className="px-4 text-xs font-bold uppercase text-gray-500">
+                    2° Suppl.
+                  </div>
+                  <div className="text-right text-sm font-semibold text-[#222]">
+                    {partita.ospite.nome}
+                  </div>
+
+                  <div className="mt-1 text-left text-xl font-black text-red-600">
+                    {partita.goal_a4}
+                  </div>
+                  <div />
+                  <div className="mt-1 text-right text-xl font-black text-[#244fa3]">
+                    {partita.goal_b4}
+                  </div>
+                </div>
+              </>
+            )}
+
+          </div>
+        </div>
+
+        {/* 5. Rigori */}
+        {((partita.rigori_a ?? 0) > 0 || (partita.rigori_b ?? 0) > 0) && (
+          <div className="mb-4 overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_22px_rgba(0,0,0,0.38)]">
+
+            <div className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 text-white">
+              <span className="text-xl">🥅</span>
+              <span className="font-extrabold uppercase tracking-wide">
+                Rigori
+              </span>
+            </div>
+
+            <div className="p-4">
+
+              <div className="mb-4 text-center text-[16px] font-extrabold text-[#181818]">
+                {partita.casa.nome}{' '}
+                <span className="text-red-600">
+                  {partita.rigori_a ?? 0} - {partita.rigori_b ?? 0}
+                </span>{' '}
+                {partita.ospite.nome}
+              </div>
+
+              <div className="space-y-2">
+                {tiriRigori.map((tiro) => {
+                  const isCasa = tiro.squadra_id === partita.casa.id
+                  const isMontecarlo =
+                    tiro.squadra_id === partita.casa.id
+                      ? partita.casa.nome === 'Montecarlo'
+                      : partita.ospite.nome === 'Montecarlo'
+
+                  const nomeRigorista =
+                    isMontecarlo && tiro.giocatore
+                      ? `${tiro.giocatore.cognome} ${tiro.giocatore.nome}`.trim()
+                      : `Rigore ${tiro.ordine}`
+
+                  return (
+                    <div
+                      key={tiro.id}
+                      className={`flex ${
+                        isCasa ? 'justify-start' : 'justify-end'
+                      }`}
+                    >
+                      <div className="flex min-w-[48%] items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
+                        <span
+                          className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
+                            isCasa ? 'bg-red-600' : 'bg-[#244fa3]'
+                          }`}
+                        >
+                          {tiro.ordine}
+                        </span>
+
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#222]">
+                          {nomeRigorista}
+                        </span>
+
+                        <span className="font-bold">
+                          {tiro.esito === 'segnato' ? '✅' : '❌'}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* 6. Supplementari */}
+        <div className="mb-4 overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_22px_rgba(0,0,0,0.38)]">
+
+          <div className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 text-white">
+            <span className="text-xl">⏱</span>
+            <span className="font-extrabold uppercase tracking-wide">
+              Supplementari
+            </span>
+          </div>
+
+          <div className="flex items-center justify-center gap-4 px-4 py-5">
+            <span className="text-sm font-medium text-gray-700">
+              Supplementari giocati
+            </span>
+
+            <span
+              className={`rounded-full px-5 py-1 text-sm font-bold ${
+                supplementariGiocati
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-gray-200 text-gray-600'
+              }`}
+            >
+              {supplementariGiocati ? 'Sì' : 'No'}
+            </span>
+          </div>
+        </div>
+
+        {/* 7. Commento / Telecronaca */}
+        <div className="mb-4 overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_22px_rgba(0,0,0,0.38)]">
+
+          <div className="relative flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 text-white">
+            <span className="text-xl">💬</span>
+
+            <span className="font-extrabold uppercase tracking-wide">
+              Commento
+            </span>
+
+            {canEdit && !editing && (
+              <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-2">
+                <button
+                  onClick={() => setEditing(true)}
+                  className="rounded-lg bg-white px-3 py-1 text-sm font-bold text-red-600 shadow-sm"
+                >
+                  ✏️ Modifica
+                </button>
+
+                <button
+                  onClick={handleDelete}
+                  className="rounded-lg bg-white px-2 py-1 text-sm text-red-600 shadow-sm"
+                >
+                  🗑️
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4">
+            {editing ? (
+              <div>
+                <ReactQuill
+                  theme="snow"
+                  value={commento}
+                  onChange={setCommento}
+                  modules={{
+                    toolbar: [
+                      [{ 'font': [] }, { 'size': [] }],
+                      ['bold', 'italic', 'underline', 'strike'],
+                      [{ 'color': [] }, { 'background': [] }],
+                      [{ 'align': [] }],
+                      ['clean']
+                    ]
+                  }}
+                />
+
+                <div className="flex justify-end mt-3 gap-2">
+                  <button
+                    onClick={() => {
+                      setEditing(false)
+                      setCommento(partita.commento || '')
+                    }}
+                    className="rounded-lg bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-300"
+                  >
+                    Annulla
+                  </button>
+
+                  <button
+                    onClick={handleSave}
+                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                  >
+                    Salva
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="prose max-w-none text-sm leading-relaxed text-gray-800"
+                dangerouslySetInnerHTML={{
+                  __html:
+                    partita.commento && partita.commento.trim() !== ''
+                      ? partita.commento
+                      : 'Riepilogo Partita'
+                }}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* 8. Azioni */}
+        <div className="grid grid-cols-2 gap-3">
+
+          <button
+            onClick={handleScreenshot}
+            className="rounded-full border border-white/30 bg-black/75 px-4 py-3 font-bold text-white shadow-[0_6px_18px_rgba(0,0,0,0.38)]"
+          >
+            📷 Screenshot
+          </button>
+
+          <button
+            onClick={() => navigate('/risultati')}
+            className="rounded-full bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 font-bold text-white shadow-[0_6px_18px_rgba(0,0,0,0.38)]"
+          >
+            ☷ Lista Partite
+          </button>
+
+        </div>
+
       </div>
     </div>
   )
