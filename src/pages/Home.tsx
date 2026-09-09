@@ -677,7 +677,7 @@ useEffect(() => {
 
 // 🔹 Calcola tempo rimanente
 useEffect(() => {
-  const durationMin = timerState?.timer_duration_min ?? 20;
+  const durationMin = timerState?.timer_duration_min ?? 35;
   const remaining = Math.floor(durationMin * 60) - Math.floor((elapsedMs || 0) / 1000);
   setTotalSeconds(remaining);
 }, [elapsedMs, timerState]);
@@ -2072,12 +2072,12 @@ birthdayDate: {
 },
 
 playerSurname: {
-  color: "#dc2626",
+  color: "#ffffff",
   fontWeight: 400,
 },
 
 playerFirstName: {
-  color: "#202020",
+  color: "#ffffff",
   fontWeight: 400,
 },
   playerNameMuted: { fontSize: 14, opacity: 0.8 },
