@@ -2072,12 +2072,12 @@ birthdayDate: {
 },
 
 playerSurname: {
-  color: "#dc2626",
+  color: "#ffffff",
   fontWeight: 400,
 },
 
 playerFirstName: {
-  color: "#202020",
+  color: "#ffffff",
   fontWeight: 400,
 },
   playerNameMuted: { fontSize: 14, opacity: 0.8 },
