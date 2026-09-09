@@ -474,7 +474,7 @@ setGiocatoriStagione(mapped);
 
   // 9) remaining sec
   useEffect(() => {
-    const durationMin = timerState?.timer_duration_min ?? 20;
+    const durationMin = timerState?.timer_duration_min ?? 35;
     const remaining = Math.floor(durationMin * 60) - Math.floor((elapsedMs || 0) / 1000);
     setTotalSeconds(remaining);
   }, [elapsedMs, timerState]);

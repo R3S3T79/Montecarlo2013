@@ -63,10 +63,34 @@ export default function AdminNotizie() {
   };
 
   const deleteNotizia = async (id: string) => {
-    const { error } = await supabase.from("notizie").delete().eq("id", id);
-    if (error) console.error("Errore eliminazione notizia:", error);
-    else fetchNotizie();
-  };
+  console.log("🗑️ Tentativo eliminazione:", id);
+
+  const { data, error } = await supabase
+    .from("notizie")
+    .delete()
+    .eq("id", id)
+    .select();
+
+  console.log("🗑️ Risultato DELETE:", {
+    data,
+    error,
+  });
+
+  if (error) {
+    console.error(
+      "❌ Errore eliminazione notizia:",
+      error
+    );
+    return;
+  }
+
+  console.log(
+    "✅ Righe eliminate:",
+    data?.length ?? 0
+  );
+
+  await fetchNotizie();
+};
 
   const updateNotizia = async (id: string) => {
     const { error } = await supabase
