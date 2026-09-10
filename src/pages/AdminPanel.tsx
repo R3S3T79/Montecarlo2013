@@ -319,6 +319,84 @@ export default function AdminPanel() {
     }
   };
 
+    // =======================================
+  // PASSWORD PROVVISORIA
+  // =======================================
+
+  const setTemporaryPassword = async (email: string) => {
+    if (processing.has(email)) return;
+
+    const password = window.prompt(
+      `Inserisci la password provvisoria per:\n${email}\n\nMinimo 8 caratteri.`
+    );
+
+    if (password === null) return;
+
+    if (password.length < 8) {
+      alert("La password deve contenere almeno 8 caratteri.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Impostare la password provvisoria per ${email}?`
+    );
+
+    if (!confirmed) return;
+
+    startProcessing(email);
+
+    try {
+      const token = await getSessionToken();
+
+      const res = await fetch(
+        "/.netlify/functions/set-temporary-password",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+
+          body: JSON.stringify({
+            email,
+            password,
+          }),
+        }
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        console.error(
+          "set-temporary-password failed:",
+          res.status,
+          data
+        );
+
+        alert(
+          data?.error ||
+            `Errore durante l'impostazione della password: ${res.status}`
+        );
+
+        return;
+      }
+
+      alert(
+        `Password provvisoria impostata correttamente per ${email}.`
+      );
+    } catch (error: any) {
+      console.error(error);
+
+      alert(
+        "Errore: " +
+          (error?.message || "operazione non riuscita")
+      );
+    } finally {
+      stopProcessing(email);
+    }
+  };
+
   // =======================================
   // ELIMINA UTENTE
   // =======================================
@@ -562,6 +640,21 @@ export default function AdminPanel() {
                           >
                             <KeyRound size={16} />
                             Reset password
+                          </button>
+                        )}
+
+                                                {/* PASSWORD PROVVISORIA */}
+                        {u.confirmed && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void setTemporaryPassword(u.email)
+                            }
+                            disabled={isProcessing}
+                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm font-medium text-yellow-300 transition hover:bg-yellow-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <KeyRound size={16} />
+                            Password provvisoria
                           </button>
                         )}
 
