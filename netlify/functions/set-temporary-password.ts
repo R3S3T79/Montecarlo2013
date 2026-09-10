@@ -100,23 +100,61 @@ export const handler: Handler = async (event) => {
   // CONTROLLO RUOLO
   // =====================================
 
-  const requesterRole =
-    requester.app_metadata?.role ||
-    requester.raw_app_meta_data?.role ||
-    requester.user_metadata?.role;
+// =====================================
+// CONTROLLO RUOLO DA USER_PROFILES
+// =====================================
 
-  if (
-    !["creator", "admin"].includes(
-      String(requesterRole || "").toLowerCase()
-    )
-  ) {
-    return {
-      statusCode: 403,
-      body: JSON.stringify({
-        error: "Access denied",
-      }),
-    };
-  }
+const requesterId =
+  requester.sub;
+
+if (!requesterId) {
+  return {
+    statusCode: 401,
+    body: JSON.stringify({
+      error: "Utente non identificato",
+    }),
+  };
+}
+
+const {
+  data: requesterProfile,
+  error: profileError,
+} = await supabase
+  .from("user_profiles")
+  .select("role")
+  .eq("user_id", requesterId)
+  .maybeSingle();
+
+if (profileError) {
+  console.error(
+    "Errore lettura ruolo:",
+    profileError
+  );
+
+  return {
+    statusCode: 500,
+    body: JSON.stringify({
+      error:
+        "Errore durante il controllo del ruolo",
+    }),
+  };
+}
+
+const requesterRole = String(
+  requesterProfile?.role || ""
+).toLowerCase();
+
+if (
+  requesterRole !== "creator" &&
+  requesterRole !== "admin"
+) {
+  return {
+    statusCode: 403,
+    body: JSON.stringify({
+      error: "Access denied",
+    }),
+  };
+}
 
   // =====================================
   // DATI RICHIESTA
