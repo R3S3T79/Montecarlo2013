@@ -261,6 +261,9 @@ export const handler: Handler = async (event) => {
   // EMAIL
   // =====================================
 
+    const resetPageUrl =
+    "https://www.montecarlo2013.it/update-password";
+
   const mailOptions = {
     to: email,
 
@@ -300,15 +303,49 @@ export const handler: Handler = async (event) => {
           ${otp}
         </div>
 
+                <p>
+          Premi il pulsante qui sotto per aprire la pagina
+          di reimpostazione della password:
+        </p>
+
+        <div style="
+          text-align: center;
+          margin: 25px 0;
+        ">
+          <a
+            href="${resetPageUrl}"
+            style="
+              display: inline-block;
+              background: #dc2626;
+              color: #ffffff;
+              text-decoration: none;
+              font-weight: bold;
+              padding: 14px 24px;
+              border-radius: 8px;
+            "
+          >
+            Reimposta password
+          </a>
+        </div>
+
         <p>
-          Apri la pagina di reimpostazione password
-          dell'app Montecarlo 2013 e inserisci:
+          Nella pagina inserisci:
         </p>
 
         <p>
           <strong>1.</strong> Il tuo indirizzo email<br>
-          <strong>2.</strong> Il codice riportato sopra<br>
+          <strong>2.</strong> Il codice OTP riportato sopra<br>
           <strong>3.</strong> La nuova password
+        </p>
+
+        <p style="
+          font-size: 13px;
+          color: #666;
+        ">
+          Se il pulsante non funziona, apri questo indirizzo:<br>
+          <a href="${resetPageUrl}">
+            ${resetPageUrl}
+          </a>
         </p>
 
         <p style="
