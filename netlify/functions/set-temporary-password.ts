@@ -225,6 +225,107 @@ export const handler: Handler = async (event) => {
       };
     }
 
+        // =========================
+    // EMAIL DI AVVISO
+    // =========================
+
+    const mailOptions = {
+      to: email,
+
+      subject:
+        "Montecarlo 2013 — Password provvisoria impostata",
+
+      html: `
+        <div style="
+          font-family: Arial, sans-serif;
+          max-width: 500px;
+          margin: auto;
+        ">
+
+          <h2>Montecarlo 2013</h2>
+
+          <p>
+            È stata impostata una
+            <strong>password provvisoria</strong>
+            per il tuo account Montecarlo 2013.
+          </p>
+
+          <div style="
+            padding: 16px;
+            margin: 20px 0;
+            background: #f3f4f6;
+            border-radius: 8px;
+          ">
+            <strong>
+              Per motivi di sicurezza la password
+              non viene comunicata tramite email.
+            </strong>
+          </div>
+
+          <p>
+            Contatta il <strong>Creator dell'app</strong>
+            per conoscere la tua password provvisoria.
+          </p>
+
+          <p>
+            Dopo aver effettuato l'accesso potrai
+            impostare una nuova password personale.
+          </p>
+
+          <p style="
+            margin-top: 30px;
+            font-size: 13px;
+            color: #666;
+          ">
+            Montecarlo 2013
+          </p>
+
+        </div>
+      `,
+    };
+
+    try {
+      await transporterNotifications.sendMail({
+        ...mailOptions,
+        from: process.env.SMTP_FROM_NOTIF,
+      });
+
+      console.log(
+        `Avviso password provvisoria inviato a ${email} tramite notifications@`
+      );
+    } catch (errNotif) {
+      console.warn(
+        "Errore notifications@, provo support@:",
+        errNotif
+      );
+
+      try {
+        await transporterSupport.sendMail({
+          ...mailOptions,
+          from: process.env.SMTP_FROM_SUPPORT,
+        });
+
+        console.log(
+          `Avviso password provvisoria inviato a ${email} tramite support@`
+        );
+      } catch (errSupport) {
+        console.error(
+          "Password modificata, ma errore invio email:",
+          errSupport
+        );
+
+        return {
+          statusCode: 200,
+          body: JSON.stringify({
+            success: true,
+            emailSent: false,
+            message:
+              "Password provvisoria impostata, ma email di avviso non inviata",
+          }),
+        };
+      }
+    }
+
     // =========================
     // RISPOSTA
     // =========================
