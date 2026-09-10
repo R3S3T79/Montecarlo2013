@@ -289,10 +289,15 @@ if (
     };
   }
 
+  
+
   // =====================================
   // EMAIL DI AVVISO
   // NON contiene la password
   // =====================================
+
+  const loginUrl =
+  "https://www.montecarlo2013.it/login";
 
   const mailOptions = {
     to: email,
@@ -332,6 +337,41 @@ if (
           <strong>Creator dell'app</strong>
           per conoscere la tua password provvisoria.
         </p>
+
+        <p>
+  Quando hai ricevuto la password provvisoria,
+  premi il pulsante qui sotto per accedere:
+</p>
+
+<div style="
+  text-align: center;
+  margin: 25px 0;
+">
+  <a
+    href="${loginUrl}"
+    style="
+      display: inline-block;
+      background: #dc2626;
+      color: #ffffff;
+      text-decoration: none;
+      font-weight: bold;
+      padding: 14px 24px;
+      border-radius: 8px;
+    "
+  >
+    Accedi a Montecarlo 2013
+  </a>
+</div>
+
+<p style="
+  font-size: 13px;
+  color: #666;
+">
+  Se il pulsante non funziona, apri questo indirizzo:<br>
+  <a href="${loginUrl}">
+    ${loginUrl}
+  </a>
+</p>
 
         <p style="
           margin-top: 30px;
