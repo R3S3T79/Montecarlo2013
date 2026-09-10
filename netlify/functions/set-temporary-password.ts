@@ -3,7 +3,7 @@
 // Permessi: solo creator / admin
 
 import type { Handler } from "@netlify/functions";
-import { createClient } from "@Supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
 import jwt from "jsonwebtoken";
 
