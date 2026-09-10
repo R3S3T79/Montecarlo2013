@@ -7,8 +7,8 @@ import { createClient } from "@supabase/supabase-js";
 import jwt from "jsonwebtoken";
 
 const supabase = createClient(
-  process.env.VITE_SUPABASE_URL ||
-    process.env.SUPABASE_URL!,
+  process.env.SUPABASE_URL ||
+    process.env.VITE_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
@@ -90,18 +90,51 @@ export const handler: Handler = async (event) => {
   }
 
   // =====================================
-  // CONTROLLO RUOLO
+  // CONTROLLO RUOLO DA USER_PROFILES
   // =====================================
 
-  const requesterRole =
-    requester.app_metadata?.role ||
-    requester.raw_app_meta_data?.role ||
-    requester.user_metadata?.role;
+  const requesterId = requester.sub;
+
+  if (!requesterId) {
+    return {
+      statusCode: 401,
+      body: JSON.stringify({
+        error: "Utente non identificato",
+      }),
+    };
+  }
+
+  const {
+    data: requesterProfile,
+    error: profileRoleError,
+  } = await supabase
+    .from("user_profiles")
+    .select("role")
+    .eq("user_id", requesterId)
+    .maybeSingle();
+
+  if (profileRoleError) {
+    console.error(
+      "Errore lettura ruolo:",
+      profileRoleError
+    );
+
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        error:
+          "Errore durante il controllo del ruolo",
+      }),
+    };
+  }
+
+  const requesterRole = String(
+    requesterProfile?.role || ""
+  ).toLowerCase();
 
   if (
-    !["creator", "admin"].includes(
-      requesterRole
-    )
+    requesterRole !== "creator" &&
+    requesterRole !== "admin"
   ) {
     return {
       statusCode: 403,
@@ -112,7 +145,7 @@ export const handler: Handler = async (event) => {
   }
 
   // =====================================
-  // EMAIL
+  // EMAIL UTENTE DA ELIMINARE
   // =====================================
 
   let body: {
@@ -144,43 +177,54 @@ export const handler: Handler = async (event) => {
 
   // =====================================
   // RACCOLTA USER ID
-  //
-  // Cerchiamo gli UUID sia in Auth sia
-  // in user_profiles.
-  //
-  // In questo modo possiamo eliminare
-  // anche eventuali residui di vecchie
-  // registrazioni.
   // =====================================
 
   const userIds = new Set<string>();
 
   // =====================================
-  // CERCA IN AUTH
+  // CERCA IN AUTH CON PAGINAZIONE
   // =====================================
 
-  const {
-    data: authData,
-    error: authListError,
-  } = await supabase.auth.admin.listUsers();
+  const authUsers: any[] = [];
 
-  if (authListError) {
-    return errorResponse(
-      "auth_lookup",
-      "Errore durante la ricerca dell'utente in Auth",
-      authListError.message
-    );
-  }
+  let page = 1;
+  const perPage = 100;
 
-  const authUsers =
-    authData?.users?.filter(
+  while (true) {
+    const {
+      data: authData,
+      error: authListError,
+    } = await supabase.auth.admin.listUsers({
+      page,
+      perPage,
+    });
+
+    if (authListError) {
+      return errorResponse(
+        "auth_lookup",
+        "Errore durante la ricerca dell'utente in Auth",
+        authListError.message
+      );
+    }
+
+    const users = authData?.users || [];
+
+    const matches = users.filter(
       (user) =>
-        user.email?.toLowerCase() === email
-    ) || [];
+        user.email?.trim().toLowerCase() === email
+    );
 
-  authUsers.forEach((user) => {
-    userIds.add(user.id);
-  });
+    for (const user of matches) {
+      authUsers.push(user);
+      userIds.add(user.id);
+    }
+
+    if (users.length < perPage) {
+      break;
+    }
+
+    page++;
+  }
 
   // =====================================
   // CERCA EVENTUALI PROFILI RESIDUI
@@ -272,9 +316,7 @@ export const handler: Handler = async (event) => {
     }
   }
 
-  // Pulizia aggiuntiva per email.
-  // Serve nel caso esista un profilo
-  // senza UUID Auth valido.
+  // Pulizia aggiuntiva tramite email
 
   const {
     error: profileEmailDeleteError,
@@ -312,8 +354,7 @@ export const handler: Handler = async (event) => {
 
   // =====================================
   // 5. AUTH USERS
-  //
-  // Auth viene eliminato per ultimo.
+  // Auth viene eliminato per ultimo
   // =====================================
 
   for (const authUser of authUsers) {
