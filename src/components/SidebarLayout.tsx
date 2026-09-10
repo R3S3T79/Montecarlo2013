@@ -538,7 +538,7 @@ const canCreator = role === UserRole.Creator;
           {/* 👇 Mostra la versione subito sotto "Galleria" */}
 {appVersion && (
   <div className="border-t border-white/20 my-2 pt-2 text-xs text-gray-400 text-center">
-    Montecarlo 2013 v{appVersion} • TEST AUTO 2
+    Montecarlo 2013 v{appVersion} • TEST AUTO 3
   </div>
 )}
 
