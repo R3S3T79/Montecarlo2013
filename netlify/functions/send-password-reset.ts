@@ -153,31 +153,47 @@ export const handler: Handler = async (event) => {
   // VERIFICA ESISTENZA UTENTE
   // =====================================
 
-  const {
-    data: authData,
-    error: listError,
-  } = await supabase.auth.admin.listUsers();
+    let targetUser: any = null;
+  let page = 1;
+  const perPage = 100;
 
-  if (listError) {
-    console.error(
-      "Errore ricerca utente:",
-      listError
-    );
+  while (!targetUser) {
+    const {
+      data: authData,
+      error: listError,
+    } = await supabase.auth.admin.listUsers({
+      page,
+      perPage,
+    });
 
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        error:
-          "Errore durante la ricerca dell'utente",
-      }),
-    };
-  }
+    if (listError) {
+      console.error(
+        "Errore ricerca utente:",
+        listError
+      );
 
-  const targetUser =
-    authData?.users?.find(
+      return {
+        statusCode: 500,
+        body: JSON.stringify({
+          error:
+            "Errore durante la ricerca dell'utente",
+        }),
+      };
+    }
+
+    const users = authData?.users || [];
+
+    targetUser = users.find(
       (user) =>
-        user.email?.toLowerCase() === email
+        user.email?.trim().toLowerCase() === email
     );
+
+    if (targetUser || users.length < perPage) {
+      break;
+    }
+
+    page++;
+  }
 
   if (!targetUser) {
     return {
