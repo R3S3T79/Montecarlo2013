@@ -15,92 +15,103 @@ function ServiceWorkerManager() {
       return;
     }
 
-    let intervalId: number | undefined;
+    let reloading = false;
 
-    const pwaRegister = new Function(
-      "return import('virtual:pwa-register')"
+    // Se all'avvio esiste già un controller significa che
+    // questa pagina è già gestita da un Service Worker.
+    const hadController = Boolean(
+      navigator.serviceWorker.controller
     );
 
-    pwaRegister()
-      .then(({ registerSW }: any) => {
-        console.log("[PWA] Inizializzazione aggiornamenti...");
-
-        const updateSW = registerSW({
-          immediate: true,
-
-          // Se viene rilevata una nuova versione,
-          // la attiviamo e ricarichiamo automaticamente.
-          onNeedRefresh() {
-            console.log("[PWA] Nuova versione disponibile.");
-            updateSW(true);
-          },
-
-          onOfflineReady() {
-            console.log("[PWA] Applicazione pronta per uso offline.");
-          },
-
-          onRegistered(registration: ServiceWorkerRegistration | undefined) {
-            if (!registration) return;
-
-            console.log("[PWA] Service Worker registrato.");
-
-            // Controllo periodico mentre l'app rimane aperta
-            intervalId = window.setInterval(() => {
-              registration.update().catch((error) => {
-                console.warn(
-                  "[PWA] Controllo aggiornamento non riuscito:",
-                  error
-                );
-              });
-            }, 60 * 1000);
-          },
-
-          onRegisterError(error: Error) {
-            console.error(
-              "[PWA] Errore registrazione Service Worker:",
-              error
-            );
-          },
-        });
-
-        // Quando l'utente torna sull'app dopo averla lasciata
-        // in background, controlliamo immediatamente.
-        const checkWhenVisible = () => {
-          if (document.visibilityState === "visible") {
-            navigator.serviceWorker
-              .getRegistration()
-              .then((registration) => registration?.update())
-              .catch((error) => {
-                console.warn(
-                  "[PWA] Controllo al ritorno sull'app non riuscito:",
-                  error
-                );
-              });
-          }
-        };
-
-        document.addEventListener("visibilitychange", checkWhenVisible);
-
-        // Pulizia listener
-        return () => {
-          document.removeEventListener(
-            "visibilitychange",
-            checkWhenVisible
-          );
-
-          if (intervalId !== undefined) {
-            window.clearInterval(intervalId);
-          }
-        };
-      })
-      .catch((error: Error) => {
-        console.error("[PWA] Impossibile inizializzare la PWA:", error);
-      });
-
-    return () => {
-      if (intervalId !== undefined) {
-        window.clearInterval(intervalId);
+    // =======================================
+    // NUOVO SERVICE WORKER ATTIVATO
+    // =======================================
+    const handleControllerChange = () => {
+      // Evita reload al primo install della PWA.
+      if (!hadController) {
+        return;
       }
+
+      // Evita più reload consecutivi.
+      if (reloading) {
+        return;
+      }
+
+      reloading = true;
+
+      console.log(
+        "[PWA] Nuova versione attivata. Ricarico l'app..."
+      );
+
+      window.location.reload();
+    };
+
+    navigator.serviceWorker.addEventListener(
+      "controllerchange",
+      handleControllerChange
+    );
+
+    // =======================================
+    // CONTROLLO AGGIORNAMENTI
+    // =======================================
+    const checkForUpdate = async () => {
+      try {
+        const registration =
+          await navigator.serviceWorker.getRegistration();
+
+        if (!registration) {
+          return;
+        }
+
+        console.log(
+          "[PWA] Controllo disponibilità nuova versione..."
+        );
+
+        await registration.update();
+      } catch (error) {
+        console.warn(
+          "[PWA] Controllo aggiornamento non riuscito:",
+          error
+        );
+      }
+    };
+
+    // Controllo subito all'apertura dell'app.
+    void checkForUpdate();
+
+    // Controllo ogni 60 secondi se l'app rimane aperta.
+    const intervalId = window.setInterval(() => {
+      void checkForUpdate();
+    }, 60 * 1000);
+
+    // Quando l'utente torna sull'app dopo averla
+    // lasciata in background, controlla subito.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void checkForUpdate();
+      }
+    };
+
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+
+    // =======================================
+    // CLEANUP
+    // =======================================
+    return () => {
+      window.clearInterval(intervalId);
+
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+
+      navigator.serviceWorker.removeEventListener(
+        "controllerchange",
+        handleControllerChange
+      );
     };
   }, []);
 
