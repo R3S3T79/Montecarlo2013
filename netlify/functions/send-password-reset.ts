@@ -1,29 +1,32 @@
 // netlify/functions/send-password-reset.ts
-// Data: 21/08/2025 (rev: dual-SMTP fallback notifications → support)
-// Scopo: genera e invia un link di "recovery" (reset password) per un'email esistente.
+// Reset password utente dal Pannello Amministratore
+// Invio OTP recovery a 6 cifre
+// Permessi: solo creator / admin
 
-// ==============================
-// 1) Import
-// ==============================
 import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
+import jwt from "jsonwebtoken";
 
-// ==============================
-// 2) Supabase (service role)
-// ==============================
+// =======================================
+// SUPABASE - SERVICE ROLE
+// =======================================
+
 const supabase = createClient(
-  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_URL ||
+    process.env.VITE_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// ==============================
-// 3) Nodemailer (SMTP) - doppio transporter
-// ==============================
+// =======================================
+// SMTP
+// =======================================
+
 const transporterNotifications = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT || "465"),
   secure: process.env.SMTP_SECURE === "true",
+
   auth: {
     user: process.env.SMTP_USER_NOTIF,
     pass: process.env.SMTP_PASS_NOTIF,
@@ -34,99 +37,333 @@ const transporterSupport = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT || "465"),
   secure: process.env.SMTP_SECURE === "true",
+
   auth: {
     user: process.env.SMTP_USER_SUPPORT,
     pass: process.env.SMTP_PASS_SUPPORT,
   },
 });
 
-// ==============================
-// 4) Redirect dopo il reset
-//    Priorità: SUPABASE_RECOVERY_REDIRECT_TO → APP_URL/SITE_URL + "/reset-password"
-// ==============================
-const RESET_PATH = "/reset-password";
-const computedRedirect =
-  process.env.SUPABASE_RECOVERY_REDIRECT_TO ||
-  (process.env.APP_URL ? `${process.env.APP_URL}${RESET_PATH}` : undefined) ||
-  (process.env.SITE_URL ? `${process.env.SITE_URL}${RESET_PATH}` : undefined);
+// =======================================
+// HANDLER
+// =======================================
 
-// ==============================
-// 5) Handler
-// ==============================
 export const handler: Handler = async (event) => {
-  if (event.httpMethod !== "GET" && event.httpMethod !== "POST") {
-    return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
+  // =====================================
+  // SOLO POST
+  // =====================================
+
+  if (event.httpMethod !== "POST") {
+    return {
+      statusCode: 405,
+      body: JSON.stringify({
+        error: "Method Not Allowed",
+      }),
+    };
   }
 
-  // Permetto sia GET con query ?email=... sia POST con body { email }
-  let email = event.queryStringParameters?.email || "";
-  if (event.httpMethod === "POST") {
-    try {
-      const body = JSON.parse(event.body || "{}");
-      if (body?.email) email = body.email;
-    } catch {
-      // body non JSON: ignora, gestiamo sotto se manca email
-    }
+  // =====================================
+  // AUTENTICAZIONE ADMIN
+  // =====================================
+
+  const authHeader =
+    event.headers.authorization || "";
+
+  if (!authHeader.startsWith("Bearer ")) {
+    return {
+      statusCode: 401,
+      body: JSON.stringify({
+        error:
+          "Missing or invalid authorization header",
+      }),
+    };
   }
 
-  if (!email) {
-    return { statusCode: 400, body: JSON.stringify({ error: "Missing email" }) };
+  let requester: any;
+
+  try {
+    requester = jwt.verify(
+      authHeader.slice(7),
+      process.env.SUPABASE_JWT_SECRET!
+    );
+  } catch (error: any) {
+    return {
+      statusCode: 401,
+      body: JSON.stringify({
+        error: "Invalid token",
+        details: error.message,
+      }),
+    };
   }
 
-  // 5.1 Genera link di recovery
-  const gen = await supabase.auth.admin.generateLink({
-    type: "recovery",
-    email,
-    options: computedRedirect ? { redirectTo: computedRedirect } : (undefined as any),
-  });
+  // =====================================
+  // CONTROLLO RUOLO
+  // =====================================
 
-  const actionLink =
-    (gen.data as any)?.action_link ||
-    (gen.data as any)?.properties?.action_link;
+  const requesterRole =
+    requester.app_metadata?.role ||
+    requester.raw_app_meta_data?.role ||
+    requester.user_metadata?.role;
 
-  if (gen.error || !actionLink) {
-    console.error("Errore generateLink (recovery):", gen.error, "Data:", gen.data);
-    return { statusCode: 500, body: JSON.stringify({ error: "Errore generazione link di reset password" }) };
+  if (
+    !["creator", "admin"].includes(
+      requesterRole
+    )
+  ) {
+    return {
+      statusCode: 403,
+      body: JSON.stringify({
+        error: "Access denied",
+      }),
+    };
   }
 
-  // 5.2 Invia mail con link di reset password (fallback: notifications → support)
-  const mailOptions = {
-    to: email,
-    subject: "Montecarlo 2013 — Reset password",
-    html: `
-      <p>Ciao,</p>
-      <p>Per impostare (o reimpostare) la tua password, clicca qui:</p>
-      <p>
-        <a href="${actionLink}"
-           style="display:inline-block;padding:10px 20px;
-                  background:#004aad;color:#fff;
-                  text-decoration:none;border-radius:5px;">
-          Reimposta password
-        </a>
-      </p>
-    `,
+  // =====================================
+  // LETTURA EMAIL
+  // =====================================
+
+  let body: {
+    email?: string;
   };
 
   try {
-    // Prova con notifications@
+    body = JSON.parse(event.body || "{}");
+  } catch {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({
+        error: "Invalid JSON",
+      }),
+    };
+  }
+
+  const email =
+    body.email?.trim().toLowerCase();
+
+  if (!email) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({
+        error: "Missing email",
+      }),
+    };
+  }
+
+  // =====================================
+  // VERIFICA ESISTENZA UTENTE
+  // =====================================
+
+  const {
+    data: authData,
+    error: listError,
+  } = await supabase.auth.admin.listUsers();
+
+  if (listError) {
+    console.error(
+      "Errore ricerca utente:",
+      listError
+    );
+
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        error:
+          "Errore durante la ricerca dell'utente",
+      }),
+    };
+  }
+
+  const targetUser =
+    authData?.users?.find(
+      (user) =>
+        user.email?.toLowerCase() === email
+    );
+
+  if (!targetUser) {
+    return {
+      statusCode: 404,
+      body: JSON.stringify({
+        error: "Utente non trovato",
+      }),
+    };
+  }
+
+  // =====================================
+  // GENERA RECOVERY OTP
+  // =====================================
+
+  const {
+    data: recoveryData,
+    error: recoveryError,
+  } = await supabase.auth.admin.generateLink({
+    type: "recovery",
+    email,
+  });
+
+  if (recoveryError) {
+    console.error(
+      "Errore generazione recovery:",
+      recoveryError
+    );
+
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        error:
+          "Errore generazione codice di recupero",
+        details: recoveryError.message,
+      }),
+    };
+  }
+
+  // Supabase restituisce l'OTP generato
+  // nelle properties della risposta.
+
+  const properties =
+    (recoveryData as any)?.properties;
+
+  const otp =
+    properties?.email_otp ||
+    (recoveryData as any)?.email_otp;
+
+  if (!otp) {
+    console.error(
+      "OTP non presente nella risposta Supabase:",
+      recoveryData
+    );
+
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        error:
+          "Supabase non ha restituito il codice OTP",
+      }),
+    };
+  }
+
+  // =====================================
+  // EMAIL
+  // =====================================
+
+  const mailOptions = {
+    to: email,
+
+    subject:
+      "Montecarlo 2013 — Codice reset password",
+
+    html: `
+      <div style="
+        font-family: Arial, sans-serif;
+        max-width: 500px;
+        margin: auto;
+      ">
+
+        <h2>
+          Montecarlo 2013
+        </h2>
+
+        <p>
+          È stato richiesto il reset della password
+          del tuo account.
+        </p>
+
+        <p>
+          Utilizza questo codice:
+        </p>
+
+        <div style="
+          font-size: 32px;
+          font-weight: bold;
+          letter-spacing: 8px;
+          text-align: center;
+          padding: 20px;
+          margin: 20px 0;
+          background: #f3f4f6;
+          border-radius: 8px;
+        ">
+          ${otp}
+        </div>
+
+        <p>
+          Apri la pagina di reimpostazione password
+          dell'app Montecarlo 2013 e inserisci:
+        </p>
+
+        <p>
+          <strong>1.</strong> Il tuo indirizzo email<br>
+          <strong>2.</strong> Il codice riportato sopra<br>
+          <strong>3.</strong> La nuova password
+        </p>
+
+        <p style="
+          margin-top: 30px;
+          font-size: 13px;
+          color: #666;
+        ">
+          Se non hai richiesto tu il reset,
+          contatta un amministratore.
+        </p>
+
+      </div>
+    `,
+  };
+
+  // =====================================
+  // INVIO EMAIL
+  // notifications@ → fallback support@
+  // =====================================
+
+  try {
     await transporterNotifications.sendMail({
       ...mailOptions,
       from: process.env.SMTP_FROM_NOTIF,
     });
-    console.log("Reset password inviato con notifications@");
+
+    console.log(
+      `OTP reset password inviato a ${email} tramite notifications@`
+    );
   } catch (errNotif) {
-    console.warn("Errore con notifications@, retry con support@ :", errNotif);
+    console.warn(
+      "Errore notifications@, provo support@:",
+      errNotif
+    );
+
     try {
       await transporterSupport.sendMail({
         ...mailOptions,
         from: process.env.SMTP_FROM_SUPPORT,
       });
-      console.log("Reset password inviato con support@");
+
+      console.log(
+        `OTP reset password inviato a ${email} tramite support@`
+      );
     } catch (errSupport) {
-      console.error("Errore invio mail reset (notif+support):", errSupport);
-      return { statusCode: 500, body: JSON.stringify({ error: "Errore invio email di reset (notif+support)" }) };
+      console.error(
+        "Errore invio OTP reset password:",
+        errSupport
+      );
+
+      return {
+        statusCode: 500,
+        body: JSON.stringify({
+          error:
+            "Errore invio email di reset password",
+        }),
+      };
     }
   }
 
-  return { statusCode: 200, body: JSON.stringify({ success: true }) };
+  // =====================================
+  // OK
+  // =====================================
+
+  return {
+    statusCode: 200,
+
+    body: JSON.stringify({
+      success: true,
+      message:
+        "Codice OTP di reset password inviato",
+    }),
+  };
 };
