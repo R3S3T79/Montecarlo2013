@@ -18,9 +18,9 @@ html, body, #root {
   }
 
   body {
-    background: url("/Sfondo.png") no-repeat center center fixed !important;
-    background-size: cover !important;
-  }
+  background: url("/Images/loader-bg.png") no-repeat center center fixed !important;
+  background-size: cover !important;
+}
 
   /* Foglio convocazione: fuori dallo schermo ma presente nel DOM */
   #convocazione {
