@@ -1,104 +1,268 @@
-// netlify/functions/set-role.ts
-import { Handler } from "@netlify/functions";
+import type { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // SERVICE ROLE
-);
+type Role = "user" | "admin" | "creator";
 
-type Role = "user" | "creator" | "admin";
-const ALLOWED: Role[] = ["user", "creator", "admin"];
+const ALLOWED_ROLES: Role[] = ["user", "admin", "creator"];
+
+const supabaseUrl =
+  process.env.SUPABASE_URL ||
+  process.env.VITE_SUPABASE_URL;
+
+const serviceRoleKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !serviceRoleKey) {
+  throw new Error("Variabili Supabase mancanti.");
+}
+
+const supabase = createClient(
+  supabaseUrl,
+  serviceRoleKey
+);
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: "Method Not Allowed" };
+    return {
+      statusCode: 405,
+      body: JSON.stringify({
+        error: "Method Not Allowed",
+      }),
+    };
   }
 
   try {
-    const { email, role } = JSON.parse(event.body || "{}") as {
+    // =========================================
+    // 1. AUTENTICAZIONE
+    // =========================================
+
+    const authHeader =
+      event.headers.authorization ||
+      event.headers.Authorization;
+
+    if (
+      !authHeader ||
+      !authHeader.startsWith("Bearer ")
+    ) {
+      return {
+        statusCode: 401,
+        body: JSON.stringify({
+          error: "Non autenticato",
+        }),
+      };
+    }
+
+    const accessToken =
+      authHeader.substring("Bearer ".length);
+
+    const {
+      data: { user: caller },
+      error: authError,
+    } = await supabase.auth.getUser(accessToken);
+
+    if (authError || !caller) {
+      return {
+        statusCode: 401,
+        body: JSON.stringify({
+          error: "Sessione non valida",
+        }),
+      };
+    }
+
+    // =========================================
+    // 2. SOLO CREATOR PUÒ CAMBIARE I RUOLI
+    // =========================================
+
+    const {
+      data: callerProfile,
+      error: callerProfileError,
+    } = await supabase
+      .from("user_profiles")
+      .select("role")
+      .eq("user_id", caller.id)
+      .maybeSingle();
+
+    if (callerProfileError) {
+      throw callerProfileError;
+    }
+
+    if (callerProfile?.role !== "creator") {
+      return {
+        statusCode: 403,
+        body: JSON.stringify({
+          error:
+            "Solo un Creator può modificare i ruoli.",
+        }),
+      };
+    }
+
+    // =========================================
+    // 3. DATI RICHIESTA
+    // =========================================
+
+    const { email, role } = JSON.parse(
+      event.body || "{}"
+    ) as {
       email?: string;
       role?: string;
     };
 
-    if (!email || !role) {
-      return { statusCode: 400, body: JSON.stringify({ error: "Missing email or role" }) };
+    const emailNorm =
+      email?.trim().toLowerCase();
+
+    const roleNorm =
+      role?.trim().toLowerCase() as Role;
+
+    if (!emailNorm || !roleNorm) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          error: "Email o ruolo mancanti",
+        }),
+      };
     }
 
-    const roleNorm = role.toLowerCase() as Role;
-    if (!ALLOWED.includes(roleNorm)) {
-      return { statusCode: 400, body: JSON.stringify({ error: "Invalid role value" }) };
+    if (!ALLOWED_ROLES.includes(roleNorm)) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          error: "Ruolo non valido",
+        }),
+      };
     }
 
-    // 1) Trova l'utente Auth per email (scorri pagine se necessario)
+    // =========================================
+    // 4. TROVA UTENTE AUTH
+    // =========================================
+
     let foundUser: any = null;
     let page = 1;
-    const perPage = 1000; // alza se hai molti utenti
+    const perPage = 1000;
+
     while (!foundUser) {
-      const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
-      if (error) throw error;
-      foundUser = data.users.find((u) => u.email === email);
-      if (data.users.length < perPage) break; // fine utenti
+      const { data, error } =
+        await supabase.auth.admin.listUsers({
+          page,
+          perPage,
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      foundUser = data.users.find(
+        (u) =>
+          u.email?.trim().toLowerCase() ===
+          emailNorm
+      );
+
+      if (
+        foundUser ||
+        data.users.length < perPage
+      ) {
+        break;
+      }
+
       page += 1;
     }
+
     if (!foundUser) {
-      return { statusCode: 404, body: JSON.stringify({ error: "User not found in auth" }) };
+      return {
+        statusCode: 404,
+        body: JSON.stringify({
+          error: "Utente Auth non trovato",
+        }),
+      };
     }
 
     const userId = foundUser.id;
 
-    // 2) Aggiorna ruolo in auth (user_metadata; valuta app_metadata se preferisci claim non modificabili)
-    {
-      const { error } = await supabase.auth.admin.updateUserById(userId, {
-        user_metadata: { ...foundUser.user_metadata, role: roleNorm },
-      });
-      if (error) throw error;
-    }
+    // =========================================
+    // 5. AUTH METADATA
+    // =========================================
 
-    // 3) Aggiorna pending_users (se esiste riga per email). Se fallisce (RLS), non blocco.
-    {
-      const { data: pendRow, error: pendCheckErr } = await supabase
-        .from("pending_users")
-        .select("email")
-        .eq("email", email)
-        .maybeSingle();
-
-      if (!pendCheckErr && pendRow?.email) {
-        const { error: pendErr } = await supabase
-          .from("pending_users")
-          .update({ role: roleNorm })
-          .eq("email", email);
-        if (pendErr) {
-          // Non blocco: pending è “di servizio”
-          console.warn("[set-role] pending_users update skipped:", pendErr.message);
+    const { error: authUpdateError } =
+      await supabase.auth.admin.updateUserById(
+        userId,
+        {
+          user_metadata: {
+            ...foundUser.user_metadata,
+            role: roleNorm,
+          },
         }
-      }
+      );
+
+    if (authUpdateError) {
+      throw authUpdateError;
     }
 
-    // 4) Aggiorna/crea in user_profiles (FONTE di verità per le policy)
-    {
-      const { error: upErr } = await supabase
+    // =========================================
+    // 6. USER_PROFILES
+    // FONTE UFFICIALE DEL RUOLO
+    // =========================================
+
+    const { error: profileError } =
+      await supabase
         .from("user_profiles")
         .upsert(
           {
             user_id: userId,
-            role: roleNorm, // enum user_role in user_profiles
-            email,          // utile tenerla allineata
+            email: emailNorm,
+            role: roleNorm,
           },
-          { onConflict: "user_id" }
+          {
+            onConflict: "user_id",
+          }
         );
-      if (upErr) throw upErr;
+
+    if (profileError) {
+      throw profileError;
     }
+
+    // =========================================
+    // 7. PENDING_USERS
+    // Manteniamo sincronizzato anche il dato
+    // storico usato dal pannello
+    // =========================================
+
+    const { error: pendingError } =
+      await supabase
+        .from("pending_users")
+        .update({
+          role: roleNorm,
+        })
+        .ilike("email", emailNorm);
+
+    if (pendingError) {
+      console.warn(
+        "[set-role] pending_users:",
+        pendingError.message
+      );
+    }
+
+    // =========================================
+    // 8. RISPOSTA
+    // =========================================
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ message: `Role updated to ${roleNorm} for ${email}` }),
+      body: JSON.stringify({
+        success: true,
+        userId,
+        email: emailNorm,
+        role: roleNorm,
+      }),
     };
-  } catch (err: any) {
-    console.error("set-role error:", err);
+  } catch (error: any) {
+    console.error("[set-role]", error);
+
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: err?.message || "Server error" }),
+      body: JSON.stringify({
+        error:
+          error?.message ||
+          "Errore durante il cambio ruolo",
+      }),
     };
   }
 };

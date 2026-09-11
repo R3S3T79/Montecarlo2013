@@ -53,9 +53,12 @@ export default defineConfig({
               // Il nuovo Service Worker prende subito il controllo
               clientsClaim: true,
               skipWaiting: true,
+              
 
               // Elimina automaticamente le vecchie cache Workbox
               cleanupOutdatedCaches: true,
+
+              importScripts: ["/push-sw.js"],
 
               runtimeCaching: [
                 // Cache soltanto delle immagini.

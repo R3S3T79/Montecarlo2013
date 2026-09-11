@@ -9,9 +9,15 @@ import {
   useLocation,
   useMatch,
 } from 'react-router-dom';
-import { Menu, PlusCircle, Trash2, Edit2, Camera } from 'lucide-react';
+import { Menu, PlusCircle, Trash2, Edit2, Camera, Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
+import {
+  getNotificationPermission,
+  isPushSubscribed,
+  pushNotificationsSupported,
+  subscribeToPushNotifications,
+} from '../lib/pushNotifications';
 import { UserRole } from '../lib/roles';
 import { Star } from "lucide-react";
 // (presente nei tuoi import originali)
@@ -22,6 +28,29 @@ export default function SidebarLayout(): JSX.Element {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Stato notifiche push
+const [pushSupported, setPushSupported] = useState(false);
+const [pushSubscribed, setPushSubscribed] = useState(false);
+const [pushLoading, setPushLoading] = useState(false);
+
+useEffect(() => {
+  const controllaNotifiche = async () => {
+    const supported = pushNotificationsSupported();
+    setPushSupported(supported);
+
+    if (!supported) return;
+
+    const permission = getNotificationPermission();
+
+    if (permission === "granted") {
+      const subscribed = await isPushSubscribed();
+      setPushSubscribed(subscribed);
+    }
+  };
+
+  controllaNotifiche();
+}, []);
 
    // 🔹 Nuovo stato: versione app da update-info.json
   const [appVersion, setAppVersion] = useState<string | null>(null);
@@ -251,6 +280,23 @@ const canCreator = role === UserRole.Creator;
 
   if (authLoading) return <div className="min-h-screen">Caricamento…</div>;
   // Handlers
+  const handleAttivaNotifiche = async () => {
+  if (pushLoading) return;
+
+  setPushLoading(true);
+
+  try {
+    const result = await subscribeToPushNotifications();
+
+    if (result.success) {
+      setPushSubscribed(true);
+    }
+
+    alert(result.message);
+  } finally {
+    setPushLoading(false);
+  }
+};
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login', { replace: true });
@@ -544,6 +590,25 @@ const canCreator = role === UserRole.Creator;
 
 {/* Footer sidebar */}
 <div className="mt-auto pt-4 border-t border-white/20 px-2">
+{user && pushSupported && (
+  <button
+    onClick={handleAttivaNotifiche}
+    disabled={pushLoading || pushSubscribed}
+    className={`w-full mb-4 flex items-center justify-center gap-2 p-2 rounded text-sm transition ${
+      pushSubscribed
+        ? "bg-green-700/40 text-green-300 cursor-default"
+        : "bg-white/10 hover:bg-white/20 text-white"
+    }`}
+  >
+    <Bell size={18} />
+
+    {pushLoading
+      ? "Attivazione..."
+      : pushSubscribed
+      ? "Notifiche attive"
+      : "Attiva notifiche"}
+  </button>
+)}
   {user ? (
     <div className="flex items-center justify-between">
       <button
