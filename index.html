@@ -81,7 +81,7 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
-  background: url('/Sfondo.png') no-repeat center center fixed;
+  background: url('/Images/loader-bg.png') no-repeat center center fixed;
   background-size: cover;
   background-attachment: fixed;
   background-color: #ffffff; /* fallback chiaro */
@@ -102,36 +102,348 @@ footer,
 }
 
 
-      #loader {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 100vh;
-        background-color: #ffffff;
-        transition: opacity 0.5s ease;
-      }
-      #loader.fade-out {
-        opacity: 0;
-        pointer-events: none;
-      }
-      #loader img {
-        width: 140px;
-        height: auto;
-        animation: pulse 1.8s infinite;
-      }
-      @keyframes pulse {
-        0% { transform: scale(1); opacity: 0.9; }
-        50% { transform: scale(1.05); opacity: 1; }
-        100% { transform: scale(1); opacity: 0.9; }
-      }
+      /* =====================================
+   LOADER MONTECARLO 2013
+   ===================================== */
+
+#loader {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+
+  overflow: hidden;
+
+  background:
+    linear-gradient(
+      rgba(0, 0, 0, 0.12),
+      rgba(0, 0, 0, 0.12)
+    ),
+    url("/Images/loader-bg.png")
+    center center / cover no-repeat;
+
+  transition:
+    opacity 0.45s ease,
+    visibility 0.45s ease;
+}
+
+#loader.fade-out {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.loader-content {
+  position: relative;
+  z-index: 2;
+
+  width: 100%;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  padding: 25px;
+
+  animation: loaderEntrance 0.8s ease-out both;
+}
+
+@keyframes loaderEntrance {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* STEMMA */
+
+.loader-crest-wrapper {
+  position: relative;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-bottom: 28px;
+}
+
+.loader-crest-glow {
+  position: absolute;
+
+  width: 230px;
+  height: 230px;
+
+  border-radius: 50%;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(230, 0, 0, 0.42) 0%,
+      rgba(150, 0, 0, 0.20) 40%,
+      transparent 70%
+    );
+
+  filter: blur(30px);
+
+  animation: loaderGlow 2.4s ease-in-out infinite;
+}
+
+@keyframes loaderGlow {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.9);
+  }
+
+  50% {
+    opacity: 0.9;
+    transform: scale(1.15);
+  }
+}
+
+.loader-crest {
+  position: relative;
+  z-index: 2;
+
+  width: min(230px, 52vw);
+  max-height: 280px;
+
+  object-fit: contain;
+
+  filter:
+    drop-shadow(0 8px 18px rgba(0, 0, 0, 0.65))
+    drop-shadow(0 0 18px rgba(220, 0, 0, 0.28));
+
+  animation: loaderCrestFloat 3.2s ease-in-out infinite;
+}
+
+@keyframes loaderCrestFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* TITOLO */
+
+.loader-title {
+  color: #ffffff;
+
+  font-family: Arial, Helvetica, sans-serif;
+
+  font-size: clamp(19px, 5vw, 30px);
+  font-weight: 400;
+
+  letter-spacing: 7px;
+
+  margin-left: 7px;
+
+  text-align: center;
+
+  text-shadow:
+    0 0 15px rgba(255, 255, 255, 0.15);
+}
+
+/* TRE LINEE */
+
+.loader-lines {
+  display: flex;
+  flex-direction: column;
+
+  gap: 6px;
+
+  margin-top: 20px;
+}
+
+.loader-line {
+  width: 105px;
+  height: 3px;
+
+  background:
+    linear-gradient(
+      90deg,
+      #8b0000,
+      #ff1822,
+      #8b0000
+    );
+
+  box-shadow:
+    0 0 8px rgba(230, 0, 0, 0.55);
+
+  transform-origin: center;
+
+  animation: loaderLinePulse 1.7s ease-in-out infinite;
+}
+
+.loader-line:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.loader-line:nth-child(3) {
+  animation-delay: 0.30s;
+}
+
+@keyframes loaderLinePulse {
+  0%,
+  100% {
+    transform: scaleX(0.65);
+    opacity: 0.45;
+  }
+
+  50% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+/* CARICAMENTO */
+
+.loader-loading-text {
+  margin-top: 27px;
+
+  color: #bcbcbc;
+
+  font-family: Arial, Helvetica, sans-serif;
+
+  font-size: 11px;
+
+  letter-spacing: 5px;
+
+  text-transform: uppercase;
+}
+
+.loader-progress {
+  position: relative;
+
+  width: min(290px, 72vw);
+  height: 3px;
+
+  margin-top: 17px;
+
+  overflow: hidden;
+
+  border-radius: 10px;
+
+  background:
+    rgba(255, 255, 255, 0.18);
+
+  box-shadow:
+    inset 0 0 3px rgba(255, 255, 255, 0.08);
+}
+
+.loader-progress::after {
+  content: "";
+
+  position: absolute;
+
+  top: 0;
+  left: -45%;
+
+  width: 45%;
+  height: 100%;
+
+  border-radius: inherit;
+
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      #b90008,
+      #ff2932,
+      #b90008
+    );
+
+  box-shadow:
+    0 0 12px rgba(255, 20, 30, 0.8);
+
+  animation:
+    loaderProgressMove 1.5s ease-in-out infinite;
+}
+
+@keyframes loaderProgressMove {
+  from {
+    left: -45%;
+  }
+
+  to {
+    left: 100%;
+  }
+}
+
+@media (max-height: 680px) {
+  .loader-crest {
+    width: 165px;
+  }
+
+  .loader-crest-glow {
+    width: 180px;
+    height: 180px;
+  }
+
+  .loader-crest-wrapper {
+    margin-bottom: 18px;
+  }
+
+  .loader-loading-text {
+    margin-top: 19px;
+  }
+}
     </style>
   </head>
 
   <body>
-    <!-- ✅ Logo di precaricamento -->
-    <div id="loader">
-      <img src="/icon_512x512.png" alt="Montecarlo 2013" />
+    <!-- Loader Montecarlo 2013 -->
+<div id="loader">
+
+  <div class="loader-content">
+
+    <div class="loader-crest-wrapper">
+
+      <div class="loader-crest-glow"></div>
+
+      <img
+        class="loader-crest"
+        src="/montecarlo.png"
+        alt="Montecarlo 2013"
+      />
+
     </div>
+
+    <div class="loader-title">
+      MONTECARLO 2013
+    </div>
+
+    <div class="loader-lines">
+      <div class="loader-line"></div>
+      <div class="loader-line"></div>
+      <div class="loader-line"></div>
+    </div>
+
+    <div class="loader-loading-text">
+      Caricamento...
+    </div>
+
+    <div class="loader-progress"></div>
+
+  </div>
+
+</div>
 
     <!-- Radice React -->
     <div id="root" style="display: none;"></div>
