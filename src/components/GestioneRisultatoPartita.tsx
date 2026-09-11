@@ -483,6 +483,10 @@ const startTimer = async () => {
 
   const now = new Date().toISOString();
   const nowSec = getTempoAssoluto(timerState, elapsed);
+  // True soltanto al primo avvio effettivo della partita.
+// Se il timer viene messo in pausa e poi ripreso,
+// la notifica non deve essere inviata nuovamente.
+const isPrimoAvvio = (timerState?.run_index ?? 0) === 0;
 
   // 1️⃣ Recupera giocatori attualmente in campo dalla formazione
   const { data: formazione, error: formErr } = await supabase
@@ -579,8 +583,53 @@ run_index:
   }));
 
   console.log("🏁 Stato locale timer aggiornato");
-};
 
+// ========================
+// PUSH - INIZIO PARTITA
+// ========================
+if (isPrimoAvvio) {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      console.error("❌ Push inizio partita: sessione assente");
+    } else {
+      const response = await fetch("/.netlify/functions/match-push", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          partitaId: id,
+          event: "match_start",
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error(
+          "❌ Errore push inizio partita:",
+          result
+        );
+      } else {
+        console.log(
+          "🔔 Push inizio partita inviata:",
+          result
+        );
+      }
+    }
+  } catch (err) {
+    console.error(
+      "❌ Errore chiamata push inizio partita:",
+      err
+    );
+  }
+}
+};
 
 // Metti in pausa il timer
 const pauseTimer = async () => {
@@ -682,7 +731,42 @@ const intervallo = async () => {
 
   setElapsed(0);
 
-  console.log("✅ Primo tempo chiuso correttamente");
+ console.log("✅ Primo tempo chiuso correttamente");
+
+// ========================
+// PUSH - FINE PRIMO TEMPO
+// ========================
+try {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    console.error("❌ Push intervallo: sessione assente");
+  } else {
+    const response = await fetch("/.netlify/functions/match-push", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        partitaId: id,
+        event: "halftime",
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error("❌ Errore push intervallo:", result);
+    } else {
+      console.log("🔔 Push intervallo inviata:", result);
+    }
+  }
+} catch (err) {
+  console.error("❌ Errore chiamata push intervallo:", err);
+}
 };
 
 // Inizio 2° tempo
@@ -800,12 +884,47 @@ const inizioSecondoTempo = async () => {
 
   setElapsed(0);
 
-  console.log(
-    "▶️ Secondo tempo avviato | tempo assoluto:",
-    tempoInizioSecondo,
-    "| giocatori in campo:",
-    inCampoIds.length
-  );
+ console.log(
+  "▶️ Secondo tempo avviato | tempo assoluto:",
+  tempoInizioSecondo,
+  "| giocatori in campo:",
+  inCampoIds.length
+);
+
+// ========================
+// PUSH - INIZIO SECONDO TEMPO
+// ========================
+try {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    console.error("❌ Push inizio 2° tempo: sessione assente");
+  } else {
+    const response = await fetch("/.netlify/functions/match-push", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        partitaId: id,
+        event: "second_half_start",
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error("❌ Errore push inizio 2° tempo:", result);
+    } else {
+      console.log("🔔 Push inizio 2° tempo inviata:", result);
+    }
+  }
+} catch (err) {
+  console.error("❌ Errore chiamata push inizio 2° tempo:", err);
+}
 };
 
 // =====================
@@ -1021,10 +1140,45 @@ const finePartita = async () => {
 
   setElapsed(0);
 
-  console.log(
-    "✅ Partita terminata | minuti totali salvati:",
-    rowsTotali
-  );
+ console.log(
+  "✅ Partita terminata | minuti totali salvati:",
+  rowsTotali
+);
+
+// ========================
+// PUSH - FINE PARTITA
+// ========================
+try {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    console.error("❌ Push fine partita: sessione assente");
+  } else {
+    const response = await fetch("/.netlify/functions/match-push", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        partitaId: id,
+        event: "match_end",
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error("❌ Errore push fine partita:", result);
+    } else {
+      console.log("🔔 Push fine partita inviata:", result);
+    }
+  }
+} catch (err) {
+  console.error("❌ Errore chiamata push fine partita:", err);
+}
 };
 
 // =====================
@@ -1925,21 +2079,30 @@ const eliminaTiroRigore = async (
       .single();
 
     if (!error && data) {
-      const attuali = marcatori[periodo] || [];
-      aggiornaMarcatoriLocal(periodo, [
-        ...attuali,
-        {
-  goal_tempo: data.goal_tempo,
-  tempo_sec: data.tempo_sec,
-  tipo_goal: data.tipo_goal,
-  giocatore_stagione_id: data.giocatore_stagione_id,
-          portiere_subisce_id: data.portiere_subisce_id,
-          squadra_segnante_id: data.squadra_segnante_id,
-          id_supabase: data.id,
-        },
-      ]);
-    }
-  };
+  const attuali = marcatori[periodo] || [];
+
+  aggiornaMarcatoriLocal(periodo, [
+    ...attuali,
+    {
+      goal_tempo: data.goal_tempo,
+      tempo_sec: data.tempo_sec,
+      tipo_goal: data.tipo_goal,
+      giocatore_stagione_id: data.giocatore_stagione_id,
+      portiere_subisce_id: data.portiere_subisce_id,
+      squadra_segnante_id: data.squadra_segnante_id,
+      id_supabase: data.id,
+    },
+  ]);
+
+  return data.id;
+}
+
+if (error) {
+  console.error("❌ Errore inserimento gol Montecarlo:", error.message);
+}
+
+return null;
+};
 
   // Inserisce una riga "gol SUBITO da Montecarlo" (portiere da scegliere)
   const aggiungiGolSubito = async (periodo: number, side: "casa" | "ospite") => {
@@ -1971,48 +2134,136 @@ const eliminaTiroRigore = async (
       .single();
 
     if (!error && data) {
-      const attuali = marcatori[periodo] || [];
-      aggiornaMarcatoriLocal(periodo, [
-        ...attuali,
-        {
-  goal_tempo: data.goal_tempo,
-  tempo_sec: data.tempo_sec,
-  tipo_goal: data.tipo_goal,
-  giocatore_stagione_id: data.giocatore_stagione_id,
-          portiere_subisce_id: data.portiere_subisce_id,
-          squadra_segnante_id: data.squadra_segnante_id,
-          id_supabase: data.id,
-        },
-      ]);
-    }
-  };
+  const attuali = marcatori[periodo] || [];
+
+  aggiornaMarcatoriLocal(periodo, [
+    ...attuali,
+    {
+      goal_tempo: data.goal_tempo,
+      tempo_sec: data.tempo_sec,
+      tipo_goal: data.tipo_goal,
+      giocatore_stagione_id: data.giocatore_stagione_id,
+      portiere_subisce_id: data.portiere_subisce_id,
+      squadra_segnante_id: data.squadra_segnante_id,
+      id_supabase: data.id,
+    },
+  ]);
+
+  return data.id;
+}
+
+if (error) {
+  console.error("❌ Errore inserimento gol avversario:", error.message);
+}
+
+return null;
+};
 
   // Incrementa/decrementa punteggio + crea/elimina riga marcatori coerentemente
-  const incrementa = async (side: "casa" | "ospite") => {
-    if (!tempo || !partita) return;
+ const incrementa = async (side: "casa" | "ospite") => {
+  if (!tempo || !partita) return;
 
-    // aggiorna scoreboard locale
-    const idx = tempo - 1;
-    const nuovaA = [...goalCasa];
-    const nuovaB = [...goalOspite];
-    if (side === "casa") nuovaA[idx]++; else nuovaB[idx]++;
-    setGoalCasa(nuovaA);
-    setGoalOspite(nuovaB);
-    await aggiornaGoalDB(nuovaA, nuovaB);
+  // aggiorna scoreboard locale
+  const idx = tempo - 1;
+  const nuovaA = [...goalCasa];
+  const nuovaB = [...goalOspite];
 
-    // determina chi è Montecarlo su questo lato
-    const haSegnatoMontecarlo =
-      side === "casa"
-        ? isMontecarlo(partita.squadra_casa_id, squadraCasa?.nome)
-        : isMontecarlo(partita.squadra_ospite_id, squadraOspite?.nome);
+  if (side === "casa") {
+    nuovaA[idx]++;
+  } else {
+    nuovaB[idx]++;
+  }
 
-    // crea riga marcatori coerente
-    if (haSegnatoMontecarlo) {
-      await aggiungiMarcatore(tempo);
-    } else {
-      await aggiungiGolSubito(tempo, side);
+  setGoalCasa(nuovaA);
+  setGoalOspite(nuovaB);
+
+  await aggiornaGoalDB(nuovaA, nuovaB);
+
+  // determina chi è Montecarlo su questo lato
+  const haSegnatoMontecarlo =
+    side === "casa"
+      ? isMontecarlo(
+          partita.squadra_casa_id,
+          squadraCasa?.nome
+        )
+      : isMontecarlo(
+          partita.squadra_ospite_id,
+          squadraOspite?.nome
+        );
+
+  // crea il gol e recupera il suo ID Supabase
+  let marcatoreId: string | null = null;
+
+  if (haSegnatoMontecarlo) {
+    marcatoreId = await aggiungiMarcatore(tempo);
+  } else {
+    marcatoreId = await aggiungiGolSubito(
+      tempo,
+      side
+    );
+  }
+
+  // Se il gol non è stato registrato nel DB,
+  // non inviare alcuna notifica.
+  if (!marcatoreId) {
+    console.error(
+      "❌ Gol non registrato: notifica push non inviata"
+    );
+    return;
+  }
+
+  // =========================
+  // PUSH AUTOMATICA GOL
+  // =========================
+
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      console.error(
+        "❌ Sessione assente: push gol non inviata"
+      );
+      return;
     }
-  };
+
+    const response = await fetch(
+      "/.netlify/functions/match-push",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          partitaId: partita.id,
+          event: "goal",
+          marcatoreId,
+        }),
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error(
+        "❌ Errore push gol:",
+        result
+      );
+    } else {
+      console.log(
+        "🔔 Push gol:",
+        result
+      );
+    }
+  } catch (error) {
+    console.error(
+      "❌ Errore chiamata push gol:",
+      error
+    );
+  }
+};
 
   const decrementa = async (side: "casa" | "ospite") => {
   if (!tempo || !partita) return;

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  Bell,
   CheckCircle,
   Clock,
   KeyRound,
@@ -13,9 +14,8 @@ import {
   Users,
 } from "lucide-react";
 
-import { supabase } from "@/lib/supabaseClient";
-import { UserRole } from "@/lib/roles";
-
+import { supabase } from "../lib/supabaseClient";
+import { UserRole } from "../lib/roles";
 interface PendingUser {
   id: string;
   email: string;
@@ -90,6 +90,48 @@ export default function AdminPanel() {
 
     return session.access_token;
   };
+
+  // =======================================
+// TEST NOTIFICA PUSH
+// =======================================
+
+const sendTestPush = async () => {
+  try {
+    const token = await getSessionToken();
+
+    const res = await fetch("/.netlify/functions/send-push", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      console.error("send-push failed:", res.status, data);
+
+      alert(
+        data?.error ||
+          `Errore durante l'invio della notifica: ${res.status}`
+      );
+
+      return;
+    }
+
+    alert(
+      `Notifica inviata correttamente.\nInviate: ${data?.sent ?? 0}\nErrori: ${data?.failed ?? 0}`
+    );
+  } catch (error: any) {
+    console.error(error);
+
+    alert(
+      "Errore: " +
+        (error?.message || "invio notifica non riuscito")
+    );
+  }
+};
 
   // =======================================
   // APPROVAZIONE NUOVO UTENTE
@@ -505,6 +547,15 @@ export default function AdminPanel() {
             </div>
 
             <div className="flex flex-wrap gap-2">
+              <Link
+  to="/admin-notifiche"
+  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-neutral-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-700"
+>
+  <Bell size={17} />
+  Notifiche
+</Link>
+
+
               <Link
                 to="/admin-notizie"
                 className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-neutral-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-700"

@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <title>Test Loader Montecarlo 2013</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #030303;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .loader {
+  position: relative;
+
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  overflow: hidden;
+
+  background:
+    linear-gradient(
+      rgba(0, 0, 0, 0.12),
+      rgba(0, 0, 0, 0.12)
+    ),
+    url("/Images/loader-bg.png")
+    center center / cover no-repeat;
+}
+
+    /* =====================================
+   FUMO AGGRESSIVO / VENATURE
+   ===================================== */
+
+.smoke-layer {
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* alone rosso centrale più concentrato */
+.red-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+
+  width: 430px;
+  height: 300px;
+
+  transform: translate(-50%, -55%);
+
+  background:
+    radial-gradient(
+      ellipse,
+      rgba(220, 0, 0, 0.38) 0%,
+      rgba(130, 0, 0, 0.16) 38%,
+      transparent 70%
+    );
+
+  filter: blur(30px);
+
+  animation: corePulse 2.8s ease-in-out infinite;
+}
+
+@keyframes corePulse {
+  0%,
+  100% {
+    opacity: 0.65;
+    transform:
+      translate(-50%, -55%)
+      scale(0.9);
+  }
+
+  50% {
+    opacity: 1;
+    transform:
+      translate(-50%, -55%)
+      scale(1.12);
+  }
+}
+
+/* singolo filamento */
+
+.vein {
+  position: absolute;
+
+  left: 50%;
+  top: 50%;
+
+  width: 430px;
+  height: 70px;
+
+  border-radius:
+    50% 20% 60% 30% /
+    40% 60% 30% 70%;
+
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      currentColor 18%,
+      rgba(255,255,255,0.10) 48%,
+      currentColor 70%,
+      transparent 100%
+    );
+
+  filter: blur(12px);
+
+  opacity: 0.45;
+
+  mix-blend-mode: screen;
+
+  transform-origin: center;
+
+  animation:
+    veinMove 5s ease-in-out infinite alternate;
+}
+
+/* bordo sottile che rende il fumo meno "macchia" */
+
+.vein::after {
+  content: "";
+
+  position: absolute;
+  inset: 18px -30px;
+
+  border-radius: 50%;
+
+  border-top:
+    2px solid currentColor;
+
+  opacity: 0.65;
+
+  filter: blur(2px);
+}
+
+/* =========================
+   ROSSO
+   ========================= */
+
+.v1 {
+  color: rgba(255, 0, 10, 0.85);
+
+  transform:
+    translate(-470px, -170px)
+    rotate(-18deg)
+    scale(1.1);
+
+  animation-delay: -1s;
+}
+
+.v2 {
+  color: rgba(210, 0, 8, 0.80);
+
+  transform:
+    translate(-380px, 70px)
+    rotate(15deg)
+    scale(1.2);
+
+  animation-delay: -3s;
+}
+
+.v3 {
+  color: rgba(255, 25, 30, 0.70);
+
+  transform:
+    translate(80px, -100px)
+    rotate(18deg)
+    scale(1.15);
+
+  animation-delay: -2s;
+}
+
+.v4 {
+  color: rgba(190, 0, 5, 0.75);
+
+  transform:
+    translate(100px, 120px)
+    rotate(-17deg)
+    scale(1.25);
+
+  animation-delay: -4s;
+}
+
+/* =========================
+   GRIGIO / BIANCO
+   ========================= */
+
+.v5 {
+  color: rgba(210, 210, 210, 0.50);
+
+  transform:
+    translate(-520px, -270px)
+    rotate(22deg)
+    scale(1.25);
+
+  animation-delay: -2.5s;
+}
+
+.v6 {
+  color: rgba(160, 160, 160, 0.45);
+
+  transform:
+    translate(180px, -250px)
+    rotate(-20deg)
+    scale(1.3);
+
+  animation-delay: -4.5s;
+}
+
+.v7 {
+  color: rgba(190, 190, 190, 0.40);
+
+  transform:
+    translate(-480px, 190px)
+    rotate(-12deg)
+    scale(1.15);
+
+  animation-delay: -1.5s;
+}
+
+.v8 {
+  color: rgba(180, 180, 180, 0.40);
+
+  transform:
+    translate(180px, 210px)
+    rotate(18deg)
+    scale(1.2);
+
+  animation-delay: -3.5s;
+}
+
+
+/* movimento */
+
+@keyframes veinMove {
+
+  0% {
+    margin-left: -45px;
+    margin-top: 25px;
+
+    opacity: 0.25;
+
+    filter:
+      blur(16px);
+
+  }
+
+  40% {
+    opacity: 0.65;
+
+    filter:
+      blur(8px);
+  }
+
+  70% {
+    opacity: 0.48;
+
+    filter:
+      blur(11px);
+  }
+
+  100% {
+    margin-left: 70px;
+    margin-top: -35px;
+
+    opacity: 0.25;
+
+    filter:
+      blur(17px);
+  }
+}
+
+
+/* =========================
+   SCIE SOTTILI
+   ========================= */
+
+.thread {
+  position: absolute;
+
+  left: 50%;
+  top: 50%;
+
+  width: 380px;
+  height: 120px;
+
+  border-radius: 50%;
+
+  border-top:
+    2px solid rgba(255, 20, 25, 0.55);
+
+  filter:
+    blur(1px)
+    drop-shadow(
+      0 0 5px rgba(255,0,0,0.6)
+    );
+
+  opacity: 0.55;
+
+  animation:
+    threadMove 4s ease-in-out infinite alternate;
+}
+
+.t1 {
+  transform:
+    translate(-410px, -80px)
+    rotate(-15deg);
+}
+
+.t2 {
+  transform:
+    translate(40px, 30px)
+    rotate(15deg);
+
+  animation-delay: -2s;
+}
+
+.t3 {
+  border-color:
+    rgba(210,210,210,0.30);
+
+  transform:
+    translate(-300px, -210px)
+    rotate(20deg);
+
+  animation-delay: -1s;
+}
+
+@keyframes threadMove {
+
+  from {
+    opacity: 0.20;
+    margin-left: -30px;
+  }
+
+  to {
+    opacity: 0.75;
+    margin-left: 50px;
+  }
+}
+    /* =====================================
+       CONTENUTO
+       ===================================== */
+
+    .content {
+      position: relative;
+      z-index: 10;
+
+      width: 100%;
+
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+
+      padding: 25px;
+
+      animation:
+        contentEntrance 0.9s ease-out both;
+    }
+
+    @keyframes contentEntrance {
+      from {
+        opacity: 0;
+        transform: scale(0.90);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    /* =====================================
+       STEMMA UFFICIALE
+       ===================================== */
+
+    .crest-wrapper {
+      position: relative;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      margin-bottom: 28px;
+    }
+
+    /* luce rossa dietro lo stemma */
+
+    .crest-glow {
+      position: absolute;
+
+      width: 230px;
+      height: 230px;
+
+      border-radius: 50%;
+
+      background:
+        radial-gradient(
+          circle,
+          rgba(230, 0, 0, 0.42) 0%,
+          rgba(150, 0, 0, 0.20) 40%,
+          transparent 70%
+        );
+
+      filter: blur(30px);
+
+      animation:
+        glowPulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes glowPulse {
+      0%,
+      100% {
+        opacity: 0.45;
+        transform: scale(0.9);
+      }
+
+      50% {
+        opacity: 0.9;
+        transform: scale(1.15);
+      }
+    }
+
+    .crest {
+      position: relative;
+      z-index: 2;
+
+      width: min(230px, 52vw);
+      max-height: 280px;
+
+      object-fit: contain;
+
+      filter:
+        drop-shadow(
+          0 8px 18px rgba(0, 0, 0, 0.65)
+        )
+        drop-shadow(
+          0 0 18px rgba(220, 0, 0, 0.28)
+        );
+
+      animation:
+        crestFloat 3.2s ease-in-out infinite;
+    }
+
+    @keyframes crestFloat {
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+
+      50% {
+        transform: translateY(-6px);
+      }
+    }
+
+    /* =====================================
+       TITOLO
+       ===================================== */
+
+    .title {
+      color: #ffffff;
+
+      font-size: clamp(19px, 5vw, 30px);
+
+      font-weight: 400;
+
+      letter-spacing: 7px;
+
+      margin-left: 7px;
+
+      text-align: center;
+
+      text-shadow:
+        0 0 15px rgba(255, 255, 255, 0.15);
+    }
+
+    /* =====================================
+       TRE LINEE
+       ===================================== */
+
+    .lines {
+      display: flex;
+      flex-direction: column;
+
+      gap: 6px;
+
+      margin-top: 20px;
+    }
+
+    .line {
+      width: 105px;
+      height: 3px;
+
+      background:
+        linear-gradient(
+          90deg,
+          #8b0000,
+          #ff1822,
+          #8b0000
+        );
+
+      box-shadow:
+        0 0 8px rgba(230, 0, 0, 0.55);
+
+      transform-origin: center;
+
+      animation:
+        linePulse 1.7s ease-in-out infinite;
+    }
+
+    .line:nth-child(2) {
+      animation-delay: 0.15s;
+    }
+
+    .line:nth-child(3) {
+      animation-delay: 0.30s;
+    }
+
+    @keyframes linePulse {
+      0%,
+      100% {
+        transform: scaleX(0.65);
+        opacity: 0.45;
+      }
+
+      50% {
+        transform: scaleX(1);
+        opacity: 1;
+      }
+    }
+
+    /* =====================================
+       CARICAMENTO
+       ===================================== */
+
+    .loading-text {
+      margin-top: 27px;
+
+      color: #bcbcbc;
+
+      font-size: 11px;
+
+      letter-spacing: 5px;
+
+      text-transform: uppercase;
+    }
+
+    .progress {
+      position: relative;
+
+      width: min(290px, 72vw);
+      height: 3px;
+
+      margin-top: 17px;
+
+      overflow: hidden;
+
+      border-radius: 10px;
+
+      background:
+        rgba(255, 255, 255, 0.12);
+
+      box-shadow:
+        inset 0 0 3px rgba(255, 255, 255, 0.08);
+    }
+
+    .progress::after {
+      content: "";
+
+      position: absolute;
+
+      top: 0;
+      left: -45%;
+
+      width: 45%;
+      height: 100%;
+
+      border-radius: inherit;
+
+      background:
+        linear-gradient(
+          90deg,
+          transparent,
+          #b90008,
+          #ff2932,
+          #b90008
+        );
+
+      box-shadow:
+        0 0 12px rgba(255, 20, 30, 0.8);
+
+      animation:
+        progressMove 1.5s ease-in-out infinite;
+    }
+
+    @keyframes progressMove {
+      from {
+        left: -45%;
+      }
+
+      to {
+        left: 100%;
+      }
+    }
+
+    /* =====================================
+       MOBILE
+       ===================================== */
+
+    @media (max-height: 680px) {
+      .crest {
+        width: 165px;
+      }
+
+      .crest-glow {
+        width: 180px;
+        height: 180px;
+      }
+
+      .crest-wrapper {
+        margin-bottom: 18px;
+      }
+
+      .loading-text {
+        margin-top: 19px;
+      }
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <div class="loader">
+
+
+    <div class="content">
+
+      <div class="crest-wrapper">
+
+        <div class="crest-glow"></div>
+
+        <!-- STEMMA UFFICIALE -->
+        <img
+          class="crest"
+          src="/montecarlo.png"
+          alt="Montecarlo 2013"
+        />
+
+      </div>
+
+      <div class="title">
+        MONTECARLO 2013
+      </div>
+
+      <div class="lines">
+        <div class="line"></div>
+        <div class="line"></div>
+        <div class="line"></div>
+      </div>
+
+      <div class="loading-text">
+        Caricamento...
+      </div>
+
+      <div class="progress"></div>
+
+    </div>
+
+  </div>
+
+</body>
+</html>
