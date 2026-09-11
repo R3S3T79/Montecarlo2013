@@ -46,10 +46,30 @@ export default function Login() {
       } = await supabase.auth.getUser();
 
       if (user) {
-        navigate("/");
-      } else {
-        setErrorMsg("Login riuscito, ma sessione non trovata");
-      }
+  const { data: profile, error: profileError } =
+    await supabase
+      .from("user_profiles")
+      .select("must_change_password")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+  if (profileError) {
+    console.error(
+      "Errore controllo cambio password:",
+      profileError
+    );
+
+    setErrorMsg(
+      "Errore durante il controllo del profilo utente"
+    );
+  } else if (profile?.must_change_password) {
+    navigate("/change-password");
+  } else {
+    navigate("/");
+  }
+} else {
+  setErrorMsg("Login riuscito, ma sessione non trovata");
+}
     }
 
     setLoading(false);
