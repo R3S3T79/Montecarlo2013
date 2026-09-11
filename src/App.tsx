@@ -1,7 +1,6 @@
 // Data creazione chat: 2025-07-30
 // src/App.tsx
 
-import React from "react";
 import { Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import SidebarLayout from "./components/SidebarLayout";
@@ -16,6 +15,7 @@ import ConfirmPage from "./pages/ConfirmPage";
 import AuthCallback from "./pages/AuthCallback";
 import UserProfile from './pages/UserProfile';
 import UpdatePassword from "./pages/UpdatePassword";
+import ChangePasswordPage from "./pages/ChangePasswordPage";
 import ForgotPassword from "./pages/ForgotPassword";
 
 // pagine utente
@@ -112,6 +112,16 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/update-password" element={<UpdatePassword />} />
         <Route path="/grafico-classifica" element={<GraficoAndamentoClassifica />} />
+
+        {/* Cambio obbligatorio password provvisoria */}
+<Route
+  path="/change-password"
+  element={
+    <ProtectedRoute>
+      <ChangePasswordPage />
+    </ProtectedRoute>
+  }
+/>
 
 
 

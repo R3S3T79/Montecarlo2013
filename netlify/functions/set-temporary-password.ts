@@ -289,6 +289,32 @@ if (
     };
   }
 
+  // =====================================
+// OBBLIGA CAMBIO PASSWORD AL LOGIN
+// =====================================
+
+const { error: flagError } = await supabase
+  .from("user_profiles")
+  .update({
+    must_change_password: true,
+  })
+  .eq("user_id", targetUser.id);
+
+if (flagError) {
+  console.error(
+    "Errore impostazione obbligo cambio password:",
+    flagError
+  );
+
+  return {
+    statusCode: 500,
+    body: JSON.stringify({
+      error:
+        "Password provvisoria impostata, ma errore nell'attivazione del cambio password obbligatorio",
+    }),
+  };
+}
+
   
 
   // =====================================
