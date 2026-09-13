@@ -21,10 +21,18 @@ interface AllenamentoRPC {
   presente: boolean | null;
 }
 
+// ======================
+// 1. COMPONENTE
+// ======================
+
 export default function Allenamenti(): JSX.Element {
   const [rows, setRows] = useState<GiocatorePresenza[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const navigate = useNavigate();
+
+  // ======================
+  // 2. CARICAMENTO DATI
+  // ======================
 
   useEffect(() => {
     async function fetchData() {
@@ -32,7 +40,7 @@ export default function Allenamenti(): JSX.Element {
       const oggi = new Date().toISOString().slice(0, 10);
 
       /* ======================
-         1️⃣ Stagione attiva
+         3. Stagione attiva
       ====================== */
       const { data: stagione, error: stagErr } = await supabase
         .from('stagioni')
@@ -48,7 +56,7 @@ export default function Allenamenti(): JSX.Element {
       }
 
       /* ======================
-         2️⃣ Giocatori stagione
+         4. Giocatori stagione
       ====================== */
       const { data: gs, error: gsErr } = await supabase
         .from('giocatori_stagioni_view')
@@ -68,7 +76,7 @@ export default function Allenamenti(): JSX.Element {
       });
 
       /* ======================
-         3️⃣ RPC con paginazione
+         5. RPC con paginazione
       ====================== */
       let allenamenti: AllenamentoRPC[] = [];
       let offset = 0;
@@ -100,7 +108,7 @@ export default function Allenamenti(): JSX.Element {
       console.log('ALLENAMENTI TOTALI:', allenamenti.length);
 
       /* ======================
-         4️⃣ Conteggio per giocatore
+         6. Conteggio per giocatore
       ====================== */
       const counts: Record<
         string,
@@ -120,7 +128,7 @@ export default function Allenamenti(): JSX.Element {
       });
 
       /* ======================
-         5️⃣ Risultato finale
+         7. Risultato finale
       ====================== */
       const result: GiocatorePresenza[] = gsSorted.map((r: any) => ({
         record_id: r.id,
@@ -139,56 +147,95 @@ export default function Allenamenti(): JSX.Element {
     fetchData();
   }, []);
 
+  // ======================
+  // 8. CARICAMENTO
+  // ======================
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-white text-lg">Caricamento…</div>
+      <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b] flex items-center justify-center">
+        <div className="rounded-xl border border-white/10 bg-[#252525]/90 px-6 py-4 text-lg font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+          Caricamento…
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen px-2 pb-2">
-      <div className="overflow-x-auto overflow-y-auto h-[calc(100vh-50px)]">
-        <table className="table-auto w-full border-separate" style={{ borderSpacing: 0 }}>
-          <thead className="bg-gradient-to-br from-[#d61f1f]/90 to-[#f45e5e]/90">
-            <tr>
-              <th className="px-4 py-3 text-left text-white uppercase sticky top-0">
-                Giocatore
-              </th>
-              <th className="px-4 py-3 text-center text-white uppercase sticky top-0">
-                All.
-              </th>
-              <th className="px-4 py-3 text-center text-white uppercase sticky top-0">
-                Pres.
-              </th>
-              <th className="px-4 py-3 text-center text-white uppercase sticky top-0">
-                Ass.
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, idx) => {
-              const rowBg = idx % 2 === 0 ? 'bg-white/90' : 'bg-white/85';
-              const cell = `px-4 py-2 text-gray-900 border-b border-white/30 ${rowBg}`;
+  // ======================
+  // 9. RENDER
+  // ======================
 
-              return (
-                <tr
-                  key={r.record_id}
-                  onClick={() => navigate(`/allenamenti/${r.giocatore_uid}`)}
-                  className="cursor-pointer"
-                >
-                  <td className={cell}>
-                    {r.cognome} {r.nome}
-                  </td>
-                  <td className={`${cell} text-center`}>{r.totaleAll}</td>
-                  <td className={`${cell} text-center`}>{r.presenze}</td>
-                  <td className={`${cell} text-center`}>{r.assenze}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b] px-2 pb-3 pt-2">
+      <div className="mx-auto w-full max-w-5xl overflow-hidden rounded-2xl border border-white/10 bg-[#252525]/95 shadow-[0_10px_30px_rgba(0,0,0,0.40)]">
+
+        <div className="bg-gradient-to-r from-red-600 to-red-700 px-4 py-4">
+          <div className="text-lg font-bold text-white">
+            Allenamenti
+          </div>
+          <div className="mt-1 text-xs text-white/80">
+            Presenze e assenze dei giocatori
+          </div>
+        </div>
+
+        <div className="max-h-[calc(100vh-150px)] overflow-x-auto overflow-y-auto">
+          <table
+            className="table-auto w-full border-separate"
+            style={{ borderSpacing: 0 }}
+          >
+            <thead>
+              <tr>
+                <th className="sticky top-0 z-10 border-b border-white/10 bg-[#1f1f1f] px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-white">
+                  Giocatore
+                </th>
+                <th className="sticky top-0 z-10 border-b border-white/10 bg-[#1f1f1f] px-3 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">
+                  All.
+                </th>
+                <th className="sticky top-0 z-10 border-b border-white/10 bg-[#1f1f1f] px-3 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">
+                  Pres.
+                </th>
+                <th className="sticky top-0 z-10 border-b border-white/10 bg-[#1f1f1f] px-3 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">
+                  Ass.
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {rows.map((r, idx) => {
+                const rowBg =
+                  idx % 2 === 0 ? 'bg-[#292929]' : 'bg-[#242424]';
+
+                return (
+                  <tr
+                    key={r.record_id}
+                    onClick={() => navigate(`/allenamenti/${r.giocatore_uid}`)}
+                    className={`${rowBg} cursor-pointer transition hover:bg-[#383838]`}
+                  >
+                    <td className="border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">
+                      {r.cognome} {r.nome}
+                    </td>
+
+                    <td className="border-b border-white/10 px-3 py-3 text-center text-sm font-bold text-gray-200">
+                      {r.totaleAll}
+                    </td>
+
+                    <td className="border-b border-white/10 px-3 py-3 text-center">
+                      <span className="inline-flex min-w-[32px] justify-center rounded-lg bg-green-600/20 px-2 py-1 text-sm font-bold text-green-400">
+                        {r.presenze}
+                      </span>
+                    </td>
+
+                    <td className="border-b border-white/10 px-3 py-3 text-center">
+                      <span className="inline-flex min-w-[32px] justify-center rounded-lg bg-red-600/20 px-2 py-1 text-sm font-bold text-red-400">
+                        {r.assenze}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

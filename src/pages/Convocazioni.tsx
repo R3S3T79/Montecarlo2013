@@ -1,10 +1,12 @@
 // src/pages/Convocazioni.tsx
 // Data creazione: 11/09/2025 (rev: gestione torneo multi-avversarie + input più visibili)
 
+// 1. IMPORTAZIONI — Data chat: 13/09/2026
 import { useEffect, useState } from 'react';
 import { supabase } from "../lib/supabaseClient";
 import html2canvas from "html2canvas";
 
+// 2. INTERFACCE
 interface Squadra {
   id: string;
   nome: string;
@@ -16,6 +18,7 @@ interface Giocatore {
   cognome: string;
 }
 
+// 3. COMPONENTE E LOGICA ESISTENTE
 export default function Convocazioni() {
   const [squadre, setSquadre] = useState<Squadra[]>([]);
   const [giocatori, setGiocatori] = useState<Giocatore[]>([]);
@@ -290,20 +293,21 @@ for (const p of partiteTarget) {
 
   return (
    <div className="w-full px-[2px] pt-6 pb-6 box-border">
+      {/* 4. INTERFACCIA A SCHERMO */}
       {/* ===== FORM A SCHERMO ===== */}
-      <div className="space-y-4 print:hidden">
-        <div className="bg-white/90 rounded shadow p-4 m-2 space-y-4">
+      <div className="space-y-4 print:hidden bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b] text-white rounded-2xl py-4">
+        <div className="bg-[#252525] rounded-2xl border border-white/10 shadow-xl p-4 m-2 space-y-4">
          {/* Pulsante selezione partita */}
 <div className="mb-4">
   <button
     onClick={() => document.getElementById("modal-partite")?.classList.remove("hidden")}
-    className="bg-blue-600 text-white px-3 py-2 rounded"
+    className="bg-gradient-to-r from-red-600 to-red-700 text-white px-3 py-2 rounded-xl shadow-lg hover:from-red-700 hover:to-red-800 transition"
   >
     Seleziona partita
   </button>
 </div>
           {/* Competizione */}
-          <label className="block font-bold">Competizione:</label>
+          <label className="block font-bold text-red-400">Competizione:</label>
           <select
             value={competizione}
             onChange={(e) => {
@@ -313,7 +317,7 @@ for (const p of partiteTarget) {
                 setSquadreAvversarie([""]);
               }
             }}
-            className="border-2 border-gray-700 p-3 w-full bg-white text-lg rounded"
+            className="border border-white/10 p-3 w-full bg-[#1f1f1f] text-white text-lg rounded-xl [color-scheme:dark] outline-none focus:border-red-500 focus:ring-2 focus:ring-red-600/40"
           >
             <option value="Campionato">Campionato</option>
             <option value="Torneo">Torneo</option>
@@ -323,23 +327,23 @@ for (const p of partiteTarget) {
           {/* Se Torneo → numero partite + squadre multiple */}
           {competizione === "Torneo" && (
             <div>
-              <label className="block font-bold mt-2">Numero partite:</label>
+              <label className="block font-bold text-red-400 mt-2">Numero partite:</label>
 <input
   type="number"
   min={1}
   value={numPartite}
   onChange={(e) => handleNumPartiteChange(Number(e.target.value))}
   onFocus={(e) => e.target.select()}   // <-- aggiunto
-  className="border-2 border-gray-700 p-3 w-full bg-white text-lg rounded"
+  className="border border-white/10 p-3 w-full bg-[#1f1f1f] text-white text-lg rounded-xl [color-scheme:dark] outline-none focus:border-red-500 focus:ring-2 focus:ring-red-600/40"
 />
 
               {Array.from({ length: numPartite }).map((_, i) => (
                 <div key={i} className="mt-2">
-                  <label className="block font-bold">Squadra avversaria {i + 1}:</label>
+                  <label className="block font-bold text-red-400">Squadra avversaria {i + 1}:</label>
                   <select
                     value={squadreAvversarie[i] || ""}
                     onChange={(e) => handleSquadraChange(i, e.target.value)}
-                    className="border-2 border-gray-700 p-3 w-full bg-white text-lg rounded"
+                    className="border border-white/10 p-3 w-full bg-[#1f1f1f] text-white text-lg rounded-xl [color-scheme:dark] outline-none focus:border-red-500 focus:ring-2 focus:ring-red-600/40"
                   >
                     <option value="">-- Seleziona --</option>
                     {squadre.map((s) => (
@@ -356,11 +360,11 @@ for (const p of partiteTarget) {
           {/* Se NON è torneo → singola squadra */}
           {competizione !== "Torneo" && (
             <>
-              <label className="block font-bold">Squadra avversaria:</label>
+              <label className="block font-bold text-red-400">Squadra avversaria:</label>
               <select
                 value={squadraAvversaria}
                 onChange={(e) => setSquadraAvversaria(e.target.value)}
-                className="border-2 border-gray-700 p-3 w-full bg-white text-lg rounded"
+                className="border border-white/10 p-3 w-full bg-[#1f1f1f] text-white text-lg rounded-xl [color-scheme:dark] outline-none focus:border-red-500 focus:ring-2 focus:ring-red-600/40"
               >
                 <option value="">-- Seleziona --</option>
                 {squadre.map((s) => (
@@ -373,63 +377,63 @@ for (const p of partiteTarget) {
           )}
 
           {/* Nome torneo */}
-          <label className="block font-bold">Nome torneo / giornata:</label>
+          <label className="block font-bold text-red-400">Nome torneo / giornata:</label>
           <input
             type="text"
             value={nomeTorneo}
             onChange={(e) => setNomeTorneo(e.target.value)}
-            className="border-2 border-gray-700 p-3 w-full bg-white text-lg rounded"
+            className="border border-white/10 p-3 w-full bg-[#1f1f1f] text-white text-lg rounded-xl [color-scheme:dark] outline-none focus:border-red-500 focus:ring-2 focus:ring-red-600/40"
           />
 
           {/* Data e ora partita */}
-          <label className="block font-bold">Data partita:</label>
+          <label className="block font-bold text-red-400">Data partita:</label>
           <input
             type="date"
             value={data}
             onChange={(e) => setData(e.target.value)}
-            className="border-2 border-gray-700 p-3 w-full bg-white text-lg rounded"
+            className="border border-white/10 p-3 w-full bg-[#1f1f1f] text-white text-lg rounded-xl [color-scheme:dark] outline-none focus:border-red-500 focus:ring-2 focus:ring-red-600/40"
           />
 
-          <label className="block font-bold">Ora partita:</label>
+          <label className="block font-bold text-red-400">Ora partita:</label>
           <input
             type="time"
             value={oraPartita}
             onChange={(e) => setOraPartita(e.target.value)}
-            className="border-2 border-gray-700 p-3 w-full bg-white text-lg rounded"
+            className="border border-white/10 p-3 w-full bg-[#1f1f1f] text-white text-lg rounded-xl [color-scheme:dark] outline-none focus:border-red-500 focus:ring-2 focus:ring-red-600/40"
           />
 
           {/* Ritrovo */}
-          <label className="block font-bold">Ritrovo:</label>
+          <label className="block font-bold text-red-400">Ritrovo:</label>
           <input
             type="text"
             value={ritrovoLuogo}
             onChange={(e) => setRitrovoLuogo(e.target.value)}
-            className="border-2 border-gray-700 p-3 w-full bg-white text-lg rounded"
+            className="border border-white/10 p-3 w-full bg-[#1f1f1f] text-white text-lg rounded-xl [color-scheme:dark] outline-none focus:border-red-500 focus:ring-2 focus:ring-red-600/40"
           />
 
-          <label className="block font-bold">Ora ritrovo:</label>
+          <label className="block font-bold text-red-400">Ora ritrovo:</label>
           <input
             type="time"
             value={oraRitrovo}
             onChange={(e) => setOraRitrovo(e.target.value)}
-            className="border-2 border-gray-700 p-3 w-full bg-white text-lg rounded"
+            className="border border-white/10 p-3 w-full bg-[#1f1f1f] text-white text-lg rounded-xl [color-scheme:dark] outline-none focus:border-red-500 focus:ring-2 focus:ring-red-600/40"
           />
         </div>
 
         {/* Giocatori */}
-        <div className="bg-white/90 rounded shadow p-4 m-2">
+        <div className="bg-[#252525] rounded-2xl border border-white/10 shadow-xl p-4 m-2">
           <div className="flex items-center justify-between mb-2">
             
             <button
               onClick={toggleAll}
-              className="text-sm bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
+              className="text-sm text-white bg-[#333333] border border-white/10 px-2 py-1 rounded-xl hover:bg-[#404040] transition"
             >
               Seleziona/Deseleziona tutti
             </button>
           </div>
           <ul className="mt-2 space-y-1">
             {giocatori.map((g) => (
-              <li key={g.id} className="flex items-center space-x-2">
+              <li key={g.id} className="flex items-center space-x-2 rounded-xl border border-white/10 bg-[#1f1f1f] px-3 py-2 accent-red-600">
                 <input
                   type="checkbox"
                   checked={convocati.includes(g.id)}
@@ -461,24 +465,25 @@ for (const p of partiteTarget) {
 
         <button
           onClick={handleShareWhatsapp}
-          className="bg-green-600 text-white px-4 py-2 rounded mt-4"
+          className="bg-gradient-to-r from-red-600 to-red-700 text-white px-4 py-2 rounded-xl shadow-lg hover:from-red-700 hover:to-red-800 transition mt-4"
         >
           Condividi su WhatsApp
         </button>
       </div>
 
-      <div id="modal-partite" className="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-  <div className="bg-white p-4 rounded shadow max-w-md w-full mx-4">
-    <h2 className="text-lg font-bold mb-2">Scegli partita</h2>
+      {/* 5. MODAL SELEZIONE PARTITE */}
+      <div id="modal-partite" className="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+  <div className="bg-[#252525] text-white border border-white/10 p-4 rounded-2xl shadow-2xl max-w-md w-full mx-4">
+    <h2 className="text-lg font-bold text-white bg-gradient-to-r from-red-600 to-red-700 rounded-xl px-3 py-2 mb-2">Scegli partita</h2>
 
-    <ul className="divide-y px-2">
+    <ul className="divide-y divide-white/10 px-2">
       {partite.map((p) => {
         const selected = partiteSelezionate.find((x) => x.id === p.id);
         return (
           <li
             key={p.id}
-            className={`py-2 cursor-pointer px-2 rounded ${
-              selected ? "bg-blue-100 font-semibold" : "hover:bg-gray-100"
+            className={`py-2 cursor-pointer px-2 rounded-xl transition ${
+              selected ? "bg-red-600/25 text-white font-semibold ring-1 ring-inset ring-red-500/40" : "hover:bg-white/10"
             }`}
             onClick={() => togglePartita(p)}
           >
@@ -490,7 +495,7 @@ for (const p of partiteTarget) {
               })}{" "}
               - {p.campionato_torneo}
             </div>
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-white/70">
               {p.squadra_casa?.nome} vs {p.squadra_ospite?.nome}
             </div>
           </li>
@@ -501,7 +506,7 @@ for (const p of partiteTarget) {
     <div className="flex justify-end space-x-2 mt-3">
       <button
         onClick={() => document.getElementById("modal-partite")?.classList.add("hidden")}
-        className="bg-gray-300 px-3 py-1 rounded"
+        className="bg-[#333333] text-white border border-white/10 px-3 py-1 rounded-xl hover:bg-[#404040] transition"
       >
         Chiudi
       </button>
@@ -545,7 +550,7 @@ setOraPartita(`${hh}:${mm}`);
          
           document.getElementById("modal-partite")?.classList.add("hidden");
         }}
-        className="bg-blue-600 text-white px-3 py-1 rounded"
+        className="bg-gradient-to-r from-red-600 to-red-700 text-white px-3 py-1 rounded-xl shadow-lg hover:from-red-700 hover:to-red-800 transition"
       >
         Seleziona
       </button>
@@ -557,6 +562,7 @@ setOraPartita(`${hh}:${mm}`);
 
 
 
+      {/* 6. LAYOUT EXPORT ORIGINALE */}
       {/* ===== LAYOUT EXPORT (screenshot) ===== */}
       <div
   id="convocazione"

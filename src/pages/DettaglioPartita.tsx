@@ -26,6 +26,32 @@ interface TiroRigore {
   } | null
 }
 
+// =========================
+// 1. FORMAZIONE E SOSTITUZIONI
+// =========================
+
+interface GiocatoreFormazione {
+  giocatore_stagione_id: string
+  nome: string
+   cognome: string
+  numero_maglia: number | null
+  titolare: boolean
+  entrata_sec: number | null
+  uscita_sec: number | null
+}
+
+// =========================
+// 6. SOSTITUZIONI PARTITA
+// =========================
+
+interface SostituzionePartita {
+  id: string
+  giocatore_uscente_stagione_id: string
+  giocatore_entrante_stagione_id: string
+  secondo_assoluto: number
+  run_index: number | null
+}
+
 interface SquadraInfo {
   id: string
   nome: string
@@ -63,6 +89,17 @@ export default function DettaglioPartita() {
   const [tiriRigori, setTiriRigori] = useState<TiroRigore[]>([])
   const [loading, setLoading] = useState(true)
   const [supplementariGiocati, setSupplementariGiocati] = useState(false)
+  // =========================
+// 2. STATO FORMAZIONE E SOSTITUZIONI
+// =========================
+
+const [formazione, setFormazione] = useState<GiocatoreFormazione[]>([])
+
+// =========================
+// 7. STATO SOSTITUZIONI PARTITA
+// =========================
+
+const [sostituzioni, setSostituzioni] = useState<SostituzionePartita[]>([])
 
   const [editing, setEditing] = useState(false)
   const [commento, setCommento] = useState<string>('')
@@ -160,6 +197,98 @@ commento,
         .eq('partita_id', id)
 
       if (errMd) console.error(errMd)
+
+              // =========================
+      // 3. CARICAMENTO FORMAZIONE E SOSTITUZIONI
+      // =========================
+
+      const { data: presenzeData, error: errPresenze } = await supabase
+        .from('presenze')
+        .select('giocatore_stagione_id, nome, cognome, titolare')
+        .eq('partita_id', id)
+
+      if (errPresenze) {
+        console.error('Errore caricamento formazione:', errPresenze)
+      }
+
+            // =========================
+      // 5. CARICAMENTO NUMERI MAGLIA
+      // =========================
+
+      const giocatoriFormazioneIds = (presenzeData || [])
+        .map(p => p.giocatore_stagione_id)
+        .filter((gid): gid is string => !!gid)
+
+      const { data: numeriMagliaData, error: errNumeriMaglia } = await supabase
+        .from('giocatori_stagioni')
+        .select('id, numero_maglia')
+        .in('id', giocatoriFormazioneIds)
+
+      if (errNumeriMaglia) {
+        console.error('Errore caricamento numeri maglia:', errNumeriMaglia)
+      }
+
+      const { data: minutiData, error: errMinuti } = await supabase
+        .from('minuti_giocati')
+                .select('giocatore_stagione_id, entrata_sec, uscita_sec, run_index')
+        .eq('partita_id', id)
+
+      if (errMinuti) {
+        console.error('Errore caricamento sostituzioni:', errMinuti)
+      }
+
+          // =========================
+      // 4. AGGREGAZIONE MINUTI FORMAZIONE
+      // =========================
+
+      const formazioneData: GiocatoreFormazione[] = (presenzeData || []).map(p => {
+        const righeGiocatore = (minutiData || [])
+          .filter(m => m.giocatore_stagione_id === p.giocatore_stagione_id)
+          .sort((a, b) => (a.entrata_sec ?? 0) - (b.entrata_sec ?? 0))
+
+        const entrate = righeGiocatore
+          .map(m => m.entrata_sec)
+          .filter((sec): sec is number => sec !== null)
+
+        const uscite = righeGiocatore
+          .map(m => m.uscita_sec)
+          .filter((sec): sec is number => sec !== null)
+
+        return {
+          giocatore_stagione_id: p.giocatore_stagione_id,
+                   nome: p.nome || '',
+          cognome: p.cognome || '',
+          numero_maglia:
+            numeriMagliaData?.find(g => g.id === p.giocatore_stagione_id)?.numero_maglia ?? null,
+          titolare: !!p.titolare,
+          entrata_sec: entrate.length > 0 ? Math.min(...entrate) : null,
+          uscita_sec: uscite.length > 0 ? Math.max(...uscite) : null,
+        }
+      })
+
+      setFormazione(formazioneData)
+
+            // =========================
+      // 8. CARICAMENTO SOSTITUZIONI PARTITA
+      // =========================
+
+      const { data: sostituzioniData, error: errSostituzioni } = await supabase
+        .from('sostituzioni_partita')
+        .select(`
+          id,
+          giocatore_uscente_stagione_id,
+          giocatore_entrante_stagione_id,
+          secondo_assoluto,
+          run_index
+        `)
+        .eq('partita_id', id)
+        .order('secondo_assoluto', { ascending: true })
+
+      if (errSostituzioni) {
+        console.error('Errore caricamento sostituzioni:', errSostituzioni)
+      }
+
+      setSostituzioni(sostituzioniData || [])
 
               const { data: rigoriData, error: errRigori } = await supabase
         .from('rigori_partita')
@@ -454,6 +583,8 @@ const goalOspiteArr = [
           </div>
         </div>
 
+        
+
         {/* 4. Parziali */}
         <div className="mb-4 overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_22px_rgba(0,0,0,0.38)]">
 
@@ -549,6 +680,99 @@ const goalOspiteArr = [
 
           </div>
         </div>
+
+                        {/* ========================= */}
+        {/* 9. FORMAZIONE E SOSTITUZIONI */}
+        {/* ========================= */}
+
+        {formazione.length > 0 && (
+          <div className="mb-4 overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_22px_rgba(0,0,0,0.38)]">
+
+            <div className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 text-white">
+              <span className="text-xl">👕</span>
+              <span className="font-extrabold uppercase tracking-wide">
+                Formazione e sostituzioni
+              </span>
+            </div>
+
+            <div className="divide-y divide-gray-200">
+              {[...formazione]
+                .filter(g => g.titolare)
+                .sort((a, b) => {
+                  if (a.numero_maglia !== null && b.numero_maglia !== null) {
+                    return a.numero_maglia - b.numero_maglia
+                  }
+
+                  if (a.numero_maglia !== null) return -1
+                  if (b.numero_maglia !== null) return 1
+
+                  return a.cognome.localeCompare(b.cognome)
+                })
+                .map(g => {
+                  const sostituzione = sostituzioni.find(
+                    s => s.giocatore_uscente_stagione_id === g.giocatore_stagione_id
+                  )
+
+                  const entrante = sostituzione
+                    ? formazione.find(
+                        p =>
+                          p.giocatore_stagione_id ===
+                          sostituzione.giocatore_entrante_stagione_id
+                      )
+                    : null
+
+                  return (
+                    <div
+                      key={g.giocatore_stagione_id}
+                      className="px-4 py-2"
+                    >
+                      <div className="flex min-h-[28px] items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="w-7 shrink-0 text-center text-[13px] font-extrabold text-gray-500">
+                            {g.numero_maglia ?? '-'}
+                          </div>
+
+                          <div className="truncate text-[14px] font-bold text-[#181818]">
+                            {g.cognome} {g.nome}
+                          </div>
+                        </div>
+
+                        {sostituzione && (
+                          <div className="flex shrink-0 items-center gap-1 font-bold text-red-600">
+                            <span className="text-lg leading-none">↓</span>
+                            <span className="text-xs">
+                              35'
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {entrante && (
+                        <div className="flex min-h-[28px] items-center justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="w-7 shrink-0 text-center text-[13px] font-normal text-gray-500">
+  {entrante.numero_maglia ?? '-'}
+</div>
+
+<div className="truncate text-[14px] font-normal text-[#181818]">
+  {entrante.cognome} {entrante.nome}
+</div>
+                          </div>
+
+                          <div className="flex shrink-0 items-center gap-1 font-bold text-green-600">
+                            <span className="text-lg leading-none">↑</span>
+                            <span className="text-xs">
+                              35'
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+        )}
 
         {/* 5. Rigori */}
         {((partita.rigori_a ?? 0) > 0 || (partita.rigori_b ?? 0) > 0) && (

@@ -15,9 +15,17 @@ interface PlayerRecord {
   presente: boolean;
 }
 
+// =========================
+// 1. COMPONENTE
+// =========================
+
 export default function StoricoAllenamenti(): JSX.Element {
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // =========================
+  // 2. RUOLO UTENTE
+  // =========================
 
   // ✅ ruolo coerente con SidebarLayout
   const [role, setRole] = useState<UserRole>(UserRole.Authenticated);
@@ -59,6 +67,10 @@ export default function StoricoAllenamenti(): JSX.Element {
   const [players, setPlayers] = useState<PlayerRecord[]>([]);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
 
+  // =========================
+  // 3. CARICAMENTO DATE
+  // =========================
+
   // Carica tutte le date allenamenti
   useEffect(() => {
     (async () => {
@@ -77,6 +89,10 @@ export default function StoricoAllenamenti(): JSX.Element {
       setLoadingDates(false);
     })();
   }, []);
+
+  // =========================
+  // 4. CARICAMENTO GIOCATORI
+  // =========================
 
   // Carica i giocatori della data selezionata
   useEffect(() => {
@@ -142,20 +158,46 @@ export default function StoricoAllenamenti(): JSX.Element {
     })();
   }, [selectedDate]);
 
+  // =========================
+  // 5. NAVIGAZIONE
+  // =========================
+
   const onDateClick = (date: string) => setSelectedDate(date);
   const onPlayerClick = (playerId: string) =>
     navigate(`/allenamenti/${playerId}`);
 
+  // =========================
+  // 6. CONTROLLI ACCESSO E CARICAMENTO
+  // =========================
+
   // ✅ gestiamo i casi di caricamento / permessi nel render, non prima
-  if (roleLoading) return <div className="p-6 text-center">Caricamento ruolo…</div>;
+  if (roleLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b] flex items-center justify-center">
+        <div className="rounded-xl border border-white/10 bg-[#252525]/90 px-6 py-4 font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+          Caricamento ruolo…
+        </div>
+      </div>
+    );
+  }
 
   if (role !== UserRole.Admin && role !== UserRole.Creator) {
     return <Navigate to="/" replace />;
   }
 
   if (loadingDates) {
-    return <div className="p-6 text-center">Caricamento…</div>;
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b] flex items-center justify-center">
+        <div className="rounded-xl border border-white/10 bg-[#252525]/90 px-6 py-4 font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+          Caricamento…
+        </div>
+      </div>
+    );
   }
+
+  // =========================
+  // 7. DETTAGLIO ALLENAMENTO
+  // =========================
 
   if (selectedDate) {
     const dt = new Date(selectedDate);
@@ -164,85 +206,130 @@ export default function StoricoAllenamenti(): JSX.Element {
     const displayDate = dt.toLocaleDateString("it-IT");
 
     return (
-      <div className="min-h-screen px-2">
-        <h2 className="text-2xl font-semibold mb-4 text-white">
-          {dayName}, {displayDate}
-        </h2>
+      <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b] px-2 py-4">
+        <div className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-[#252525]/95 shadow-[0_10px_30px_rgba(0,0,0,0.40)]">
 
-        {loadingPlayers ? (
-          <div>Caricamento elenco giocatori…</div>
-        ) : players.length === 0 ? (
-          <div>Nessun allenamento registrato per questa data.</div>
-        ) : (
-          <ul className="divide-y divide-gray-200">
-            {players.map((p) => (
-              <li
-                key={p.record_id}
-                className="py-3 flex justify-between hover:bg-gray-100 cursor-pointer"
-                onClick={() => onPlayerClick(p.giocatore_id)}
-              >
-                <span className="font-medium text-lg text-white">
-                  {p.cognome} {p.nome}
-                </span>
-                <span
-                  className={`px-2 py-1 rounded bg-white/80 ${
-                    p.presente ? "text-green-600" : "text-red-600"
-                  } font-semibold`}
-                >
-                  {p.presente ? "Presente" : "Assente"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+          <div className="bg-gradient-to-r from-red-600 to-red-700 px-5 py-4">
+            <div className="text-lg font-bold text-white">
+              {dayName}, {displayDate}
+            </div>
+            <div className="mt-1 text-xs text-white/80">
+              Presenze allenamento
+            </div>
+          </div>
+
+          <div className="p-4">
+            {loadingPlayers ? (
+              <div className="py-8 text-center font-semibold text-gray-300">
+                Caricamento elenco giocatori…
+              </div>
+            ) : players.length === 0 ? (
+              <div className="rounded-xl border border-white/10 bg-[#1f1f1f] p-6 text-center text-gray-300">
+                Nessun allenamento registrato per questa data.
+              </div>
+            ) : (
+              <ul className="overflow-hidden rounded-xl border border-white/10">
+                {players.map((p, idx) => (
+                  <li
+                    key={p.record_id}
+                    className={`flex cursor-pointer items-center justify-between border-b border-white/10 px-4 py-3 transition last:border-b-0 hover:bg-[#383838] ${
+                      idx % 2 === 0 ? "bg-[#292929]" : "bg-[#242424]"
+                    }`}
+                    onClick={() => onPlayerClick(p.giocatore_id)}
+                  >
+                    <span className="pr-3 text-base font-bold text-white">
+                      {p.cognome} {p.nome}
+                    </span>
+
+                    <span
+                      className={`min-w-[88px] rounded-lg px-3 py-1.5 text-center text-sm font-bold ${
+                        p.presente
+                          ? "bg-green-600/20 text-green-400"
+                          : "bg-red-600/20 text-red-400"
+                      }`}
+                    >
+                      {p.presente ? "Presente" : "Assente"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
       </div>
     );
   }
 
+  // =========================
+  // 8. STORICO ALLENAMENTI
+  // =========================
+
   return (
-    <div className="min-h-screen px-4">
-      {dates.length === 0 ? (
-        <div>Nessuna seduta registrata.</div>
-      ) : (
-        <ul className="divide-y divide-gray-200">
-          {dates.map((date) => {
-            const dt = new Date(date);
-            const weekday = dt.toLocaleDateString("it-IT", { weekday: "long" });
-            const dayName =
-              weekday.charAt(0).toUpperCase() + weekday.slice(1);
-            const displayDate = dt.toLocaleDateString("it-IT");
-            return (
-              <li
-                key={date}
-                className="flex items-center justify-between py-2 hover:bg-gray-100"
-              >
-                <span
-                  className="cursor-pointer text-lg font-semibold text-white"
-                  onClick={() => onDateClick(date)}
-                >
-                  {dayName}, {displayDate}
-                </span>
-                <button
-                  onClick={async () => {
-                    if (
-                      confirm(`Eliminare tutte le sedute del ${displayDate}?`)
-                    ) {
-                      await supabase
-                        .from("allenamenti")
-                        .delete()
-                        .eq("data_allenamento", date);
-                      setDates(dates.filter((d) => d !== date));
-                    }
-                  }}
-                  className="text-red-600 hover:underline"
-                >
-                  Elimina
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+    <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b] px-2 py-4">
+      <div className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-[#252525]/95 shadow-[0_10px_30px_rgba(0,0,0,0.40)]">
+
+        <div className="bg-gradient-to-r from-red-600 to-red-700 px-5 py-4">
+          <div className="text-lg font-bold text-white">
+            Storico Allenamenti
+          </div>
+          <div className="mt-1 text-xs text-white/80">
+            Seleziona una data per visualizzare le presenze
+          </div>
+        </div>
+
+        <div className="p-4">
+          {dates.length === 0 ? (
+            <div className="rounded-xl border border-white/10 bg-[#1f1f1f] p-6 text-center text-gray-300">
+              Nessuna seduta registrata.
+            </div>
+          ) : (
+            <ul className="overflow-hidden rounded-xl border border-white/10">
+              {dates.map((date, idx) => {
+                const dt = new Date(date);
+                const weekday = dt.toLocaleDateString("it-IT", {
+                  weekday: "long",
+                });
+                const dayName =
+                  weekday.charAt(0).toUpperCase() + weekday.slice(1);
+                const displayDate = dt.toLocaleDateString("it-IT");
+
+                return (
+                  <li
+                    key={date}
+                    className={`flex items-center justify-between border-b border-white/10 px-4 py-3 last:border-b-0 ${
+                      idx % 2 === 0 ? "bg-[#292929]" : "bg-[#242424]"
+                    }`}
+                  >
+                    <span
+                      className="cursor-pointer pr-3 text-base font-bold text-white transition hover:text-red-400"
+                      onClick={() => onDateClick(date)}
+                    >
+                      {dayName}, {displayDate}
+                    </span>
+
+                    <button
+                      onClick={async () => {
+                        if (
+                          confirm(`Eliminare tutte le sedute del ${displayDate}?`)
+                        ) {
+                          await supabase
+                            .from("allenamenti")
+                            .delete()
+                            .eq("data_allenamento", date);
+                          setDates(dates.filter((d) => d !== date));
+                        }
+                      }}
+                      className="rounded-lg border border-red-600/40 bg-red-600/10 px-3 py-1.5 text-sm font-bold text-red-400 transition hover:bg-red-600/20"
+                    >
+                      Elimina
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

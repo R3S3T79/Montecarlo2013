@@ -20,6 +20,10 @@ interface Stagione {
   data_fine: string;
 }
 
+// =========================
+// 1. COMPONENTE
+// =========================
+
 export default function AllenamentiNuovo(): JSX.Element {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -33,6 +37,10 @@ export default function AllenamentiNuovo(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(true);
   const [seasons, setSeasons] = useState<Stagione[]>([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState<string>("");
+
+  // =========================
+  // 2. RUOLO UTENTE
+  // =========================
 
   // Ruolo coerente con SidebarLayout
   const [role, setRole] = useState<UserRole>(UserRole.Authenticated);
@@ -81,6 +89,10 @@ export default function AllenamentiNuovo(): JSX.Element {
   ];
   const selectedDayName = weekdays[new Date(date).getDay()];
 
+  // =========================
+  // 3. CARICAMENTO STAGIONI
+  // =========================
+
   // Carica stagioni
   useEffect(() => {
     (async () => {
@@ -103,6 +115,10 @@ export default function AllenamentiNuovo(): JSX.Element {
       setSelectedSeasonId(attiva ? attiva.id : data[0]?.id ?? "");
     })();
   }, []);
+
+  // =========================
+  // 4. CARICAMENTO GIOCATORI
+  // =========================
 
   // Carica giocatori
   useEffect(() => {
@@ -143,9 +159,17 @@ export default function AllenamentiNuovo(): JSX.Element {
     load();
   }, [selectedSeasonId]);
 
+  // =========================
+  // 5. GESTIONE PRESENZE
+  // =========================
+
   const togglePresenza = (id: string, presente: boolean) => {
     setSelections((prev) => ({ ...prev, [id]: presente }));
   };
+
+  // =========================
+  // 6. SALVATAGGIO
+  // =========================
 
   const handleSave = async () => {
     const records = players.map((p) => ({
@@ -164,99 +188,141 @@ export default function AllenamentiNuovo(): JSX.Element {
     }
   };
 
+  // =========================
+  // 7. CONTROLLI ACCESSO E CARICAMENTO
+  // =========================
+
   // ✅ RENDER FINALE SICURO (niente return prima)
-  if (roleLoading) return <div className="p-4">Caricamento ruolo…</div>;
+  if (roleLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b] flex items-center justify-center">
+        <div className="rounded-xl border border-white/10 bg-[#252525]/90 px-6 py-4 text-lg font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+          Caricamento ruolo…
+        </div>
+      </div>
+    );
+  }
 
   if (role !== UserRole.Admin && role !== UserRole.Creator) {
     return <Navigate to="/" replace />;
   }
 
   if (loading) {
-    return <div className="min-h-screen p-4">Caricamento dati…</div>;
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b] flex items-center justify-center">
+        <div className="rounded-xl border border-white/10 bg-[#252525]/90 px-6 py-4 text-lg font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+          Caricamento dati…
+        </div>
+      </div>
+    );
   }
 
+  // =========================
+  // 8. RENDER
+  // =========================
+
   return (
-    <div className="min-h-screen px-2 py-4">
-      <div className="max-w-2xl mx-auto bg-white/60 rounded-lg shadow p-6">
-        {/* Selettore giorno, data e stagione */}
-        <div className="mb-6 text-center">
-          <div className="flex flex-col md:flex-row items-center md:space-x-4 space-y-3 md:space-y-0">
-            <span className="text-lg text-gray-800 font-semibold">
-              {selectedDayName}
-            </span>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="rounded-md bg-white border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-            />
-            <select
-              value={selectedSeasonId}
-              onChange={(e) => setSelectedSeasonId(e.target.value)}
-              className="rounded-md bg-white border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-            >
-              {seasons.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nome}
-                </option>
-              ))}
-            </select>
+    <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b] px-2 py-4">
+      <div className="max-w-2xl mx-auto overflow-hidden rounded-2xl border border-white/10 bg-[#252525]/95 shadow-[0_10px_30px_rgba(0,0,0,0.40)]">
+
+        <div className="bg-gradient-to-r from-red-600 to-red-700 px-5 py-4">
+          <div className="text-lg font-bold text-white">
+            Nuovo Allenamento
+          </div>
+          <div className="mt-1 text-xs text-white/80">
+            Registra le presenze dei giocatori
           </div>
         </div>
 
-        {/* Lista giocatori */}
-        <ul className="divide-y divide-red-400 mb-6">
-          {players.map((p) => {
-            const isPresente = selections[p.id];
-            return (
-              <li
-                key={p.id}
-                className="flex items-center justify-between py-3 px-2"
-              >
-                <span className="text-xl font-bold text-gray-900">
-                  {p.cognome} {p.nome}
-                </span>
-                <div className="flex flex-col space-y-2 pr-2">
-                  <button
-                    onClick={() => togglePresenza(p.id, true)}
-                    className={`px-4 py-1 rounded ${
-                      isPresente
-                        ? "bg-green-600 text-white"
-                        : "bg-green-200 text-green-800"
-                    }`}
-                  >
-                    Presente
-                  </button>
-                  <button
-                    onClick={() => togglePresenza(p.id, false)}
-                    className={`px-4 py-1 rounded ${
-                      !isPresente
-                        ? "bg-red-600 text-white"
-                        : "bg-red-200 text-red-800"
-                    }`}
-                  >
-                    Assente
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="p-4 md:p-6">
+          {/* Selettore giorno, data e stagione */}
+          <div className="mb-6 rounded-xl border border-white/10 bg-[#1f1f1f] p-4">
+            <div className="flex flex-col md:flex-row items-center md:space-x-4 space-y-3 md:space-y-0">
+              <span className="text-lg text-white font-bold">
+                {selectedDayName}
+              </span>
 
-        {/* Azioni */}
-        <div className="flex justify-center space-x-6">
-          <button
-            onClick={() => navigate(-1)}
-            className="px-6 py-2 border border-gray-400 rounded-lg text-gray-700 hover:bg-gray-100 transition"
-          >
-            Annulla
-          </button>
-          <button
-            onClick={handleSave}
-            className="px-6 py-2 bg-red-600 text-white rounded-lg hover:opacity-90 transition"
-          >
-            Salva
-          </button>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full md:w-auto rounded-xl border border-white/15 bg-[#292929] px-3 py-2 text-white shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-600/40"
+              />
+
+              <select
+                value={selectedSeasonId}
+                onChange={(e) => setSelectedSeasonId(e.target.value)}
+                className="w-full md:w-auto rounded-xl border border-white/15 bg-[#292929] px-3 py-2 text-white shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-600/40"
+              >
+                {seasons.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Lista giocatori */}
+          <ul className="mb-6 overflow-hidden rounded-xl border border-white/10">
+            {players.map((p, idx) => {
+              const isPresente = selections[p.id];
+
+              return (
+                <li
+                  key={p.id}
+                  className={`flex items-center justify-between border-b border-white/10 px-3 py-3 last:border-b-0 ${
+                    idx % 2 === 0 ? "bg-[#292929]" : "bg-[#242424]"
+                  }`}
+                >
+                  <span className="pr-3 text-base font-bold text-white md:text-lg">
+                    {p.cognome} {p.nome}
+                  </span>
+
+                  <div className="flex shrink-0 flex-col space-y-2">
+                    <button
+                      onClick={() => togglePresenza(p.id, true)}
+                      className={`min-w-[96px] rounded-lg px-3 py-1.5 text-sm font-bold transition ${
+                        isPresente
+                          ? "bg-green-600 text-white shadow"
+                          : "border border-green-600/40 bg-green-600/10 text-green-400 hover:bg-green-600/20"
+                      }`}
+                    >
+                      Presente
+                    </button>
+
+                    <button
+                      onClick={() => togglePresenza(p.id, false)}
+                      className={`min-w-[96px] rounded-lg px-3 py-1.5 text-sm font-bold transition ${
+                        !isPresente
+                          ? "bg-red-600 text-white shadow"
+                          : "border border-red-600/40 bg-red-600/10 text-red-400 hover:bg-red-600/20"
+                      }`}
+                    >
+                      Assente
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Azioni */}
+          <div className="flex justify-center space-x-4 border-t border-white/10 pt-5">
+            <button
+              onClick={() => navigate(-1)}
+              className="rounded-xl border border-white/20 bg-[#333333] px-6 py-2.5 font-semibold text-white transition hover:bg-[#404040]"
+            >
+              Annulla
+            </button>
+
+            <button
+              onClick={handleSave}
+              className="rounded-xl bg-gradient-to-r from-red-600 to-red-700 px-6 py-2.5 font-bold text-white shadow-lg transition hover:from-red-700 hover:to-red-800"
+            >
+              Salva
+            </button>
+          </div>
         </div>
       </div>
     </div>

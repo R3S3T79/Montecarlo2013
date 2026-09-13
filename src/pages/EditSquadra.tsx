@@ -1,4 +1,5 @@
 // src/pages/EditSquadra.tsx
+// Data creazione chat: 13/09/2026
 
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -14,6 +15,10 @@ interface Squadra {
   indirizzo: string | null;
   mappa_url: string | null;
 }
+
+// =========================
+// 1. COMPONENTE
+// =========================
 
 export default function EditSquadra(): JSX.Element {
   const { id } = useParams<{ id: string }>();
@@ -36,6 +41,10 @@ export default function EditSquadra(): JSX.Element {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
+  // =========================
+  // 2. CARICAMENTO SQUADRA
+  // =========================
+
   useEffect(() => {
     if (!id) {
       navigate('/squadre');
@@ -57,6 +66,10 @@ export default function EditSquadra(): JSX.Element {
       setLoading(false);
     })();
   }, [id, navigate]);
+
+  // =========================
+  // 3. GESTIONE CAMPI
+  // =========================
 
   const handleInputChange = (field: keyof Squadra, value: string) => {
     setFormData(f => ({ ...f, [field]: value || null }));
@@ -81,6 +94,10 @@ export default function EditSquadra(): JSX.Element {
   const handleCancel = () => {
     navigate('/squadre');
   };
+
+  // =========================
+  // 4. SALVATAGGIO
+  // =========================
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,131 +145,171 @@ export default function EditSquadra(): JSX.Element {
     }
   };
 
+  // =========================
+  // 5. CARICAMENTO
+  // =========================
+
   if (loading) {
-    return <div className="p-4 text-center">Caricamento…</div>;
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b] flex items-center justify-center">
+        <div className="rounded-xl border border-white/10 bg-[#252525]/90 px-6 py-4 font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+          Caricamento…
+        </div>
+      </div>
+    );
   }
 
-  return (
-    <div className="max-w-3xl mx-auto p-2">
-      <form onSubmit={handleSubmit} className="bg-white/90 shadow rounded-lg p-6 space-y-6">
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-            {error}
-          </div>
-        )}
+  // =========================
+  // 6. RENDER
+  // =========================
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Logo Squadra
-          </label>
-          {logoPreview && (
-            <div className="flex items-center mb-4 space-x-4">
-              <img
-                src={logoPreview}
-                alt="Preview logo"
-                className="w-16 h-16 object-contain border rounded"
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b]">
+      <div className="max-w-3xl mx-auto px-3 py-5">
+        <form
+          onSubmit={handleSubmit}
+          className="overflow-hidden rounded-2xl border border-white/10 bg-[#252525]/95 shadow-[0_10px_30px_rgba(0,0,0,0.40)]"
+        >
+          <div className="bg-gradient-to-r from-red-600 to-red-700 px-5 py-4">
+            <div className="text-lg font-bold text-white">
+              Modifica Squadra
+            </div>
+            <div className="mt-1 text-xs text-white/80">
+              Aggiorna i dati della squadra
+            </div>
+          </div>
+
+          <div className="space-y-6 p-5">
+            {error && (
+              <div className="rounded-xl border border-red-500/40 bg-red-950/40 px-4 py-3 text-sm font-semibold text-red-200">
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-white">
+                Logo Squadra
+              </label>
+
+              {logoPreview && (
+                <div className="mb-4 flex items-center space-x-4 rounded-xl border border-white/10 bg-[#1f1f1f] p-3">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-white p-2 shadow">
+                    <img
+                      src={logoPreview}
+                      alt="Preview logo"
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleRemoveLogo}
+                    className="flex items-center rounded-lg border border-red-500/40 bg-red-950/30 px-3 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-900/40"
+                  >
+                    <X size={16} />
+                    <span className="ml-1">Rimuovi</span>
+                  </button>
+                </div>
+              )}
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleLogoChange}
+                className="w-full rounded-xl border border-white/15 bg-[#1f1f1f] px-3 py-2 text-sm text-white file:mr-3 file:rounded-lg file:border-0 file:bg-red-600 file:px-3 file:py-2 file:font-semibold file:text-white hover:file:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-600"
               />
+
+              <p className="mt-1 text-xs text-gray-400">
+                JPG, PNG, GIF
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-white">
+                Nome Squadra *
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.nome}
+                onChange={e => handleInputChange('nome', e.target.value)}
+                className="w-full rounded-xl border border-white/15 bg-[#1f1f1f] px-3 py-2.5 text-white outline-none transition placeholder:text-gray-500 focus:border-red-500 focus:ring-2 focus:ring-red-600/40"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-white">
+                Nome Completo
+              </label>
+              <input
+                type="text"
+                value={formData.nome_completo || ''}
+                onChange={e => handleInputChange('nome_completo', e.target.value)}
+                className="w-full rounded-xl border border-white/15 bg-[#1f1f1f] px-3 py-2.5 text-white outline-none transition placeholder:text-gray-500 focus:border-red-500 focus:ring-2 focus:ring-red-600/40"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-white">
+                Nome Stadio
+              </label>
+              <input
+                type="text"
+                value={formData.nome_stadio || ''}
+                onChange={e => handleInputChange('nome_stadio', e.target.value)}
+                className="w-full rounded-xl border border-white/15 bg-[#1f1f1f] px-3 py-2.5 text-white outline-none transition placeholder:text-gray-500 focus:border-red-500 focus:ring-2 focus:ring-red-600/40"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-white">
+                Indirizzo
+              </label>
+              <input
+                type="text"
+                value={formData.indirizzo || ''}
+                onChange={e => handleInputChange('indirizzo', e.target.value)}
+                className="w-full rounded-xl border border-white/15 bg-[#1f1f1f] px-3 py-2.5 text-white outline-none transition placeholder:text-gray-500 focus:border-red-500 focus:ring-2 focus:ring-red-600/40"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-white">
+                URL mappa Google Maps
+              </label>
+              <input
+                type="url"
+                value={formData.mappa_url || ''}
+                onChange={e => handleInputChange('mappa_url', e.target.value)}
+                className="w-full rounded-xl border border-white/15 bg-[#1f1f1f] px-3 py-2.5 text-white outline-none transition placeholder:text-gray-500 focus:border-red-500 focus:ring-2 focus:ring-red-600/40"
+                placeholder="https://www.google.com/maps/embed?pb=..."
+              />
+              <p className="mt-1 text-xs text-gray-400">
+                deve contenere "/maps/embed?pb="
+              </p>
+            </div>
+
+            <div className="flex justify-end space-x-3 border-t border-white/10 pt-5">
               <button
                 type="button"
-                onClick={handleRemoveLogo}
-                className="flex items-center text-red-600 hover:text-red-800"
+                onClick={handleCancel}
+                className="rounded-xl border border-white/20 bg-[#333333] px-5 py-2.5 font-semibold text-white transition hover:bg-[#404040]"
               >
-                <X size={16} />
-                <span className="ml-1">Rimuovi</span>
+                Annulla
+              </button>
+
+              <button
+                type="submit"
+                disabled={saving || !formData.nome.trim()}
+                className="flex items-center rounded-xl bg-gradient-to-r from-red-600 to-red-700 px-5 py-2.5 font-bold text-white shadow-lg transition hover:from-red-700 hover:to-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Save size={16} className="mr-2" />
+                {saving ? 'Salvataggio...' : 'Salva'}
               </button>
             </div>
-          )}
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleLogoChange}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <p className="text-sm text-gray-500 mt-1">JPG, PNG, GIF</p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Nome Squadra *
-          </label>
-          <input
-            type="text"
-            required
-            value={formData.nome}
-            onChange={e => handleInputChange('nome', e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Nome Completo
-          </label>
-          <input
-            type="text"
-            value={formData.nome_completo || ''}
-            onChange={e => handleInputChange('nome_completo', e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Nome Stadio
-          </label>
-          <input
-            type="text"
-            value={formData.nome_stadio || ''}
-            onChange={e => handleInputChange('nome_stadio', e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Indirizzo
-          </label>
-          <input
-            type="text"
-            value={formData.indirizzo || ''}
-            onChange={e => handleInputChange('indirizzo', e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            URL mappa Google Maps
-          </label>
-          <input
-            type="url"
-            value={formData.mappa_url || ''}
-            onChange={e => handleInputChange('mappa_url', e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="https://www.google.com/maps/embed?pb=..."
-          />
-          <p className="text-sm text-gray-500 mt-1">
-            deve contenere "/maps/embed?pb="
-          </p>
-        </div>
-
-        <div className="flex justify-end space-x-4 pt-4">
-          <button
-            type="button"
-            onClick={handleCancel}
-            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
-          >
-            Annulla
-          </button>
-          <button
-            type="submit"
-            disabled={saving || !formData.nome.trim()}
-            className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
-          >
-            <Save size={16} className="mr-2" />
-            {saving ? 'Salvataggio...' : 'Salva'}
-          </button>
-        </div>
-      </form>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
