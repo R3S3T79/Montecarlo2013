@@ -558,7 +558,10 @@ export const handler: Handler = async (event) => {
               auth: sub.auth,
             },
           },
-          payload
+          payload,
+          {
+            TTL: 600,
+          }
         );
 
         sent++;
