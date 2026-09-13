@@ -154,18 +154,25 @@ export const handler: Handler = async (event) => {
     // 6. RISULTATO
     // =========================================
 
-    const result = (users || []).map(
-      (utente) => ({
-        user_id: utente.user_id,
-        email: utente.email,
-        username: utente.username,
-        role: utente.role,
-        devices:
-          deviceCount.get(
+    const result = (users || [])
+      .filter(
+        (utente) =>
+          (deviceCount.get(
             utente.user_id
-          ) || 0,
-      })
-    );
+          ) || 0) > 0
+      )
+      .map(
+        (utente) => ({
+          user_id: utente.user_id,
+          email: utente.email,
+          username: utente.username,
+          role: utente.role,
+          devices:
+            deviceCount.get(
+              utente.user_id
+            ) || 0,
+        })
+      );
 
     return {
       statusCode: 200,
