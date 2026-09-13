@@ -1,6 +1,7 @@
 // src/pages/DettaglioPartita.tsx
 // Data creazione chat: 2025-08-03 
 // rev3: aggiunto editor Rich Text (ReactQuill) per il campo commento, editabile da Admin/Creator
+// rev4: aggiunta sezione "A disposizione" per i panchinari non ancora entrati
 
 import { useEffect, useState, useRef } from 'react'
 import html2canvas from 'html2canvas'
@@ -203,30 +204,15 @@ commento,
       // =========================
 
       const { data: presenzeData, error: errPresenze } = await supabase
-        .from('presenze')
-        .select('giocatore_stagione_id, nome, cognome, titolare')
-        .eq('partita_id', id)
+  .from('presenze')
+  .select('giocatore_stagione_id, nome, cognome, titolare, numero_maglia')
+  .eq('partita_id', id)
 
       if (errPresenze) {
         console.error('Errore caricamento formazione:', errPresenze)
       }
 
-            // =========================
-      // 5. CARICAMENTO NUMERI MAGLIA
-      // =========================
 
-      const giocatoriFormazioneIds = (presenzeData || [])
-        .map(p => p.giocatore_stagione_id)
-        .filter((gid): gid is string => !!gid)
-
-      const { data: numeriMagliaData, error: errNumeriMaglia } = await supabase
-        .from('giocatori_stagioni')
-        .select('id, numero_maglia')
-        .in('id', giocatoriFormazioneIds)
-
-      if (errNumeriMaglia) {
-        console.error('Errore caricamento numeri maglia:', errNumeriMaglia)
-      }
 
       const { data: minutiData, error: errMinuti } = await supabase
         .from('minuti_giocati')
@@ -258,8 +244,7 @@ commento,
           giocatore_stagione_id: p.giocatore_stagione_id,
                    nome: p.nome || '',
           cognome: p.cognome || '',
-          numero_maglia:
-            numeriMagliaData?.find(g => g.id === p.giocatore_stagione_id)?.numero_maglia ?? null,
+          numero_maglia: p.numero_maglia ?? null,
           titolare: !!p.titolare,
           entrata_sec: entrate.length > 0 ? Math.min(...entrate) : null,
           uscita_sec: uscite.length > 0 ? Math.max(...uscite) : null,
@@ -463,6 +448,24 @@ const goalOspiteArr = [
 
   const totaleCasa = goalCasaArr.reduce((a, b) => a + b, 0)
   const totaleOspite = goalOspiteArr.reduce((a, b) => a + b, 0)
+
+  // =========================
+  // 9bis. CALCOLO "A DISPOSIZIONE" (panchinari non ancora entrati)
+  // =========================
+  const idsEntrati = new Set(
+    sostituzioni.map(s => s.giocatore_entrante_stagione_id)
+  )
+
+  const aDisposizione = [...formazione]
+    .filter(g => !g.titolare && !idsEntrati.has(g.giocatore_stagione_id))
+    .sort((a, b) => {
+      if (a.numero_maglia !== null && b.numero_maglia !== null) {
+        return a.numero_maglia - b.numero_maglia
+      }
+      if (a.numero_maglia !== null) return -1
+      if (b.numero_maglia !== null) return 1
+      return a.cognome.localeCompare(b.cognome)
+    })
 
   return (
     <div className="min-h-screen w-full px-[2px] pb-4 box-border">
@@ -770,6 +773,37 @@ const goalOspiteArr = [
                     </div>
                   )
                 })}
+            </div>
+          </div>
+        )}
+
+        {/* ========================= */}
+        {/* 9bis. A DISPOSIZIONE (panchinari non ancora entrati) */}
+        {/* ========================= */}
+
+        {aDisposizione.length > 0 && (
+          <div className="mb-4 overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_22px_rgba(0,0,0,0.38)]">
+
+            <div className="flex items-center gap-2 bg-gradient-to-r from-gray-700 to-gray-800 px-4 py-3 text-white">
+              <span className="text-xl">🪑</span>
+              <span className="font-extrabold uppercase tracking-wide">
+                A disposizione
+              </span>
+            </div>
+
+            <div className="divide-y divide-gray-200">
+              {aDisposizione.map(g => (
+                <div key={g.giocatore_stagione_id} className="px-4 py-2">
+                  <div className="flex min-h-[28px] items-center gap-3">
+                    <div className="w-7 shrink-0 text-center text-[13px] font-extrabold text-gray-500">
+                      {g.numero_maglia ?? '-'}
+                    </div>
+                    <div className="truncate text-[14px] font-bold text-[#181818]">
+                      {g.cognome} {g.nome}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
