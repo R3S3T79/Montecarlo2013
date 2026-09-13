@@ -111,6 +111,38 @@ export const handler: Handler = async (event) => {
     });
   }
 
+    // =========================
+  // CONTROLLO NOTIFICHE AUTOMATICHE
+  // =========================
+
+  const { data: pushSettings, error: pushSettingsError } =
+    await supabase
+      .from("push_settings")
+      .select("enabled")
+      .eq("id", "match_notifications")
+      .maybeSingle();
+
+  if (pushSettingsError) {
+    console.error(
+      "Errore recupero impostazioni notifiche:",
+      pushSettingsError.message
+    );
+
+    return json(500, {
+      error: "Errore recupero impostazioni notifiche",
+    });
+  }
+
+  if (pushSettings?.enabled === false) {
+    console.log("Notifiche automatiche partite sospese");
+
+    return json(200, {
+      success: true,
+      disabled: true,
+      message: "Notifiche automatiche partite sospese",
+    });
+  }
+
   // =========================
   // BODY
   // =========================

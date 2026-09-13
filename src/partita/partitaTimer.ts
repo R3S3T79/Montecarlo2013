@@ -4,7 +4,7 @@
 // Gestione completa del cronometro della partita
 // ===============================
 
-import { SupabaseClient } from "@supabase/supabase-js";
+
 
 // ===============================
 // Tipi

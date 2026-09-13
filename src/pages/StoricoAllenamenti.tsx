@@ -1,7 +1,7 @@
 // src/pages/StoricoAllenamenti.tsx
 // Data revisione: 27/10/2025 (fix definitivo ordine hooks + ruolo da user_profiles)
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabaseClient";

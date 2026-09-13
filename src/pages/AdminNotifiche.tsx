@@ -23,8 +23,17 @@ export default function AdminNotifiche() {
   const [utenti, setUtenti] = useState<Utente[]>([]);
   const [utentiSelezionati, setUtentiSelezionati] = useState<string[]>([]);
 
-  const [loadingUtenti, setLoadingUtenti] = useState(true);
+   const [loadingUtenti, setLoadingUtenti] = useState(true);
   const [sending, setSending] = useState(false);
+
+  const [notifichePartitaAttive, setNotifichePartitaAttive] =
+    useState<boolean | null>(null);
+
+  const [loadingNotifichePartita, setLoadingNotifichePartita] =
+    useState(true);
+
+  const [savingNotifichePartita, setSavingNotifichePartita] =
+    useState(false);
 
   // ==========================================
   // CARICAMENTO UTENTI
@@ -81,6 +90,58 @@ export default function AdminNotifiche() {
     void caricaUtenti();
   }, []);
 
+    // ==========================================
+  // STATO NOTIFICHE AUTOMATICHE PARTITA
+  // ==========================================
+
+  useEffect(() => {
+    const caricaStatoNotifichePartita = async () => {
+      setLoadingNotifichePartita(true);
+
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session?.access_token) {
+          throw new Error("Sessione scaduta");
+        }
+
+        const response = await fetch(
+          "/.netlify/functions/match-push-settings",
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          }
+        );
+
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(
+            data?.error ||
+              `Errore caricamento stato notifiche (${response.status})`
+          );
+        }
+
+        setNotifichePartitaAttive(data?.enabled !== false);
+      } catch (error: any) {
+        console.error(
+          "Errore caricamento stato notifiche partita:",
+          error
+        );
+
+        setNotifichePartitaAttive(null);
+      } finally {
+        setLoadingNotifichePartita(false);
+      }
+    };
+
+    void caricaStatoNotifichePartita();
+  }, []);
+
   // ==========================================
   // UTENTI ORDINATI
   // ==========================================
@@ -106,6 +167,78 @@ export default function AdminNotifiche() {
 
       return [...current, userId];
     });
+  };
+
+    // ==========================================
+  // MODIFICA NOTIFICHE AUTOMATICHE PARTITA
+  // ==========================================
+
+  const cambiaStatoNotifichePartita = async () => {
+    if (
+      savingNotifichePartita ||
+      notifichePartitaAttive === null
+    ) {
+      return;
+    }
+
+    const nuovoStato = !notifichePartitaAttive;
+
+    const conferma = window.confirm(
+      nuovoStato
+        ? "Vuoi ATTIVARE le notifiche automatiche delle partite?"
+        : "Vuoi SOSPENDERE le notifiche automatiche delle partite?"
+    );
+
+    if (!conferma) return;
+
+    setSavingNotifichePartita(true);
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error("Sessione scaduta");
+      }
+
+      const response = await fetch(
+        "/.netlify/functions/match-push-settings",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            enabled: nuovoStato,
+          }),
+        }
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            `Errore modifica stato notifiche (${response.status})`
+        );
+      }
+
+      setNotifichePartitaAttive(data.enabled);
+    } catch (error: any) {
+      console.error(
+        "Errore modifica stato notifiche partita:",
+        error
+      );
+
+      alert(
+        error?.message ||
+          "Errore durante la modifica delle notifiche automatiche."
+      );
+    } finally {
+      setSavingNotifichePartita(false);
+    }
   };
 
   // ==========================================
@@ -244,6 +377,46 @@ export default function AdminNotifiche() {
           </div>
 
           <div className="space-y-5">
+
+                        {/* NOTIFICHE AUTOMATICHE PARTITA */}
+            <div className="rounded-xl border border-white/10 bg-neutral-800/60 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-white">
+                    Notifiche automatiche partite
+                  </div>
+
+                  <div className="mt-1 text-xs text-gray-400">
+                    Gol, inizio partita, intervallo, secondo tempo e fine partita
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    void cambiaStatoNotifichePartita()
+                  }
+                  disabled={
+                    loadingNotifichePartita ||
+                    savingNotifichePartita ||
+                    notifichePartitaAttive === null
+                  }
+                  className={`rounded-xl border px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    notifichePartitaAttive
+                      ? "border-green-500 bg-green-600 text-white hover:bg-green-500"
+                      : "border-red-500 bg-red-600 text-white hover:bg-red-500"
+                  }`}
+                >
+                  {loadingNotifichePartita
+                    ? "Caricamento..."
+                    : savingNotifichePartita
+                      ? "Salvataggio..."
+                      : notifichePartitaAttive
+                        ? "🟢 ATTIVE"
+                        : "🔴 SOSPESE"}
+                </button>
+              </div>
+            </div>
 
             {/* TITOLO */}
             <div>
