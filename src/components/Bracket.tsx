@@ -113,17 +113,28 @@ export default function Bracket({ teams, matches, onEditResult }: BracketProps) 
   }, [rounds]);
 
   return (
-    <div className="p-4">
+    <div className="p-2 sm:p-4">
       <div className="overflow-x-auto overflow-y-hidden">
         <div className="flex justify-center min-w-max">
-          <svg width={size.width} height={size.height} className="bg-white/80 p-6 rounded border">
+          <svg
+            width={size.width}
+            height={size.height}
+            className="bg-transparent"
+          >
             <defs>
               <linearGradient id="matchGradient" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#e0f7ff" />
-                <stop offset="100%" stopColor="#b3e5fc" />
+                <stop offset="0%" stopColor="#fff1f2" />
+                <stop offset="100%" stopColor="#fee2e2" />
               </linearGradient>
+
               <filter id="shadow">
-                <feDropShadow dx="1" dy="2" stdDeviation="2" floodColor="#888" />
+                <feDropShadow
+                  dx="0"
+                  dy="2"
+                  stdDeviation="2"
+                  floodColor="#000000"
+                  floodOpacity="0.15"
+                />
               </filter>
             </defs>
 
@@ -131,11 +142,11 @@ export default function Bracket({ teams, matches, onEditResult }: BracketProps) 
               <line
                 key={`sep-${ri}`}
                 x1={ri * COL_W - 20}
-                y1={0}
+                y1={28}
                 x2={ri * COL_W - 20}
                 y2={size.height}
-                stroke="#e2e8f0"
-                strokeDasharray="4 2"
+                stroke="#e5e7eb"
+                strokeDasharray="5 5"
               />
             ))}
 
@@ -153,7 +164,7 @@ export default function Bracket({ teams, matches, onEditResult }: BracketProps) 
                       key={`${m.id}-line`}
                       d={`M${x1},${y1} L${mid},${y1} L${mid},${y2} L${x2},${y2}`}
                       fill="none"
-                      stroke="#A0A0A0"
+                      stroke="#cbd5e1"
                       strokeWidth={2}
                     />
                   );
@@ -163,11 +174,23 @@ export default function Bracket({ teams, matches, onEditResult }: BracketProps) 
 
             {rounds.map((lvl, ri) => (
               <React.Fragment key={ri}>
+                <rect
+                  x={ri * COL_W + 10}
+                  y={2}
+                  width={BOX_W - 20}
+                  height={28}
+                  rx={14}
+                  ry={14}
+                  fill="#fff1f2"
+                  stroke="#fecaca"
+                />
+
                 <text
                   x={ri * COL_W + BOX_W / 2}
-                  y={16}
+                  y={21}
                   textAnchor="middle"
-                  className="text-sm font-semibold text-gray-700 uppercase"
+                  className="text-xs font-bold uppercase"
+                  fill="#b91c1c"
                 >
                   {getPhaseName(ri, rounds.length)}
                 </text>
@@ -193,31 +216,112 @@ export default function Bracket({ teams, matches, onEditResult }: BracketProps) 
                       onClick={() => onEditResult(m.id)}
                       style={{ filter: "url(#shadow)", cursor: "pointer" }}
                     >
-                      <rect x={0} y={0} width={BOX_W} height={BOX_H} rx={12} ry={12} fill="#fff" stroke="#e2e8f0" strokeWidth={2} />
-                      <rect x={0} y={0} width={BOX_W} height={28} rx={8} ry={8} fill="url(#matchGradient)" />
+                      <rect
+                        x={0}
+                        y={0}
+                        width={BOX_W}
+                        height={BOX_H}
+                        rx={12}
+                        ry={12}
+                        fill="#ffffff"
+                        stroke="#e5e7eb"
+                        strokeWidth={1.5}
+                      />
 
-                      <text x={8} y={18} className="text-xs font-bold text-gray-800">{m.displayLabel}</text>
-                      <text x={BOX_W - 8} y={18} textAnchor="end" className="text-xs text-gray-800">
+                      <rect
+                        x={0}
+                        y={0}
+                        width={BOX_W}
+                        height={28}
+                        rx={12}
+                        ry={12}
+                        fill="url(#matchGradient)"
+                      />
+
+                      <rect
+                        x={0}
+                        y={20}
+                        width={BOX_W}
+                        height={8}
+                        fill="url(#matchGradient)"
+                      />
+
+                      <text
+                        x={10}
+                        y={18}
+                        className="text-xs font-bold"
+                        fill="#b91c1c"
+                      >
+                        {m.displayLabel}
+                      </text>
+
+                      <text
+                        x={BOX_W - 10}
+                        y={18}
+                        textAnchor="end"
+                        className="text-xs"
+                        fill="#6b7280"
+                      >
                         {formatDate(m.data_ora)}
                       </text>
 
                       {teamCasa?.logo_url && (
-                        <image href={teamCasa.logo_url} x={8} y={32} width={20} height={20} preserveAspectRatio="xMidYMid slice" />
+                        <image
+                          href={teamCasa.logo_url}
+                          x={10}
+                          y={36}
+                          width={20}
+                          height={20}
+                          preserveAspectRatio="xMidYMid meet"
+                        />
                       )}
-                      <text x={teamCasa?.logo_url ? 34 : 8} y={46} className="text-base font-medium text-gray-800">
+
+                      <text
+                        x={teamCasa?.logo_url ? 38 : 10}
+                        y={50}
+                        className="text-sm font-semibold"
+                        fill="#1f2937"
+                      >
                         {name1}
                       </text>
-                      <text x={BOX_W - 8} y={46} textAnchor="end" className="text-base font-bold text-blue-600">
+
+                      <text
+                        x={BOX_W - 10}
+                        y={50}
+                        textAnchor="end"
+                        className="text-base font-bold"
+                        fill="#b91c1c"
+                      >
                         {m.gol_casa}{dot1}
                       </text>
 
                       {teamOspite?.logo_url && (
-                        <image href={teamOspite.logo_url} x={8} y={58} width={20} height={20} preserveAspectRatio="xMidYMid slice" />
+                        <image
+                          href={teamOspite.logo_url}
+                          x={10}
+                          y={64}
+                          width={20}
+                          height={20}
+                          preserveAspectRatio="xMidYMid meet"
+                        />
                       )}
-                      <text x={teamOspite?.logo_url ? 34 : 8} y={72} className="text-base font-medium text-gray-800">
+
+                      <text
+                        x={teamOspite?.logo_url ? 38 : 10}
+                        y={78}
+                        className="text-sm font-semibold"
+                        fill="#1f2937"
+                      >
                         {name2}
                       </text>
-                      <text x={BOX_W - 8} y={72} textAnchor="end" className="text-base font-bold text-blue-600">
+
+                      <text
+                        x={BOX_W - 10}
+                        y={78}
+                        textAnchor="end"
+                        className="text-base font-bold"
+                        fill="#b91c1c"
+                      >
                         {m.gol_ospite}{dot2}
                       </text>
                     </g>
@@ -230,19 +334,44 @@ export default function Bracket({ teams, matches, onEditResult }: BracketProps) 
             {(() => {
               const last = rounds[rounds.length - 1][0];
               if (!last || !last.vincitore_id) return null;
-const winner = getTeam(teams, last.vincitore_id);
+              const winner = getTeam(teams, last.vincitore_id);
               if (!winner?.logo_url) return null;
               const top = getTop(last.id, rounds.length - 1);
-              const left = (rounds.length - 1) * COL_W + BOX_W + 10;
+              const left = (rounds.length - 1) * COL_W + BOX_W + 14;
+
               return (
-                <image
-                  href={winner.logo_url}
-                  x={left}
-                  y={top}
-                  width={BOX_H}
-                  height={BOX_H}
-                  preserveAspectRatio="xMidYMid slice"
-                />
+                <g transform={`translate(${left},${top})`}>
+                  <rect
+                    x={0}
+                    y={0}
+                    width={BOX_H}
+                    height={BOX_H}
+                    rx={14}
+                    ry={14}
+                    fill="#ffffff"
+                    stroke="#fecaca"
+                    strokeWidth={1.5}
+                  />
+
+                  <text
+                    x={BOX_H / 2}
+                    y={18}
+                    textAnchor="middle"
+                    className="text-[10px] font-bold uppercase"
+                    fill="#b91c1c"
+                  >
+                    Vincitore
+                  </text>
+
+                  <image
+                    href={winner.logo_url}
+                    x={18}
+                    y={26}
+                    width={BOX_H - 36}
+                    height={BOX_H - 36}
+                    preserveAspectRatio="xMidYMid meet"
+                  />
+                </g>
               );
             })()}
           </svg>

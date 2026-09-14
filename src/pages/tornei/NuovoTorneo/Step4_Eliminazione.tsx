@@ -151,74 +151,127 @@ export default function Step4_Eliminazione() {
 
   return (
     // Wrapper esterno per distanziare leggermente il contenuto dai bordi della pagina
-    <div className="p-2 sm:p-6 md:p-8">
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6 bg-white/90 rounded-lg shadow">
-        <div className="space-y-6">
-          {Array.from({ length: state.numSquadre / 2 }).map((_, groupIdx) => {
-            const i1 = groupIdx * 2;
-            const i2 = i1 + 1;
+    <div className="min-h-screen mt-2 w-full px-2 pb-6 box-border">
+      <div className="w-full max-w-2xl mx-auto">
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-montecarlo">
 
-            const opzioni1 = squadre.filter(
-              (s) => !scelte.includes(s.id) || s.id === scelte[i1]
-            );
-            const opzioni2 = squadre.filter(
-              (s) => !scelte.includes(s.id) || s.id === scelte[i2]
-            );
+          <div className="h-1 w-full bg-gradient-to-r from-[#d61f1f] to-[#f45e5e]" />
 
-            return (
-              <div key={groupIdx} className="space-y-2">
-                <div className="text-center text-sm text-gray-600 font-semibold">
-                  Incontro {lettere[groupIdx] ?? `${groupIdx + 1}`}
-                </div>
+          <div className="p-4 sm:p-6">
 
-                <select
-                  value={scelte[i1] || ""}
-                  onChange={(e) => handleSelect(i1, e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
-                >
-                  <option value="">Squadra {i1 + 1}</option>
-                  {opzioni1.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.nome}
-                    </option>
-                  ))}
-                </select>
+            <div className="mb-5">
+              <h2 className="text-xl font-bold text-gray-900">
+                Composizione Incontri
+              </h2>
 
-                <select
-                  value={scelte[i2] || ""}
-                  onChange={(e) => handleSelect(i2, e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
-                >
-                  <option value="">Squadra {i2 + 1}</option>
-                  {opzioni2.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            );
-          })}
-        </div>
+              <p className="mt-1 text-sm text-gray-500">
+                Seleziona le squadre per ogni incontro
+              </p>
+            </div>
 
-        <div className="flex flex-col gap-4 pt-4">
-          <button
-            onClick={handleContinue}
-            disabled={!tutteScelteValide()}
-            className={`w-full py-2 text-lg rounded-lg text-white transition ${
-              tutteScelteValide()
-                ? "bg-green-600 hover:bg-green-700 shadow"
-                : "bg-gray-400 cursor-not-allowed"
-            }`}
-          >
-            Continua
-          </button>
-          <button
-            onClick={() => navigate(-1)}
-            className="w-full bg-gray-300 text-black py-2 rounded-lg hover:bg-gray-400 transition"
-          >
-            Indietro
-          </button>
+            <div className="space-y-4">
+              {Array.from({ length: state.numSquadre / 2 }).map((_, groupIdx) => {
+                const i1 = groupIdx * 2;
+                const i2 = i1 + 1;
+
+                const opzioni1 = squadre.filter(
+                  (s) => !scelte.includes(s.id) || s.id === scelte[i1]
+                );
+                const opzioni2 = squadre.filter(
+                  (s) => !scelte.includes(s.id) || s.id === scelte[i2]
+                );
+
+                return (
+                  <div
+                    key={groupIdx}
+                    className="rounded-xl border border-gray-200 bg-gray-50 p-3 sm:p-4"
+                  >
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="font-semibold text-gray-800">
+                        Incontro {lettere[groupIdx] ?? `${groupIdx + 1}`}
+                      </div>
+
+                      <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-inset ring-red-200">
+                        {faseIniziale[state.numSquadre]}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-gray-500">
+                          Squadra {i1 + 1}
+                        </label>
+
+                        <select
+                          value={scelte[i1] || ""}
+                          onChange={(e) => handleSelect(i1, e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-montecarlo-secondary transition"
+                        >
+                          <option value="">Squadra {i1 + 1}</option>
+                          {opzioni1.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.nome}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex items-center gap-3 py-1">
+                        <div className="h-px flex-1 bg-gray-200" />
+                        <span className="text-xs font-bold text-montecarlo-secondary">
+                          VS
+                        </span>
+                        <div className="h-px flex-1 bg-gray-200" />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-gray-500">
+                          Squadra {i2 + 1}
+                        </label>
+
+                        <select
+                          value={scelte[i2] || ""}
+                          onChange={(e) => handleSelect(i2, e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-montecarlo-secondary transition"
+                        >
+                          <option value="">Squadra {i2 + 1}</option>
+                          {opzioni2.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.nome}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-col gap-2 pt-5">
+              <button
+                onClick={handleContinue}
+                disabled={!tutteScelteValide()}
+                className={`w-full py-2.5 font-semibold rounded-lg text-white transition ${
+                  tutteScelteValide()
+                    ? "bg-gradient-to-br from-[#d61f1f] to-[#f45e5e] hover:opacity-90 shadow-sm"
+                    : "bg-gray-300 cursor-not-allowed"
+                }`}
+              >
+                Continua
+              </button>
+
+              <button
+                onClick={() => navigate(-1)}
+                className="w-full bg-gray-100 border border-gray-200 text-gray-700 font-medium py-2.5 rounded-lg hover:bg-gray-200 transition"
+              >
+                Indietro
+              </button>
+            </div>
+
+          </div>
         </div>
       </div>
     </div>

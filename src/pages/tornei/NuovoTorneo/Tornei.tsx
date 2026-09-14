@@ -21,12 +21,28 @@ export default function Tornei() {
   const [listaTornei, setListaTornei] = useState<TorneoMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
-  const role =
-    (user?.user_metadata?.role as UserRole) ||
-    (user?.app_metadata?.role as UserRole) ||
-    UserRole.Authenticated;
-  const canAdd = role === UserRole.Admin || role === UserRole.Creator;
+ const { user, loading: authLoading } = useAuth();
+const [role, setRole] = useState<UserRole>(UserRole.Authenticated);
+
+useEffect(() => {
+  const caricaRuolo = async () => {
+    if (!user?.id) return;
+
+    const { data, error } = await supabase
+      .from("user_profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!error && data?.role) {
+      setRole(data.role as UserRole);
+    }
+  };
+
+  caricaRuolo();
+}, [user?.id]);
+
+const canAdd = role === UserRole.Admin || role === UserRole.Creator;
 
   useEffect(() => {
     fetchListaTornei();
@@ -37,15 +53,9 @@ export default function Tornei() {
     setLoading(true);
     try {
       const { data: tornei, error: errT } = await supabase
-        .from("tornei")
-        .select<{
-          id: string;
-          nome_torneo: string;
-          luogo: string | null;
-          stagioni: string;
-          formato_torneo: string;
-        }>("id, nome_torneo, luogo, stagioni, formato_torneo")
-        .order("created_at", { ascending: false });
+  .from("tornei")
+  .select("id, nome_torneo, luogo, stagioni, formato_torneo")
+  .order("created_at", { ascending: false });
 
       if (errT || !tornei) {
         alert("Errore caricamento tornei: " + errT?.message);
@@ -53,10 +63,10 @@ export default function Tornei() {
       }
 
       const stagIds = Array.from(new Set(tornei.map((t) => t.stagioni)));
-      const { data: st, error: errSt } = await supabase
-        .from("stagioni")
-        .select<{ id: string; nome: string }>("id, nome")
-        .in("id", stagIds);
+     const { data: st, error: errSt } = await supabase
+  .from("stagioni")
+  .select("id, nome")
+  .in("id", stagIds);
 
       if (errSt || !st) {
         alert("Errore caricamento stagioni: " + errSt?.message);
@@ -79,12 +89,12 @@ export default function Tornei() {
           const table = tableByFormato[t.formato_torneo] ?? null;
           if (table) {
             const { data, error } = await supabase
-              .from(table)
-              .select<{ [key: string]: string }>(colData)
-              .eq("torneo_id", t.id)
-              .order(colData, { ascending: true })
-              .limit(1)
-              .single();
+  .from(table)
+  .select(colData)
+  .eq("torneo_id", t.id)
+  .order(colData, { ascending: true })
+  .limit(1)
+  .single();
             if (!error && data && data[colData]) {
               dataInizio = data[colData];
             }
@@ -110,13 +120,15 @@ export default function Tornei() {
   }
 
   const apriTorneo = (id: string, formato: string) => {
-    const route = {
-      Eliminazione: `/tornei/nuovo/step6-eliminazione/${id}`,
-      Fase_Gironi: `/tornei/nuovo/step6-fasegironi/${id}`,
-      Girone_Unico: `/tornei/nuovo/step6-gironeunico/${id}`,
-    }[formato as keyof typeof route];
-    navigate(route ?? `/tornei/nuovo/step1/${id}`);
+  const routes: Record<string, string> = {
+    Eliminazione: `/tornei/nuovo/step6-eliminazione/${id}`,
+    Fase_Gironi: `/tornei/nuovo/step6-fasegironi/${id}`,
+    Girone_Unico: `/tornei/nuovo/step6-gironeunico/${id}`,
   };
+
+  const route = routes[formato];
+  navigate(route ?? `/tornei/nuovo/step1/${id}`);
+};
 
   const eliminaTorneo = async (
     e: React.MouseEvent<HTMLButtonElement>,
@@ -143,80 +155,157 @@ export default function Tornei() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#6B7280] to-[#bfb9b9]">
-        <div className="text-white text-lg">Caricamento…</div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="bg-white/80 backdrop-blur-sm rounded-xl px-6 py-4 shadow-montecarlo">
+          <div className="text-montecarlo-secondary text-base font-semibold">
+            Caricamento…
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen mt-2 w-full px-[2px] pb-6 box-border">
+    <div className="min-h-screen mt-2 w-full px-2 pb-6 box-border">
+      <div className="w-full max-w-5xl mx-auto">
 
-      <div className="w-full">
-        {/* wrapper trasparente: lo sfondo si vede tra tornei */}
-        <div className="rounded-xl shadow-montecarlo p-2 bg-transparent">
-          {listaTornei.length === 0 ? (
-            <p className="text-center text-gray-600 italic">
-              Nessun torneo disponibile.
-            </p>
-          ) : (
-            <ul className="space-y-3">
-              {listaTornei.map((t) => (
-                <li
-                  key={t.id}
-                  onClick={() => apriTorneo(t.id, t.formato)}
-                  className="group cursor-pointer rounded-xl border border-gray-200 bg-white/85 px-4 py-3 shadow-sm transition hover:shadow-md"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="truncate font-semibold text-gray-900">
-                          {t.nome}
-                        </h3>
-                        <span className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ring-red-200 bg-red-50 text-red-700">
-                          {t.formato.replace("_", " ")}
+        <div className="mb-4 rounded-xl border border-red-100 bg-white/80 backdrop-blur-sm shadow-sm px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="w-1.5 h-10 rounded-full bg-montecarlo-secondary" />
+
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+                Tornei
+              </h1>
+
+              <p className="text-sm text-gray-500">
+                Competizioni e tornei della squadra
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="w-full">
+          {/* wrapper trasparente: lo sfondo si vede tra tornei */}
+          <div className="rounded-xl bg-transparent">
+
+            {listaTornei.length === 0 ? (
+              <div className="rounded-xl border border-gray-200 bg-white/80 backdrop-blur-sm px-4 py-10 text-center shadow-sm">
+                <div className="text-4xl mb-3">🏆</div>
+
+                <p className="font-semibold text-gray-700">
+                  Nessun torneo disponibile
+                </p>
+
+                <p className="mt-1 text-sm text-gray-500">
+                  Al momento non sono presenti tornei.
+                </p>
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {listaTornei.map((t) => (
+                  <li
+                    key={t.id}
+                    onClick={() => apriTorneo(t.id, t.formato)}
+                    className="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-montecarlo"
+                  >
+                    <div className="h-1 w-full bg-gradient-to-r from-[#d61f1f] to-[#f45e5e]" />
+
+                    <div className="px-4 py-4">
+
+                      <div className="flex items-start justify-between gap-3">
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+
+                            <h3 className="truncate text-lg font-bold text-gray-900">
+                              {t.nome}
+                            </h3>
+
+                            <span className="shrink-0 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-inset ring-red-200">
+                              {t.formato.replace("_", " ")}
+                            </span>
+
+                          </div>
+                        </div>
+
+                        {canAdd && (
+                          <button
+                            onClick={(e) => eliminaTorneo(e, t.id)}
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-red-500 transition hover:bg-red-50 hover:text-red-700"
+                            title="Elimina torneo"
+                          >
+                            <X size={18} />
+                          </button>
+                        )}
+
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+
+                        <div className="flex items-center gap-3 rounded-lg bg-gray-50 px-3 py-2.5">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
+                            📍
+                          </div>
+
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                              Luogo
+                            </div>
+
+                            <div className="truncate text-sm font-semibold text-gray-700">
+                              {t.luogo || "—"}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 rounded-lg bg-gray-50 px-3 py-2.5">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
+                            📅
+                          </div>
+
+                          <div>
+                            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                              Data inizio
+                            </div>
+
+                            <div className="text-sm font-semibold text-gray-700">
+                              {formatDate(t.dataInizio)}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 rounded-lg bg-gray-50 px-3 py-2.5">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
+                            ⚽
+                          </div>
+
+                          <div>
+                            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                              Stagione
+                            </div>
+
+                            <div className="text-sm font-semibold text-gray-700">
+                              {t.stagioneNome}
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+
+                      <div className="mt-3 flex justify-end">
+                        <span className="text-xs font-medium text-montecarlo-secondary transition group-hover:translate-x-1">
+                          Apri torneo →
                         </span>
                       </div>
-                      <p className="mt-0.5 text-sm text-gray-600">
-                        {t.luogo || "—"}
-                      </p>
-                    </div>
 
-                    {canAdd && (
-                      <button
-                        onClick={(e) => eliminaTorneo(e, t.id)}
-                        className="opacity-70 transition hover:opacity-100 text-red-600 hover:text-red-700"
-                        title="Elimina torneo"
-                      >
-                        <X size={18} />
-                      </button>
-                    )}
-                  </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
 
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-sm text-gray-700 sm:grid-cols-4">
-                    <div className="rounded-lg bg-gray-50 px-3 py-2">
-                      <div className="text-xs text-gray-500">Luogo</div>
-                      <div className="font-medium">{t.luogo || "—"}</div>
-                    </div>
-                    <div className="rounded-lg bg-gray-50 px-3 py-2">
-                      <div className="text-xs text-gray-500">Data Inizio</div>
-                      <div className="font-medium">{formatDate(t.dataInizio)}</div>
-                    </div>
-                    <div className="rounded-lg bg-gray-50 px-3 py-2">
-                      <div className="text-xs text-gray-500">Stagione</div>
-                      <div className="font-medium">{t.stagioneNome}</div>
-                    </div>
-                    <div className="rounded-lg bg-gray-50 px-3 py-2">
-                      <div className="text-xs text-gray-500">Tipo</div>
-                      <div className="font-medium">
-                        {t.formato.replace("_", " ")}
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+          </div>
         </div>
       </div>
     </div>

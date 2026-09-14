@@ -1,5 +1,5 @@
 // src/pages/tornei/NuovoTorneo/Step6_Eliminazione.tsx
-import React, { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../../../lib/supabaseClient";
 import Bracket from "../../../components/Bracket";
@@ -91,7 +91,15 @@ export default function Step6_Eliminazione() {
   }, [torneoId]);
 
   if (loading) {
-    return <p className="text-center py-6">Caricamento…</p>;
+    return (
+      <div className="min-h-screen flex items-center justify-center px-2">
+        <div className="rounded-xl border border-gray-200 bg-white/90 px-6 py-4 shadow-montecarlo">
+          <div className="text-sm font-semibold text-montecarlo-secondary">
+            Caricamento…
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const handleEditResult = (matchId: string) => {
@@ -102,36 +110,86 @@ export default function Step6_Eliminazione() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-2 py-6 space-y-4">
-      
-      <div className="overflow-x-auto overflow-y-hidden pb-4">
-        <div className="flex flex-col items-center min-w-max pb-6">
-          <Bracket
-            teams={teams}
-            matches={matches}
-            onEditResult={handleEditResult}
-          />
-          <div className="mt-6 flex space-x-6 print:hidden">
-            <button
-              onClick={() => navigate(`/tornei/nuovo/step5-eliminazione/${torneoId}`)}
-              className="bg-gray-400 text-white px-6 py-2 rounded hover:bg-gray-500"
-            >
-              Indietro
-            </button>
-            <button
-              onClick={() => window.print()}
-              className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
-            >
-              Stampa
-            </button>
-            <button
-              onClick={() => navigate("/tornei")}
-              className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
-            >
-              Salva ed Esci
-            </button>
+    <div className="min-h-screen mt-2 w-full px-2 pb-6 box-border">
+      <div className="w-full max-w-7xl mx-auto space-y-4">
+
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-montecarlo print:hidden">
+          <div className="h-1 w-full bg-gradient-to-r from-[#d61f1f] to-[#f45e5e]" />
+
+          <div className="px-4 py-4 sm:px-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-50 text-xl ring-1 ring-inset ring-red-200">
+                🏆
+              </div>
+
+              <div className="min-w-0">
+                <h1 className="truncate text-xl sm:text-2xl font-bold text-gray-900">
+                  {torneoNome}
+                </h1>
+
+                <p className="mt-0.5 text-sm text-gray-500">
+                  Tabellone eliminazione diretta
+                </p>
+              </div>
+            </div>
           </div>
         </div>
+
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-montecarlo">
+          <div className="border-b border-gray-100 px-4 py-3 print:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-gray-900">
+                  Tabellone
+                </h2>
+
+                <p className="text-xs text-gray-500">
+                  Tocca una partita per inserire o modificare il risultato
+                </p>
+              </div>
+
+              <div className="shrink-0 rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700 ring-1 ring-inset ring-red-200">
+                Eliminazione diretta
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto overflow-y-hidden px-2 py-4 sm:px-4">
+            <div className="flex min-w-max flex-col items-center pb-2">
+              <Bracket
+                teams={teams}
+                matches={matches}
+                onEditResult={handleEditResult}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 print:hidden">
+          <button
+            onClick={() =>
+              navigate(`/tornei/nuovo/step5-eliminazione/${torneoId}`)
+            }
+            className="w-full rounded-lg border border-gray-200 bg-gray-100 px-4 py-2.5 font-medium text-gray-700 transition hover:bg-gray-200"
+          >
+            Indietro
+          </button>
+
+          <button
+            onClick={() => window.print()}
+            className="w-full rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 font-semibold text-montecarlo-secondary transition hover:bg-red-100"
+          >
+            🖨️ Stampa
+          </button>
+
+          <button
+            onClick={() => navigate("/tornei")}
+            className="w-full rounded-lg bg-gradient-to-br from-[#d61f1f] to-[#f45e5e] px-4 py-2.5 font-semibold text-white shadow-sm transition hover:opacity-90"
+          >
+            Salva ed Esci
+          </button>
+        </div>
+
       </div>
     </div>
   );

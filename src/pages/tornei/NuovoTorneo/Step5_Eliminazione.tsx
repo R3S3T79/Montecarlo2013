@@ -247,85 +247,169 @@ export default function Step5_Eliminazione() {
   const totTurni = getNumeroTurni(squadre.length);
 
   return (
-    <div className="max-w-3xl mx-auto px-2 py-6 space-y-6">
-      <h2 className="text-2xl text-white font-bold text-center border-b pb-2">
-        {getEtichettaFase(0, totTurni)}
-      </h2>
+    <div className="min-h-screen mt-2 w-full px-2 pb-6 box-border">
+      <div className="w-full max-w-3xl mx-auto space-y-5">
 
-      {accoppiamenti.map((m, i) => (
-        <div key={i} className="bg-white/90 rounded-lg shadow p-4">
-          <div className="relative mb-3 h-6 text-base font-medium text-gray-700">
-            <span className="absolute left-0">{squadre.find(s => s.id === m.casa)?.nome}</span>
-            <span className="absolute right-0">{squadre.find(s => s.id === m.ospite)?.nome}</span>
-            <button
-              onClick={() => inverti(i)}
-              className="absolute inset-y-0 left-1/2 transform -translate-x-1/2"
-            >
-              {letters[i]}
-            </button>
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-montecarlo">
+          <div className="h-1 w-full bg-gradient-to-r from-[#d61f1f] to-[#f45e5e]" />
+
+          <div className="px-4 py-4 sm:px-6">
+            <h2 className="text-xl font-bold text-gray-900">
+              {getEtichettaFase(0, totTurni)}
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Imposta data e ora degli incontri
+            </p>
           </div>
-          <input
-            type="datetime-local"
-            value={formatDateForInput(m.data)}
-            onChange={e => {
-              aggiornaData(i, e.target.value);
-              e.target.blur();
-            }}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-400 outline-none transition"
-          />
         </div>
-      ))}
 
-      {Object.entries(dateTurni).map(([roundStr, arr]) => {
-        const round = parseInt(roundStr, 10);
-        const startIdx = accoppiamenti.length + (accoppiamenti.length / 2) * (round - 1);
-        return (
-          <div key={round}>
-            <h3 className="text-2xl text-white font-semibold text-center mt-6">
-              {getEtichettaFase(round, totTurni)}
-            </h3>
-            {arr.map((d, i) => {
-              const letter = letters[startIdx + i];
-              const prev1 = letters[startIdx - (accoppiamenti.length / Math.pow(2, round)) * 2 + 2 * i];
-              const prev2 = letters[startIdx - (accoppiamenti.length / Math.pow(2, round)) * 2 + 2 * i + 1];
-              return (
-                <div key={i} className="bg-white/90 rounded-lg shadow p-4 mt-2">
-                  <div className="relative mb-3 h-6 text-base font-medium text-gray-700">
-                    <span className="absolute left-0">Vincitrice {prev1}</span>
-                    <span className="absolute right-0">Vincitrice {prev2}</span>
-                    <div className="absolute inset-y-0 left-1/2 transform -translate-x-1/2">
-                      {letter}
+        {accoppiamenti.map((m, i) => (
+          <div
+            key={i}
+            className="overflow-hidden rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-sm"
+          >
+            <div className="px-4 py-4">
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+
+                <div className="min-w-0 text-left">
+                  <div className="text-[11px] uppercase tracking-wide text-gray-400">
+                    Casa
+                  </div>
+                  <div className="truncate font-semibold text-gray-800">
+                    {squadre.find(s => s.id === m.casa)?.nome}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => inverti(i)}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 font-bold text-montecarlo-secondary ring-1 ring-inset ring-red-200 transition hover:bg-red-100"
+                >
+                  {letters[i]}
+                </button>
+
+                <div className="min-w-0 text-right">
+                  <div className="text-[11px] uppercase tracking-wide text-gray-400">
+                    Ospite
+                  </div>
+                  <div className="truncate font-semibold text-gray-800">
+                    {squadre.find(s => s.id === m.ospite)?.nome}
+                  </div>
+                </div>
+
+              </div>
+
+              <div className="my-3 flex items-center gap-3">
+                <div className="h-px flex-1 bg-gray-200" />
+                <span className="text-xs font-bold text-montecarlo-secondary">
+                  VS
+                </span>
+                <div className="h-px flex-1 bg-gray-200" />
+              </div>
+
+              <input
+                type="datetime-local"
+                value={formatDateForInput(m.data)}
+                onChange={e => {
+                  aggiornaData(i, e.target.value);
+                  e.target.blur();
+                }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-montecarlo-secondary transition"
+              />
+            </div>
+          </div>
+        ))}
+
+        {Object.entries(dateTurni).map(([roundStr, arr]) => {
+          const round = parseInt(roundStr, 10);
+          const startIdx = accoppiamenti.length + (accoppiamenti.length / 2) * (round - 1);
+          return (
+            <div key={round} className="space-y-3">
+
+              <div className="mt-6 rounded-xl border border-red-100 bg-white/90 px-4 py-3 shadow-sm">
+                <h3 className="text-lg font-bold text-gray-900">
+                  {getEtichettaFase(round, totTurni)}
+                </h3>
+              </div>
+
+              {arr.map((d, i) => {
+                const letter = letters[startIdx + i];
+                const prev1 = letters[startIdx - (accoppiamenti.length / Math.pow(2, round)) * 2 + 2 * i];
+                const prev2 = letters[startIdx - (accoppiamenti.length / Math.pow(2, round)) * 2 + 2 * i + 1];
+                return (
+                  <div
+                    key={i}
+                    className="overflow-hidden rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-sm"
+                  >
+                    <div className="px-4 py-4">
+
+                      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+
+                        <div className="min-w-0 text-left">
+                          <div className="text-[11px] uppercase tracking-wide text-gray-400">
+                            Qualificata
+                          </div>
+                          <div className="truncate text-sm font-semibold text-gray-800">
+                            Vincitrice {prev1}
+                          </div>
+                        </div>
+
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 font-bold text-montecarlo-secondary ring-1 ring-inset ring-red-200">
+                          {letter}
+                        </div>
+
+                        <div className="min-w-0 text-right">
+                          <div className="text-[11px] uppercase tracking-wide text-gray-400">
+                            Qualificata
+                          </div>
+                          <div className="truncate text-sm font-semibold text-gray-800">
+                            Vincitrice {prev2}
+                          </div>
+                        </div>
+
+                      </div>
+
+                      <div className="my-3 flex items-center gap-3">
+                        <div className="h-px flex-1 bg-gray-200" />
+                        <span className="text-xs font-bold text-montecarlo-secondary">
+                          VS
+                        </span>
+                        <div className="h-px flex-1 bg-gray-200" />
+                      </div>
+
+                      <input
+                        type="datetime-local"
+                        value={formatDateForInput(d)}
+                        onChange={e => {
+                          aggiornaDataTurno(round, i, e.target.value);
+                          e.target.blur();
+                        }}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-montecarlo-secondary transition"
+                      />
                     </div>
                   </div>
-                  <input
-                    type="datetime-local"
-                    value={formatDateForInput(d)}
-                    onChange={e => {
-                      aggiornaDataTurno(round, i, e.target.value);
-                      e.target.blur();
-                    }}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-400 outline-none transition"
-                  />
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
+                );
+              })}
+            </div>
+          );
+        })}
 
-      <button
-        onClick={salvaEliminazione}
-        className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-semibold shadow"
-      >
-        Continua
-      </button>
+        <div className="space-y-2 pt-2">
+          <button
+            onClick={salvaEliminazione}
+            className="w-full bg-gradient-to-br from-[#d61f1f] to-[#f45e5e] text-white py-2.5 rounded-lg font-semibold shadow-sm hover:opacity-90 transition"
+          >
+            Continua
+          </button>
 
-      <button
-        onClick={() => navigate(-1)}
-        className="w-full bg-gray-300 text-black py-2 rounded-lg hover:bg-gray-400 transition"
-      >
-        Indietro
-      </button>
+          <button
+            onClick={() => navigate(-1)}
+            className="w-full bg-gray-100 border border-gray-200 text-gray-700 font-medium py-2.5 rounded-lg hover:bg-gray-200 transition"
+          >
+            Indietro
+          </button>
+        </div>
+
+      </div>
     </div>
   );
 }

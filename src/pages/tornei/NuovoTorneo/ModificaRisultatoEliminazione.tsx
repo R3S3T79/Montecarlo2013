@@ -1,5 +1,5 @@
 // src/pages/tornei/NuovoTorneo/ModificaRisultatoEliminazione.tsx
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../../../lib/supabaseClient";
 
@@ -124,16 +124,31 @@ export default function ModificaRisultatoEliminazione() {
       navigate(-1);
     }
   };
+
   if (loading) {
-    return <p className="text-center py-6">Caricamento…</p>;
+    return (
+      <div className="min-h-screen flex items-center justify-center px-2">
+        <div className="rounded-xl border border-gray-200 bg-white/90 px-6 py-4 shadow-montecarlo">
+          <div className="text-sm font-semibold text-montecarlo-secondary">
+            Caricamento…
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!match?.squadra_casa || !match?.squadra_ospite) {
     return (
-      <div className="max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow">
-        <p className="text-center">
-          Le squadre non sono ancora definite per questa partita.
-        </p>
+      <div className="min-h-screen mt-2 w-full px-2 pb-6 box-border">
+        <div className="max-w-md mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white/90 shadow-montecarlo">
+          <div className="h-1 w-full bg-gradient-to-r from-[#d61f1f] to-[#f45e5e]" />
+
+          <div className="p-6 text-center">
+            <p className="font-medium text-gray-700">
+              Le squadre non sono ancora definite per questa partita.
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -142,122 +157,190 @@ export default function ModificaRisultatoEliminazione() {
   const ospite = teams[match.squadra_ospite]!;
 
   return (
-    <div className="bg-white/85 max-w-md mx-auto mt-2 p-6 bg-white rounded-lg shadow space-y-6">
+    <div className="min-h-screen mt-2 w-full px-2 pb-6 box-border">
+      <div className="w-full max-w-md mx-auto">
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-montecarlo">
 
-      {/* CASA */}
-      <div className="text-xs text-gray-500 uppercase mb-1">Casa</div>
-      <div className="flex items-center justify-between p-3 bg-gray-50 rounded border">
-        <div className="flex items-center space-x-2">
-          {casa.logo_url && (
-            <img
-              src={casa.logo_url}
-              alt={casa.nome}
-              className="w-8 h-8 rounded-full"
-            />
-          )}
-          <span className={`font-medium ${
-            goal1 === goal2 && rigoriVincitore === match.squadra_casa
-              ? "text-green-600"
-              : ""
-          }`}>
-            {casa.nome}{" "}
-            {goal1 === goal2 && rigoriVincitore === match.squadra_casa && "🏆"}
-          </span>
-        </div>
-        <input
-          type="number"
-          min={0}
-          value={goal1}
-          onChange={(e) => setGoal1(+e.currentTarget.value)}
-          onFocus={(e) => e.currentTarget.select()}
-          className="w-16 text-center border rounded text-xl font-bold hover:ring-2 hover:ring-blue-300"
-        />
-      </div>
+          <div className="h-1 w-full bg-gradient-to-r from-[#d61f1f] to-[#f45e5e]" />
 
-      {/* OSPITE */}
-      <div className="text-xs text-gray-500 uppercase mb-1">Ospite</div>
-      <div className="flex items-center justify-between p-3 bg-gray-50 rounded border">
-        <div className="flex items-center space-x-2">
-          {ospite.logo_url && (
-            <img
-              src={ospite.logo_url}
-              alt={ospite.nome}
-              className="w-8 h-8 rounded-full"
-            />
-          )}
-          <span className={`font-medium ${
-            goal1 === goal2 && rigoriVincitore === match.squadra_ospite
-              ? "text-green-600"
-              : ""
-          }`}>
-            {ospite.nome}{" "}
-            {goal1 === goal2 && rigoriVincitore === match.squadra_ospite && "🏆"}
-          </span>
-        </div>
-        <input
-          type="number"
-          min={0}
-          value={goal2}
-          onChange={(e) => setGoal2(+e.currentTarget.value)}
-          onFocus={(e) => e.currentTarget.select()}
-          className="w-16 text-center border rounded text-xl font-bold hover:ring-2 hover:ring-blue-300"
-        />
-      </div>
+          <div className="p-4 sm:p-6 space-y-5">
 
-      {/* RIGORI */}
-      {goal1 === goal2 && (
-        <div className="space-y-1">
-          <span className="font-medium">Vincitore ai rigori:</span>
-          <div className="flex items-center space-x-4">
-            <label className="flex items-center space-x-1">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">
+                Modifica Risultato
+              </h1>
+
+              <p className="mt-1 text-sm text-gray-500">
+                Aggiorna risultato, rigori e data dell'incontro
+              </p>
+            </div>
+
+            {/* CASA */}
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1.5">
+                Casa
+              </div>
+
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  {casa.logo_url && (
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-gray-100">
+                      <img
+                        src={casa.logo_url}
+                        alt={casa.nome}
+                        className="h-9 w-9 rounded-full object-contain"
+                      />
+                    </div>
+                  )}
+
+                  <span
+                    className={`truncate font-semibold ${
+                      goal1 === goal2 && rigoriVincitore === match.squadra_casa
+                        ? "text-green-600"
+                        : "text-gray-900"
+                    }`}
+                  >
+                    {casa.nome}{" "}
+                    {goal1 === goal2 &&
+                      rigoriVincitore === match.squadra_casa &&
+                      "🏆"}
+                  </span>
+                </div>
+
+                <input
+                  type="number"
+                  min={0}
+                  value={goal1}
+                  onChange={(e) => setGoal1(+e.currentTarget.value)}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="h-11 w-16 shrink-0 rounded-lg border border-gray-300 bg-white text-center text-xl font-bold text-gray-900 outline-none transition focus:border-montecarlo-secondary focus:ring-2 focus:ring-red-200"
+                />
+              </div>
+            </div>
+
+            {/* OSPITE */}
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1.5">
+                Ospite
+              </div>
+
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  {ospite.logo_url && (
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-gray-100">
+                      <img
+                        src={ospite.logo_url}
+                        alt={ospite.nome}
+                        className="h-9 w-9 rounded-full object-contain"
+                      />
+                    </div>
+                  )}
+
+                  <span
+                    className={`truncate font-semibold ${
+                      goal1 === goal2 && rigoriVincitore === match.squadra_ospite
+                        ? "text-green-600"
+                        : "text-gray-900"
+                    }`}
+                  >
+                    {ospite.nome}{" "}
+                    {goal1 === goal2 &&
+                      rigoriVincitore === match.squadra_ospite &&
+                      "🏆"}
+                  </span>
+                </div>
+
+                <input
+                  type="number"
+                  min={0}
+                  value={goal2}
+                  onChange={(e) => setGoal2(+e.currentTarget.value)}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="h-11 w-16 shrink-0 rounded-lg border border-gray-300 bg-white text-center text-xl font-bold text-gray-900 outline-none transition focus:border-montecarlo-secondary focus:ring-2 focus:ring-red-200"
+                />
+              </div>
+            </div>
+
+            {/* RIGORI */}
+            {goal1 === goal2 && (
+              <div className="rounded-xl border border-red-100 bg-red-50/60 p-3">
+                <span className="block text-sm font-semibold text-gray-800 mb-2">
+                  Vincitore ai rigori
+                </span>
+
+                <div className="space-y-2">
+                  <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-white px-3 py-2 ring-1 ring-gray-100">
+                    <input
+                      type="radio"
+                      name="rigori"
+                      checked={rigoriVincitore === match.squadra_casa}
+                      onChange={() => setRigoriVincitore(match.squadra_casa!)}
+                      className="accent-red-600"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      {casa.nome}
+                    </span>
+                  </label>
+
+                  <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-white px-3 py-2 ring-1 ring-gray-100">
+                    <input
+                      type="radio"
+                      name="rigori"
+                      checked={rigoriVincitore === match.squadra_ospite}
+                      onChange={() => setRigoriVincitore(match.squadra_ospite!)}
+                      className="accent-red-600"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      {ospite.nome}
+                    </span>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* DATA & ORA */}
+            <div>
+              <label className="block mb-1.5 text-sm font-semibold text-gray-700">
+                Data &amp; Ora Incontro
+              </label>
+
               <input
-                type="radio"
-                name="rigori"
-                checked={rigoriVincitore === match.squadra_casa}
-                onChange={() => setRigoriVincitore(match.squadra_casa!)}
+                type="datetime-local"
+                value={dataOra}
+                onChange={(e) => setDataOra(e.currentTarget.value)}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 outline-none transition focus:border-montecarlo-secondary focus:ring-2 focus:ring-red-200"
               />
-              <span>{casa.nome}</span>
-            </label>
-            <label className="flex items-center space-x-1">
-              <input
-                type="radio"
-                name="rigori"
-                checked={rigoriVincitore === match.squadra_ospite}
-                onChange={() => setRigoriVincitore(match.squadra_ospite!)}
-              />
-              <span>{ospite.nome}</span>
-            </label>
+            </div>
+
+            {/* PULSANTI */}
+            <div className="space-y-2 pt-2">
+              <button
+                onClick={handleSaveResults}
+                disabled={saving}
+                className="w-full rounded-lg bg-gradient-to-br from-[#d61f1f] to-[#f45e5e] py-2.5 font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saving ? "Salvando…" : "Salva Risultato e Data"}
+              </button>
+
+              <button
+                onClick={handleSaveDateOnly}
+                disabled={saving}
+                className="w-full rounded-lg border border-red-200 bg-red-50 py-2.5 font-semibold text-montecarlo-secondary transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saving ? "Salvando…" : "Salva Solo Data"}
+              </button>
+
+              <button
+                onClick={() => navigate(-1)}
+                disabled={saving}
+                className="w-full rounded-lg border border-gray-200 bg-gray-100 py-2.5 font-medium text-gray-700 transition hover:bg-gray-200 disabled:opacity-50"
+              >
+                Indietro
+              </button>
+            </div>
+
           </div>
         </div>
-      )}
-
-      {/* DATA & ORA */}
-      <div>
-        <label className="block mb-1 font-medium">Data &amp; Ora Incontro</label>
-        <input
-          type="datetime-local"
-          value={dataOra}
-          onChange={(e) => setDataOra(e.currentTarget.value)}
-          className="w-full border rounded px-3 py-2"
-        />
-      </div>
-
-      {/* PULSANTI */}
-      <div className="space-y-3">
-        <button
-          onClick={handleSaveResults}
-          disabled={saving}
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {saving ? "Salvando…" : "Salva Risultato e Data"}
-        </button>
-        <button
-          onClick={handleSaveDateOnly}
-          disabled={saving}
-          className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 disabled:opacity-50"
-        >
-          {saving ? "Salvando…" : "Salva Solo Data"}
-        </button>
       </div>
     </div>
   );

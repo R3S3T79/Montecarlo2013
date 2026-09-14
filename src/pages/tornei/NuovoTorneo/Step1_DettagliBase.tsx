@@ -1,5 +1,5 @@
 // src/pages/tornei/NuovoTorneo/Step1_DettagliBase.tsx
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../../lib/supabaseClient";
 
@@ -46,73 +46,88 @@ export default function Step1_DettagliBase() {
   };
 
   return (
-    <div className="max-w-md mx-auto mt-2 px-4 py-6 bg-white/90 rounded-lg shadow space-y-6">
-      
+    <div className="min-h-screen mt-2 w-full px-2 pb-6 box-border">
+      <div className="w-full max-w-md mx-auto">
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-montecarlo">
 
-      <div className="space-y-4">
-        {/* Nome Torneo */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Nome Torneo</label>
-          <input
-            type="text"
-            value={torneoNome}
-            onChange={(e) => setTorneoNome(e.target.value)}
-            placeholder="Es. Torneo Primavera 2025"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
-          />
-        </div>
+          <div className="h-1 w-full bg-gradient-to-r from-[#d61f1f] to-[#f45e5e]" />
 
-        {/* Luogo */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Luogo</label>
-          <input
-            type="text"
-            value={torneoLuogo}
-            onChange={(e) => setTorneoLuogo(e.target.value)}
-            placeholder="Es. Montecarlo"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
-          />
-        </div>
+          <div className="p-4 sm:p-6">
+            <div className="space-y-4">
 
-        {/* Stagione */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Stagione</label>
-          <select
-            value={stagioneSelezionata}
-            onChange={(e) => setStagioneSelezionata(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
-          >
-            <option value="">– Seleziona stagione –</option>
-            {stagioni.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nome}
-              </option>
-            ))}
-          </select>
-        </div>
+              {/* Nome Torneo */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Nome Torneo
+                </label>
+                <input
+                  type="text"
+                  value={torneoNome}
+                  onChange={(e) => setTorneoNome(e.target.value)}
+                  placeholder="Es. Torneo Primavera 2025"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-montecarlo-secondary transition"
+                />
+              </div>
 
-        {/* Errore */}
-        {errorMsg && (
-          <div className="text-red-600 text-sm text-center bg-red-50 border border-red-200 py-2 rounded">
-            {errorMsg}
+              {/* Luogo */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Luogo
+                </label>
+                <input
+                  type="text"
+                  value={torneoLuogo}
+                  onChange={(e) => setTorneoLuogo(e.target.value)}
+                  placeholder="Es. Montecarlo"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-montecarlo-secondary transition"
+                />
+              </div>
+
+              {/* Stagione */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Stagione
+                </label>
+                <select
+                  value={stagioneSelezionata}
+                  onChange={(e) => setStagioneSelezionata(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-montecarlo-secondary transition"
+                >
+                  <option value="">– Seleziona stagione –</option>
+                  {stagioni.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Errore */}
+              {errorMsg && (
+                <div className="text-red-700 text-sm text-center font-medium bg-red-50 border border-red-200 px-3 py-2.5 rounded-lg">
+                  {errorMsg}
+                </div>
+              )}
+
+              {/* Pulsanti */}
+              <div className="space-y-2 pt-3">
+                <button
+                  onClick={handleSubmit}
+                  className="w-full bg-gradient-to-br from-[#d61f1f] to-[#f45e5e] text-white font-semibold py-2.5 rounded-lg shadow-sm hover:opacity-90 transition"
+                >
+                  Continua
+                </button>
+
+                <button
+                  onClick={() => navigate("/tornei")}
+                  className="w-full bg-gray-100 border border-gray-200 text-gray-700 font-medium py-2.5 rounded-lg hover:bg-gray-200 transition"
+                >
+                  Indietro
+                </button>
+              </div>
+
+            </div>
           </div>
-        )}
-
-        {/* Pulsanti */}
-        <div className="space-y-2 pt-2">
-          <button
-            onClick={handleSubmit}
-            className="w-full bg-blue-600 text-white text-lg py-2 rounded-lg hover:bg-blue-700 transition"
-          >
-            Continua
-          </button>
-
-          <button
-            onClick={() => navigate("/tornei")}
-            className="w-full bg-gray-200 text-black py-2 rounded-lg hover:bg-gray-300 transition"
-          >
-            Indietro
-          </button>
         </div>
       </div>
     </div>
