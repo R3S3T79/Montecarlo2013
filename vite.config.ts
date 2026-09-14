@@ -32,8 +32,8 @@ export default defineConfig({
               short_name: "Montecarlo",
               start_url: "/",
               display: "standalone",
-              background_color: "#ffffff",
-              theme_color: "#004aad",
+             background_color: "#252525",
+theme_color: "#252525",
 
               icons: [
                 {
