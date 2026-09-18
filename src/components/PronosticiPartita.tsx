@@ -56,6 +56,7 @@ export default function PronosticiPartita({
   const [messaggio, setMessaggio] = useState('');
   const [errore, setErrore] = useState('');
   const [mostraRegole, setMostraRegole] = useState(false);
+  const [modificaPronostico, setModificaPronostico] = useState(false);
 
   // 3. CARICAMENTO DATI
 
@@ -114,6 +115,9 @@ export default function PronosticiPartita({
               : ''
           );
           setPunti(esistente.punti);
+          setModificaPronostico(false);
+        } else {
+          setModificaPronostico(true);
         }
 
         const { data: classificaData, error: classificaError } = await supabase
@@ -210,6 +214,7 @@ export default function PronosticiPartita({
         }
 
         setMessaggio('Pronostico aggiornato.');
+        setModificaPronostico(false);
       } else {
         const { data, error } = await supabase
           .from('pronostici_partite')
@@ -230,6 +235,7 @@ export default function PronosticiPartita({
         setPronosticoId(data.id);
         setPunti(data.punti);
         setMessaggio('Pronostico salvato.');
+        setModificaPronostico(false);
       }
     } catch (error) {
       console.error('Errore salvataggio pronostico:', error);
@@ -307,76 +313,113 @@ export default function PronosticiPartita({
           </div>
         )}
 
-        <div className="mx-auto mt-3 grid max-w-sm grid-cols-5 gap-1.5">
-          {(['1', 'X', '2', '1X', 'X2'] as Pronostico[]).map((valore) => (
-            <button
-              key={valore}
-              type="button"
-              disabled={pronosticoChiuso}
-              onClick={() => setPronostico(valore)}
-              className={`rounded-lg px-1 py-1.5 text-sm font-bold transition ${
-                pronostico === valore
-                  ? 'bg-red-600 text-white shadow'
-                  : 'bg-white/90 text-black hover:bg-white'
-              } ${
-                pronosticoChiuso
-                  ? 'cursor-not-allowed opacity-60'
-                  : 'cursor-pointer'
-              }`}
-            >
-              {valore}
-            </button>
-          ))}
-        </div>
+        {!pronosticoId || modificaPronostico ? (
+          <>
+            <div className="mx-auto mt-3 grid max-w-sm grid-cols-5 gap-1.5">
+              {(['1', 'X', '2', '1X', 'X2'] as Pronostico[]).map((valore) => (
+                <button
+                  key={valore}
+                  type="button"
+                  disabled={pronosticoChiuso}
+                  onClick={() => setPronostico(valore)}
+                  className={`rounded-lg px-1 py-1.5 text-sm font-bold transition ${
+                    pronostico === valore
+                      ? 'bg-red-600 text-white shadow'
+                      : 'bg-white/90 text-black hover:bg-white'
+                  } ${
+                    pronosticoChiuso
+                      ? 'cursor-not-allowed opacity-60'
+                      : 'cursor-pointer'
+                  }`}
+                >
+                  {valore}
+                </button>
+              ))}
+            </div>
 
-        <div className="mt-3">
-          <div className="mb-1.5 text-center text-xs font-semibold text-white">
-            Risultato esatto
-            <span className="ml-1 font-normal text-white/60">
-              (facoltativo)
-            </span>
-          </div>
+            <div className="mt-3">
+              <div className="mb-1.5 text-center text-xs font-semibold text-white">
+                Risultato esatto
+                <span className="ml-1 font-normal text-white/60">
+                  (facoltativo)
+                </span>
+              </div>
 
-          <div className="flex items-center justify-center gap-2">
-            <input
-              type="number"
-              min="0"
-              inputMode="numeric"
-              disabled={pronosticoChiuso}
-              value={goalCasa}
-              onChange={(e) => setGoalCasa(e.target.value)}
-              className="h-8 w-11 rounded-md border border-white/30 bg-white text-center text-sm font-bold text-black outline-none focus:border-red-600"
-            />
+              <div className="flex items-center justify-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  disabled={pronosticoChiuso}
+                  value={goalCasa}
+                  onChange={(e) => setGoalCasa(e.target.value)}
+                  className="h-8 w-11 rounded-md border border-white/30 bg-white text-center text-sm font-bold text-black outline-none focus:border-red-600"
+                />
 
-            <span className="text-sm font-bold text-white">-</span>
+                <span className="text-sm font-bold text-white">-</span>
 
-            <input
-              type="number"
-              min="0"
-              inputMode="numeric"
-              disabled={pronosticoChiuso}
-              value={goalOspite}
-              onChange={(e) => setGoalOspite(e.target.value)}
-              className="h-8 w-11 rounded-md border border-white/30 bg-white text-center text-sm font-bold text-black outline-none focus:border-red-600"
-            />
-          </div>
-        </div>
+                <input
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  disabled={pronosticoChiuso}
+                  value={goalOspite}
+                  onChange={(e) => setGoalOspite(e.target.value)}
+                  className="h-8 w-11 rounded-md border border-white/30 bg-white text-center text-sm font-bold text-black outline-none focus:border-red-600"
+                />
+              </div>
+            </div>
 
-        {!pronosticoChiuso && (
-          <div className="mt-3 text-center">
-            <button
-              type="button"
-              disabled={salvataggio}
-              onClick={salvaPronostico}
-              className="rounded-lg bg-red-600 px-5 py-2 text-xs font-bold text-white shadow transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {salvataggio
-                ? 'SALVATAGGIO...'
-                : pronosticoId
-                  ? 'AGGIORNA PRONOSTICO'
-                  : 'CONFERMA PRONOSTICO'}
-            </button>
-          </div>
+            {!pronosticoChiuso && (
+              <div className="mt-3 text-center">
+                <button
+                  type="button"
+                  disabled={salvataggio}
+                  onClick={salvaPronostico}
+                  className="rounded-lg bg-red-600 px-5 py-2 text-xs font-bold text-white shadow transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {salvataggio
+                    ? 'SALVATAGGIO...'
+                    : pronosticoId
+                      ? 'AGGIORNA PRONOSTICO'
+                      : 'CONFERMA PRONOSTICO'}
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="mx-auto mt-3 max-w-sm rounded-lg bg-white/10 px-3 py-2 text-center text-sm text-white">
+              <span className="font-semibold">Il tuo pronostico: </span>
+              <span className="font-bold text-red-400">{pronostico}</span>
+
+              {goalCasa !== '' && goalOspite !== '' && (
+                <>
+                  <span className="mx-2 text-white/50">•</span>
+                  <span className="font-semibold">Risultato: </span>
+                  <span className="font-bold">
+                    {goalCasa}-{goalOspite}
+                  </span>
+                </>
+              )}
+            </div>
+
+            {!pronosticoChiuso && (
+              <div className="mt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMessaggio('');
+                    setErrore('');
+                    setModificaPronostico(true);
+                  }}
+                  className="rounded-lg bg-white/90 px-4 py-1.5 text-xs font-bold text-black shadow transition hover:bg-white"
+                >
+                  MODIFICA PRONOSTICO
+                </button>
+              </div>
+            )}
+          </>
         )}
 
         {pronosticoChiuso && pronosticoId && (
