@@ -23,8 +23,8 @@ export default defineConfig({
             includeAssets: [
               "favicon.ico",
               "apple-touch-icon.png",
-              "icon_192x192.png",
-              "icon_512x512.png",
+              "icon_192x192_v2.png",
+              "icon_512x512_v2.png",
             ],
 
             manifest: {
@@ -37,12 +37,12 @@ theme_color: "#252525",
 
               icons: [
                 {
-                  src: "/icon_192x192.png",
+                  src: "/icon_192x192_v2.png",
                   sizes: "192x192",
                   type: "image/png",
                 },
                 {
-                  src: "/icon_512x512.png",
+                  src: "/icon_512x512_v2.png",
                   sizes: "512x512",
                   type: "image/png",
                 },
