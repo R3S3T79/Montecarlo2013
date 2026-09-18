@@ -1,7 +1,7 @@
 // src/pages/tornei/NuovoTorneo/Step6_GironeUnico.tsx
 // Data: 24/08/2025 (rev: classifica con rigori_vincitore + tabella con bordi rosso-200)
 
-import React, { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, type ReactNode } from "react";
 import { useParams, useNavigate, useLocation, Outlet } from "react-router-dom";
 import { supabase } from "../../../lib/supabaseClient";
 import { useAuth } from "../../../context/AuthContext";
@@ -26,11 +26,27 @@ interface Partita {
 
 export default function Step6_GironeUnico() {
   const { user } = useAuth();
-  const role =
-    (user?.user_metadata?.role as UserRole) ||
-    (user?.app_metadata?.role as UserRole) ||
-    UserRole.Authenticated;
-  const canEdit = role === UserRole.Admin || role === UserRole.Creator;
+const [role, setRole] = useState<UserRole>(UserRole.Authenticated);
+
+useEffect(() => {
+  const caricaRuolo = async () => {
+    if (!user?.id) return;
+
+    const { data, error } = await supabase
+      .from("user_profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!error && data?.role) {
+      setRole(data.role as UserRole);
+    }
+  };
+
+  caricaRuolo();
+}, [user?.id]);
+
+const canEdit = role === UserRole.Admin || role === UserRole.Creator;
 
   const { torneoId: paramId } = useParams<{ torneoId?: string }>();
   const location = useLocation();
@@ -192,123 +208,204 @@ export default function Step6_GironeUnico() {
 
   const handleSaveAndExit = () => navigate("/tornei");
 
-  if (loading) return <p className="text-center text-white py-6">Caricamento in corso…</p>;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-2">
+        <div className="rounded-xl border border-gray-200 bg-white/90 px-6 py-4 shadow-montecarlo">
+          <div className="text-sm font-semibold text-montecarlo-secondary">
+            Caricamento in corso…
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-3xl mx-auto m-2 mt-2 p-2 print:p-0 space-y-6">
-      <div className="space-y-3">
-        {matches.map((m) => {
-          const home = squadreMap[m.squadra_casa];
-          const away = squadreMap[m.squadra_ospite];
-          let score: React.ReactNode = <span className="text-sm">VS</span>;
-          if (m.giocata) {
-            let a = String(m.gol_casa),
-              b = String(m.gol_ospite);
-            if (a === b && m.rigori_vincitore) {
-              if (m.rigori_vincitore === m.squadra_casa) {
-                a = "." + a;
-              } else if (m.rigori_vincitore === m.squadra_ospite) {
-                b = b + ".";
-              }
-            }
-            score = (
-              <span className="text-base font-medium">
-                {a}-{b}
-              </span>
-            );
-          }
+    <div className="min-h-screen mt-2 w-full px-2 pb-6 box-border print:p-0">
+      <div className="w-full max-w-4xl mx-auto space-y-4">
 
-          return (
-            <div
-              key={m.id}
-              onClick={canEdit ? () => handleEdit(m.id) : undefined}
-              className={`bg-white/90 shadow rounded-lg p-2 ${
-                canEdit ? "cursor-pointer hover:bg-gray-50" : ""
-              }`}
-            >
-              <div className="text-base text-gray-500 mb-1 text-center">
-                {formatDate(m.data_match)}
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-montecarlo print:hidden">
+          <div className="h-1 w-full bg-gradient-to-r from-[#d61f1f] to-[#f45e5e]" />
+
+          <div className="px-4 py-4 sm:px-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-50 text-xl ring-1 ring-inset ring-red-200">
+                🏆
               </div>
-             <div className="flex items-center justify-between px-2">
-  <span className="flex-1 text-left text-base truncate">{home?.nome}</span>
-  <span className="mx-2 text-center font-medium">{score}</span>
-  <span className="flex-1 text-right text-base truncate">{away?.nome}</span>
-</div>
 
+              <div className="min-w-0">
+                <h1 className="truncate text-xl sm:text-2xl font-bold text-gray-900">
+                  {torneoNome}
+                </h1>
+
+                <p className="mt-0.5 text-sm text-gray-500">
+                  Girone unico
+                </p>
+              </div>
             </div>
-          );
-        })}
-      </div>
+          </div>
+        </div>
 
-      {/* CLASSIFICA */}
-<table className="bg-white/90 table-auto border-collapse text-center text-base mb-6 w-full border border-red-200">
-  <thead>
-    <tr>
-      <th className="px-2 py-1 border border-red-200 text-left">
-        Squadra
-      </th>
-      <th className="px-2 py-1 border border-red-200">G</th>   {/* ex PG */}
-      <th className="px-2 py-1 border border-red-200">V</th>
-      <th className="px-2 py-1 border border-red-200">N</th>
-      <th className="px-2 py-1 border border-red-200">P</th>
-      <th className="px-2 py-1 border border-red-200">F</th>   {/* ex GF */}
-      <th className="px-2 py-1 border border-red-200">S</th>   {/* ex GS */}
-      <th className="px-2 py-1 border border-red-200">D</th>   {/* ex DR */}
-      <th className="px-2 py-1 border border-red-200">P</th>   {/* ex Pt */}
-    </tr>
-  </thead>
+        <div className="space-y-3">
+          {matches.map((m) => {
+            const home = squadreMap[m.squadra_casa];
+            const away = squadreMap[m.squadra_ospite];
+            let score: ReactNode = <span className="text-xs font-semibold text-gray-400">VS</span>;
+            if (m.giocata) {
+              let a = String(m.gol_casa),
+                b = String(m.gol_ospite);
+              if (a === b && m.rigori_vincitore) {
+                if (m.rigori_vincitore === m.squadra_casa) {
+                  a = "." + a;
+                } else if (m.rigori_vincitore === m.squadra_ospite) {
+                  b = b + ".";
+                }
+              }
+              score = (
+                <span className="text-lg font-bold text-montecarlo-secondary">
+                  {a}-{b}
+                </span>
+              );
+            }
 
-        <tbody>
-          {classifica.map((r) => (
-            <tr key={r.id}>
-              <td className="px-2 py-1 border border-red-200 flex items-center space-x-2 whitespace-nowrap text-left">
-                {r.logo_url && (
-                  <img
-                    src={r.logo_url}
-                    alt=""
-                    className="w-4 h-4 rounded-full"
-                  />
-                )}
-                <span>{r.nome}</span>
-              </td>
-              <td className="px-2 py-1 border border-red-200">{r.PG}</td>
-              <td className="px-2 py-1 border border-red-200">{r.V}</td>
-              <td className="px-2 py-1 border border-red-200">{r.N}</td>
-              <td className="px-2 py-1 border border-red-200">{r.P}</td>
-              <td className="px-2 py-1 border border-red-200">{r.GF}</td>
-              <td className="px-2 py-1 border border-red-200">{r.GS}</td>
-              <td className="px-2 py-1 border border-red-200">{r.DR}</td>
-              <td className="px-2 py-1 border border-red-200">{r.Pt}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+            return (
+              <div
+                key={m.id}
+                onClick={canEdit ? () => handleEdit(m.id) : undefined}
+                className={`overflow-hidden rounded-xl border border-gray-200 bg-white/90 shadow-sm transition ${
+                  canEdit ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-montecarlo" : ""
+                }`}
+              >
+                <div className="h-1 w-full bg-gradient-to-r from-[#d61f1f] to-[#f45e5e]" />
 
-      {/* BOTTONI */}
-      <div className="flex justify-between print:hidden">
-        <button
-          onClick={() => navigate(-1)}
-          className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
-        >
-          Indietro
-        </button>
-        <button
-          onClick={() => window.print()}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          Stampa
-        </button>
-        {canEdit && (
+                <div className="p-3 sm:p-4">
+                  <div className="mb-3 text-center text-xs font-medium text-gray-500">
+                    {formatDate(m.data_match)}
+                  </div>
+
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      {home?.logo_url && (
+                        <img
+                          src={home.logo_url}
+                          alt=""
+                          className="h-8 w-8 shrink-0 rounded-full object-contain bg-white p-0.5 shadow-sm"
+                        />
+                      )}
+
+                      <span className="truncate text-sm sm:text-base font-semibold text-gray-800">
+                        {home?.nome}
+                      </span>
+                    </div>
+
+                    <div className="flex min-w-[52px] items-center justify-center rounded-lg bg-red-50 px-2 py-2 ring-1 ring-inset ring-red-100">
+                      {score}
+                    </div>
+
+                    <div className="flex min-w-0 items-center justify-end gap-2">
+                      <span className="truncate text-right text-sm sm:text-base font-semibold text-gray-800">
+                        {away?.nome}
+                      </span>
+
+                      {away?.logo_url && (
+                        <img
+                          src={away.logo_url}
+                          alt=""
+                          className="h-8 w-8 shrink-0 rounded-full object-contain bg-white p-0.5 shadow-sm"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* CLASSIFICA */}
+        <div className="overflow-hidden rounded-xl border border-red-200 bg-white/90 shadow-sm">
+          <div className="border-b border-red-100 bg-red-50 px-4 py-3">
+            <h2 className="font-bold text-gray-900">
+              Classifica
+            </h2>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="table-auto border-collapse text-center text-sm sm:text-base w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-2 py-2 border-b border-r border-red-200 text-left">
+                    Squadra
+                  </th>
+                  <th className="px-2 py-2 border-b border-r border-red-200">G</th>   {/* ex PG */}
+                  <th className="px-2 py-2 border-b border-r border-red-200">V</th>
+                  <th className="px-2 py-2 border-b border-r border-red-200">N</th>
+                  <th className="px-2 py-2 border-b border-r border-red-200">P</th>
+                  <th className="px-2 py-2 border-b border-r border-red-200">F</th>   {/* ex GF */}
+                  <th className="px-2 py-2 border-b border-r border-red-200">S</th>   {/* ex GS */}
+                  <th className="px-2 py-2 border-b border-r border-red-200">D</th>   {/* ex DR */}
+                  <th className="px-2 py-2 border-b border-red-200 bg-red-50 font-bold text-montecarlo-secondary">P</th>   {/* ex Pt */}
+                </tr>
+              </thead>
+
+              <tbody>
+                {classifica.map((r) => (
+                  <tr key={r.id} className="hover:bg-gray-50">
+                    <td className="px-2 py-2 border-b border-r border-red-100 whitespace-nowrap text-left">
+                      <div className="flex items-center space-x-2">
+                        {r.logo_url && (
+                          <img
+                            src={r.logo_url}
+                            alt=""
+                            className="w-5 h-5 rounded-full object-contain"
+                          />
+                        )}
+                        <span className="font-medium">{r.nome}</span>
+                      </div>
+                    </td>
+                    <td className="px-2 py-2 border-b border-r border-red-100">{r.PG}</td>
+                    <td className="px-2 py-2 border-b border-r border-red-100">{r.V}</td>
+                    <td className="px-2 py-2 border-b border-r border-red-100">{r.N}</td>
+                    <td className="px-2 py-2 border-b border-r border-red-100">{r.P}</td>
+                    <td className="px-2 py-2 border-b border-r border-red-100">{r.GF}</td>
+                    <td className="px-2 py-2 border-b border-r border-red-100">{r.GS}</td>
+                    <td className="px-2 py-2 border-b border-r border-red-100">{r.DR}</td>
+                    <td className="px-2 py-2 border-b border-red-100 bg-red-50/50 font-bold text-montecarlo-secondary">{r.Pt}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* BOTTONI */}
+        <div className={`grid grid-cols-1 gap-2 print:hidden ${canEdit ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
           <button
-            onClick={handleSaveAndExit}
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            onClick={() => navigate(-1)}
+            className="w-full bg-gray-100 border border-gray-200 text-gray-700 font-medium py-2.5 px-4 rounded-lg hover:bg-gray-200 transition"
           >
-            Salva ed Esci
+            Indietro
           </button>
-        )}
-      </div>
 
-      {canEdit && <Outlet />}
+          <button
+            onClick={() => window.print()}
+            className="w-full border border-red-200 bg-red-50 text-montecarlo-secondary font-semibold py-2.5 px-4 rounded-lg hover:bg-red-100 transition"
+          >
+            Stampa
+          </button>
+
+          {canEdit && (
+            <button
+              onClick={handleSaveAndExit}
+              className="w-full bg-gradient-to-br from-[#d61f1f] to-[#f45e5e] text-white font-semibold py-2.5 px-4 rounded-lg shadow-sm hover:opacity-90 transition"
+            >
+              Salva ed Esci
+            </button>
+          )}
+        </div>
+
+        {canEdit && <Outlet />}
+      </div>
     </div>
   );
 }

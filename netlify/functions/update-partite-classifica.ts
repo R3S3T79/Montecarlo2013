@@ -10,8 +10,15 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const CAMP_ID = "6158";
-const BASE_URL = "https://campionando.it/ruolino.php";
+const CAMP_ID = ""; // Inserire qui il nuovo ID Campionando U14 2026/27
+const BASE_URL = "https://www.campionando.it/ruolino.php";
+
+const STAGIONE_ID = "6a7cc3ea-b316-4261-85ed-73e310710dd8";
+const STAGIONE_NOME = "2026/2027";
+const FASE = "Prima Fase";
+
+const FONTE = "campionando";
+const STATO_FONTE = "provvisorio";
 
 export const handler: Handler = async () => {
   try {
@@ -190,15 +197,41 @@ export const handler: Handler = async () => {
       `📌 Partite + riposi totali: ${calendarioCompleto.length}`
     );
 
-    // 7️⃣ Salva nel DB
-    await supabase
-      .from("classifica_partite")
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+  // 7️⃣ Aggiunge stagione/fase/fonte a tutte le righe
+const calendarioDaSalvare = calendarioCompleto.map((p) => ({
+  ...p,
+  stagione_id: STAGIONE_ID,
+  stagione_nome: STAGIONE_NOME,
+  fase: FASE,
+  fonte: FONTE,
+  stato_fonte: STATO_FONTE,
+}));
 
-    const { error: insErr } = await supabase
-      .from("classifica_partite")
-      .insert(calendarioCompleto);
+// 8️⃣ Cancella SOLO i dati della stagione/fase/fonte che stiamo aggiornando.
+// Lo storico delle altre stagioni rimane intatto.
+const { error: deleteErr } = await supabase
+  .from("classifica_partite")
+  .delete()
+  .eq("stagione_id", STAGIONE_ID)
+  .eq("fase", FASE)
+  .eq("fonte", FONTE);
+
+if (deleteErr) {
+  throw new Error(
+    `Errore cancellazione vecchi dati ${STAGIONE_NOME} / ${FASE}: ${deleteErr.message}`
+  );
+}
+
+// 9️⃣ Inserisce il nuovo calendario
+const { error: insErr } = await supabase
+  .from("classifica_partite")
+  .insert(calendarioDaSalvare);
+
+if (insErr) throw insErr;
+
+console.log(
+  `✅ Inserite ${calendarioDaSalvare.length} righe — ${STAGIONE_NOME} / ${FASE} / ${FONTE}.`
+);
 
     if (insErr) throw insErr;
 
@@ -208,7 +241,7 @@ export const handler: Handler = async () => {
       statusCode: 200,
       body: JSON.stringify({
         message: "Partite aggiornate correttamente (Real Calendar Mode)",
-        totale: calendarioCompleto.length,
+        totale: calendarioDaSalvare.length,
       }),
     };
   } catch (err: any) {

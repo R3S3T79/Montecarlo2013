@@ -94,7 +94,67 @@ if (uniche.length > 0) {
   setFaseSelezionata(uniche[0]);
 } else {
   setFaseSelezionata("");
-  setRighe([]);
+
+  // Nessuna classifica ancora presente:
+  // ricaviamo le squadre dalle partite della stagione
+  const { data: partite, error: partiteError } = await supabase
+    .from("partite")
+    .select(`
+      squadra_casa_id,
+      squadra_ospite_id,
+      squadra_casa:squadre!partite_squadra_casa_id_fkey (
+        id,
+        nome,
+        logo_url
+      ),
+      squadra_ospite:squadre!partite_squadra_ospite_id_fkey (
+        id,
+        nome,
+        logo_url
+      )
+    `)
+    .eq("stagione_id", stagioneSelezionata)
+    .eq("campionato_torneo", "Campionato");
+
+  if (partiteError) {
+    console.error("Errore caricamento squadre classifica:", partiteError);
+    setRighe([]);
+    setLoading(false);
+    return;
+  }
+
+  const squadreMap = new Map<string, any>();
+
+  (partite || []).forEach((p: any) => {
+    if (p.squadra_casa) {
+      squadreMap.set(p.squadra_casa.id, p.squadra_casa);
+    }
+
+    if (p.squadra_ospite) {
+      squadreMap.set(p.squadra_ospite.id, p.squadra_ospite);
+    }
+  });
+
+  const classificaIniziale: RigaClassifica[] = Array.from(
+    squadreMap.values()
+  )
+    .sort((a, b) => a.nome.localeCompare(b.nome))
+    .map((squadra, index) => ({
+      id: squadra.id,
+      posizione: index + 1,
+      squadra: squadra.nome,
+      partite_giocate: 0,
+      vinte: 0,
+      pareggiate: 0,
+      perse: 0,
+      goal_fatti: 0,
+      goal_subiti: 0,
+      differenza_reti: 0,
+      punti: 0,
+      logo_url: squadra.logo_url || null,
+    }));
+
+  setRighe(classificaIniziale);
   setLoading(false);
 }
     };

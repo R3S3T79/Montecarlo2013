@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 // import CountdownVeronica from "../components/CountdownVeronica";
 import WeatherWidget_OpenMeteo from "../components/WeatherWidget_OpenMeteo";
+import PronosticiPartita from "../components/PronosticiPartita";
 import { supabase } from "../lib/supabaseClient";
 import {
   getStatoPartita,
@@ -1539,6 +1540,10 @@ if (urlDiretto) {
     </div>
   )}
 </section>
+
+{/* 1. PRONOSTICI PARTITA */}
+{match && <PronosticiPartita partitaId={match.id} />}
+
 {/* METEO PREVISTO */}
 {match && (
   <div style={{ marginBottom: 24 }}>

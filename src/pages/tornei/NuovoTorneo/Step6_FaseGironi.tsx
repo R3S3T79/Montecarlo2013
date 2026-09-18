@@ -1,7 +1,7 @@
 // src/pages/tornei/NuovoTorneo/Step6_FaseGironi.tsx
 // Data creazione chat: 29/07/2025
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../../../lib/supabaseClient";
 import { useAuth } from "../../../context/AuthContext";
@@ -26,22 +26,32 @@ interface Partita {
   giocata: boolean;
 }
 
-interface Fase {
-  id: string;
-  tipo_fase: string;
-  fase_numerica?: number;
-  formula_tipo?: string;
-}
-
 export default function Step6_FaseGironi() {
   const { torneoId: paramId } = useParams<{ torneoId?: string }>();
   const location = useLocation();
   const navigate = useNavigate();
   const { user: authUser, loading: authLoading } = useAuth();
 
-  const role =
-    (authUser?.user_metadata?.role ?? authUser?.app_metadata?.role) as UserRole ||
-    UserRole.Authenticated;
+  const [role, setRole] = useState<UserRole>(UserRole.Authenticated);
+
+  useEffect(() => {
+    const caricaRuolo = async () => {
+      if (!authUser?.id) return;
+
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("role")
+        .eq("user_id", authUser.id)
+        .maybeSingle();
+
+      if (!error && data?.role) {
+        setRole(data.role as UserRole);
+      }
+    };
+
+    caricaRuolo();
+  }, [authUser?.id]);
+
   const canEdit = role === UserRole.Admin || role === UserRole.Creator;
 
   const torneoId =
@@ -56,7 +66,7 @@ export default function Step6_FaseGironi() {
     "eliminazione"
   );
  const [hasNextPhase, setHasNextPhase] = useState(false);
- const [hasEliminationMatches, setHasEliminationMatches] = useState(false);
+ const [hasEliminationMatches] = useState(false);
 
 
 
@@ -350,18 +360,52 @@ const handleNextPhase = async () => {
 
 
   if (authLoading || loading) {
-    return <p className="text-center text-white py-6">Caricamento in corso…</p>;
+    return (
+      <div className="min-h-screen flex items-center justify-center px-2">
+        <div className="rounded-xl border border-gray-200 bg-white/90 px-6 py-4 shadow-montecarlo">
+          <div className="text-sm font-semibold text-montecarlo-secondary">
+            Caricamento in corso…
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
-  <div className="w-full p-0 m-0 space-y-6 print:p-0">
+  <div className="min-h-screen mt-2 w-full px-2 pb-6 box-border print:p-0 print:pt-6">
+    <div className="w-full max-w-5xl mx-auto space-y-4">
+
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-montecarlo print:hidden">
+        <div className="h-1 w-full bg-gradient-to-r from-[#d61f1f] to-[#f45e5e]" />
+
+        <div className="px-4 py-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-50 text-xl ring-1 ring-inset ring-red-200">
+              🏆
+            </div>
+
+            <div className="min-w-0">
+              <h1 className="truncate text-xl sm:text-2xl font-bold text-gray-900">
+                {torneoNome}
+              </h1>
+
+              <p className="mt-0.5 text-sm text-gray-500">
+                Fase a gironi
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
     {/* ⛔️ Select visibile solo a chi può editare */}
     {canEdit && !hasNextPhase && (
-  <div className="flex justify-center items-center gap-2 print:hidden no-print">
+      <div className="rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-sm p-4 print:hidden no-print">
+        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+          Formula fase successiva
+        </label>
 
-        
         <select
-          className="border rounded px-2 py-1"
+          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 outline-none transition focus:border-red-300 focus:ring-2 focus:ring-red-200"
           value={formulaType}
           onChange={(e) =>
             setFormulaType(e.currentTarget.value as "eliminazione" | "gironi")
@@ -374,10 +418,19 @@ const handleNextPhase = async () => {
     )}
 
     {Object.entries(partitePerGirone).map(([girone, matches]) => (
-      <div key={girone} className="space-y-4 avoid-break">
-        <h3 className="text-lg font-semibold text-center text-white print:text-black">
-          {girone}
-        </h3>
+      <div
+        key={girone}
+        className="overflow-hidden rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-sm avoid-break"
+      >
+        <div className="h-1 w-full bg-gradient-to-r from-[#d61f1f] to-[#f45e5e]" />
+
+        <div className="border-b border-gray-100 bg-red-50/60 px-4 py-3">
+          <h3 className="text-lg font-bold text-center text-gray-900">
+            {girone}
+          </h3>
+        </div>
+
+        <div className="p-2 sm:p-4 space-y-4">
 
         {/* 🟢 Tabella partite */}
 <div
@@ -386,9 +439,9 @@ const handleNextPhase = async () => {
     paddingRight: "0px",
   }}
 >
+  <div className="overflow-hidden rounded-lg border border-gray-200">
   <table
-    className="bg-white/90 w-full table-fixed border-collapse text-sm mb-4 print:mb-6"
-    style={{ borderRadius: "6px", overflow: "hidden" }}
+    className="bg-white w-full table-fixed border-collapse text-sm"
   >
     <colgroup>
       <col style={{ width: "42%" }} />
@@ -402,38 +455,42 @@ const handleNextPhase = async () => {
           onClick={canEdit ? () => handleEditPartita(m.id) : undefined}
           className={
             canEdit
-              ? "hover:bg-gray-100 cursor-pointer print:cursor-auto"
-              : ""
+              ? "border-b border-gray-100 last:border-b-0 hover:bg-red-50 cursor-pointer transition print:cursor-auto"
+              : "border-b border-gray-100 last:border-b-0"
           }
         >
           {/* Casa */}
-          <td className="border border-grey-200 px-2 py-1">
+          <td className="px-2 py-2.5">
             <div className="flex items-center gap-2 min-w-0">
               {m.squadra_casa?.logo_url && (
                 <img
                   src={m.squadra_casa.logo_url}
                   alt={m.squadra_casa.nome}
-                  className="w-4 h-4 rounded-full flex-none"
+                  className="w-5 h-5 rounded-full flex-none object-contain"
                 />
               )}
-              <span className="truncate">{m.squadra_casa?.nome}</span>
+              <span className="truncate font-medium text-gray-800">
+                {m.squadra_casa?.nome}
+              </span>
             </div>
           </td>
 
           {/* Risultato */}
-          <td className="border border-grey-200 px-2 py-1 text-center font-medium whitespace-nowrap">
+          <td className="px-1 py-2.5 text-center font-bold whitespace-nowrap text-montecarlo-secondary">
             {m.giocata ? `${m.gol_casa} – ${m.gol_ospite}` : "VS"}
           </td>
 
           {/* Ospite */}
-          <td className="border border-grey-200 px-2 py-1">
+          <td className="px-2 py-2.5">
             <div className="flex items-center gap-2 justify-end min-w-0">
-              <span className="truncate">{m.squadra_ospite?.nome}</span>
+              <span className="truncate font-medium text-gray-800">
+                {m.squadra_ospite?.nome}
+              </span>
               {m.squadra_ospite?.logo_url && (
                 <img
                   src={m.squadra_ospite.logo_url}
                   alt={m.squadra_ospite.nome}
-                  className="w-4 h-4 rounded-full flex-none"
+                  className="w-5 h-5 rounded-full flex-none object-contain"
                 />
               )}
             </div>
@@ -442,6 +499,7 @@ const handleNextPhase = async () => {
       ))}
     </tbody>
   </table>
+  </div>
 </div>
 
 {/* 🟢 CLASSIFICA */}
@@ -451,83 +509,89 @@ const handleNextPhase = async () => {
     paddingRight: "0px",
   }}
 >
+  <div className="overflow-x-auto rounded-lg border border-gray-200">
   <table
-    className="w-full table-fixed border-collapse text-center text-sm mb-6 bg-white/85"
-    style={{ borderRadius: "6px", overflow: "hidden" }}
+    className="w-full table-fixed border-collapse text-center text-sm bg-white"
   >
     <thead>
-      <tr className="bg-gray-100">
-        <th className="border px-3 py-1 text-left" style={{ width: "52%" }}>
+      <tr className="bg-gray-50 text-gray-600">
+        <th className="border-b border-gray-200 px-3 py-2 text-left" style={{ width: "52%" }}>
           Squadra
         </th>
-        <th className="border border-grey-200 px-2 py-1">PG</th>
-        <th className="border border-grey-200 px-2 py-1">V</th>
-        <th className="border border-grey-200 px-2 py-1">N</th>
-        <th className="border border-grey-200 px-2 py-1">P</th>
-        <th className="border border-grey-200 px-2 py-1">GF</th>
-        <th className="border border-grey-200 px-2 py-1">GS</th>
-        <th className="border border-grey-200 px-2 py-1">DR</th>
-        <th className="border border-grey-200 px-2 py-1">Pt</th>
+        <th className="border-b border-gray-200 px-2 py-2">PG</th>
+        <th className="border-b border-gray-200 px-2 py-2">V</th>
+        <th className="border-b border-gray-200 px-2 py-2">N</th>
+        <th className="border-b border-gray-200 px-2 py-2">P</th>
+        <th className="border-b border-gray-200 px-2 py-2">GF</th>
+        <th className="border-b border-gray-200 px-2 py-2">GS</th>
+        <th className="border-b border-gray-200 px-2 py-2">DR</th>
+        <th className="border-b border-gray-200 px-2 py-2 font-bold text-montecarlo-secondary">Pt</th>
       </tr>
     </thead>
     <tbody>
       {classificaPerGirone[girone].map((r) => (
-        <tr key={r.id} className="align-middle">
-          <td className="border px-3 py-1 text-left" style={{ width: "52%" }}>
+        <tr key={r.id} className="align-middle border-b border-gray-100 last:border-b-0">
+          <td className="px-3 py-2 text-left" style={{ width: "52%" }}>
             <div className="td-team">
               {r.logo_url && (
                 <img
                   src={r.logo_url}
                   alt={r.nome}
-                  className="w-4 h-4 rounded-full flex-none"
+                  className="w-5 h-5 rounded-full flex-none object-contain"
                 />
               )}
-              <span className="name">{r.nome}</span>
+              <span className="name font-medium text-gray-800">{r.nome}</span>
             </div>
           </td>
-          <td className="border border-grey-200 px-2 py-1">{r.PG}</td>
-          <td className="border border-grey-200 px-2 py-1">{r.V}</td>
-          <td className="border border-grey-200 px-2 py-1">{r.N}</td>
-          <td className="border border-grey-200 px-2 py-1">{r.P}</td>
-          <td className="border border-grey-200 px-2 py-1">{r.GF}</td>
-          <td className="border border-grey-200 px-2 py-1">{r.GS}</td>
-          <td className="border border-grey-200 px-2 py-1">{r.DR}</td>
-          <td className="border border-grey-200 px-2 py-1">{r.Pt}</td>
+          <td className="px-2 py-2">{r.PG}</td>
+          <td className="px-2 py-2">{r.V}</td>
+          <td className="px-2 py-2">{r.N}</td>
+          <td className="px-2 py-2">{r.P}</td>
+          <td className="px-2 py-2">{r.GF}</td>
+          <td className="px-2 py-2">{r.GS}</td>
+          <td className="px-2 py-2">{r.DR}</td>
+          <td className="px-2 py-2 font-bold text-montecarlo-secondary">{r.Pt}</td>
         </tr>
       ))}
     </tbody>
   </table>
+  </div>
 </div>
 
+        </div>
       </div>
     ))}
 
     {/* Pulsanti */}
     <div
-  className="flex justify-between print:hidden space-x-2"
-  style={{
-    paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)",
-  }}
->
+      className="grid grid-cols-1 gap-2 sm:grid-cols-3 print:hidden"
+      style={{
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)",
+      }}
+    >
       <button
         onClick={() => navigate(-1)}
-        className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+        className="w-full bg-gray-100 border border-gray-200 text-gray-700 font-medium py-2.5 px-4 rounded-lg hover:bg-gray-200 transition"
       >
         Indietro
       </button>
+
       <button
         onClick={() => window.print()}
-        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        className="w-full border border-red-200 bg-red-50 text-montecarlo-secondary font-semibold py-2.5 px-4 rounded-lg hover:bg-red-100 transition"
       >
         Stampa
       </button>
+
       <button
         onClick={handleNextPhase}
         disabled={savingFormula}
-        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
+        className="w-full bg-gradient-to-br from-[#d61f1f] to-[#f45e5e] text-white font-semibold py-2.5 px-4 rounded-lg shadow-sm hover:opacity-90 transition disabled:opacity-50"
       >
         {savingFormula ? "Salvataggio…" : "Prossima Fase"}
       </button>
+    </div>
+
     </div>
   </div>
 );

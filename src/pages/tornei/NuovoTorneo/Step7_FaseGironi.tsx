@@ -39,10 +39,26 @@ export default function Step7_FaseGironi() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user: authUser, loading: authLoading } = useAuth();
+  const [role, setRole] = useState<UserRole>(UserRole.Authenticated);
 
-  const role =
-    (authUser?.user_metadata?.role ?? authUser?.app_metadata?.role) as UserRole ||
-    UserRole.Authenticated;
+  useEffect(() => {
+    const caricaRuolo = async () => {
+      if (!authUser?.id) return;
+
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("role")
+        .eq("user_id", authUser.id)
+        .maybeSingle();
+
+      if (!error && data?.role) {
+        setRole(data.role as UserRole);
+      }
+    };
+
+    caricaRuolo();
+  }, [authUser?.id]);
+
   const canEdit = role === UserRole.Admin || role === UserRole.Creator;
 
 
@@ -354,16 +370,44 @@ const a = Array.isArray(m.squadra_ospite) ? m.squadra_ospite[0] : m.squadra_ospi
   }
 
   return (
-  <div className="w-full p-0 m-0 space-y-6 print:p-0">
+  <div className="min-h-screen mt-2 w-full px-2 pb-6 box-border print:p-0 print:pt-6">
+    <div className="w-full max-w-3xl mx-auto space-y-4">
+
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-montecarlo print:hidden">
+        <div className="h-1 w-full bg-gradient-to-r from-[#d61f1f] to-[#f45e5e]" />
+
+        <div className="px-4 py-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-50 text-xl ring-1 ring-inset ring-red-200">
+              🏆
+            </div>
+
+            <div className="min-w-0">
+              <h1 className="truncate text-xl sm:text-2xl font-bold text-gray-900">
+                {torneoNome}
+              </h1>
+
+              <p className="mt-0.5 text-sm text-gray-500">
+                Seconda fase a gironi
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
 
     {Object.entries(classificaPerGirone).map(([girone, squadre]) => (
-  <div key={girone} className="space-y-[3px]">
+  <div
+    key={girone}
+    className="overflow-hidden rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-sm print:break-inside-avoid"
+  >
+        <div className="border-t-4 border-red-500 px-4 py-3 bg-red-50/70">
+          <h3 className="text-base font-bold text-gray-900">
+            {girone}
+          </h3>
+        </div>
 
-        {/* Titolo Girone */}
-        <h3 className="text-lg font-semibold text-center text-white">
-          {girone}
-        </h3>
+        <div className="p-3 space-y-2">
 
         {/* Box Partite */}
         {partite
@@ -372,30 +416,31 @@ const a = Array.isArray(m.squadra_ospite) ? m.squadra_ospite[0] : m.squadra_ospi
   .map(m => (
     <div
   key={m.id}
-  className={`grid grid-cols-[44%_12%_44%] items-center bg-white/90 rounded px-2 py-[4px] mb-0 ${
-    canEdit ? "cursor-pointer hover:bg-gray-100" : ""
+  className={`grid grid-cols-[44%_12%_44%] items-center rounded-lg border border-gray-200 bg-white px-3 py-2 ${
+    canEdit ? "cursor-pointer transition hover:border-red-300 hover:bg-red-50" : ""
   }`}
   style={{ lineHeight: "1.1" }}
   onClick={() => canEdit && navigate(`/modifica-partita-fasegironi/${m.id}`)}
 >
 
       {/* Casa - allineata a sinistra */}
-      <div className="text-left truncate">
+      <div className="text-left truncate font-medium text-gray-800">
         {m.squadra_casa!.nome}
       </div>
       {/* Risultato - centrato orizzontalmente e verticalmente */}
-      <div className="text-center font-medium">
+      <div className="text-center font-bold text-montecarlo-secondary">
         {m.giocata ? `${m.gol_casa} – ${m.gol_ospite}` : "VS"}
       </div>
       {/* Ospite - allineata a destra */}
-      <div className="text-right truncate">
+      <div className="text-right truncate font-medium text-gray-800">
         {m.squadra_ospite!.nome}
       </div>
     </div>
 ))}
 
         {/* Tabella Classifica Girone */}
-        <table className="w-full border-collapse text-center text-sm bg-white/90 rounded">
+        <div className="overflow-hidden rounded-lg border border-gray-200">
+        <table className="w-full border-collapse text-center text-sm bg-white">
         <colgroup>
   <col style={{ width: "60%" }} />   {/* Colonna nomi squadre più larga */}
   <col style={{ width: "5%" }} />
@@ -410,22 +455,22 @@ const a = Array.isArray(m.squadra_ospite) ? m.squadra_ospite[0] : m.squadra_ospi
 
 
           <thead>
-            <tr className="bg-gray-100">
-              <th className="border px-3 py-1 text-left">Squadra</th>
-              <th className="border px-2 py-1">G</th>
-              <th className="border px-2 py-1">V</th>
-              <th className="border px-2 py-1">N</th>
-              <th className="border px-2 py-1">P</th>
-              <th className="border px-2 py-1">F</th>
-              <th className="border px-2 py-1">S</th>
-              <th className="border px-2 py-1">D</th>
-              <th className="border px-2 py-1">P</th>
+            <tr className="bg-gray-50 text-gray-600">
+              <th className="border-b border-r px-3 py-2 text-left">Squadra</th>
+              <th className="border-b border-r px-2 py-2">G</th>
+              <th className="border-b border-r px-2 py-2">V</th>
+              <th className="border-b border-r px-2 py-2">N</th>
+              <th className="border-b border-r px-2 py-2">P</th>
+              <th className="border-b border-r px-2 py-2">F</th>
+              <th className="border-b border-r px-2 py-2">S</th>
+              <th className="border-b border-r px-2 py-2">D</th>
+              <th className="border-b px-2 py-2 text-montecarlo-secondary">P</th>
             </tr>
           </thead>
           <tbody>
             {squadre.map((r: any) => (
-              <tr key={r.id}>
-                <td className="border px-3 py-1 text-left">
+              <tr key={r.id} className="border-b border-gray-100 last:border-b-0">
+                <td className="border-r px-3 py-2 text-left">
                   <div className="flex items-center space-x-2">
                     {r.logo_url && (
                       <img
@@ -434,46 +479,56 @@ const a = Array.isArray(m.squadra_ospite) ? m.squadra_ospite[0] : m.squadra_ospi
                         className="w-5 h-5 rounded-full"
                       />
                     )}
-                    <span>{r.nome}</span>
+                    <span className="font-medium text-gray-800">{r.nome}</span>
                   </div>
                 </td>
-                <td className="border px-2 py-1">{r.PG}</td>
-                <td className="border px-2 py-1">{r.V}</td>
-                <td className="border px-2 py-1">{r.N}</td>
-                <td className="border px-2 py-1">{r.P}</td>
-                <td className="border px-2 py-1">{r.GF}</td>
-                <td className="border px-2 py-1">{r.GS}</td>
-                <td className="border px-2 py-1">{r.DR}</td>
-                <td className="border px-2 py-1">{r.Pt}</td>
+                <td className="border-r px-2 py-2">{r.PG}</td>
+                <td className="border-r px-2 py-2">{r.V}</td>
+                <td className="border-r px-2 py-2">{r.N}</td>
+                <td className="border-r px-2 py-2">{r.P}</td>
+                <td className="border-r px-2 py-2">{r.GF}</td>
+                <td className="border-r px-2 py-2">{r.GS}</td>
+                <td className="border-r px-2 py-2">{r.DR}</td>
+                <td className="px-2 py-2 font-bold text-montecarlo-secondary">{r.Pt}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
+        </div>
       </div>
     ))}
 
     {/* CLASSIFICA GENERALE - mostrata solo se almeno una partita è giocata */}
 {partite.some(p => p.giocata) && (
-  <div className="pt-4">
-    <h3 className="text-xl text-white font-semibold text-center mb-2">
-      Classifica Generale
-    </h3>
-    <table className="w-full table-auto border-collapse text-center text-sm bg-white/90 rounded">
+  <div className="overflow-hidden rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-sm print:break-inside-avoid">
+    <div className="border-t-4 border-red-500 px-4 py-3 bg-red-50/70">
+      <div className="flex items-center gap-2">
+        <span className="text-lg">🏅</span>
+        <h3 className="text-base font-bold text-gray-900">
+          Classifica Generale
+        </h3>
+      </div>
+    </div>
+
+    <div className="p-3">
+    <div className="overflow-hidden rounded-lg border border-gray-200">
+    <table className="w-full table-auto border-collapse text-center text-sm bg-white">
       <colgroup>
         <col style={{ width: "10%" }} />
         <col style={{ width: "90%" }} />
       </colgroup>
       <thead>
-        <tr className="bg-gray-100">
-          <th className="border px-3 py-1">Pos</th>
-          <th className="border px-3 py-1 text-left">Squadra</th>
+        <tr className="bg-gray-50 text-gray-600">
+          <th className="border-b border-r px-3 py-2">Pos</th>
+          <th className="border-b px-3 py-2 text-left">Squadra</th>
         </tr>
       </thead>
       <tbody>
         {classificaGenerale.map(item => (
-          <tr key={item.id}>
-            <td className="border px-3 py-1">{item.pos}</td>
-            <td className="border px-3 py-1 text-left">
+          <tr key={item.id} className="border-b border-gray-100 last:border-b-0">
+            <td className="border-r px-3 py-2 font-bold text-montecarlo-secondary">{item.pos}</td>
+            <td className="px-3 py-2 text-left">
               <div className="flex items-center space-x-2">
                 {item.logo_url && (
                   <img
@@ -482,43 +537,46 @@ const a = Array.isArray(m.squadra_ospite) ? m.squadra_ospite[0] : m.squadra_ospi
                     className="w-5 h-5 rounded-full"
                   />
                 )}
-                <span>{item.nome}</span>
+                <span className="font-medium text-gray-800">{item.nome}</span>
               </div>
             </td>
           </tr>
         ))}
       </tbody>
     </table>
+    </div>
+    </div>
   </div>
 )}
 
 
     {/* PULSANTI */}
     <div
-  className="flex justify-between print:hidden space-x-2"
+  className="grid grid-cols-1 gap-2 sm:grid-cols-3 print:hidden"
   style={{
     paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)",
   }}
 >
       <button
         onClick={() => navigate(-1)}
-        className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+        className="w-full bg-gray-100 border border-gray-200 text-gray-700 font-medium py-2.5 px-4 rounded-lg hover:bg-gray-200 transition"
       >
         Indietro
       </button>
       <button
         onClick={() => window.print()}
-        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        className="w-full border border-red-200 bg-red-50 text-montecarlo-secondary font-semibold py-2.5 px-4 rounded-lg hover:bg-red-100 transition"
       >
         Stampa
       </button>
       <button
         onClick={() => navigate("/tornei")}
-        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+        className="w-full bg-gradient-to-br from-[#d61f1f] to-[#f45e5e] text-white font-semibold py-2.5 px-4 rounded-lg shadow-sm hover:opacity-90 transition"
       >
         Salva ed Esci
       </button>
     </div>
+  </div>
   </div>
 );
 
