@@ -1,6 +1,7 @@
 // src/pages/Classifica.tsx
 // Data: 15/11/2025 — versione corretta: aggiornamento classifica sempre via Netlify Function (anche in locale)
 // REV: 12/04/2026 — aggiunti dropdown stagione + fase
+// REV: 19/09/2026 — recupero fase da classifica_partite senza perdere la classifica iniziale
 
 import { useEffect, useState } from 'react';
 import { supabase } from "../lib/supabaseClient";
@@ -86,17 +87,36 @@ useEffect(() => {
         .select("fase")
         .eq("stagione_id", stagioneSelezionata);
 
-      const uniche = [...new Set((data || []).map((d) => d.fase).filter(Boolean))];
+      let uniche = [...new Set((data || []).map((d) => d.fase).filter(Boolean))] as string[];
+
+      if (uniche.length === 0) {
+        const { data: fasiCalendario, error: fasiCalendarioError } = await supabase
+          .from("classifica_partite")
+          .select("fase")
+          .eq("stagione_id", stagioneSelezionata);
+
+        if (fasiCalendarioError) {
+          console.error("Errore caricamento fasi calendario:", fasiCalendarioError);
+        } else {
+          uniche = [
+            ...new Set(
+              (fasiCalendario || [])
+                .map((d) => d.fase)
+                .filter(Boolean)
+            ),
+          ] as string[];
+        }
+      }
 
 setFasi(uniche);
 
 if (uniche.length > 0) {
   setFaseSelezionata(uniche[0]);
-} else {
-  setFaseSelezionata("");
+}
 
   // Nessuna classifica ancora presente:
   // ricaviamo le squadre dalle partite della stagione
+  if (!data || data.length === 0) {
   const { data: partite, error: partiteError } = await supabase
     .from("partite")
     .select(`
@@ -180,6 +200,11 @@ const { data, error } = await query
   .order("differenza_reti", { ascending: false });
 
       if (error) throw error;
+
+      if (!data || data.length === 0) {
+        setLoading(false);
+        return;
+      }
 
       const dataConPosizione = (data || []).map((r, i) => ({
         ...r,
@@ -278,17 +303,27 @@ const { data, error } = await query
         </select>
       </div>
 
-      {/* 3. Bottone aggiornamento */}
-      {role === UserRole.Creator && (
-        <div className="text-center mb-4">
+      
+
+           {/* 3. Pulsanti calendario e aggiornamento */}
+      <div className="mb-4 flex items-center justify-center gap-2">
+        <button
+          type="button"
+          onClick={() => navigate("/calendario-completo")}
+          className="rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-3 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(0,0,0,0.30)] transition hover:-translate-y-[1px]"
+        >
+          📅 Calendario completo
+        </button>
+
+        {role === UserRole.Creator && (
           <button
             onClick={aggiornaClassifica}
-            className="rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-4 py-2 font-semibold text-white shadow-[0_4px_12px_rgba(0,0,0,0.30)] transition hover:-translate-y-[1px]"
+            className="rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-3 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(0,0,0,0.30)] transition hover:-translate-y-[1px]"
           >
             🔄 Aggiorna classifica
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* 4. Tabella */}
       <div className="overflow-hidden rounded-2xl border-l-4 border-red-600 bg-white shadow-[0_8px_24px_rgba(0,0,0,0.40)]">

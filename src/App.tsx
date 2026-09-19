@@ -29,6 +29,7 @@ import GraficoAndamentoClassifica from "./pages/GraficoAndamentoClassifica";
 // pagine interne
 import Home from "./pages/Home";
 import Calendario from "./pages/Calendario";
+import CalendarioCompleto from "./pages/CalendarioCompleto";
 import DettaglioPrePartita from "./pages/DettaglioPrePartita";
 import Risultati from "./pages/Risultati";
 import NuovaPartitaPage from "./pages/NuovaPartitaPage";
@@ -148,6 +149,7 @@ export default function App() {
 
           {/* Calendario e partite */}
 <Route path="/calendario" element={<Calendario />} />
+<Route path="/calendario-completo" element={<CalendarioCompleto />} />
 <Route path="/risultati" element={<Risultati />} />
 <Route path="/nuova-partita" element={<NuovaPartitaPage />} />
 <Route path="/partita/:id" element={<DettaglioPartita />} />

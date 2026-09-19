@@ -70,6 +70,17 @@ export default function Calendario(): JSX.Element {
     <div className="min-h-screen bg-gradient-to-b from-[#343434] via-[#404040] to-[#2b2b2b] pt-2 pb-4">
       <div className="w-full px-2">
 
+                {/* 1. Calendario completo */}
+        <div className="mb-4 text-center">
+          <button
+            type="button"
+            onClick={() => navigate("/calendario-completo")}
+            className="rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-3 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(0,0,0,0.30)] transition hover:-translate-y-[1px]"
+          >
+            📅 Calendario completo
+          </button>
+        </div>
+
         {/* 1. Contenuto Partite */}
         {loading ? (
           <div className="min-h-screen">
