@@ -405,14 +405,22 @@ export default function CalendarioCompleto(): JSX.Element {
           Nessuna partita disponibile per questa giornata.
         </div>
       )}
-            {/* 8. Pulsante indietro */}
-      <div className="mt-5 text-center">
+                       {/* 8. Pulsanti navigazione */}
+      <div className="mt-5 flex items-center justify-center gap-3">
         <button
           type="button"
           onClick={() => navigate(-1)}
           className="rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(0,0,0,0.30)] transition hover:-translate-y-[1px]"
         >
           ← Indietro
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate("/classifica")}
+          className="rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(0,0,0,0.30)] transition hover:-translate-y-[1px]"
+        >
+          Classifica
         </button>
       </div>
     </div>
