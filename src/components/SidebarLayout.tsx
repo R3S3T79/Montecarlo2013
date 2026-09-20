@@ -62,15 +62,40 @@ useEffect(() => {
 
   setIsIOS(ios);
 
+  const promptSalvato = (
+    window as Window & {
+      deferredInstallPrompt?: BeforeInstallPromptEvent;
+    }
+  ).deferredInstallPrompt;
+
+  if (promptSalvato) {
+    setInstallPrompt(promptSalvato);
+  }
+
   const handleBeforeInstallPrompt = (event: Event) => {
     event.preventDefault();
-    setInstallPrompt(event as BeforeInstallPromptEvent);
+
+    const promptEvent = event as BeforeInstallPromptEvent;
+
+    (
+      window as Window & {
+        deferredInstallPrompt?: BeforeInstallPromptEvent;
+      }
+    ).deferredInstallPrompt = promptEvent;
+
+    setInstallPrompt(promptEvent);
   };
 
   const handleAppInstalled = () => {
     setAppInstallata(true);
     setInstallPrompt(null);
     setMostraIstruzioniInstallazione(false);
+
+    delete (
+      window as Window & {
+        deferredInstallPrompt?: BeforeInstallPromptEvent;
+      }
+    ).deferredInstallPrompt;
   };
 
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);

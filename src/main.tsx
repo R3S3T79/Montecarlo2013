@@ -7,6 +7,17 @@ import App from "./App";
 import "./index.css";
 
 // =======================================
+// 1. Cattura anticipata installazione PWA
+// =======================================
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+
+  (window as Window & {
+    deferredInstallPrompt?: Event;
+  }).deferredInstallPrompt = event;
+});
+
+// =======================================
 // Gestione automatica aggiornamenti PWA
 // =======================================
 function ServiceWorkerManager() {
