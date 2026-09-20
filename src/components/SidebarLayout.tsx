@@ -9,7 +9,7 @@ import {
   useLocation,
   useMatch,
 } from 'react-router-dom';
-import { Menu, PlusCircle, Trash2, Edit2, Camera, Bell } from 'lucide-react';
+import { Menu, PlusCircle, Trash2, Edit2, Camera, Bell, Download } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import {
@@ -23,6 +23,14 @@ import { Star } from "lucide-react";
 // (presente nei tuoi import originali)
 import Step3_GuNumeroSquadre from '../pages/tornei/NuovoTorneo/Step3_GuNumeroSquadre';
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{
+    outcome: 'accepted' | 'dismissed';
+    platform: string;
+  }>;
+}
+
 export default function SidebarLayout(): JSX.Element {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { user, loading: authLoading } = useAuth();
@@ -33,6 +41,46 @@ export default function SidebarLayout(): JSX.Element {
 const [pushSupported, setPushSupported] = useState(false);
 const [pushSubscribed, setPushSubscribed] = useState(false);
 const [pushLoading, setPushLoading] = useState(false);
+
+// Stato installazione PWA
+const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+const [appInstallata, setAppInstallata] = useState(false);
+const [mostraIstruzioniInstallazione, setMostraIstruzioniInstallazione] = useState(false);
+const [isIOS, setIsIOS] = useState(false);
+
+useEffect(() => {
+  const standalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+  setAppInstallata(standalone);
+
+  const userAgent = window.navigator.userAgent.toLowerCase();
+  const ios =
+    /iphone|ipad|ipod/.test(userAgent) ||
+    (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
+
+  setIsIOS(ios);
+
+  const handleBeforeInstallPrompt = (event: Event) => {
+    event.preventDefault();
+    setInstallPrompt(event as BeforeInstallPromptEvent);
+  };
+
+  const handleAppInstalled = () => {
+    setAppInstallata(true);
+    setInstallPrompt(null);
+    setMostraIstruzioniInstallazione(false);
+  };
+
+  window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  window.addEventListener('appinstalled', handleAppInstalled);
+
+  return () => {
+    window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.removeEventListener('appinstalled', handleAppInstalled);
+  };
+}, []);
 
 useEffect(() => {
   const controllaNotifiche = async () => {
@@ -297,6 +345,23 @@ const canCreator = role === UserRole.Creator;
     setPushLoading(false);
   }
 };
+
+  const handleInstallaApp = async () => {
+    if (installPrompt) {
+      await installPrompt.prompt();
+
+      const scelta = await installPrompt.userChoice;
+
+      if (scelta.outcome === 'accepted') {
+        setInstallPrompt(null);
+      }
+
+      return;
+    }
+
+    setMostraIstruzioniInstallazione(true);
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login', { replace: true });
@@ -588,6 +653,16 @@ const canCreator = role === UserRole.Creator;
   </div>
 )}
 
+{!appInstallata && (
+  <button
+    onClick={handleInstallaApp}
+    className="w-full flex items-center justify-center gap-2 p-2 rounded text-sm transition bg-white/10 hover:bg-white/20 text-white"
+  >
+    <Download size={18} />
+    Installa App
+  </button>
+)}
+
 {/* Footer sidebar */}
 <div className="mt-auto pt-4 border-t border-white/20 px-2">
 {user && pushSupported && (
@@ -625,6 +700,39 @@ const canCreator = role === UserRole.Creator;
     <span className="text-sm">Accesso Pubblico</span>
   )}
 </div>
+
+{mostraIstruzioniInstallazione && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4">
+    <div className="w-full max-w-sm rounded-xl bg-neutral-900 border border-white/20 p-5 text-white shadow-xl">
+      <h2 className="text-lg font-bold mb-3">
+        Installa Montecarlo 2013
+      </h2>
+
+      {isIOS ? (
+        <div className="text-sm space-y-2">
+          <p>Per installare l'app su iPhone o iPad:</p>
+          <p>1. Premi il pulsante Condividi.</p>
+          <p>2. Seleziona "Aggiungi alla schermata Home".</p>
+          <p>3. Premi "Aggiungi".</p>
+        </div>
+      ) : (
+        <div className="text-sm space-y-2">
+          <p>Per installare l'app:</p>
+          <p>1. Apri il menu del browser.</p>
+          <p>2. Seleziona "Aggiungi alla schermata Home" oppure "Installa app".</p>
+          <p>3. Conferma l'installazione.</p>
+        </div>
+      )}
+
+      <button
+        onClick={() => setMostraIstruzioniInstallazione(false)}
+        className="mt-5 w-full rounded bg-red-700 hover:bg-red-600 p-2 text-sm font-semibold"
+      >
+        Chiudi
+      </button>
+    </div>
+  </div>
+)}
 
 
         </nav>
