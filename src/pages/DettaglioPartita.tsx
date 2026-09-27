@@ -13,6 +13,7 @@ import 'react-quill/dist/quill.snow.css'
 
 interface MarcatoriEntry {
   periodo: number
+  tempo_sec: number | null
   giocatore: { nome: string; cognome: string }
 }
 interface TiroRigore {
@@ -39,6 +40,7 @@ interface GiocatoreFormazione {
   titolare: boolean
   entrata_sec: number | null
   uscita_sec: number | null
+  run_index: number | null
 }
 
 // =========================
@@ -101,6 +103,8 @@ const [formazione, setFormazione] = useState<GiocatoreFormazione[]>([])
 // =========================
 
 const [sostituzioni, setSostituzioni] = useState<SostituzionePartita[]>([])
+
+const [inizioSecondoTempo, setInizioSecondoTempo] = useState<number>(0)
 
   const [editing, setEditing] = useState(false)
   const [commento, setCommento] = useState<string>('')
@@ -194,7 +198,7 @@ commento,
 
       const { data: marcatoriData, error: errMd } = await supabase
         .from('marcatori_alias')
-        .select('periodo, giocatore_stagione_id, giocatore_nome, giocatore_cognome')
+        .select('periodo, tempo_sec, giocatore_stagione_id, giocatore_nome, giocatore_cognome')
         .eq('partita_id', id)
 
       if (errMd) console.error(errMd)
@@ -216,17 +220,29 @@ commento,
 
       const { data: minutiData, error: errMinuti } = await supabase
         .from('minuti_giocati')
-                .select('giocatore_stagione_id, entrata_sec, uscita_sec, run_index')
+               .select('giocatore_stagione_id, entrata_sec, uscita_sec, run_index')
         .eq('partita_id', id)
 
       if (errMinuti) {
         console.error('Errore caricamento sostituzioni:', errMinuti)
       }
+      
 
           // =========================
       // 4. AGGREGAZIONE MINUTI FORMAZIONE
       // =========================
 
+      const secondiInizioSecondoTempo = Math.min(
+  ...((minutiData ?? [])
+    .filter((m) => m.run_index === 2 && m.entrata_sec != null)
+    .map((m) => m.entrata_sec as number))
+);
+
+setInizioSecondoTempo(
+  Number.isFinite(secondiInizioSecondoTempo)
+    ? secondiInizioSecondoTempo
+    : 0
+);
       const formazioneData: GiocatoreFormazione[] = (presenzeData || []).map(p => {
         const righeGiocatore = (minutiData || [])
           .filter(m => m.giocatore_stagione_id === p.giocatore_stagione_id)
@@ -248,6 +264,7 @@ commento,
           titolare: !!p.titolare,
           entrata_sec: entrate.length > 0 ? Math.min(...entrate) : null,
           uscita_sec: uscite.length > 0 ? Math.max(...uscite) : null,
+          run_index: righeGiocatore.length > 0 ? righeGiocatore[righeGiocatore.length - 1].run_index ?? null : null,
         }
       })
 
@@ -352,12 +369,13 @@ commento,
 
       const marcatori: MarcatoriEntry[] = (marcatoriData || [])
         .filter(m => m.giocatore_nome || m.giocatore_cognome)
-        .map(m => ({
-          periodo: m.periodo,
-          giocatore: {
-            nome: m.giocatore_nome || '',
-            cognome: m.giocatore_cognome || ''
-          }
+       .map(m => ({
+  periodo: m.periodo,
+  tempo_sec: m.tempo_sec ?? null,
+ giocatore: {
+  nome: m.giocatore_nome || '',
+  cognome: m.giocatore_cognome || ''
+}
         }))
 
       setPartita({ ...(pd as any), marcatori })
@@ -562,14 +580,23 @@ const goalOspiteArr = [
 
                     <div>
                       <div className="text-[12px] font-medium text-gray-500">
-                        {m.periodo === 1
-                          ? '1° Tempo'
-                          : m.periodo === 2
-                            ? '2° Tempo'
-                            : m.periodo === 3
-                              ? '1° Supplementare'
-                              : '2° Supplementare'}
-                      </div>
+  {m.periodo === 1
+    ? '1° Tempo'
+    : m.periodo === 2
+      ? '2° Tempo'
+      : m.periodo === 3
+        ? '1° Supplementare'
+        : '2° Supplementare'}
+  {m.tempo_sec !== null && (
+    <>
+      {' - '}
+      {m.periodo === 1
+        ? Math.floor(m.tempo_sec / 60)
+        : 35 + Math.floor((m.tempo_sec - inizioSecondoTempo) / 60)}
+      '
+    </>
+  )}
+</div>
 
                       <div className="text-[14px] font-bold text-[#181818]">
                         {m.giocatore?.cognome || ''} {m.giocatore?.nome || ''}
@@ -744,8 +771,8 @@ const goalOspiteArr = [
                           <div className="flex shrink-0 items-center gap-1 font-bold text-red-600">
                             <span className="text-lg leading-none">↓</span>
                             <span className="text-xs">
-                              35'
-                            </span>
+  {35 + Math.floor((sostituzione.secondo_assoluto - inizioSecondoTempo) / 60)}'
+</span>
                           </div>
                         )}
                       </div>
@@ -765,8 +792,8 @@ const goalOspiteArr = [
                           <div className="flex shrink-0 items-center gap-1 font-bold text-green-600">
                             <span className="text-lg leading-none">↑</span>
                             <span className="text-xs">
-                              35'
-                            </span>
+ {35 + Math.floor(((sostituzione?.secondo_assoluto ?? inizioSecondoTempo) - inizioSecondoTempo) / 60)}'
+</span>
                           </div>
                         </div>
                       )}

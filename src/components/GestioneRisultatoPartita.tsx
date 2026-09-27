@@ -2604,6 +2604,24 @@ const salvaSostituzione = async (uscente: string, entrante: string, _minutoIgnor
   // Il nuovo giocatore verrà aperto da inizioSecondoTempo()
   // con run_index = 2.
 
+    // =========================
+  // 1. REGISTRA SOSTITUZIONE PARTITA
+  // =========================
+
+  const { error: sostituzioneError } = await supabase
+    .from("sostituzioni_partita")
+    .insert({
+      partita_id: partita.id,
+      giocatore_uscente_stagione_id: uscente,
+      giocatore_entrante_stagione_id: entrante,
+      secondo_assoluto: nowSec,
+      run_index: timerState?.run_index ?? 1,
+    });
+
+  if (sostituzioneError) {
+    console.error("❌ Errore salvataggio sostituzione:", sostituzioneError);
+  }
+
   // Aggiorna formazioni_partita (sostituzione sul campo)
   await supabase
     .from("formazioni_partita")
