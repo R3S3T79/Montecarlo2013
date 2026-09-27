@@ -373,9 +373,9 @@ rigori_b: totaleRigoriOspite,
       })
       .eq("id", id);
 
-    await supabase.from("marcatori").delete().eq("partita_id", id);
+   // await supabase.from("marcatori").delete().eq("partita_id", id);
 
-    const nuoviMarc: any[] = [];
+    /*const nuoviMarc: any[] = [];
     for (let i = 0; i < 4; i++) {
       const periodo = i + 1;
 
@@ -416,27 +416,33 @@ rigori_b: totaleRigoriOspite,
     }
     if (nuoviMarc.length) {
       await supabase.from("marcatori").insert(nuoviMarc);
-    }
+    }*/
 
-    await supabase.from("presenze").delete().eq("partita_id", id).eq("stagione_id", stagioneId);
-    if (formazione.length) {
-      const nuovePres = formazione.map((gid) => ({
-        partita_id: id!,
-        giocatore_stagione_id: gid,
-        stagione_id: stagioneId,
-      }));
-      await supabase.from("presenze").insert(nuovePres);
-    }
+    // await supabase.from("presenze").delete().eq("partita_id", id).eq("stagione_id", stagioneId);
+    /*
+if (formazione.length) {
+  const nuovePres = formazione.map((gid) => ({
+    partita_id: id!,
+    giocatore_stagione_id: gid,
+    stagione_id: stagioneId,
+  }));
+  await supabase.from("presenze").insert(nuovePres);
+}
+*/
 
     // 🔹 Salvo i minuti giocati totali
+/*
 await supabase.from("minuti_giocati_totali").delete().eq("partita_id", id);
+
 const nuoviMinuti = Object.entries(minutiGiocati).map(([gid, min]) => ({
   partita_id: id!,
   giocatore_stagione_id: gid,
   tempo_giocato_sec: (min || 0) * 60,
 }));
+
 if (nuoviMinuti.length)
   await supabase.from("minuti_giocati_totali").insert(nuoviMinuti);
+*/
 // 🔹 Elimino i tiri dei rigori rimossi
 if (rigoriDaEliminare.length > 0) {
   await supabase

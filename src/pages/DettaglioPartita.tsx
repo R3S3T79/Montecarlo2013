@@ -16,6 +16,9 @@ interface MarcatoriEntry {
   tempo_sec: number | null
     avversario: boolean
   giocatore: { nome: string; cognome: string }
+  assist_giocatore_stagione_id: string | null
+  assist_nome: string
+  assist_cognome: string
 }
 interface TiroRigore {
   id: string
@@ -106,6 +109,7 @@ const [formazione, setFormazione] = useState<GiocatoreFormazione[]>([])
 const [sostituzioni, setSostituzioni] = useState<SostituzionePartita[]>([])
 
 const [inizioSecondoTempo, setInizioSecondoTempo] = useState<number>(0)
+const [cartellini, setCartellini] = useState<any[]>([])
 
   const [editing, setEditing] = useState(false)
   const [commento, setCommento] = useState<string>('')
@@ -199,11 +203,41 @@ commento,
 
       const { data: marcatoriData, error: errMd } = await supabase
         .from('marcatori_alias')
-        .select('periodo, tempo_sec, giocatore_stagione_id, giocatore_nome, giocatore_cognome, avversario_nome, avversario_cognome, avversario_numero_maglia, tipo_goal')
+        .select('periodo, tempo_sec, giocatore_stagione_id, giocatore_nome, giocatore_cognome, avversario_nome, avversario_cognome, avversario_numero_maglia, tipo_goal, assist_giocatore_stagione_id, assist_nome, assist_cognome')
         .eq('partita_id', id)
 
       if (errMd) console.error(errMd)
 
+        // =========================
+// 3. CARICAMENTO CARTELLINI
+// =========================
+
+const { data: cartelliniData, error: errCartellini } = await supabase
+  .from('cartellini')
+  .select(`
+    id,
+    giocatore_stagione_id,
+    giocatore_avversario_id,
+    tipo,
+    periodo,
+    tempo_sec,
+    giocatore:giocatore_stagione_id (
+      nome,
+      cognome
+    ),
+    giocatore_avversario:giocatore_avversario_id (
+      nome,
+      cognome,
+      numero_maglia
+    )
+  `)
+  .eq('partita_id', id)
+
+if (errCartellini) {
+  console.error('Errore caricamento cartellini:', errCartellini)
+}
+
+setCartellini(cartelliniData || [])
               // =========================
       // 3. CARICAMENTO FORMAZIONE E SOSTITUZIONI
       // =========================
@@ -369,25 +403,29 @@ setInizioSecondoTempo(
       }
 
       const marcatori: MarcatoriEntry[] = (marcatoriData || [])
-          .filter(m =>
+  .filter(m =>
     m.giocatore_nome ||
     m.giocatore_cognome ||
     m.avversario_nome ||
     m.avversario_cognome
   )
-       .map(m => ({
-  periodo: m.periodo,
-  tempo_sec: m.tempo_sec ?? null,
+  .map(m => ({
+    periodo: m.periodo,
+    tempo_sec: m.tempo_sec ?? null,
     avversario: !!(m.avversario_nome || m.avversario_cognome),
-giocatore: {
+    giocatore: {
   nome: m.giocatore_nome || (m.avversario_nome
     ? m.avversario_nome.charAt(0).toUpperCase() + m.avversario_nome.slice(1).toLowerCase()
     : ''),
   cognome: m.giocatore_cognome || (m.avversario_cognome
     ? m.avversario_cognome.charAt(0).toUpperCase() + m.avversario_cognome.slice(1).toLowerCase()
     : '')
-}
-        }))
+},
+assist_giocatore_stagione_id: m.assist_giocatore_stagione_id ?? null,
+assist_nome: m.assist_nome || '',
+assist_cognome: m.assist_cognome || '',
+  }))
+  .sort((a, b) => (a.tempo_sec ?? 0) - (b.tempo_sec ?? 0))
 
       setPartita({ ...(pd as any), marcatori })
       setCommento(pd.commento || '')
@@ -496,6 +534,39 @@ const goalOspiteArr = [
       return a.cognome.localeCompare(b.cognome)
     })
 
+    // =========================
+// 10. SINTESI PARTITA
+// =========================
+
+const eventiSintesi = [
+  ...partita.marcatori.map((m) => ({
+    tipoEvento: 'goal' as const,
+    periodo: m.periodo,
+    tempo_sec: m.tempo_sec,
+    avversario: m.avversario,
+    nome: m.giocatore?.nome || '',
+    cognome: m.giocatore?.cognome || '',
+    assist_nome: m.assist_nome || '',
+assist_cognome: m.assist_cognome || '',
+  })),
+
+  ...cartellini.map((c) => ({
+    tipoEvento: 'cartellino' as const,
+    periodo: c.periodo,
+    tempo_sec: c.tempo_sec ?? null,
+    avversario: !!c.giocatore_avversario_id,
+    nome:
+      c.giocatore_avversario?.nome ||
+      c.giocatore?.nome ||
+      '',
+    cognome:
+      c.giocatore_avversario?.cognome ||
+      c.giocatore?.cognome ||
+      '',
+    tipoCartellino: c.tipo,
+  })),
+].sort((a, b) => (a.tempo_sec ?? 0) - (b.tempo_sec ?? 0))
+
   return (
     <div className="min-h-screen w-full px-[2px] pb-4 box-border">
       <div className="w-full max-w-md mx-auto" ref={containerRef}>
@@ -567,160 +638,118 @@ const goalOspiteArr = [
           </div>
         </div>
 
-        {/* 3. Marcatori */}
+             {/* ========================= */}
+        {/* 3. SINTESI PARTITA */}
+        {/* ========================= */}
+
         <div className="mb-4 overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_22px_rgba(0,0,0,0.38)]">
 
           <div className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 text-white">
-            <span className="text-xl">⚽</span>
+            <span className="text-xl">📋</span>
             <span className="font-extrabold uppercase tracking-wide">
-              Marcatori
+              Sintesi partita
             </span>
           </div>
 
-          <div className="p-4">
-            {partita.marcatori.length > 0 ? (
-              <div className="space-y-3">
-                {partita.marcatori.map((m, i) => (
-                  <div
-                    key={i}
-                    className={`flex items-center gap-3 border-b border-gray-200 pb-3 last:border-b-0 last:pb-0 ${
-  m.avversario ? 'flex-row-reverse' : ''
-}`}
-                  >
-                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-base shadow-sm">
-                      ⚽
-                    </div>
+          <div className="grid grid-cols-2 border-b border-gray-200 bg-gray-50 px-4 py-3">
+            <div className="text-left text-sm font-extrabold text-[#181818]">
+              {partita.casa.nome}
+            </div>
 
-                    <div className={m.avversario ? 'ml-auto text-right' : ''}>
-                      <div className="text-[12px] font-medium text-gray-500">
-  {m.periodo === 1
-    ? '1° Tempo'
-    : m.periodo === 2
-      ? '2° Tempo'
-      : m.periodo === 3
-        ? '1° Supplementare'
-        : '2° Supplementare'}
-  {m.tempo_sec !== null && (
-    <>
-      {' - '}
-      {m.periodo === 1
-        ? Math.floor(m.tempo_sec / 60)
-        : 35 + Math.floor((m.tempo_sec - inizioSecondoTempo) / 60)}
-      '
-    </>
-  )}
-</div>
-
-                      <div className="text-[14px] font-bold text-[#181818]">
-                        {m.giocatore?.cognome || ''} {m.giocatore?.nome || ''}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="py-2 text-center text-sm text-gray-500">
-                Nessun marcatore registrato
-              </div>
-            )}
-          </div>
-        </div>
-
-        
-
-        {/* 4. Parziali */}
-        <div className="mb-4 overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_22px_rgba(0,0,0,0.38)]">
-
-          <div className="bg-gradient-to-r from-[#242424] to-[#3b3b3b] px-4 py-3 text-center font-extrabold text-white">
-            Parziali
+            <div className="text-right text-sm font-extrabold text-[#181818]">
+              {partita.ospite.nome}
+            </div>
           </div>
 
           <div className="divide-y divide-gray-200">
+            {eventiSintesi.length > 0 ? (
+              eventiSintesi.map((evento, i) => {
+                const minuto =
+                  evento.tempo_sec !== null
+                    ? evento.periodo === 1
+                      ? Math.floor(evento.tempo_sec / 60)
+                      : 35 + Math.floor((evento.tempo_sec - inizioSecondoTempo) / 60)
+                    : null
 
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 py-3">
-              <div className="text-left text-sm font-semibold text-[#222]">
-                {partita.casa.nome}
-              </div>
-              <div className="px-4 text-xs font-bold uppercase text-gray-500">
-                1° Tempo
-              </div>
-              <div className="text-right text-sm font-semibold text-[#222]">
-                {partita.ospite.nome}
-              </div>
+                const nomeTempo =
+                  evento.periodo === 1
+                    ? '1° Tempo'
+                    : evento.periodo === 2
+                      ? '2° Tempo'
+                      : evento.periodo === 3
+                        ? '1° Supplementare'
+                        : '2° Supplementare'
 
-              <div className="mt-1 text-left text-xl font-black text-red-600">
-                {partita.goal_a1}
-              </div>
-              <div />
-              <div className="mt-1 text-right text-xl font-black text-[#244fa3]">
-                {partita.goal_b1}
-              </div>
-            </div>
+                const contenuto = (
+                  <div
+                    className={`flex flex-col ${
+                      evento.avversario ? 'items-end text-right' : 'items-start text-left'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {!evento.avversario && (
+                        <span className="text-lg">
+                          {evento.tipoEvento === 'goal'
+                            ? '⚽'
+                            : evento.tipoCartellino === 'rosso'
+                              ? '🟥'
+                              : '🟨'}
+                        </span>
+                      )}
 
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 py-3">
-              <div className="text-left text-sm font-semibold text-[#222]">
-                {partita.casa.nome}
-              </div>
-              <div className="px-4 text-xs font-bold uppercase text-gray-500">
-                2° Tempo
-              </div>
-              <div className="text-right text-sm font-semibold text-[#222]">
-                {partita.ospite.nome}
-              </div>
+                      <div>
+                        <div className="text-[14px] font-bold text-[#181818]">
+                          {evento.cognome} {evento.nome}
+                        </div>
 
-              <div className="mt-1 text-left text-xl font-black text-red-600">
-                {partita.goal_a2}
+                        {evento.tipoEvento === 'goal' &&
+                          (evento.assist_nome || evento.assist_cognome) && (
+                            <div className="text-[12px] font-medium text-gray-600">
+                              Assist: {evento.assist_cognome} {evento.assist_nome}
+                            </div>
+                          )}
+
+                        <div className="text-[12px] font-medium text-gray-500">
+                          {nomeTempo}
+                          {minuto !== null && (
+                            <>
+                              {' - '}
+                              {minuto}'
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {evento.avversario && (
+                        <span className="text-lg">
+                          {evento.tipoEvento === 'goal'
+                            ? '⚽'
+                            : evento.tipoCartellino === 'rosso'
+                              ? '🟥'
+                              : '🟨'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+
+                return (
+                  <div key={i} className="grid grid-cols-2 gap-3 px-4 py-3">
+                    <div>
+                      {!evento.avversario && contenuto}
+                    </div>
+
+                    <div>
+                      {evento.avversario && contenuto}
+                    </div>
+                  </div>
+                )
+              })
+            ) : (
+              <div className="py-4 text-center text-sm text-gray-500">
+                Nessun evento registrato
               </div>
-              <div />
-              <div className="mt-1 text-right text-xl font-black text-[#244fa3]">
-                {partita.goal_b2}
-              </div>
-            </div>
-
-            {supplementariGiocati && (
-              <>
-                <div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 py-3">
-                  <div className="text-left text-sm font-semibold text-[#222]">
-                    {partita.casa.nome}
-                  </div>
-                  <div className="px-4 text-xs font-bold uppercase text-gray-500">
-                    1° Suppl.
-                  </div>
-                  <div className="text-right text-sm font-semibold text-[#222]">
-                    {partita.ospite.nome}
-                  </div>
-
-                  <div className="mt-1 text-left text-xl font-black text-red-600">
-                    {partita.goal_a3}
-                  </div>
-                  <div />
-                  <div className="mt-1 text-right text-xl font-black text-[#244fa3]">
-                    {partita.goal_b3}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 py-3">
-                  <div className="text-left text-sm font-semibold text-[#222]">
-                    {partita.casa.nome}
-                  </div>
-                  <div className="px-4 text-xs font-bold uppercase text-gray-500">
-                    2° Suppl.
-                  </div>
-                  <div className="text-right text-sm font-semibold text-[#222]">
-                    {partita.ospite.nome}
-                  </div>
-
-                  <div className="mt-1 text-left text-xl font-black text-red-600">
-                    {partita.goal_a4}
-                  </div>
-                  <div />
-                  <div className="mt-1 text-right text-xl font-black text-[#244fa3]">
-                    {partita.goal_b4}
-                  </div>
-                </div>
-              </>
             )}
-
           </div>
         </div>
 
