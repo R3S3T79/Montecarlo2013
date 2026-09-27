@@ -51,6 +51,14 @@ export default function GestioneRisultatoPartita() {
   const [convocati, setConvocati] = useState<string[]>([]);
   const [titolari, setTitolari] = useState<string[]>([]);
   const [refreshCampo, setRefreshCampo] = useState(0);
+    const [giocatoriAvversari, setGiocatoriAvversari] = useState<
+    {
+      id: string;
+      numero_maglia: number | null;
+      nome: string | null;
+      cognome: string | null;
+    }[]
+  >([]);
 
 
   // ========================
@@ -116,6 +124,7 @@ const [tiriRigori, setTiriRigori] = useState<
   tempo_sec?: number | null;
   tipo_goal?: "azione" | "rigore";
   giocatore_stagione_id: string | null;
+  giocatore_avversario_id?: string | null;
   assist_giocatore_stagione_id?: string | null;
   portiere_subisce_id?: string | null;
   squadra_segnante_id?: string | null;
@@ -269,6 +278,20 @@ setRigoriOspite(p.rigori_b ?? 0);
     });
     setGiocatori(elencoGiocatori);
 
+        // 4.1) Giocatori avversari
+    const { data: giocatoriAvversariDB, error: errAvversari } = await supabase
+      .from("giocatori_avversari_partita")
+      .select("id, numero_maglia, nome, cognome")
+      .eq("partita_id", p.id)
+      .order("numero_maglia", { ascending: true });
+
+    if (errAvversari) {
+      console.error("Errore fetch giocatori avversari:", errAvversari.message);
+    }
+
+    setGiocatoriAvversari(giocatoriAvversariDB || []);
+    
+
     // 5) Minuti giocati già registrati
     const { data: minutiDB, error: minErr } = await supabase
       .from("minuti_giocati")
@@ -281,7 +304,7 @@ setRigoriOspite(p.rigori_b ?? 0);
     // 6) Marcatori
     const { data: marcatoriDB } = await supabase
       .from("marcatori")
-      .select("giocatore_stagione_id, assist_giocatore_stagione_id, periodo, goal_tempo, tempo_sec, tipo_goal, portiere_subisce_id, squadra_segnante_id, id")
+      .select("giocatore_stagione_id, giocatore_avversario_id, assist_giocatore_stagione_id, periodo, goal_tempo, tempo_sec, tipo_goal, portiere_subisce_id, squadra_segnante_id, id")
       .eq("partita_id", p.id);
 
     const perPeriodo: Record<number, any[]> = {};
@@ -291,6 +314,7 @@ setRigoriOspite(p.rigori_b ?? 0);
   goal_tempo: m.goal_tempo,
   tempo_sec: m.tempo_sec,
   giocatore_stagione_id: m.giocatore_stagione_id,
+giocatore_avversario_id: m.giocatore_avversario_id,
   assist_giocatore_stagione_id: m.assist_giocatore_stagione_id,
   portiere_subisce_id: m.portiere_subisce_id,
   squadra_segnante_id: m.squadra_segnante_id,
@@ -367,7 +391,7 @@ if (cartelliniErr) {
         async () => {
           const { data: live } = await supabase
             .from("marcatori")
-            .select("giocatore_stagione_id, assist_giocatore_stagione_id, periodo, goal_tempo, tempo_sec, tipo_goal, portiere_subisce_id, squadra_segnante_id, id")
+            .select("giocatore_stagione_id, giocatore_avversario_id, assist_giocatore_stagione_id, periodo, goal_tempo, tempo_sec, tipo_goal, portiere_subisce_id, squadra_segnante_id, id")
             .eq("partita_id", p.id);
           const perLive: Record<number, any[]> = {};
           live?.forEach((m) => {
@@ -377,6 +401,7 @@ if (cartelliniErr) {
   tempo_sec: m.tempo_sec,
   tipo_goal: m.tipo_goal,
   giocatore_stagione_id: m.giocatore_stagione_id,
+giocatore_avversario_id: m.giocatore_avversario_id,
   assist_giocatore_stagione_id: m.assist_giocatore_stagione_id,
   portiere_subisce_id: m.portiere_subisce_id,
   squadra_segnante_id: m.squadra_segnante_id,
@@ -2073,10 +2098,10 @@ const eliminaTiroRigore = async (
         portiere_subisce_id: null,
         squadra_segnante_id: MONTECARLO_ID,
       })
-      .select(
-  "id, periodo, goal_tempo, tempo_sec, tipo_goal, giocatore_stagione_id, portiere_subisce_id, squadra_segnante_id"
-)
-      .single();
+          .select(
+      "id, periodo, goal_tempo, tempo_sec, tipo_goal, giocatore_stagione_id, giocatore_avversario_id, portiere_subisce_id, squadra_segnante_id"
+    )
+    .single();
 
     if (!error && data) {
   const attuali = marcatori[periodo] || [];
@@ -2124,6 +2149,7 @@ return null;
         goal_tempo,
         tempo_sec: tempoSec,
         giocatore_stagione_id: null, // non è un marcatore MC
+        giocatore_avversario_id: null,
         giocatore_uid: null,
         portiere_subisce_id: null, // lo scegli dopo
         squadra_segnante_id: squadraSegnanteId,
@@ -2317,6 +2343,39 @@ return null;
   await aggiornaGoalDB(nuovaA, nuovaB);
 };
 
+// Assegna marcatore avversario
+const selezionaMarcatoreAvversario = async (
+  periodo: number,
+  goal_tempo: number,
+  giocatoreAvversarioId: string
+) => {
+  if (!partita) return;
+
+  // update locale
+  setMarcatori((prev) => {
+    const aggiornata = (prev[periodo] || []).map((m) =>
+      m.goal_tempo === goal_tempo
+        ? { ...m, giocatore_avversario_id: giocatoreAvversarioId || null }
+        : m
+    );
+
+    return { ...prev, [periodo]: aggiornata };
+  });
+
+  // update DB
+  const { error } = await supabase
+    .from("marcatori")
+    .update({
+      giocatore_avversario_id: giocatoreAvversarioId || null,
+    })
+    .eq("partita_id", partita.id)
+    .eq("periodo", periodo)
+    .eq("goal_tempo", goal_tempo);
+
+  if (error) {
+    console.error("Errore aggiornamento marcatore avversario:", error.message);
+  }
+};
 
   // Assegna marcatore (solo per gol segnati da MC)
   const selezionaMarcatore = async (periodo: number, goal_tempo: number, gStagioneId: string) => {
@@ -2851,6 +2910,26 @@ setOrdineEntrati((prev) => [
         <option value="rigore">🥅 Rigore</option>
       </select>
     </div>
+
+        {/* Marcatore avversario */}
+    <select
+      value={m.giocatore_avversario_id || ""}
+      onChange={(e) =>
+        selezionaMarcatoreAvversario(
+          tempo,
+          m.goal_tempo,
+          e.target.value
+        )
+      }
+      className="w-full border rounded px-2 py-1"
+    >
+      <option value="">-- Seleziona marcatore avversario --</option>
+      {giocatoriAvversari.map((g) => (
+        <option key={g.id} value={g.id}>
+          #{g.numero_maglia} {(g.nome || "").trim()} {(g.cognome || "").trim()}
+        </option>
+      ))}
+    </select>
 
     {/* Portiere che subisce */}
     <select
