@@ -14,6 +14,7 @@ import 'react-quill/dist/quill.snow.css'
 interface MarcatoriEntry {
   periodo: number
   tempo_sec: number | null
+    avversario: boolean
   giocatore: { nome: string; cognome: string }
 }
 interface TiroRigore {
@@ -198,7 +199,7 @@ commento,
 
       const { data: marcatoriData, error: errMd } = await supabase
         .from('marcatori_alias')
-        .select('periodo, tempo_sec, giocatore_stagione_id, giocatore_nome, giocatore_cognome')
+        .select('periodo, tempo_sec, giocatore_stagione_id, giocatore_nome, giocatore_cognome, avversario_nome, avversario_cognome, avversario_numero_maglia, tipo_goal')
         .eq('partita_id', id)
 
       if (errMd) console.error(errMd)
@@ -368,13 +369,23 @@ setInizioSecondoTempo(
       }
 
       const marcatori: MarcatoriEntry[] = (marcatoriData || [])
-        .filter(m => m.giocatore_nome || m.giocatore_cognome)
+          .filter(m =>
+    m.giocatore_nome ||
+    m.giocatore_cognome ||
+    m.avversario_nome ||
+    m.avversario_cognome
+  )
        .map(m => ({
   periodo: m.periodo,
   tempo_sec: m.tempo_sec ?? null,
- giocatore: {
-  nome: m.giocatore_nome || '',
-  cognome: m.giocatore_cognome || ''
+    avversario: !!(m.avversario_nome || m.avversario_cognome),
+giocatore: {
+  nome: m.giocatore_nome || (m.avversario_nome
+    ? m.avversario_nome.charAt(0).toUpperCase() + m.avversario_nome.slice(1).toLowerCase()
+    : ''),
+  cognome: m.giocatore_cognome || (m.avversario_cognome
+    ? m.avversario_cognome.charAt(0).toUpperCase() + m.avversario_cognome.slice(1).toLowerCase()
+    : '')
 }
         }))
 
@@ -572,13 +583,15 @@ const goalOspiteArr = [
                 {partita.marcatori.map((m, i) => (
                   <div
                     key={i}
-                    className="flex items-center gap-3 border-b border-gray-200 pb-3 last:border-b-0 last:pb-0"
+                    className={`flex items-center gap-3 border-b border-gray-200 pb-3 last:border-b-0 last:pb-0 ${
+  m.avversario ? 'flex-row-reverse' : ''
+}`}
                   >
                     <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-base shadow-sm">
                       ⚽
                     </div>
 
-                    <div>
+                    <div className={m.avversario ? 'ml-auto text-right' : ''}>
                       <div className="text-[12px] font-medium text-gray-500">
   {m.periodo === 1
     ? '1° Tempo'
