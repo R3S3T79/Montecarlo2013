@@ -82,6 +82,7 @@ interface PartitaDettaglio {
   rigori_a: number
   rigori_b: number
   commento?: string | null
+  arbitro_nome?: string | null
   marcatori: MarcatoriEntry[]
 }
 
@@ -150,7 +151,47 @@ const canEdit = role === "admin" || role === "creator";
 
   const handleScreenshot = async () => {
     if (!containerRef.current) return
-    const canvas = await html2canvas(containerRef.current)
+
+    const immagini = Array.from(
+      containerRef.current.querySelectorAll('img')
+    )
+
+    await Promise.all(
+      immagini.map(
+        img =>
+          new Promise<void>(resolve => {
+            if (img.complete) {
+              resolve()
+              return
+            }
+
+            img.onload = () => resolve()
+            img.onerror = () => resolve()
+          })
+      )
+    )
+
+    
+
+   const canvas = await html2canvas(containerRef.current, {
+  useCORS: true,
+  allowTaint: false,
+  backgroundColor: '#ffffff',
+  onclone: (documentClone) => {
+    const elemento = documentClone.querySelector(
+      '[data-screenshot-partita]'
+    ) as HTMLElement | null
+
+    if (elemento) {
+      elemento.style.fontFamily = 'Arial, Helvetica, sans-serif'
+    }
+    documentClone
+  .querySelectorAll('[data-screenshot-hide]')
+  .forEach((el) => {
+    ;(el as HTMLElement).style.display = 'none'
+  })
+  },
+})
     const dataUrl = canvas.toDataURL('image/png')
     const link = document.createElement('a')
     link.href = dataUrl
@@ -189,7 +230,8 @@ const canEdit = role === "admin" || role === "creator";
 goal_b1, goal_b2, goal_b3, goal_b4,
 rigori_a, rigori_b,
 commento,
-          casa: squadra_casa_id ( id, nome, logo_url ),
+arbitro_nome,
+casa: squadra_casa_id ( id, nome, logo_url ),
           ospite: squadra_ospite_id ( id, nome, logo_url )
         `)
         .eq('id', id)
@@ -569,7 +611,11 @@ assist_cognome: m.assist_cognome || '',
 
   return (
     <div className="min-h-screen w-full px-[2px] pb-4 box-border">
-      <div className="w-full max-w-md mx-auto" ref={containerRef}>
+      <div
+  className="w-full max-w-md mx-auto"
+  ref={containerRef}
+  data-screenshot-partita
+>
 
         {/* 1. Data partita */}
         <div className="mb-3 flex items-center rounded-xl border border-white/20 bg-black/65 px-4 py-3 shadow-[0_6px_18px_rgba(0,0,0,0.35)]">
@@ -595,7 +641,7 @@ assist_cognome: m.assist_cognome || '',
                 />
               )}
 
-              <div className="w-full truncate text-center text-[15px] font-extrabold text-[#181818]">
+              <div className="w-full min-w-0 break-words text-center text-[15px] font-extrabold leading-tight text-[#181818]">
                 {partita.casa.nome}
               </div>
 
@@ -623,7 +669,7 @@ assist_cognome: m.assist_cognome || '',
                 />
               )}
 
-              <div className="w-full truncate text-center text-[15px] font-extrabold text-[#181818]">
+              <div className="w-full min-w-0 break-words text-center text-[15px] font-extrabold leading-tight text-[#181818]">
                 {partita.ospite.nome}
               </div>
 
@@ -634,6 +680,11 @@ assist_cognome: m.assist_cognome || '',
           <div className="flex justify-center pb-4">
             <div className="rounded-full border border-gray-300 bg-white px-4 py-1 text-xs font-semibold text-gray-700 shadow-sm">
               ⏱ Terminata
+              {partita.arbitro_nome && (
+  <div className="mt-1 text-center text-[12px] font-semibold text-gray-600">
+    Arbitro: {partita.arbitro_nome}
+  </div>
+)}
             </div>
           </div>
         </div>
@@ -804,7 +855,7 @@ assist_cognome: m.assist_cognome || '',
                             {g.numero_maglia ?? '-'}
                           </div>
 
-                          <div className="truncate text-[14px] font-bold text-[#181818]">
+                          <div className="text-[14px] font-bold text-[#181818]">
                             {g.cognome} {g.nome}
                           </div>
                         </div>
@@ -820,7 +871,7 @@ assist_cognome: m.assist_cognome || '',
                       </div>
 
                       {entrante && (
-                        <div className="flex min-h-[28px] items-center justify-between gap-3">
+                        <div className="flex min-h-[32px] items-center justify-between gap-3">
                           <div className="flex min-w-0 items-center gap-3">
                             <div className="w-7 shrink-0 text-center text-[13px] font-normal text-gray-500">
   {entrante.numero_maglia ?? '-'}
@@ -867,7 +918,7 @@ assist_cognome: m.assist_cognome || '',
                     <div className="w-7 shrink-0 text-center text-[13px] font-extrabold text-gray-500">
                       {g.numero_maglia ?? '-'}
                     </div>
-                    <div className="truncate text-[14px] font-bold text-[#181818]">
+                    <div className="text-[14px] font-bold text-[#181818]">
                       {g.cognome} {g.nome}
                     </div>
                   </div>
@@ -972,7 +1023,10 @@ assist_cognome: m.assist_cognome || '',
         </div>
 
         {/* 7. Commento / Telecronaca */}
-        <div className="mb-4 overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_22px_rgba(0,0,0,0.38)]">
+        <div
+  data-screenshot-hide
+  className="mb-4 overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_22px_rgba(0,0,0,0.38)]"
+>
 
           <div className="relative flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 text-white">
             <span className="text-xl">💬</span>
