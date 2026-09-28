@@ -23,9 +23,12 @@ interface TiroRigore {
 
 interface Cartellino {
   id: string;
-  giocatore_stagione_id: string;
+  giocatore_stagione_id: string | null;
+  giocatore_avversario_id: string | null;
+  squadra_id?: string;
   tipo: "giallo" | "rosso";
   periodo: number;
+  tempo_sec: number;
 }
 
 export default function EditPartitaGiocata() {
@@ -58,6 +61,15 @@ const [tiriRigori, setTiriRigori] = useState<TiroRigore[]>([]);
 const [rigoriDaEliminare, setRigoriDaEliminare] = useState<string[]>([]);
 const [cartellini, setCartellini] = useState<Cartellino[]>([]);
 const [cartelliniDaEliminare, setCartelliniDaEliminare] = useState<string[]>([]);
+const [giocatoriAvversari, setGiocatoriAvversari] = useState<
+  {
+    id: string;
+    nome: string;
+    cognome: string;
+    numero_maglia: number;
+    squadra_id: string;
+  }[]
+>([]);
   
 
 
@@ -164,11 +176,28 @@ const { data: minutiSupplementari } = await supabase
   // 🔹 Carico i cartellini già registrati nella partita
 const { data: cartelliniPartita } = await supabase
   .from("cartellini")
-  .select("id, giocatore_stagione_id, tipo, periodo")
+  .select("id, giocatore_stagione_id, giocatore_avversario_id, tipo, periodo, tempo_sec")
   .eq("partita_id", id);
 
 if (cartelliniPartita) {
-  setCartellini(cartelliniPartita as Cartellino[]);
+  setCartellini(
+    cartelliniPartita.map((c) => ({
+      ...c,
+      squadra_id: c.giocatore_stagione_id
+  ? p.squadra_casa_id
+  : p.squadra_ospite_id,
+    })) as Cartellino[]
+  );
+}
+
+const { data: avversariPartita } = await supabase
+  .from("giocatori_avversari_partita")
+  .select("id, nome, cognome, numero_maglia, squadra_id")
+  .eq("partita_id", id)
+  .order("numero_maglia", { ascending: true });
+
+if (avversariPartita) {
+  setGiocatoriAvversari(avversariPartita);
 }
 
 setHaSupplementari(!!minutiSupplementari?.length);
@@ -487,7 +516,10 @@ if (cartelliniDaEliminare.length > 0) {
 
 // 2. Aggiorno o inserisco i cartellini
 for (const cartellino of cartellini) {
-  if (!cartellino.giocatore_stagione_id) continue;
+  if (
+  !cartellino.giocatore_stagione_id &&
+  !cartellino.giocatore_avversario_id
+) continue;
 
   if (cartellino.id.startsWith("nuovo-")) {
     await supabase
@@ -496,16 +528,21 @@ for (const cartellino of cartellini) {
   partita_id: id!,
   stagione_id: stagioneId,
   giocatore_stagione_id: cartellino.giocatore_stagione_id,
-  tipo: cartellino.tipo,
-  periodo: cartellino.periodo,
+giocatore_avversario_id: cartellino.giocatore_avversario_id,
+tipo: cartellino.tipo,
+periodo: cartellino.periodo,
+tempo_sec: cartellino.tempo_sec,
 });
   } else {
     await supabase
       .from("cartellini")
       .update({
-        giocatore_stagione_id: cartellino.giocatore_stagione_id,
-        tipo: cartellino.tipo,
-      })
+  giocatore_stagione_id: cartellino.giocatore_stagione_id,
+  giocatore_avversario_id: cartellino.giocatore_avversario_id,
+  tipo: cartellino.tipo,
+  periodo: cartellino.periodo,
+  tempo_sec: cartellino.tempo_sec,
+})
       .eq("id", cartellino.id);
   }
 }
@@ -853,9 +890,11 @@ for (const cartellino of cartellini) {
         ...prev,
         {
   id: `nuovo-${Date.now()}`,
-  giocatore_stagione_id: "",
+  giocatore_stagione_id: null,
+  giocatore_avversario_id: null,
   tipo: "giallo",
   periodo: 1,
+  tempo_sec: 0,
 },
       ])
     }
@@ -875,31 +914,81 @@ for (const cartellino of cartellini) {
           key={cartellino.id}
           className="flex items-center gap-2"
         >
+
           <select
-            value={cartellino.giocatore_stagione_id}
-            onChange={(e) => {
-              const gid = e.target.value;
+  value={cartellino.squadra_id || ""}
+  onChange={(e) => {
+    const squadraId = e.target.value;
 
-              setCartellini((prev) =>
-                prev.map((c) =>
-                  c.id === cartellino.id
-                    ? { ...c, giocatore_stagione_id: gid }
-                    : c
-                )
-              );
-            }}
-            className="flex-1 p-2 border border-gray-300 rounded text-sm"
-          >
-            <option value="">-- Seleziona giocatore --</option>
+    setCartellini((prev) =>
+      prev.map((c) =>
+        c.id === cartellino.id
+          ? {
+              ...c,
+              squadra_id: squadraId,
+              giocatore_stagione_id: null,
+              giocatore_avversario_id: null,
+            }
+          : c
+      )
+    );
+  }}
+  className="p-2 border border-gray-300 rounded text-sm"
+>
+  <option value="">-- Squadra --</option>
+  <option value={squadraCasa}>{getNomeSquadra(squadraCasa)}</option>
+  <option value={squadraOspite}>{getNomeSquadra(squadraOspite)}</option>
+</select>
 
-            {giocatoriStagione
-              .filter((g) => formazione.includes(g.id))
-              .map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.cognome} {g.nome}
-                </option>
-              ))}
-          </select>
+        <select
+  value={
+    cartellino.giocatore_stagione_id ||
+    cartellino.giocatore_avversario_id ||
+    ""
+  }
+  onChange={(e) => {
+    const giocatoreId = e.target.value;
+
+    const squadraMontecarlo = isMontecarlo(
+  cartellino.squadra_id || ""
+);
+
+    setCartellini((prev) =>
+      prev.map((c) =>
+        c.id === cartellino.id
+          ? squadraMontecarlo
+            ? {
+    ...c,
+    giocatore_stagione_id: giocatoreId || null,
+    giocatore_avversario_id: null,
+  }
+            : {
+                ...c,
+                giocatore_stagione_id: null,
+                giocatore_avversario_id: giocatoreId || null,
+              }
+          : c
+      )
+    );
+  }}
+  className="flex-1 p-2 border border-gray-300 rounded text-sm"
+>
+  <option value="">-- Seleziona giocatore --</option>
+
+{!isMontecarlo(cartellino.squadra_id || "")
+  ? giocatoriAvversari.map((g) => (
+        <option key={g.id} value={g.id}>
+          #{g.numero_maglia} {g.cognome} {g.nome}
+        </option>
+      ))
+    : giocatoriStagione
+        .filter((g) => formazione.includes(g.id))
+        .map((g) => (
+          <option key={g.id} value={g.id}>
+            {g.cognome} {g.nome}
+          </option>
+        ))}
+</select>
 
           <select
             value={cartellino.tipo}
@@ -944,6 +1033,25 @@ for (const cartellino of cartellini) {
     </>
   )}
 </select>
+
+<input
+  type="number"
+  min="0"
+  value={Math.floor(cartellino.tempo_sec / 60)}
+  onChange={(e) => {
+    const minuto = Math.max(0, Number(e.target.value) || 0);
+
+    setCartellini((prev) =>
+      prev.map((c) =>
+        c.id === cartellino.id
+          ? { ...c, tempo_sec: minuto * 60 }
+          : c
+      )
+    );
+  }}
+  className="w-20 p-2 border border-gray-300 rounded text-sm"
+  placeholder="Min."
+/>
           <button
   type="button"
   onClick={() => {
