@@ -150,10 +150,12 @@ const [tiriRigori, setTiriRigori] = useState<
 // ========================
 // Stati cartellini
 // ========================
+const [squadraCartellino, setSquadraCartellino] = useState<string>("");
 const [cartellini, setCartellini] = useState<
   {
     id?: string;
-    giocatore_stagione_id: string;
+    giocatore_stagione_id: string | null;
+giocatore_avversario_id?: string | null;
     tipo: "giallo" | "rosso";
     periodo: number;
     tempo_sec: number;
@@ -341,7 +343,7 @@ if (rigoriErr) {
     // 7) Cartellini
 const { data: cartelliniDB, error: cartelliniErr } = await supabase
   .from("cartellini")
-  .select("id, giocatore_stagione_id, tipo, periodo, tempo_sec")
+  .select("id, giocatore_stagione_id, giocatore_avversario_id, tipo, periodo, tempo_sec")
   .eq("partita_id", p.id)
   .order("created_at", { ascending: true });
 
@@ -2556,8 +2558,9 @@ const modificaTipoGoal = async (
 // CARTELLINI - Salvataggio
 // =====================
 const salvaCartellino = async (
-  giocatoreStagioneId: string,
-  tipo: "giallo" | "rosso"
+  giocatoreId: string,
+  tipo: "giallo" | "rosso",
+  avversario: boolean = false
 ) => {
   if (!partita || periodoCartellino === null) return;
 
@@ -2575,12 +2578,13 @@ const salvaCartellino = async (
     .insert({
       partita_id: partita.id,
       stagione_id: partita.stagione_id,
-      giocatore_stagione_id: giocatoreStagioneId,
+      giocatore_stagione_id: avversario ? null : giocatoreId,
+      giocatore_avversario_id: avversario ? giocatoreId : null,
       tipo,
       periodo: periodoCartellino,
       tempo_sec: tempoSec,
     })
-    .select("id, giocatore_stagione_id, tipo, periodo, tempo_sec")
+    .select("id, giocatore_stagione_id, giocatore_avversario_id, tipo, periodo, tempo_sec")
     .single();
 
   if (error) {
@@ -3954,9 +3958,19 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
   </div>
 )}
 
-{/* Sezione gestione cartellini */}
-{(tipoEvento === "giallo" || tipoEvento === "rosso") && (
-  <div className="space-y-3">
+{/* Sezione gestione cartellini */} 
+{(tipoEvento === "giallo" || tipoEvento === "rosso") && ( 
+  <div className="space-y-3"> 
+      {/* Scelta squadra cartellino */} 
+    <select 
+      value={squadraCartellino} 
+      onChange={(e) => setSquadraCartellino(e.target.value)} 
+      className="w-full border rounded px-2 py-2" 
+    > 
+      <option value="">-- Seleziona squadra --</option> 
+      <option value={squadraCasa?.id || ""}>{squadraCasa?.nome}</option> 
+      <option value={squadraOspite?.id || ""}>{squadraOspite?.nome}</option> 
+    </select>
         {/* Scelta periodo cartellino */}
     <select
       value={periodoCartellino ?? ""}
@@ -4000,6 +4014,7 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
     <select
       value=""
       disabled={
+  !squadraCartellino ||
   periodoCartellino === null ||
   !minutoCartellino ||
   Number(minutoCartellino) < 1
@@ -4009,31 +4024,43 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
 
         if (!giocatoreId) return;
 
-        await salvaCartellino(giocatoreId, tipoEvento);
+        await salvaCartellino(
+  giocatoreId,
+  tipoEvento as "giallo" | "rosso",
+  squadraCartellino !== MONTECARLO_ID
+);
 
         setTipoEvento(null);
+        setSquadraCartellino("");
       }}
       className={`w-full border rounded px-2 py-2 ${
-  periodoCartellino === null ||
-  !minutoCartellino ||
-  Number(minutoCartellino) < 1
+  !squadraCartellino ||
+periodoCartellino === null ||
+!minutoCartellino ||
+Number(minutoCartellino) < 1
     ? "bg-gray-100 cursor-not-allowed"
     : ""
 }`}
     >
-      <option value="">-- Seleziona giocatore --</option>
+            <option value="">-- Seleziona giocatore --</option>
 
-      {giocatori
-        .filter((g) => convocati.includes(g.id))
-        .map((g) => (
-          <option key={g.id} value={g.id}>
-            {(g.cognome || "").trim()} {(g.nome || "").trim()}
-          </option>
-        ))}
-    </select>
-  </div>
+      {squadraCartellino === MONTECARLO_ID
+        ? giocatori
+            .filter((g) => convocati.includes(g.id))
+            .map((g) => (
+              <option key={g.id} value={g.id}>
+                {(g.cognome || "").trim()} {(g.nome || "").trim()}
+              </option>
+            ))
+        : giocatoriAvversari.map((g) => (
+            <option key={g.id} value={g.id}>
+              #{g.numero_maglia} {(g.nome || "").trim()} {(g.cognome || "").trim()}
+            </option>
+          ))}
+        </select> 
+  </div> 
 )}
-
+ 
 {/* Sezione gestione goal */}
 {tipoEvento === "gol" && tempo && (
   <div className="space-y-6">
