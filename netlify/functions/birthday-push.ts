@@ -82,11 +82,7 @@ export const handler: Handler = async () => {
 
     const today = `${year}-${month}-${day}`;
 
-    // =======================================
-// TEST TEMPORANEO - CONTROLLO ORARIO DISATTIVATO
-// =======================================
-
-/*
+ 
 if (hour !== "08") {
   console.log(
     `Birthday push ignorata: in Italia sono le ore ${hour}`
@@ -99,7 +95,6 @@ if (hour !== "08") {
     italianHour: hour,
   });
 }
-*/
 
     // =======================================
     // 5. RECUPERA STAGIONE CORRENTE
