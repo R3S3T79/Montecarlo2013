@@ -1640,7 +1640,7 @@ function getBirthdayBackground(targetDate: Date, now: Date) {
   const diffDays = (targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
 
   // 🎂 Giorno del compleanno → immagine torta
-  if (isSameCalendarDay(now, targetDate) || diffDays <= 0.3) {
+  if (isSameCalendarDay(now, targetDate)) {
     return {
       backgroundImage: "url('/Images/Torta.jpeg')",
       backgroundSize: "cover",

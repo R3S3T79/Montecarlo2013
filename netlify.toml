@@ -63,3 +63,7 @@ envFiles = [".env"]
   cron = "5 21 * * *"
   path = "/.netlify/functions/update-partite-classifica"
 
+[[scheduled]]
+  name = "birthday-push"
+  cron = "0 6,7 * * *"
+  path = "/.netlify/functions/birthday-push"
