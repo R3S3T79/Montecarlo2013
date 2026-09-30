@@ -82,18 +82,24 @@ export const handler: Handler = async () => {
 
     const today = `${year}-${month}-${day}`;
 
-    if (hour !== "08") {
-      console.log(
-        `Birthday push ignorata: in Italia sono le ore ${hour}`
-      );
+    // =======================================
+// TEST TEMPORANEO - CONTROLLO ORARIO DISATTIVATO
+// =======================================
 
-      return json(200, {
-        success: true,
-        skipped: true,
-        reason: "Fuori dall'orario previsto",
-        italianHour: hour,
-      });
-    }
+/*
+if (hour !== "08") {
+  console.log(
+    `Birthday push ignorata: in Italia sono le ore ${hour}`
+  );
+
+  return json(200, {
+    success: true,
+    skipped: true,
+    reason: "Fuori dall'orario previsto",
+    italianHour: hour,
+  });
+}
+*/
 
     // =======================================
     // 5. RECUPERA STAGIONE CORRENTE
