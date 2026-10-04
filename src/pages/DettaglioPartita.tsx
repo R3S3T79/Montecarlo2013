@@ -621,7 +621,15 @@ assist_cognome: m.assist_cognome || '',
       '',
     tipoCartellino: c.tipo,
   })),
-].sort((a, b) => (a.tempo_sec ?? 0) - (b.tempo_sec ?? 0))
+].sort((a, b) => {
+  const secondoA = a.tempo_sec === null
+    ? Number.MAX_SAFE_INTEGER
+    : a.periodo === 1 ? a.tempo_sec : 35 * 60 + a.tempo_sec - inizioSecondoTempo
+  const secondoB = b.tempo_sec === null
+    ? Number.MAX_SAFE_INTEGER
+    : b.periodo === 1 ? b.tempo_sec : 35 * 60 + b.tempo_sec - inizioSecondoTempo
+  return secondoA - secondoB
+})
 
   return (
     <div className="min-h-screen w-full px-[2px] pb-4 box-border">
