@@ -1018,6 +1018,7 @@ assist_cognome: m.assist_cognome || '',
         )}
 
         {/* 6. Supplementari */}
+        {supplementariGiocati && (
         <div className="mb-4 overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_22px_rgba(0,0,0,0.38)]">
 
           <div className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 text-white">
@@ -1043,6 +1044,7 @@ assist_cognome: m.assist_cognome || '',
             </span>
           </div>
         </div>
+        )}
 
         {/* 7. Commento / Telecronaca */}
         <div
