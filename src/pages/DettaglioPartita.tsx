@@ -245,7 +245,7 @@ casa: squadra_casa_id ( id, nome, logo_url ),
 
       const { data: marcatoriData, error: errMd } = await supabase
         .from('marcatori_alias')
-        .select('periodo, tempo_sec, giocatore_stagione_id, giocatore_nome, giocatore_cognome, avversario_nome, avversario_cognome, avversario_numero_maglia, tipo_goal, assist_giocatore_stagione_id, assist_nome, assist_cognome')
+        .select('periodo, tempo_sec, giocatore_stagione_id, squadra_segnante_id, giocatore_nome, giocatore_cognome, avversario_nome, avversario_cognome, avversario_numero_maglia, tipo_goal, assist_giocatore_stagione_id, assist_nome, assist_cognome')
         .eq('partita_id', id)
 
       if (errMd) console.error(errMd)
@@ -293,6 +293,18 @@ setCartellini(cartelliniData || [])
         console.error('Errore caricamento formazione:', errPresenze)
       }
 
+      const idsGiocatori = (presenzeData || []).map(p => p.giocatore_stagione_id)
+      const { data: maglieData, error: errMaglie } = idsGiocatori.length > 0
+        ? await supabase
+            .from('giocatori_stagioni')
+            .select('id, numero_maglia')
+            .in('id', idsGiocatori)
+        : { data: [], error: null }
+
+      if (errMaglie) {
+        console.error('Errore caricamento numeri maglia:', errMaglie)
+      }
+
 
 
       const { data: minutiData, error: errMinuti } = await supabase
@@ -337,7 +349,7 @@ setInizioSecondoTempo(
           giocatore_stagione_id: p.giocatore_stagione_id,
                    nome: p.nome || '',
           cognome: p.cognome || '',
-          numero_maglia: p.numero_maglia ?? null,
+          numero_maglia: p.numero_maglia ?? (maglieData || []).find(g => g.id === p.giocatore_stagione_id)?.numero_maglia ?? null,
           titolare: !!p.titolare,
           entrata_sec: entrate.length > 0 ? Math.min(...entrate) : null,
           uscita_sec: uscite.length > 0 ? Math.max(...uscite) : null,
@@ -454,7 +466,9 @@ setInizioSecondoTempo(
   .map(m => ({
     periodo: m.periodo,
     tempo_sec: m.tempo_sec ?? null,
-    avversario: !!(m.avversario_nome || m.avversario_cognome),
+    avversario: m.squadra_segnante_id
+      ? m.squadra_segnante_id === (pd as any).ospite.id
+      : !!(m.avversario_nome || m.avversario_cognome) === ((pd as any).casa.id === 'a16a8645-9f86-41d9-a81f-a92931f1cc67'),
     giocatore: {
   nome: m.giocatore_nome || (m.avversario_nome
     ? m.avversario_nome.charAt(0).toUpperCase() + m.avversario_nome.slice(1).toLowerCase()
@@ -596,7 +610,7 @@ assist_cognome: m.assist_cognome || '',
     tipoEvento: 'cartellino' as const,
     periodo: c.periodo,
     tempo_sec: c.tempo_sec ?? null,
-    avversario: !!c.giocatore_avversario_id,
+    avversario: !!c.giocatore_avversario_id === (partita.casa.id === 'a16a8645-9f86-41d9-a81f-a92931f1cc67'),
     nome:
       c.giocatore_avversario?.nome ||
       c.giocatore?.nome ||
