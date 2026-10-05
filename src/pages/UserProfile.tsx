@@ -148,7 +148,7 @@ export default function UserProfile(): JSX.Element {
     // 1) user_profiles: scrivo SEMPRE i campi di profilo + username/email/role
     const upUpdates = {
       user_id: user.id,
-      role: profile.role, // visibile, non editabile, ma sincronizzato
+     
       email: user.email || profile.email || "",
       username: profile.username ?? "",
       first_name: toNullIfEmpty(profile.first_name),
@@ -185,9 +185,8 @@ export default function UserProfile(): JSX.Element {
           const { error: pendErr } = await supabase
             .from("pending_users")
             .update({
-              username: profile.username ?? "",
-              role: profile.role, // testo o enum lato DB? Se è text va benissimo
-            })
+  username: profile.username ?? "",
+})
             .eq("email", profile.email);
 
           if (pendErr) {
