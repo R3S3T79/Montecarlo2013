@@ -651,8 +651,20 @@ assist_cognome: m.assist_cognome || '',
         </div>
 
         {/* 2. Risultato principale */}
-        <div className="mb-4 overflow-hidden rounded-2xl border border-white/60 bg-white/95 shadow-[0_10px_28px_rgba(0,0,0,0.42)]">
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-5">
+<div className="mb-4 overflow-hidden rounded-2xl border border-white/60 bg-white/95 shadow-[0_10px_28px_rgba(0,0,0,0.42)]">
+
+  <div className="flex justify-center pt-4">
+    <div className="rounded-full border border-gray-300 bg-white px-4 py-1 text-xs font-semibold text-gray-700 shadow-sm">
+      ⏱ Terminata
+      {partita.arbitro_nome && (
+        <div className="mt-1 text-center text-[12px] font-semibold text-gray-600">
+          Arbitro: {partita.arbitro_nome}
+        </div>
+      )}
+    </div>
+  </div>
+
+  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-5">
 
             <div className="flex min-w-0 flex-col items-center">
               {partita.casa.logo_url && (
@@ -699,40 +711,11 @@ assist_cognome: m.assist_cognome || '',
             </div>
           </div>
 
-          <div className="flex justify-center pb-4">
-            <div className="rounded-full border border-gray-300 bg-white px-4 py-1 text-xs font-semibold text-gray-700 shadow-sm">
-              ⏱ Terminata
-              {partita.arbitro_nome && (
-  <div className="mt-1 text-center text-[12px] font-semibold text-gray-600">
-    Arbitro: {partita.arbitro_nome}
-  </div>
-)}
-            </div>
-          </div>
-        </div>
+          {/* ========================= */}
+          {/* 3. SINTESI PARTITA */}
+          {/* ========================= */}
 
-             {/* ========================= */}
-        {/* 3. SINTESI PARTITA */}
-        {/* ========================= */}
-
-        <div className="mb-4 overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_22px_rgba(0,0,0,0.38)]">
-
-          <div className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 text-white">
-            <span className="text-xl">📋</span>
-            <span className="font-extrabold uppercase tracking-wide">
-              Sintesi partita
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 border-b border-gray-200 bg-gray-50 px-4 py-3">
-            <div className="text-left text-sm font-extrabold text-[#181818]">
-              {partita.casa.nome}
-            </div>
-
-            <div className="text-right text-sm font-extrabold text-[#181818]">
-              {partita.ospite.nome}
-            </div>
-          </div>
+          <div className="h-2 border-t border-b border-gray-200 bg-gray-50" />
 
           <div className="divide-y divide-gray-200">
             {eventiSintesi.length > 0 ? (
@@ -836,8 +819,8 @@ assist_cognome: m.assist_cognome || '',
             <div className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 text-white">
               <span className="text-xl">👕</span>
               <span className="font-extrabold uppercase tracking-wide">
-                Formazione e sostituzioni
-              </span>
+  Montecarlo
+</span>
             </div>
 
             <div className="divide-y divide-gray-200">
@@ -1047,8 +1030,10 @@ assist_cognome: m.assist_cognome || '',
         )}
 
         {/* 7. Commento / Telecronaca */}
-        <div
-  data-screenshot-hide
+<div
+  {...(!partita.commento || partita.commento.trim() === ''
+    ? { 'data-screenshot-hide': true }
+    : {})}
   className="mb-4 overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_22px_rgba(0,0,0,0.38)]"
 >
 
