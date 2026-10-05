@@ -77,24 +77,17 @@ async function syncSubscriptionWithCurrentUser(
       );
     }
 
-    const { error } = await supabase
-      .from("push_subscriptions")
-      .upsert(
-        {
-          user_id: user.id,
-          endpoint: subscription.endpoint,
-          p256dh:
-            subscriptionJson.keys.p256dh,
-          auth:
-            subscriptionJson.keys.auth,
-          user_agent: navigator.userAgent,
-          updated_at:
-            new Date().toISOString(),
-        },
-        {
-          onConflict: "endpoint",
-        }
-      );
+    const { error } = await supabase.rpc(
+      "sync_push_subscription",
+      {
+        p_endpoint: subscription.endpoint,
+        p_p256dh:
+          subscriptionJson.keys.p256dh,
+        p_auth:
+          subscriptionJson.keys.auth,
+        p_user_agent: navigator.userAgent,
+      }
+    );
 
     if (error) {
       throw error;
