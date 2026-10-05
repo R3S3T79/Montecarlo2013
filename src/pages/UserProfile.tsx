@@ -147,8 +147,6 @@ export default function UserProfile(): JSX.Element {
 
     // 1) user_profiles: scrivo SEMPRE i campi di profilo + username/email/role
     const upUpdates = {
-      user_id: user.id,
-     
       email: user.email || profile.email || "",
       username: profile.username ?? "",
       first_name: toNullIfEmpty(profile.first_name),
