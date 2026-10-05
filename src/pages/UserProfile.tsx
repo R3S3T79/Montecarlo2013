@@ -160,7 +160,8 @@ export default function UserProfile(): JSX.Element {
 
     const { data: upSaved, error: upSaveErr } = await supabase
       .from("user_profiles")
-      .upsert(upUpdates, { onConflict: "user_id" })
+      .update(upUpdates)
+      .eq("user_id", user.id)
       .select("role, email, username, first_name, last_name, date_of_birth, phone, avatar_url")
       .single();
 
