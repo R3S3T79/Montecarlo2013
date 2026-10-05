@@ -169,33 +169,7 @@ export default function UserProfile(): JSX.Element {
       return;
     }
 
-    // 2) pending_users: prova ad aggiornare username/role SOLO se la riga esiste (by email)
-    //    (non blocco se fallisce per policy)
-    if (profile.email) {
-      try {
-        // verifica esistenza
-        const { data: exists, error: chkErr } = await supabase
-          .from("pending_users")
-          .select("email")
-          .eq("email", profile.email)
-          .maybeSingle();
-
-        if (!chkErr && exists?.email) {
-          const { error: pendErr } = await supabase
-            .from("pending_users")
-            .update({
-  username: profile.username ?? "",
-})
-            .eq("email", profile.email);
-
-          if (pendErr) {
-            console.warn("[UserProfile] pending_users update skipped:", pendErr.message);
-          }
-        }
-      } catch (e) {
-        console.warn("[UserProfile] pending_users update not allowed:", (e as any)?.message);
-      }
-    }
+    
 
     // aggiorna stato locale con quanto salvato
     setProfile((p) => ({
