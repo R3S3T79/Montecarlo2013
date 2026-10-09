@@ -431,11 +431,28 @@ const perc = (n: number) => (totale > 0 ? (n / totale) * 100 : 0);
               <div className="p-3">
                 <ul className="space-y-2">
                   {precedenti.map((p) => {
-                    const d = new Date(p.data_ora).toLocaleDateString('it-IT', {
+                                        const d = new Date(p.data_ora).toLocaleDateString('it-IT', {
                       day: '2-digit',
                       month: '2-digit',
                       year: '2-digit',
                     });
+
+                    const isMontecarloCasa = p.squadra_casa === nomeMontecarlo;
+
+                    const goalMC = isMontecarloCasa
+                      ? p.goal_montecarlo_tot ?? 0
+                      : p.goal_avversaria_tot ?? 0;
+
+                    const goalAvv = isMontecarloCasa
+                      ? p.goal_avversaria_tot ?? 0
+                      : p.goal_montecarlo_tot ?? 0;
+
+                    const esito =
+                      goalMC > goalAvv
+                        ? "Vittoria"
+                        : goalMC < goalAvv
+                        ? "Sconfitta"
+                        : "Pareggio";
 
                     return (
                       <li
@@ -469,18 +486,18 @@ const perc = (n: number) => (totale > 0 ? (n / totale) * 100 : 0);
 
                         </div>
 
-                        {p.esito && (
+                        {esito && (
                           <div className="border-t border-gray-100 px-3 py-2 text-center">
                             <span
                               className={`inline-flex rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide ${
-                                p.esito.toLowerCase().includes("vitt")
+                                esito.toLowerCase().includes("vitt")
                                   ? "bg-green-100 text-green-700"
-                                  : p.esito.toLowerCase().includes("sconf")
+                                  : esito.toLowerCase().includes("sconf")
                                   ? "bg-red-100 text-red-700"
                                   : "bg-gray-200 text-gray-600"
                               }`}
                             >
-                              {p.esito}
+                              {esito}
                             </span>
                           </div>
                         )}

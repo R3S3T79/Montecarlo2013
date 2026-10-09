@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Bell,
+  Bug,
   CheckCircle,
   Clock,
   KeyRound,
@@ -547,6 +548,13 @@ const sendTestPush = async () => {
             </div>
 
             <div className="flex flex-wrap gap-2">
+              <Link
+  to="/admin-segnalazioni"
+  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-neutral-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-700"
+>
+  <Bug size={17} />
+  Segnalazioni
+</Link>
               <Link
   to="/admin-notifiche"
   className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-neutral-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-700"

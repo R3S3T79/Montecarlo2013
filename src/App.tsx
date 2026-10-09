@@ -89,10 +89,12 @@ import EditSquadra from "./pages/EditSquadra";
 
 // admin panel
 import AdminPanel from "./pages/AdminPanel";
+import AdminSegnalazioni from "./pages/AdminSegnalazioni";
 import AdminNotizie from "./pages/AdminNotizie"; // <--- aggiungi import
 import AdminNotifiche from "./pages/AdminNotifiche";
 import NuovoUtente from "./pages/NuovoUtente"; // nuova pagina
 import Convocazioni from "./pages/Convocazioni";
+import Segnalazioni from "./pages/Segnalazioni";
 
 
 // fallback
@@ -145,6 +147,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/profilo" element={<UserProfile />} />
           <Route path="/galleria" element={<Galleria />} />
+          <Route path="/segnalazioni" element={<Segnalazioni />} />
 
 
           {/* Calendario e partite */}
@@ -224,6 +227,7 @@ export default function App() {
 
           {/* Admin Panel */}
           <Route path="/admin-panel" element={<AdminPanel />} />
+          <Route path="/admin-segnalazioni" element={<AdminSegnalazioni />} />
           <Route path="/admin-notizie" element={<AdminNotizie />} />
           <Route path="/admin-notifiche" element={<AdminNotifiche />} />
           <Route path="/nuovo-utente" element={<NuovoUtente />} /> {/* nuova */}

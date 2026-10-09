@@ -278,6 +278,52 @@ else setRole(UserRole.Authenticated);
 
 const canAdmin = role === UserRole.Admin;
 const canCreator = role === UserRole.Creator;
+const [nuoveSegnalazioni, setNuoveSegnalazioni] = useState(0);
+
+useEffect(() => {
+  if (!canCreator) {
+    setNuoveSegnalazioni(0);
+    return;
+  }
+
+  const caricaNuoveSegnalazioni = async () => {
+    const { count, error } = await supabase
+      .from("segnalazioni")
+      .select("*", { count: "exact", head: true })
+      .eq("stato", "Nuova");
+
+    if (error) {
+      console.error(
+        "Errore conteggio nuove segnalazioni:",
+        error
+      );
+      return;
+    }
+
+    setNuoveSegnalazioni(count ?? 0);
+  };
+
+    void caricaNuoveSegnalazioni();
+
+  const channel = supabase
+    .channel("creator-segnalazioni-nuove")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "segnalazioni",
+      },
+      () => {
+        void caricaNuoveSegnalazioni();
+      }
+    )
+    .subscribe();
+
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}, [canCreator]);
 
 
   // Gruppi link — PRIMA voce: "Home"
@@ -657,10 +703,16 @@ const canCreator = role === UserRole.Creator;
   to={link.to}
   onClick={() => setDrawerOpen(false)}   // ✅ forza chiusura anche se stessa pagina
   className={({ isActive }) =>
-    `block p-2 rounded ${isActive ? 'bg-white text-gray-800' : 'hover:bg-white/20'}`
+    `flex items-center justify-between p-2 rounded ${isActive ? 'bg-white text-gray-800' : 'hover:bg-white/20'}`
   }
 >
-  {link.label}
+  <span>{link.label}</span>
+
+  {link.to === '/admin-panel' && canCreator && nuoveSegnalazioni > 0 && (
+    <span className="ml-2 flex min-w-[20px] h-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-bold text-white">
+      {nuoveSegnalazioni}
+    </span>
+  )}
 </NavLink>
 
               {link.to === '/' && <hr className="border-t border-white/20 my-2" />}
@@ -677,6 +729,20 @@ const canCreator = role === UserRole.Creator;
     Montecarlo 2013 v{appVersion}
   </div>
 )}
+
+<NavLink
+  to="/segnalazioni"
+  onClick={() => setDrawerOpen(false)}
+  className={({ isActive }) =>
+    `w-full flex items-center justify-center gap-2 p-2 rounded text-sm transition ${
+      isActive
+        ? 'bg-red-600 text-white'
+        : 'bg-white/10 hover:bg-white/20 text-white'
+    }`
+  }
+>
+  Segnalazioni
+</NavLink>
 
 {!appInstallata && (
   <button
