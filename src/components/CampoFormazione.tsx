@@ -74,6 +74,32 @@ const MODULO_4_4_2: SlotPos[] = [
 ];
 
 // ========================================
+// 4-5-1
+// ========================================
+
+const MODULO_4_5_1: SlotPos[] = [
+  // Portiere
+  { x: 46, y: 88 },
+
+  // Difensori
+  { x: 15, y: 72 },
+  { x: 36, y: 72 },
+  { x: 56, y: 72 },
+  { x: 77, y: 72 },
+
+  // Centrocampisti
+  { x: 10, y: 48 },
+  { x: 30, y: 52 },
+  { x: 46, y: 46 },
+  { x: 62, y: 52 },
+  { x: 82, y: 48 },
+
+  // Attaccante
+  { x: 46, y: 22 },
+];
+
+
+// ========================================
 // 4-3-3
 // ========================================
 
@@ -198,8 +224,8 @@ export default function CampoFormazione({
   });
 
   const [modulo, setModulo] = useState<
-    "4-4-2" | "4-3-3" | "3-5-2" | "3-4-3" | "4-2-3-1"
-  >("4-4-2");
+  "4-4-2" | "4-5-1" | "4-3-3" | "3-5-2" | "3-4-3" | "4-2-3-1"
+  >("4-5-1");
 
   // ========================================
   // SLOT DEL MODULO
@@ -209,6 +235,10 @@ export default function CampoFormazione({
     switch (modulo) {
       case "4-3-3":
         return MODULO_4_3_3;
+
+      case "4-5-1":
+        return MODULO_4_5_1;
+
 
       case "3-5-2":
         return MODULO_3_5_2;
@@ -309,6 +339,7 @@ export default function CampoFormazione({
       setModulo(
         partita.modulo as
           | "4-4-2"
+          | "4-5-1"
           | "4-3-3"
           | "3-5-2"
           | "3-4-3"
@@ -894,6 +925,7 @@ export default function CampoFormazione({
               const nuovoModulo =
                 e.target.value as
                   | "4-4-2"
+                  | "4-5-1"
                   | "4-3-3"
                   | "3-5-2"
                   | "3-4-3"
@@ -926,6 +958,10 @@ export default function CampoFormazione({
           >
             <option value="4-4-2">
               4-4-2
+            </option>
+
+            <option value="4-5-1">
+              4-5-1
             </option>
 
             <option value="4-3-3">
