@@ -33,8 +33,28 @@ export default function Login() {
     setErrorMsg(null);
     setLoading(true);
 
+        let loginEmail = email.trim().toLowerCase();
+
+        if (!loginEmail.includes("@")) {
+      const resp = await fetch("/.netlify/functions/resolve-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: email.trim() }),
+      });
+
+      if (!resp.ok) {
+        const errorText = await resp.text();
+        setErrorMsg(errorText || "Username non trovato");
+        setLoading(false);
+        return;
+      }
+
+      const data = await resp.json();
+      loginEmail = data.email.trim().toLowerCase();
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
+      email: loginEmail,
       password,
     });
 
@@ -268,7 +288,7 @@ export default function Login() {
               htmlFor="email"
               className="block mb-2 text-sm font-semibold"
             >
-              Email
+              Email o username
             </label>
 
             <div className="relative">
@@ -283,12 +303,12 @@ export default function Login() {
 
               <input
                 id="email"
-                type="email"
+                type="text"
                 required
-                autoComplete="email"
+                autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="nome@esempio.it"
+                placeholder="Email o username"
                 className={inputClass}
               />
             </div>
