@@ -1395,15 +1395,23 @@ const renderNomeMarcatore = (m: Marcatore) => {
     <div style={styles.tempoValue}>{perTimeOspite[1]}</div>
   </div>
 
-  <div style={styles.tempoItem}>
-    <div style={styles.tempoLabel}>1° Tempo Suppl.</div>
-    <div style={styles.tempoValue}>{perTimeOspite[2]}</div>
-  </div>
-
-  <div style={styles.tempoItem}>
-    <div style={styles.tempoLabel}>2° Tempo Suppl.</div>
-    <div style={styles.tempoValue}>{perTimeOspite[3]}</div>
+  {(statoPartita === StatoPartita.PRIMO_TEMPO_SUPPLEMENTARE ||
+    statoPartita === StatoPartita.INTERVALLO_SUPPLEMENTARI ||
+    statoPartita === StatoPartita.SECONDO_TEMPO_SUPPLEMENTARE ||
+    statoPartita === StatoPartita.RIGORI) && (
+    <div style={styles.tempoItem}>
+      <div style={styles.tempoLabel}>1° Tempo Suppl.</div>
+      <div style={styles.tempoValue}>{perTimeOspite[2]}</div>
     </div>
+  )}
+
+  {(statoPartita === StatoPartita.SECONDO_TEMPO_SUPPLEMENTARE ||
+    statoPartita === StatoPartita.RIGORI) && (
+    <div style={styles.tempoItem}>
+      <div style={styles.tempoLabel}>2° Tempo Suppl.</div>
+      <div style={styles.tempoValue}>{perTimeOspite[3]}</div>
+    </div>
+  )}
 </div>
               )}
 

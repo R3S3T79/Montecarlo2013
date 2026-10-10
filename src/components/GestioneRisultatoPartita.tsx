@@ -226,18 +226,64 @@ setRigoriOspite(p.rigori_b ?? 0);
     setSquadraCasa(resCasa.data);
     setSquadraOspite(resOspite.data);
 
-    // 3) Presenze (convocati + titolari)
+   // 3) Presenze (convocati + titolari)
     const { data: presenze } = await supabase
       .from("presenze")
       .select("giocatore_stagione_id, nome, cognome, titolare")
       .eq("partita_id", id);
 
+    const { data: formazioneCorrente } = await supabase
+      .from("formazioni_partita")
+      .select("giocatore_stagione_id")
+      .eq("partita_id", id);
+
+    const { data: sostituzioniDB } = await supabase
+      .from("sostituzioni_partita")
+      .select("giocatore_uscente_stagione_id, giocatore_entrante_stagione_id, secondo_assoluto")
+      .eq("partita_id", id)
+      .order("secondo_assoluto", { ascending: true });
+
     if (presenze && presenze.length > 0) {
       setConvocati(presenze.map((p) => p.giocatore_stagione_id));
-      setTitolari(presenze.filter((p) => p.titolare).map((p) => p.giocatore_stagione_id));
+
+      if (formazioneCorrente && formazioneCorrente.length > 0) {
+        setTitolari(
+          formazioneCorrente.map((f) => f.giocatore_stagione_id)
+        );
+      } else {
+        setTitolari(
+          presenze
+            .filter((p) => p.titolare)
+            .map((p) => p.giocatore_stagione_id)
+        );
+      }
+
+      setOrdineUsciti(
+        (sostituzioniDB || []).map(
+          (s) => s.giocatore_uscente_stagione_id
+        )
+      );
+
+      setOrdineEntrati(
+        (sostituzioniDB || []).map(
+          (s) => s.giocatore_entrante_stagione_id
+        )
+      );
+
+            setHighlightedSubs(
+        new Set(
+          (sostituzioniDB || []).flatMap((s) => [
+            s.giocatore_uscente_stagione_id,
+            s.giocatore_entrante_stagione_id,
+          ])
+        )
+      );
+
     } else {
       setConvocati([]);
       setTitolari([]);
+      setOrdineUsciti([]);
+      setOrdineEntrati([]);
     }
 
     // 4) Giocatori stagione (lista completa)
@@ -480,16 +526,27 @@ useEffect(() => {
 
 // 🔹 Ricalcolo continuo dei minuti giocati visibili nel menu convocati
 useEffect(() => {
-  if (!partita || timerState?.timer_status !== "running") return;
+  if (!partita || !timerState) return;
 
-  setMinutiGiocati((prev) => {
-    const aggiornati: Record<string, number> = { ...prev };
-    titolari.forEach((id) => {
-      aggiornati[id] = (aggiornati[id] || 0) + 1;
-    });
-    return aggiornati;
+  const tempoAssoluto = getTempoAssoluto(timerState, elapsed);
+  const aggiornati: Record<string, number> = {};
+
+  minutiRows.forEach((r) => {
+    if (r.entrata_sec == null) return;
+
+    const fine =
+      r.uscita_sec == null
+        ? tempoAssoluto
+        : r.uscita_sec;
+
+    const durata = Math.max(0, fine - r.entrata_sec);
+
+    aggiornati[r.giocatore_stagione_id] =
+      (aggiornati[r.giocatore_stagione_id] || 0) + durata;
   });
-}, [nowSec]);
+
+  setMinutiGiocati(aggiornati);
+}, [partita, timerState, elapsed, minutiRows]);
 
 
 
