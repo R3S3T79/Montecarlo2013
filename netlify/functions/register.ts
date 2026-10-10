@@ -70,8 +70,19 @@ export const handler: Handler = async (event) => {
     },
   ]);
 
-  if (insertErr) {
+    if (insertErr) {
     console.error("Errore insert pending_users:", insertErr);
+
+    if (
+      insertErr.code === "23505" &&
+      insertErr.message.includes("pending_users_username_normalized_unique")
+    ) {
+      return {
+        statusCode: 409,
+        body: JSON.stringify({ error: "Username già utilizzato. Scegline un altro." }),
+      };
+    }
+
     return { statusCode: 500, body: JSON.stringify({ error: "Errore salvataggio utente" }) };
   }
 
