@@ -30,6 +30,8 @@ export default function AdminPanel() {
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
   const [processing, setProcessing] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [filtroUtenti, setFiltroUtenti] = useState<"tutti" | "attesa">("tutti");
+  const [ricercaUtenti, setRicercaUtenti] = useState("");
 
   // =======================================
   // CARICAMENTO UTENTI
@@ -91,6 +93,23 @@ export default function AdminPanel() {
 
     return session.access_token;
   };
+
+  const utentiFiltrati = pendingUsers.filter((utente) => {
+  if (filtroUtenti === "attesa" && utente.confirmed) {
+    return false;
+  }
+
+  const ricerca = ricercaUtenti.trim().toLowerCase();
+
+  if (!ricerca) {
+    return true;
+  }
+
+  return (
+    utente.username?.toLowerCase().includes(ricerca) ||
+    utente.email.toLowerCase().includes(ricerca)
+  );
+});
 
   // =======================================
 // TEST NOTIFICA PUSH
@@ -602,13 +621,49 @@ const sendTestPush = async () => {
             </span>
           </div>
 
-          {pendingUsers.length === 0 ? (
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+  <input
+    type="text"
+    value={ricercaUtenti}
+    onChange={(e) => setRicercaUtenti(e.target.value)}
+    placeholder="Cerca per username o email..."
+    className="flex-1 rounded-xl border border-white/10 bg-neutral-800 px-4 py-2.5 text-sm text-white outline-none transition placeholder:text-gray-500 focus:border-red-500"
+  />
+
+  <div className="flex gap-2">
+    <button
+      type="button"
+      onClick={() => setFiltroUtenti("tutti")}
+      className={`rounded-xl px-4 py-2.5 text-sm font-medium transition ${
+        filtroUtenti === "tutti"
+          ? "bg-red-600 text-white"
+          : "border border-white/10 bg-neutral-800 text-gray-300 hover:bg-neutral-700"
+      }`}
+    >
+      Tutti
+    </button>
+
+    <button
+      type="button"
+      onClick={() => setFiltroUtenti("attesa")}
+      className={`rounded-xl px-4 py-2.5 text-sm font-medium transition ${
+        filtroUtenti === "attesa"
+          ? "bg-red-600 text-white"
+          : "border border-white/10 bg-neutral-800 text-gray-300 hover:bg-neutral-700"
+      }`}
+    >
+      In attesa
+    </button>
+  </div>
+</div>
+
+          {utentiFiltrati.length === 0 ? (
             <div className="rounded-xl border border-white/10 bg-neutral-800/60 p-6 text-center text-sm text-gray-400">
               Nessun utente presente.
             </div>
           ) : (
             <div className="space-y-3">
-              {pendingUsers.map((u) => {
+              {utentiFiltrati.map((u) => {
                 const isProcessing =
                   processing.has(u.email);
 
