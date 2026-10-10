@@ -7,8 +7,6 @@ import { useNavigate } from "react-router-dom";
 export default function NuovoUtente() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [nome, setNome] = useState("");
-  const [cognome, setCognome] = useState("");
   const [username, setUsername] = useState("");
   const [role, setRole] = useState("user");
   const [loading, setLoading] = useState(false);
@@ -25,16 +23,17 @@ export default function NuovoUtente() {
       const resp = await fetch("/.netlify/functions/create-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, nome, cognome, username, role }),
+                body: JSON.stringify({ email, password, username, role }),
       });
 
-      if (!resp.ok) throw new Error("Errore durante la creazione");
+            if (!resp.ok) {
+        const errorText = await resp.text();
+        throw new Error(errorText || "Errore durante la creazione");
+      }
 
       setMessage("✅ Utente creato con successo!");
-      setEmail("");
+            setEmail("");
       setPassword("");
-      setNome("");
-      setCognome("");
       setUsername("");
       setRole("user");
 
@@ -52,24 +51,10 @@ export default function NuovoUtente() {
         <h2 className="text-xl font-bold mb-4">Crea Nuovo Utente</h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          
           <input
             type="text"
-            placeholder="Nome"
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-            className="w-full border px-3 py-2 rounded"
-            required
-          />
-          <input
-            type="text"
-            placeholder="Cognome"
-            value={cognome}
-            onChange={(e) => setCognome(e.target.value)}
-            className="w-full border px-3 py-2 rounded"
-            required
-          />
-          <input
-            type="text"
+            autoComplete="off"
             placeholder="Username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
