@@ -608,7 +608,16 @@ assist_cognome: m.assist_cognome || '',
 
   ...cartellini.map((c) => ({
     tipoEvento: 'cartellino' as const,
-    periodo: c.periodo,
+    periodo:
+  c.periodo === 1
+    ? 1
+    : c.periodo === 3
+      ? 2
+      : c.periodo === 5
+        ? 3
+        : c.periodo === 7
+          ? 4
+          : c.periodo,
     tempo_sec: c.tempo_sec ?? null,
     avversario: !!c.giocatore_avversario_id === (partita.casa.id === 'a16a8645-9f86-41d9-a81f-a92931f1cc67'),
     nome:

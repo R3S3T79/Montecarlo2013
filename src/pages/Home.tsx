@@ -49,6 +49,7 @@ type PartitaLite = {
   squadra_casa_id: string;
   squadra_ospite_id: string;
   stagione_id?: string;
+    arbitro_nome?: string | null;
 
   goal_a: number;
   goal_b: number;
@@ -95,6 +96,7 @@ type Marcatore = {
   id: string;
   periodo: number;
   giocatore_uid: string;
+  giocatore_stagione_id?: string | null;
   partita_id: string;
   stagione_id: string;
   squadra_segnante_id?: string | null;
@@ -103,8 +105,61 @@ type Marcatore = {
   assist_giocatore_stagione_id?: string | null;
   assist_nome?: string;
   assist_cognome?: string;
+  giocatore_avversario_id?: string | null;
+  avversario_nome?: string;
+  avversario_cognome?: string;
+  avversario_numero_maglia?: number | null;
+  tempo_sec?: number | null;
 };
 
+
+type CartellinoLive = {
+  id: string;
+  partita_id: string;
+  giocatore_stagione_id?: string | null;
+  giocatore_avversario_id?: string | null;
+  tipo: string;
+  periodo: number;
+  tempo_sec?: number | null;
+};
+
+type SostituzioneLive = {
+  id: string;
+  giocatore_uscente_stagione_id: string;
+  giocatore_entrante_stagione_id: string;
+  secondo_assoluto: number;
+  run_index?: number | null;
+};
+
+type GiocatoreLive = {
+  giocatore_stagione_id: string;
+  nome: string;
+  cognome: string;
+  numero_maglia?: number | null;
+};
+
+type GiocatoreAvversarioLive = {
+  id: string;
+  nome: string;
+  cognome: string;
+  numero_maglia?: number | null;
+};
+
+type EventoLive = {
+  id: string;
+  tipo: "goal" | "cartellino" | "sostituzione";
+  tempo_sec: number;
+  periodo: number;
+  squadra: "casa" | "ospite";
+  nome?: string;
+  cognome?: string;
+  numero_maglia?: number | null;
+  assist_nome?: string;
+  assist_cognome?: string;
+  tipo_cartellino?: string;
+  entrante_nome?: string;
+  entrante_cognome?: string;
+};
 
 type Stagione = {
   id: string;
@@ -335,6 +390,16 @@ const { data: last, error: e2 } = await supabase
   const [loadingMatch, setLoadingMatch] = useState<boolean>(true);
 
   const [marcatoriLive, setMarcatoriLive] = useState<Marcatore[]>([]);
+  const [cartelliniLive, setCartelliniLive] = useState<CartellinoLive[]>([]);
+  const [sostituzioniLive, setSostituzioniLive] = useState<SostituzioneLive[]>([]);
+  const [giocatoriLive, setGiocatoriLive] = useState<GiocatoreLive[]>([]);
+  const [giocatoriAvversariLive, setGiocatoriAvversariLive] = useState<
+  GiocatoreAvversarioLive[]
+>([]);
+  const [inizioSecondoTempo, setInizioSecondoTempo] = useState<number>(0);
+  const [inizioPrimoSupplementare, setInizioPrimoSupplementare] = useState<number>(0);
+  const [inizioSecondoSupplementare, setInizioSecondoSupplementare] = useState<number>(0);
+  
 
 // ========================
 // 1. Serie rigori live
@@ -424,6 +489,132 @@ const [perTimeOspite, setPerTimeOspite] = useState<number[]>([0, 0, 0, 0]);
   };
 }, []);
 
+// ========================
+// Giocatori partita LIVE
+// ========================
+useEffect(() => {
+  if (!match || match.stato !== "InCorso") return;
+
+  const loadGiocatoriLive = async () => {
+    const { data, error } = await supabase
+      .from("presenze")
+      .select("giocatore_stagione_id, nome, cognome, numero_maglia")
+      .eq("partita_id", match.id);
+
+    if (error) {
+      console.error(
+        "[HomePage] Errore caricamento giocatori LIVE:",
+        error.message
+      );
+      return;
+    }
+
+    setGiocatoriLive((data || []) as GiocatoreLive[]);
+  };
+
+  loadGiocatoriLive();
+}, [match?.id, match?.stato]);
+
+// ========================
+// Giocatori avversari partita LIVE
+// ========================
+useEffect(() => {
+  if (!match || match.stato !== "InCorso") return;
+
+  const loadGiocatoriAvversariLive = async () => {
+    const { data, error } = await supabase
+      .from("giocatori_avversari_partita")
+      .select("id, nome, cognome, numero_maglia")
+      .eq("partita_id", match.id);
+
+    if (error) {
+      console.error(
+        "[HomePage] Errore caricamento giocatori avversari LIVE:",
+        error.message
+      );
+      return;
+    }
+
+    setGiocatoriAvversariLive(
+      (data || []) as GiocatoreAvversarioLive[]
+    );
+  };
+
+  loadGiocatoriAvversariLive();
+}, [match?.id, match?.stato]);
+
+// ========================
+// Inizio secondo tempo LIVE
+// ========================
+useEffect(() => {
+  if (!match || match.stato !== "InCorso") return;
+
+  const loadInizioSecondoTempo = async () => {
+    const { data, error } = await supabase
+      .from("minuti_giocati")
+      .select("entrata_sec")
+      .eq("partita_id", match.id)
+      .eq("run_index", 2)
+      .not("entrata_sec", "is", null)
+      .order("entrata_sec", { ascending: true })
+      .limit(1);
+
+    if (error) {
+      console.error(
+        "[HomePage] Errore caricamento inizio secondo tempo:",
+        error.message
+      );
+      return;
+    }
+
+    setInizioSecondoTempo(data?.[0]?.entrata_sec ?? 0);
+    const { data: dataSupplementare, error: errorSupplementare } = await supabase
+  .from("minuti_giocati")
+  .select("entrata_sec")
+  .eq("partita_id", match.id)
+  .eq("run_index", 3)
+  .not("entrata_sec", "is", null)
+  .order("entrata_sec", { ascending: true })
+  .limit(1);
+
+if (errorSupplementare) {
+  console.error(
+    "[HomePage] Errore caricamento inizio primo supplementare:",
+    errorSupplementare.message
+  );
+  return;
+}
+
+setInizioPrimoSupplementare(
+  dataSupplementare?.[0]?.entrata_sec ?? 0
+);
+const { data: dataSecondoSupplementare, error: errorSecondoSupplementare } =
+  await supabase
+    .from("minuti_giocati")
+    .select("entrata_sec")
+    .eq("partita_id", match.id)
+    .eq("run_index", 4)
+    .not("entrata_sec", "is", null)
+    .order("entrata_sec", { ascending: true })
+    .limit(1);
+
+if (errorSecondoSupplementare) {
+  console.error(
+    "[HomePage] Errore caricamento inizio secondo supplementare:",
+    errorSecondoSupplementare.message
+  );
+  return;
+}
+
+setInizioSecondoSupplementare(
+  dataSecondoSupplementare?.[0]?.entrata_sec ?? 0
+);
+  };
+
+  loadInizioSecondoTempo();
+}, [match?.id, match?.stato]);
+
+
 // ✅ Caricamento e Realtime Marcatori Live (view marcatori_v)
 useEffect(() => {
   if (!match || match.stato !== "InCorso") return;
@@ -448,7 +639,12 @@ useEffect(() => {
         giocatore_cognome,
         assist_giocatore_stagione_id,
         assist_nome,
-        assist_cognome
+        assist_cognome,
+        giocatore_avversario_id,
+        avversario_nome,
+        avversario_cognome,
+        avversario_numero_maglia,
+        tempo_sec
       `)
       .eq("partita_id", match.id)
       .order("periodo", { ascending: true });
@@ -463,12 +659,7 @@ useEffect(() => {
       return;
     }
 
-    // Mostra solo marcatori del Montecarlo
-    const mc = (data || []).filter(
-      (m) => m.squadra_segnante_id === MONTECARLO_ID
-    );
-
-    setMarcatoriLive(mc.map(normalizeMarcatore));
+        setMarcatoriLive((data || []).map(normalizeMarcatore));
   };
 
   loadMarcatori();
@@ -499,6 +690,122 @@ useEffect(() => {
 }, [match?.id, match?.stato]);;
 
 // ========================
+// Caricamento e Realtime cartellini LIVE
+// ========================
+useEffect(() => {
+  if (!match || match.stato !== "InCorso") return;
+
+  let channel: any = null;
+  let active = true;
+
+  const loadCartellini = async () => {
+    const { data, error } = await supabase
+      .from("cartellini")
+      .select(
+        "id, partita_id, giocatore_stagione_id, giocatore_avversario_id, tipo, periodo, tempo_sec"
+      )
+      .eq("partita_id", match.id)
+      .order("tempo_sec", { ascending: true });
+
+    if (!active) return;
+
+    if (error) {
+      console.error(
+        "[HomePage] Errore caricamento cartellini:",
+        error.message
+      );
+      return;
+    }
+
+    setCartelliniLive((data || []) as CartellinoLive[]);
+  };
+
+  loadCartellini();
+
+  channel = supabase
+    .channel(`home-cartellini-${match.id}-${Date.now()}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "cartellini",
+        filter: `partita_id=eq.${match.id}`,
+      },
+      () => {
+        loadCartellini();
+      }
+    )
+    .subscribe();
+
+  return () => {
+    active = false;
+
+    if (channel) {
+      supabase.removeChannel(channel);
+    }
+  };
+}, [match?.id, match?.stato]);
+
+// ========================
+// Caricamento e Realtime sostituzioni LIVE
+// ========================
+useEffect(() => {
+  if (!match || match.stato !== "InCorso") return;
+
+  let channel: any = null;
+  let active = true;
+
+  const loadSostituzioni = async () => {
+    const { data, error } = await supabase
+      .from("sostituzioni_partita")
+      .select(
+        "id, giocatore_uscente_stagione_id, giocatore_entrante_stagione_id, secondo_assoluto, run_index"
+      )
+      .eq("partita_id", match.id)
+      .order("secondo_assoluto", { ascending: true });
+
+    if (!active) return;
+
+    if (error) {
+      console.error(
+        "[HomePage] Errore caricamento sostituzioni:",
+        error.message
+      );
+      return;
+    }
+
+    setSostituzioniLive((data || []) as SostituzioneLive[]);
+  };
+
+  loadSostituzioni();
+
+  channel = supabase
+    .channel(`home-sostituzioni-${match.id}-${Date.now()}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "sostituzioni_partita",
+        filter: `partita_id=eq.${match.id}`,
+      },
+      () => {
+        loadSostituzioni();
+      }
+    )
+    .subscribe();
+
+  return () => {
+    active = false;
+
+    if (channel) {
+      supabase.removeChannel(channel);
+    }
+  };
+}, [match?.id, match?.stato]);
+
+// ========================
 // 2. Caricamento e Realtime serie rigori
 // ========================
 useEffect(() => {
@@ -514,8 +821,11 @@ useEffect(() => {
         id,
         partita_id,
         squadra_id,
+        giocatore_stagione_id,
+        giocatore_avversario_id,
         ordine,
-        esito
+esito,
+created_at
       `)
       .eq("partita_id", match.id)
       .order("ordine", { ascending: true });
@@ -573,14 +883,20 @@ const normalizeMarcatore = (row: any): Marcatore => ({
   id: row.id,
   periodo: Number(row.periodo ?? row.goal_tempo ?? 1),
   giocatore_uid: String(row.giocatore_uid ?? row.giocatore_stagione_id ?? ""),
+  giocatore_stagione_id: row.giocatore_stagione_id ?? null,
   partita_id: row.partita_id,
   stagione_id: row.stagione_id,
   squadra_segnante_id: row.squadra_segnante_id ?? null,
   nome: row.giocatore_nome || "",
   cognome: row.giocatore_cognome || "",
-  assist_giocatore_stagione_id: row.assist_giocatore_stagione_id ?? null,
+    assist_giocatore_stagione_id: row.assist_giocatore_stagione_id ?? null,
   assist_nome: row.assist_nome || "",
   assist_cognome: row.assist_cognome || "",
+  giocatore_avversario_id: row.giocatore_avversario_id ?? null,
+  avversario_nome: row.avversario_nome || "",
+  avversario_cognome: row.avversario_cognome || "",
+  avversario_numero_maglia: row.avversario_numero_maglia ?? null,
+  tempo_sec: row.tempo_sec ?? null,
 });
 
 
@@ -605,6 +921,197 @@ const marcatoriByPeriodo = useMemo(() => {
   }
   return map;
 }, [marcatoriLive]);
+
+const normalizzaNome = (valore?: string | null) => {
+  return (valore || "")
+    .trim()
+    .toLocaleLowerCase("it-IT")
+    .replace(/(^|[\s'-])\p{L}/gu, (lettera) =>
+      lettera.toLocaleUpperCase("it-IT")
+    );
+};
+
+const eventiLive = useMemo<EventoLive[]>(() => {
+  if (!match) return [];
+
+  const eventi: EventoLive[] = [];
+  
+
+  for (const m of marcatoriLive) {
+    const squadra: "casa" | "ospite" =
+      m.squadra_segnante_id === match.squadra_casa_id
+        ? "casa"
+        : "ospite";
+
+    const isAvversario =
+      !!m.giocatore_avversario_id ||
+      !!m.avversario_nome ||
+      !!m.avversario_cognome;
+
+      const giocatoreMontecarlo = giocatoriLive.find(
+  (g) => g.giocatore_stagione_id === m.giocatore_stagione_id
+);
+
+    eventi.push({
+      id: `goal-${m.id}`,
+      tipo: "goal",
+      tempo_sec: m.tempo_sec ?? 0,
+      periodo: m.periodo,
+      squadra,
+      numero_maglia: isAvversario
+  ? m.avversario_numero_maglia ?? null
+  : giocatoreMontecarlo?.numero_maglia ?? null,
+      nome: isAvversario
+  ? normalizzaNome(m.avversario_nome)
+  : m.nome || "",
+cognome: isAvversario
+  ? normalizzaNome(m.avversario_cognome)
+  : m.cognome || "",
+      assist_nome: m.assist_nome || "",
+      assist_cognome: m.assist_cognome || "",
+    });
+  }
+  for (const c of cartelliniLive) {
+    const giocatoreMontecarlo = giocatoriLive.find(
+      (g) => g.giocatore_stagione_id === c.giocatore_stagione_id
+    );
+
+        const giocatoreAvversario = giocatoriAvversariLive.find(
+      (g) => g.id === c.giocatore_avversario_id
+    );
+
+    const squadra: "casa" | "ospite" =
+      c.giocatore_avversario_id
+        ? match.squadra_casa_id ===
+          "a16a8645-9f86-41d9-a81f-a92931f1cc67"
+          ? "ospite"
+          : "casa"
+        : match.squadra_casa_id ===
+          "a16a8645-9f86-41d9-a81f-a92931f1cc67"
+          ? "casa"
+          : "ospite";
+
+    eventi.push({
+      id: `cartellino-${c.id}`,
+      tipo: "cartellino",
+      tempo_sec: c.tempo_sec ?? 0,
+      periodo:
+  c.periodo === 1
+    ? 1
+    : c.periodo === 3
+      ? 2
+      : c.periodo === 5
+        ? 3
+        : c.periodo === 7
+          ? 4
+          : c.periodo,
+      squadra,
+      numero_maglia:
+  giocatoreAvversario?.numero_maglia ??
+  giocatoreMontecarlo?.numero_maglia ??
+  null,
+      nome: giocatoreAvversario
+  ? normalizzaNome(giocatoreAvversario.nome)
+  : giocatoreMontecarlo?.nome || "",
+cognome: giocatoreAvversario
+  ? normalizzaNome(giocatoreAvversario.cognome)
+  : giocatoreMontecarlo?.cognome || "",
+      tipo_cartellino: c.tipo,
+    });
+  }
+    for (const s of sostituzioniLive) {
+    const uscente = giocatoriLive.find(
+      (g) =>
+        g.giocatore_stagione_id ===
+        s.giocatore_uscente_stagione_id
+    );
+
+    const entrante = giocatoriLive.find(
+      (g) =>
+        g.giocatore_stagione_id ===
+        s.giocatore_entrante_stagione_id
+    );
+
+    const squadra: "casa" | "ospite" =
+      match.squadra_casa_id ===
+      "a16a8645-9f86-41d9-a81f-a92931f1cc67"
+        ? "casa"
+        : "ospite";
+
+    eventi.push({
+      id: `sostituzione-${s.id}`,
+      tipo: "sostituzione",
+      tempo_sec: s.secondo_assoluto,
+      periodo: s.run_index ?? 1,
+      squadra,
+      nome: uscente?.nome || "",
+      cognome: uscente?.cognome || "",
+      entrante_nome: entrante?.nome || "",
+      entrante_cognome: entrante?.cognome || "",
+    });
+  }
+  return eventi.sort((a, b) => a.tempo_sec - b.tempo_sec);
+}, [
+   match,
+  marcatoriLive,
+  cartelliniLive,
+  giocatoriLive,
+  giocatoriAvversariLive,
+  sostituzioniLive,
+]);
+
+const getInfoTempoEventoLive = (evento: EventoLive) => {
+  let nomeTempo = "";
+
+  if (evento.periodo === 1) {
+    nomeTempo = "1° Tempo";
+  } else if (evento.periodo === 2) {
+    nomeTempo = "2° Tempo";
+  } else if (evento.periodo === 3) {
+    nomeTempo = "1° Supplementare";
+  } else if (evento.periodo === 4) {
+    nomeTempo = "2° Supplementare";
+  }
+
+  let minuto: number | null = null;
+
+  if (evento.tempo_sec >= 0) {
+    if (evento.periodo === 1) {
+      minuto = Math.floor(evento.tempo_sec / 60);
+    } else if (evento.periodo === 2 && inizioSecondoTempo > 0) {
+      minuto =
+        35 +
+        Math.floor(
+          (evento.tempo_sec - inizioSecondoTempo) / 60
+        );
+    }
+    else if (
+  evento.periodo === 3 &&
+  inizioPrimoSupplementare > 0
+) {
+  minuto =
+    70 +
+    Math.floor(
+      (evento.tempo_sec - inizioPrimoSupplementare) / 60
+    );
+}
+else if (
+  evento.periodo === 4 &&
+  inizioSecondoSupplementare > 0
+) {
+  minuto =
+    80 +
+    Math.floor(
+      (evento.tempo_sec - inizioSecondoSupplementare) / 60
+    );
+}
+  }
+
+  return {
+    nomeTempo,
+    minuto,
+  };
+};
 
 // =========================
 // TIMER LIVE (partita_timer_state con logica ProssimaPartita)
@@ -703,6 +1210,28 @@ const isGiocoAttivo =
     statoPartita === StatoPartita.SECONDO_TEMPO_SUPPLEMENTARE
   );
 
+  const labelStatoPartitaLive =
+  statoPartita === StatoPartita.PRIMO_TEMPO
+    ? "1° Tempo"
+    : statoPartita === StatoPartita.INTERVALLO
+      ? "Intervallo"
+      : statoPartita === StatoPartita.SECONDO_TEMPO
+        ? "2° Tempo"
+        : statoPartita === StatoPartita.FINE_TEMPI_REGOLAMENTARI
+          ? "Fine tempi regolamentari"
+          : statoPartita === StatoPartita.PRIMO_TEMPO_SUPPLEMENTARE
+            ? "1° Supplementare"
+            : statoPartita === StatoPartita.INTERVALLO_SUPPLEMENTARI
+              ? "Intervallo supplementari"
+              : statoPartita === StatoPartita.SECONDO_TEMPO_SUPPLEMENTARE
+                ? "2° Supplementare"
+                : statoPartita === StatoPartita.FINE_TEMPI_SUPPLEMENTARI
+                  ? "Fine supplementari"
+                  : statoPartita === StatoPartita.RIGORI
+                    ? "Rigori"
+                    : statoPartita === StatoPartita.FINE_PARTITA
+                      ? "Terminata"
+                      : "Prepartita";
 
 
 // usa direttamente nome e cognome dalla view
@@ -943,488 +1472,604 @@ const renderNomeMarcatore = (m: Marcatore) => {
       </div>
 
       
-{/* 🔹 Timer in tempo reale dal gestionerisultato */}
-{isLive && (
-  <div
-    style={{
-      display: "grid",
-      gridTemplateColumns: "1fr auto 1fr",
-      alignItems: "center",
-      width: "100%",
-      marginTop: 6,
-    }}
-  >
+      {isLive ? (
+  <>
+    {/* ======================== */}
+    {/* 1. SCHEDA PARTITA LIVE */}
+    {/* ======================== */}
+
     <div
       style={{
-        justifySelf: "start",
-        paddingLeft:65,
-        fontSize: 13,
-        fontWeight: 800,
-        color: "#202020",
-        textTransform: "uppercase",
+        overflow: "hidden",
+        borderRadius: 16,
+        background: "rgba(255,255,255,0.96)",
+        boxShadow: "0 8px 22px rgba(0,0,0,0.38)",
       }}
     >
-      {!isIntervallo &&
-        (statoPartita === StatoPartita.PRIMO_TEMPO
-          ? "1° Tempo"
-          : statoPartita === StatoPartita.SECONDO_TEMPO
-          ? "2° Tempo"
-          : statoPartita === StatoPartita.PRIMO_TEMPO_SUPPLEMENTARE
-          ? "1° Suppl."
-          : statoPartita === StatoPartita.SECONDO_TEMPO_SUPPLEMENTARE
-          ? "2° Suppl."
-          : "")}
-    </div>
+      {/* Stato partita */}
+      <div
+        style={{
+          padding: "16px 16px 8px",
+          textAlign: "center",
+        }}
+      >
 
-        <div style={styles.timerInlineBox}>
-      {statoPartita === StatoPartita.RIGORI ? (
+        {statoPartita !== StatoPartita.RIGORI && (
+  <>
+
+
         <span
           style={{
-            ...styles.timerValue,
-            fontFamily: "inherit",
-            fontSize: 18,
-            letterSpacing: 0.5,
+            display: "inline-block",
+            padding: "6px 14px",
+            borderRadius: 999,
+            background: "#dc2626",
+            color: "#ffffff",
+            fontSize: 13,
+            fontWeight: 900,
           }}
         >
-          RIGORI
+          ⏱ {labelStatoPartitaLive}
         </span>
-      ) : isIntervallo ? (
-        <span
+
+                <div
           style={{
-            ...styles.timerValue,
-            fontFamily: "inherit",
-            fontSize: 18,
-            letterSpacing: 0.5,
+            marginTop: 8,
+            fontFamily: "monospace",
+            fontSize: 28,
+            fontWeight: 900,
+            lineHeight: 1,
+            color: "#181818",
           }}
         >
-          INTERVALLO
-        </span>
-      ) : (
-        <>
-          <span style={styles.timerValue}>{minDisplay}′</span>
-          <span style={styles.timerSeparator}>:</span>
-          <span style={styles.timerValue}>{secDisplay}″</span>
-        </>
+          {minDisplay}:{secDisplay}
+        </div>
+          </>
+)}
+        
+
+        {match.arbitro_nome && (
+          <div
+            style={{
+              marginTop: 7,
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#6b7280",
+            }}
+          >
+            Arbitro: {match.arbitro_nome}
+          </div>
+        )}
+      </div>
+
+      {/* Squadre e risultato */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr auto 1fr",
+          alignItems: "center",
+          gap: 12,
+          padding: "12px 16px 20px",
+        }}
+      >
+        {/* Casa */}
+        <div
+          style={{
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            textAlign: "center",
+          }}
+        >
+          {match.squadra_casa_logo && (
+            <img
+              src={match.squadra_casa_logo}
+              alt={match.squadra_casa_nome || "Casa"}
+              style={{
+                width: 64,
+                height: 64,
+                objectFit: "contain",
+                marginBottom: 8,
+              }}
+            />
+          )}
+
+          <div
+            style={{
+              width: "100%",
+              fontSize: 15,
+              fontWeight: 900,
+              lineHeight: 1.15,
+              color: "#181818",
+              overflowWrap: "break-word",
+            }}
+          >
+            {match.squadra_casa_nome || "Casa"}
+          </div>
+        </div>
+
+        {/* Risultato */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 12,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 38,
+              lineHeight: 1,
+              fontWeight: 900,
+              color: "#181818",
+              animation: isGiocoAttivo
+                ? "blink 1s linear infinite"
+                : "none",
+            }}
+          >
+            {match.goal_a}
+          </span>
+
+          <div
+            style={{
+              width: 2,
+              height: 38,
+              borderRadius: 999,
+              background: "#dc2626",
+            }}
+          />
+
+          <span
+            style={{
+              fontSize: 38,
+              lineHeight: 1,
+              fontWeight: 900,
+              color: "#181818",
+              animation: isGiocoAttivo
+                ? "blink 1s linear infinite"
+                : "none",
+            }}
+          >
+            {match.goal_b}
+          </span>
+        </div>
+
+        {/* Ospite */}
+        <div
+          style={{
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            textAlign: "center",
+          }}
+        >
+          {match.squadra_ospite_logo && (
+            <img
+              src={match.squadra_ospite_logo}
+              alt={match.squadra_ospite_nome || "Ospite"}
+              style={{
+                width: 64,
+                height: 64,
+                objectFit: "contain",
+                marginBottom: 8,
+              }}
+            />
+          )}
+
+          <div
+            style={{
+              width: "100%",
+              fontSize: 15,
+              fontWeight: 900,
+              lineHeight: 1.15,
+              color: "#181818",
+              overflowWrap: "break-word",
+            }}
+          >
+            {match.squadra_ospite_nome || "Ospite"}
+          </div>
+        </div>
+      </div>
+
+      {/* ======================== */}
+      {/* 2. CRONOLOGIA EVENTI */}
+      {/* ======================== */}
+
+      <div
+        style={{
+          borderTop: "8px solid #f3f4f6",
+        }}
+      >
+        {eventiLive.length > 0 ? (
+          eventiLive.map((evento) => {
+            const { nomeTempo, minuto } =
+              getInfoTempoEventoLive(evento);
+
+            const contenuto = (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems:
+                    evento.squadra === "casa"
+                      ? "flex-start"
+                      : "flex-end",
+                  textAlign:
+                    evento.squadra === "casa"
+                      ? "left"
+                      : "right",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  {evento.squadra === "casa" && (
+                    <span style={{ fontSize: 18 }}>
+                      {evento.tipo === "goal"
+                        ? "⚽"
+                        : evento.tipo === "sostituzione"
+                          ? "🔄"
+                          : evento.tipo_cartellino === "rosso"
+                            ? "🟥"
+                            : "🟨"}
+                    </span>
+                  )}
+
+                  <div>
+                    {evento.tipo === "sostituzione" ? (
+                      <>
+                        <div
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: "#dc2626",
+                          }}
+                        >
+                          ↓ {evento.cognome} {evento.nome}
+                        </div>
+
+                        <div
+                          style={{
+                            marginTop: 2,
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: "#16a34a",
+                          }}
+                        >
+                          ↑ {evento.entrante_cognome}{" "}
+                          {evento.entrante_nome}
+                        </div>
+                      </>
+                    ) : (
+                      <div
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 800,
+                          color: "#181818",
+                        }}
+                      >
+                        {evento.numero_maglia != null && `${evento.numero_maglia} `}
+{evento.cognome} {evento.nome}
+                      </div>
+                    )}
+
+                    {evento.tipo === "goal" &&
+                      (evento.assist_nome ||
+                        evento.assist_cognome) && (
+                        <div
+                          style={{
+                            marginTop: 2,
+                            fontSize: 12,
+                            fontWeight: 500,
+                            color: "#6b7280",
+                          }}
+                        >
+                          Assist: {evento.assist_cognome}{" "}
+                          {evento.assist_nome}
+                        </div>
+                      )}
+
+                    <div
+                      style={{
+                        marginTop: 2,
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color: "#6b7280",
+                      }}
+                    >
+                      {nomeTempo}
+                      {minuto !== null && (
+                        <>
+                          {" - "}
+                          {minuto}'
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {evento.squadra === "ospite" && (
+                    <span style={{ fontSize: 18 }}>
+                      {evento.tipo === "goal"
+                        ? "⚽"
+                        : evento.tipo === "sostituzione"
+                          ? "🔄"
+                          : evento.tipo_cartellino === "rosso"
+                            ? "🟥"
+                            : "🟨"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+
+            return (
+              <div
+                key={evento.id}
+                style={{
+  display: "flex",
+  justifyContent:
+    evento.squadra === "casa" ? "flex-start" : "flex-end",
+  width: "100%",
+  padding: "12px 16px",
+  boxSizing: "border-box",
+  borderBottom: "1px solid #e5e7eb",
+}}
+              >
+                <div style={{ width: "100%" }}>
+  {contenuto}
+</div>
+              </div>
+            );
+          })
+        ) : (
+          <div
+            style={{
+              padding: 16,
+              textAlign: "center",
+              fontSize: 13,
+              color: "#6b7280",
+            }}
+          >
+            Nessun evento registrato
+          </div>
+        )}
+      </div>
+
+      {/* ======================== */}
+      {/* 3. RIGORI */}
+      {/* ======================== */}
+
+      {statoPartita === StatoPartita.RIGORI && (
+        <div
+          style={{
+            borderTop: "8px solid #f3f4f6",
+            padding: 16,
+          }}
+        >
+          <div
+  style={{
+    marginBottom: 12,
+    textAlign: "center",
+  }}
+>
+  <span
+    style={{
+      display: "inline-block",
+      padding: "6px 14px",
+      borderRadius: 999,
+      background: "#dc2626",
+      color: "#ffffff",
+      fontSize: 13,
+      fontWeight: 900,
+    }}
+  >
+    ⏱ Rigori
+  </span>
+</div>
+
+          {(() => {
+            const rigoriCasa = rigoriSerie
+              .filter(
+                (r) =>
+                  String(r.squadra_id) ===
+                  String(match.squadra_casa_id)
+              )
+              .sort(
+                (a, b) =>
+                  Number(a.ordine) - Number(b.ordine)
+              );
+
+            const rigoriOspite = rigoriSerie
+              .filter(
+                (r) =>
+                  String(r.squadra_id) ===
+                  String(match.squadra_ospite_id)
+              )
+              .sort(
+                (a, b) =>
+                  Number(a.ordine) - Number(b.ordine)
+              );
+
+            const numeroTiri = Math.max(
+              rigoriCasa.length,
+              rigoriOspite.length
+            );
+
+            const sequenzaRigori = [...rigoriSerie].sort(
+  (a, b) =>
+    new Date(a.created_at).getTime() -
+    new Date(b.created_at).getTime()
+);
+
+            return (
+              <>
+                 
+
+                {sequenzaRigori.map((tiro, index) => {
+  const tiroCasa =
+    String(tiro.squadra_id) ===
+    String(match.squadra_casa_id);
+
+  const rigorista =
+    tiro.giocatore_stagione_id
+      ? giocatoriLive.find(
+          (g) =>
+            String(g.giocatore_stagione_id) ===
+            String(tiro.giocatore_stagione_id)
+        )
+      : tiro.giocatore_avversario_id
+        ? giocatoriAvversariLive.find(
+            (g) =>
+              String(g.id) ===
+              String(tiro.giocatore_avversario_id)
+          )
+        : null;
+
+  const nomeRigorista = rigorista
+    ? `${rigorista.cognome} ${rigorista.nome}`
+        .toLowerCase()
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+    : "";
+
+  return (
+    <div
+      key={`${tiro.squadra_id}-${tiro.ordine}-${index}`}
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 40px 1fr",
+        alignItems: "center",
+        padding: "6px 0",
+      }}
+    >
+      <div
+        style={{
+          textAlign: "center",
+          fontSize: 20,
+          fontWeight: 900,
+          color: tiroCasa
+            ? tiro.esito === "segnato"
+              ? "#16a34a"
+              : "#dc2626"
+            : "#cccccc",
+        }}
+      >
+        {tiroCasa
+          ? tiro.esito === "segnato"
+            ? "✓"
+            : "✕"
+          : ""}
+
+        {tiroCasa && rigorista && (
+          <div
+            style={{
+              textAlign: "center",
+              marginTop: 1,
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#777777",
+            }}
+          >
+            {nomeRigorista}
+          </div>
+        )}
+      </div>
+
+      <div />
+
+      <div
+        style={{
+          textAlign: "center",
+          fontSize: 20,
+          fontWeight: 900,
+          color: !tiroCasa
+            ? tiro.esito === "segnato"
+              ? "#16a34a"
+              : "#dc2626"
+            : "#cccccc",
+        }}
+      >
+        {!tiroCasa
+          ? tiro.esito === "segnato"
+            ? "✓"
+            : "✕"
+          : ""}
+
+        {!tiroCasa && rigorista && (
+          <div
+            style={{
+              textAlign: "center",
+              marginTop: 1,
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#777777",
+            }}
+          >
+            {nomeRigorista}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+})}
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 40px 1fr",
+                    alignItems: "center",
+                    marginTop: 10,
+                    paddingTop: 10,
+                    borderTop: "1px solid #dddddd",
+                  }}
+                >
+                  <div
+                    style={{
+                      textAlign: "center",
+                      fontSize: 22,
+                      fontWeight: 900,
+                      color: "#dc2626",
+                    }}
+                  >
+                    {match.rigori_a ?? 0}
+                  </div>
+
+                  <div />
+
+                  <div
+                    style={{
+                      textAlign: "center",
+                      fontSize: 22,
+                      fontWeight: 900,
+                      color: "#dc2626",
+                    }}
+                  >
+                    {match.rigori_b ?? 0}
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </div>
       )}
     </div>
 
-    <div />
-  </div>
-)}
+    {/* ======================== */}
+    {/* 4. LINK PARTITA LIVE */}
+    {/* ======================== */}
 
-
-
-
-      {isLive ? (
-        <>
-          {/* Struttura LIVE */}
-          <div style={styles.teamsLiveRow}>
-            {/* Squadra Casa */}
-            <div style={styles.teamLiveCol}>
-              <div style={styles.teamLiveHead}>
-                {match.squadra_casa_logo && (
-                  <img
-                    src={match.squadra_casa_logo}
-                    alt={match.squadra_casa_nome || "Casa"}
-                    style={styles.teamLogo}
-                  />
-                )}
-                <div style={styles.teamName}>{match.squadra_casa_nome || "Casa"}</div>
-               <span
-  style={{
-    ...styles.liveScoreBlink,
-    animation: isGiocoAttivo ? "blink 1s linear infinite" : "none",
-  }}
->
-  {match.goal_a}
-</span>
-              </div>
-
-              {/* 👇 Se Montecarlo è in casa, mostra marcatori live */}
-              {mcSide === "casa" ? (
-                <div style={styles.scorersWrapper}>
-                  {Object.entries(marcatoriByPeriodo).map(([periodo, lista]) => (
-                    <div key={periodo}>
-                      <strong>
-  {periodo === "1"
-    ? "1° Tempo"
-    : periodo === "2"
-    ? "2° Tempo"
-    : periodo === "3"
-    ? "1° T Suppl."
-    : periodo === "4"
-    ? "2° T Suppl."
-    : `${periodo}° Tempo`}
-</strong>
-                      {lista.length ? (
-                        <ul style={styles.scorersUl}>
-                          {lista.map((m) => (
-                            <li
-  key={m.id}
-  style={{
-    listStyle: "none",
-    padding: "7px 8px",
-    marginTop: 5,
-    borderRadius: 8,
-    background: "rgba(245,245,245,0.85)",
-    borderLeft: "3px solid #dc2626",
-  }}
->
-  <div
-    style={{
-      fontSize: 13,
-      fontWeight: 800,
-      color: "#202020",
-      lineHeight: 1.2,
-    }}
-  >
-    {renderNomeMarcatore(m)}
-  </div>
-
-  {m.assist_giocatore_stagione_id && (
-    <div
-      style={{
-        marginTop: 4,
-        fontSize: 10,
-        fontWeight: 500,
-        color: "#777777",
-        lineHeight: 1.2,
-      }}
-    >
-      Assist: {`${m.assist_cognome || ""} ${m.assist_nome || ""}`.trim()}
+    <div style={styles.actions}>
+      <Link to="/prossima-partita" style={styles.linkBtn}>
+        Partita in Diretta
+      </Link>
     </div>
-  )}
-</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <div style={styles.scorersListMuted}>—</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={styles.perTimeRow}>
-  <div style={styles.tempoItem}>
-    <div style={styles.tempoLabel}>1° Tempo</div>
-    <div style={styles.tempoValue}>{perTimeCasa[0]}</div>
-  </div>
-
-  <div style={styles.tempoItem}>
-    <div style={styles.tempoLabel}>2° Tempo</div>
-    <div style={styles.tempoValue}>{perTimeCasa[1]}</div>
-  </div>
-
-  {(statoPartita === StatoPartita.PRIMO_TEMPO_SUPPLEMENTARE ||
-    statoPartita === StatoPartita.INTERVALLO_SUPPLEMENTARI ||
-    statoPartita === StatoPartita.SECONDO_TEMPO_SUPPLEMENTARE ||
-    statoPartita === StatoPartita.RIGORI) && (
-    <div style={styles.tempoItem}>
-      <div style={styles.tempoLabel}>1° Suppl.</div>
-      <div style={styles.tempoValue}>{perTimeCasa[2]}</div>
-    </div>
-  )}
-
-  {(statoPartita === StatoPartita.SECONDO_TEMPO_SUPPLEMENTARE ||
-    statoPartita === StatoPartita.RIGORI) && (
-    <div style={styles.tempoItem}>
-      <div style={styles.tempoLabel}>2° Suppl.</div>
-      <div style={styles.tempoValue}>{perTimeCasa[3]}</div>
-    </div>
-   )}
-</div>
-              )}
-
-                        </div>
-
-                        {statoPartita === StatoPartita.RIGORI && (
-              <div style={styles.teamLiveCol}>
-                <div
-                  style={{
-                    textAlign: "center",
-                    fontSize: 14,
-                    fontWeight: 900,
-                    color: "#202020",
-                    textTransform: "uppercase",
-                    marginBottom: 12,
-                  }}
-                >
-                  Rigori
-                </div>
-
-                {(() => {
-                  const rigoriCasa = rigoriSerie
-                    .filter(
-                      (r) =>
-                        String(r.squadra_id) ===
-                        String(match.squadra_casa_id)
-                    )
-                    .sort(
-                      (a, b) =>
-                        Number(a.ordine) - Number(b.ordine)
-                    );
-
-                  const rigoriOspite = rigoriSerie
-                    .filter(
-                      (r) =>
-                        String(r.squadra_id) ===
-                        String(match.squadra_ospite_id)
-                    )
-                    .sort(
-                      (a, b) =>
-                        Number(a.ordine) - Number(b.ordine)
-                    );
-
-                  const numeroTiri = Math.max(
-                    rigoriCasa.length,
-                    rigoriOspite.length
-                  );
-
-                  return (
-                    <>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "1fr 40px 1fr",
-                          alignItems: "center",
-                          marginBottom: 10,
-                        }}
-                      >
-                        <div
-                          style={{
-                            textAlign: "center",
-                            fontSize: 13,
-                            fontWeight: 900,
-                            color: "#202020",
-                          }}
-                        >
-                          {match.squadra_casa_nome || "Casa"}
-                        </div>
-
-                        <div
-                          style={{
-                            textAlign: "center",
-                            fontSize: 11,
-                            fontWeight: 900,
-                            color: "#777777",
-                          }}
-                        >
-                          VS
-                        </div>
-
-                        <div
-                          style={{
-                            textAlign: "center",
-                            fontSize: 13,
-                            fontWeight: 900,
-                            color: "#202020",
-                          }}
-                        >
-                          {match.squadra_ospite_nome || "Ospite"}
-                        </div>
-                      </div>
-
-                      {Array.from({ length: numeroTiri }).map(
-                        (_, index) => {
-                          const ordine = index + 1;
-
-                          const tiroCasa = rigoriCasa.find(
-                            (r) => Number(r.ordine) === ordine
-                          );
-
-                          const tiroOspite = rigoriOspite.find(
-                            (r) => Number(r.ordine) === ordine
-                          );
-
-                          return (
-                            <div
-                              key={ordine}
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns: "1fr 40px 1fr",
-                                alignItems: "center",
-                                minHeight: 30,
-                              }}
-                            >
-                              <div
-                                style={{
-                                  textAlign: "center",
-                                  fontSize: 20,
-                                  fontWeight: 900,
-                                  color:
-                                    tiroCasa?.esito === "segnato"
-                                      ? "#16a34a"
-                                      : tiroCasa
-                                      ? "#dc2626"
-                                      : "#cccccc",
-                                }}
-                              >
-                                {tiroCasa
-                                  ? tiroCasa.esito === "segnato"
-                                    ? "V"
-                                    : "X"
-                                  : ""}
-                              </div>
-
-                              <div />
-
-                              <div
-                                style={{
-                                  textAlign: "center",
-                                  fontSize: 20,
-                                  fontWeight: 900,
-                                  color:
-                                    tiroOspite?.esito === "segnato"
-                                      ? "#16a34a"
-                                      : tiroOspite
-                                      ? "#dc2626"
-                                      : "#cccccc",
-                                }}
-                              >
-                                {tiroOspite
-                                  ? tiroOspite.esito === "segnato"
-                                    ? "V"
-                                    : "X"
-                                  : ""}
-                              </div>
-                            </div>
-                          );
-                        }
-                      )}
-
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "1fr 40px 1fr",
-                          alignItems: "center",
-                          marginTop: 10,
-                          paddingTop: 10,
-                          borderTop: "1px solid #dddddd",
-                        }}
-                      >
-                        <div
-                          style={{
-                            textAlign: "center",
-                            fontSize: 22,
-                            fontWeight: 900,
-                            color: "#dc2626",
-                          }}
-                        >
-                          {match.rigori_a ?? 0}
-                        </div>
-
-                        <div />
-
-                        <div
-                          style={{
-                            textAlign: "center",
-                            fontSize: 22,
-                            fontWeight: 900,
-                            color: "#dc2626",
-                          }}
-                        >
-                          {match.rigori_b ?? 0}
-                        </div>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            )}
-
-            {/* Squadra Ospite */}
-            <div style={styles.teamLiveCol}>
-              <div style={styles.teamLiveHead}>
-                {match.squadra_ospite_logo && (
-                  <img
-                    src={match.squadra_ospite_logo}
-                    alt={match.squadra_ospite_nome || "Ospite"}
-                    style={styles.teamLogo}
-                  />
-                )}
-                <div style={styles.teamName}>{match.squadra_ospite_nome || "Ospite"}</div>
-                <span
-  style={{
-    ...styles.liveScoreBlink,
-    animation: isGiocoAttivo ? "blink 1s linear infinite" : "none",
-  }}
->
-  {match.goal_b}
-</span>
-              </div>
-
-              {/* 👇 Se Montecarlo è in trasferta, mostra marcatori live */}
-              {mcSide === "ospite" ? (
-                <div style={styles.scorersWrapper}>
-                  {Object.entries(marcatoriByPeriodo).map(([periodo, lista]) => (
-                    <div key={periodo}>
-                      <div
-  style={{
-    marginBottom: 7,
-    fontSize: 13,
-    fontWeight: 900,
-    textTransform: "uppercase",
-    color: "#202020",
-  }}
->
-  {periodo}° Tempo
-</div>
-                      {lista.length ? (
-                        <ul style={styles.scorersUl}>
-                          {lista.map((m) => (
-                            <li key={m.id} style={styles.scorerItem}>
-                              {renderNomeMarcatore(m)}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <div style={styles.scorersListMuted}>—</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-               <div style={styles.perTimeRow}>
-  <div style={styles.tempoItem}>
-    <div style={styles.tempoLabel}>1° Tempo</div>
-    <div style={styles.tempoValue}>{perTimeOspite[0]}</div>
-  </div>
-
-  <div style={styles.tempoItem}>
-    <div style={styles.tempoLabel}>2° Tempo</div>
-    <div style={styles.tempoValue}>{perTimeOspite[1]}</div>
-  </div>
-
-  {(statoPartita === StatoPartita.PRIMO_TEMPO_SUPPLEMENTARE ||
-    statoPartita === StatoPartita.INTERVALLO_SUPPLEMENTARI ||
-    statoPartita === StatoPartita.SECONDO_TEMPO_SUPPLEMENTARE ||
-    statoPartita === StatoPartita.RIGORI) && (
-    <div style={styles.tempoItem}>
-      <div style={styles.tempoLabel}>1° Tempo Suppl.</div>
-      <div style={styles.tempoValue}>{perTimeOspite[2]}</div>
-    </div>
-  )}
-
-  {(statoPartita === StatoPartita.SECONDO_TEMPO_SUPPLEMENTARE ||
-    statoPartita === StatoPartita.RIGORI) && (
-    <div style={styles.tempoItem}>
-      <div style={styles.tempoLabel}>2° Tempo Suppl.</div>
-      <div style={styles.tempoValue}>{perTimeOspite[3]}</div>
-    </div>
-  )}
-</div>
-              )}
-
-          
-            </div>
-          </div>
-
-          <div style={styles.actions}>
-            <Link to="/prossima-partita" style={styles.linkBtn}>
-              Partita in Diretta
-            </Link>
-          </div>
-        </>
+  </>
       ) : (
   // Struttura normale se non è in corso
 <>

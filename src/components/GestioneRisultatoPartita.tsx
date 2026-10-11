@@ -99,6 +99,7 @@ const [manualTime, setManualTime] = useState<string>("");
   const [rigoriCasa, setRigoriCasa] = useState(0);
 const [rigoriOspite, setRigoriOspite] = useState(0);
 const [rigoristaSelezionato, setRigoristaSelezionato] = useState("");
+const [rigoristaAvversarioSelezionato, setRigoristaAvversarioSelezionato] = useState("");
 // ========================
 // Stato sequenza rigori
 // ========================
@@ -376,7 +377,7 @@ giocatore_avversario_id: m.giocatore_avversario_id,
 // ========================
 const { data: rigoriDB, error: rigoriErr } = await supabase
   .from("rigori_partita")
-  .select("id, squadra_id, giocatore_stagione_id, ordine, esito")
+  .select("id, squadra_id, giocatore_stagione_id, giocatore_avversario_id, ordine, esito")
   .eq("partita_id", p.id)
   .order("ordine", { ascending: true });
 
@@ -1995,6 +1996,8 @@ const registraTiroRigoreAvversario = async (
 ) => {
 if (!partita) return false;
 
+if (!rigoristaAvversarioSelezionato) return false;
+
   const squadraAvversariaId =
     isMontecarlo(squadraCasa?.id, squadraCasa?.nome)
       ? squadraOspite?.id
@@ -2024,11 +2027,12 @@ if (!partita) return false;
     partita_id: partita.id,
     stagione_id: partita.stagione_id,
     giocatore_stagione_id: null,
+    giocatore_avversario_id: rigoristaAvversarioSelezionato,
     squadra_id: squadraAvversariaId,
     ordine,
     esito,
   })
-  .select("id, squadra_id, giocatore_stagione_id, ordine, esito")
+  .select("id, squadra_id, giocatore_stagione_id, giocatore_avversario_id, ordine, esito")
   .single();
 
  if (error) {
@@ -2041,6 +2045,7 @@ if (!partita) return false;
 if (tiroSalvato) {
   setTiriRigori((prev) => [...prev, tiroSalvato]);
 }
+setRigoristaAvversarioSelezionato("");
 
 console.log(
   esito === "segnato"
@@ -2059,6 +2064,8 @@ const eliminaTiroRigore = async (
     id: string;
     squadra_id: string;
     giocatore_stagione_id: string | null;
+    giocatore_avversario_id: string | null;
+    giocatore_avversario_id: string | null;
     ordine: number;
     esito: "segnato" | "sbagliato";
   }
@@ -3443,6 +3450,21 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
           : squadraCasa?.nome}
       </div>
 
+      <select
+  value={rigoristaAvversarioSelezionato}
+  onChange={(e) => setRigoristaAvversarioSelezionato(e.target.value)}
+  className="w-full border rounded px-2 py-1"
+>
+  <option value="">-- Seleziona rigorista --</option>
+
+  {giocatoriAvversari.map((g) => (
+    <option key={g.id} value={g.id}>
+      {g.numero_maglia ? `${g.numero_maglia} - ` : ""}
+      {(g.cognome || "").trim()} {(g.nome || "").trim()}
+    </option>
+  ))}
+</select>
+
       <div className="flex justify-center gap-3">
         <button
           onClick={async () => {
@@ -3456,14 +3478,16 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
     await aggiornaRigori("casa", 1);
   }
 }}
-          className="bg-green-600 text-white px-4 py-2 rounded"
+          disabled={!rigoristaAvversarioSelezionato}
+className="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
         >
           ⚽ Segnato
         </button>
 
         <button
           onClick={() => registraTiroRigoreAvversario("sbagliato")}
-          className="bg-red-600 text-white px-4 py-2 rounded"
+          disabled={!rigoristaAvversarioSelezionato}
+className="bg-red-600 text-white px-4 py-2 rounded disabled:opacity-50"
         >
           ❌ Sbagliato
         </button>
@@ -3488,11 +3512,15 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
               )
             : null;
 
+            const giocatoreAvversario = !montecarlo
+  ? giocatoriAvversari.find(
+      (g) => g.id === tiro.giocatore_avversario_id
+    )
+  : null;
+
           const nome = montecarlo
-            ? `${(giocatore?.cognome || "").trim()} ${(giocatore?.nome || "").trim()}`.trim()
-            : isMontecarlo(squadraCasa?.id, squadraCasa?.nome)
-              ? squadraOspite?.nome
-              : squadraCasa?.nome;
+  ? `${(giocatore?.cognome || "").trim()} ${(giocatore?.nome || "").trim()}`.trim()
+  : `${giocatoreAvversario?.numero_maglia ? `#${giocatoreAvversario.numero_maglia} ` : ""}${(giocatoreAvversario?.cognome || "").trim()} ${(giocatoreAvversario?.nome || "").trim()}`.trim();
 
           return (
             <div
@@ -3981,6 +4009,10 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
   setTipoEvento((prev) => (prev === "giallo" ? null : "giallo"));
 
   const statoCorrente = getStatoPartita(timerState);
+    const secondoAssoluto = getTempoAssoluto(timerState, elapsed);
+  const minutoAutomatico = Math.floor(secondoAssoluto / 60) + 1;
+
+  setMinutoCartellino(String(minutoAutomatico));
 
   if (statoCorrente === StatoPartita.PRIMO_TEMPO) {
     setPeriodoCartellino(1);
@@ -4027,6 +4059,10 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
   setTipoEvento((prev) => (prev === "rosso" ? null : "rosso"));
 
   const statoCorrente = getStatoPartita(timerState);
+  const secondoAssoluto = getTempoAssoluto(timerState, elapsed);
+const minutoAutomatico = Math.floor(secondoAssoluto / 60) + 1;
+
+setMinutoCartellino(String(minutoAutomatico));
 
   if (statoCorrente === StatoPartita.PRIMO_TEMPO) {
     setPeriodoCartellino(1);
@@ -4175,9 +4211,7 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
       value=""
       disabled={
   !squadraCartellino ||
-  periodoCartellino === null ||
-  !minutoCartellino ||
-  Number(minutoCartellino) < 1
+  periodoCartellino === null
 }
       onChange={async (e) => {
         const giocatoreId = e.target.value;
