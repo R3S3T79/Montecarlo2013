@@ -268,7 +268,14 @@ export default function HomePage(): JSX.Element {
     return [...marqueeItems, sep, ...marqueeItems];
   }, [marqueeItems]);
 
+  const marqueeDuration = useMemo(() => {
+    const lunghezzaTotale = marqueeItems.reduce(
+      (totale, item) => totale + item.testo.length,
+      0
+    );
 
+    return Math.max(20, lunghezzaTotale * 0.18);
+  }, [marqueeItems]);
 
   // --------------------------------
 // COMPLEANNI — solo stagione attuale
@@ -1290,7 +1297,10 @@ const renderNomeMarcatore = (m: Marcatore) => {
       <div
         ref={newsTrackRef}
         className="marqueeTrack"
-        style={styles.marqueeTrack}
+        style={{
+  ...styles.marqueeTrack,
+  animation: `scrollLeft ${marqueeDuration}s linear infinite`,
+}}
         onMouseEnter={() => newsTrackRef.current?.classList.add("paused")}
         onMouseLeave={() => newsTrackRef.current?.classList.remove("paused")}
         onTouchStart={() => newsTrackRef.current?.classList.add("paused")}
