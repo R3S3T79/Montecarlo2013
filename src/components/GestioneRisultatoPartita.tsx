@@ -2199,6 +2199,28 @@ return null;
     const squadraSegnanteId =
       side === "casa" ? partita.squadra_casa_id : partita.squadra_ospite_id;
 
+          const { data: formazioneCorrente, error: formazioneErr } = await supabase
+      .from("formazioni_partita")
+      .select("giocatore_stagione_id")
+      .eq("partita_id", partita.id);
+
+    if (formazioneErr) {
+      console.error(
+        "❌ Errore lettura formazione per portiere:",
+        formazioneErr.message
+      );
+    }
+
+    const idsInCampo = new Set(
+      (formazioneCorrente || []).map((f) => f.giocatore_stagione_id)
+    );
+
+    const portiereInCampo = giocatori.find(
+      (g) =>
+        idsInCampo.has(g.id) &&
+        (g.ruolo || "").toLowerCase() === "portiere"
+    );
+
     const { data, error } = await supabase
       .from("marcatori")
       .insert({
@@ -2210,7 +2232,7 @@ return null;
         giocatore_stagione_id: null, // non è un marcatore MC
         giocatore_avversario_id: null,
         giocatore_uid: null,
-        portiere_subisce_id: null, // lo scegli dopo
+        portiere_subisce_id: portiereInCampo?.id ?? null,
         squadra_segnante_id: squadraSegnanteId,
       })
       .select(
@@ -3923,9 +3945,26 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
 {/* Pulsanti eventi partita */}
 <div className="flex justify-center space-x-4">
   <button
-    onClick={() => {
+  onClick={() => {
   setTipoEvento((prev) => (prev === "gol" ? null : "gol"));
-  setTempo(null);
+
+  const statoCorrente = getStatoPartita(timerState);
+
+  if (statoCorrente === StatoPartita.PRIMO_TEMPO) {
+    setTempo(1);
+  } else if (statoCorrente === StatoPartita.SECONDO_TEMPO) {
+    setTempo(2);
+  } else if (
+    statoCorrente === StatoPartita.PRIMO_TEMPO_SUPPLEMENTARE
+  ) {
+    setTempo(3);
+  } else if (
+    statoCorrente === StatoPartita.SECONDO_TEMPO_SUPPLEMENTARE
+  ) {
+    setTempo(4);
+  } else {
+    setTempo(null);
+  }
 }}
     className={`px-5 py-2 rounded-full text-2xl ${
       tipoEvento === "gol"
@@ -3938,9 +3977,41 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
   </button>
 
   <button
-    onClick={() =>
-      setTipoEvento((prev) => (prev === "giallo" ? null : "giallo"))
-    }
+    onClick={() => {
+  setTipoEvento((prev) => (prev === "giallo" ? null : "giallo"));
+
+  const statoCorrente = getStatoPartita(timerState);
+
+  if (statoCorrente === StatoPartita.PRIMO_TEMPO) {
+    setPeriodoCartellino(1);
+  } else if (statoCorrente === StatoPartita.INTERVALLO) {
+    setPeriodoCartellino(2);
+  } else if (statoCorrente === StatoPartita.SECONDO_TEMPO) {
+    setPeriodoCartellino(3);
+  } else if (
+    statoCorrente === StatoPartita.FINE_TEMPI_REGOLAMENTARI
+  ) {
+    setPeriodoCartellino(4);
+  } else if (
+    statoCorrente === StatoPartita.PRIMO_TEMPO_SUPPLEMENTARE
+  ) {
+    setPeriodoCartellino(5);
+  } else if (
+    statoCorrente === StatoPartita.INTERVALLO_SUPPLEMENTARI
+  ) {
+    setPeriodoCartellino(6);
+  } else if (
+    statoCorrente === StatoPartita.SECONDO_TEMPO_SUPPLEMENTARE
+  ) {
+    setPeriodoCartellino(7);
+  } else if (statoCorrente === StatoPartita.RIGORI) {
+    setPeriodoCartellino(8);
+  } else if (statoCorrente === StatoPartita.FINE_PARTITA) {
+    setPeriodoCartellino(9);
+  } else {
+    setPeriodoCartellino(null);
+  }
+}}
     className={`px-5 py-2 rounded-full text-2xl ${
       tipoEvento === "giallo"
         ? "bg-montecarlo-secondary text-white"
@@ -3952,9 +4023,41 @@ if (statoPartita === StatoPartita.FINE_PARTITA) {
   </button>
 
     <button
-    onClick={() =>
-      setTipoEvento((prev) => (prev === "rosso" ? null : "rosso"))
-    }
+    onClick={() => {
+  setTipoEvento((prev) => (prev === "rosso" ? null : "rosso"));
+
+  const statoCorrente = getStatoPartita(timerState);
+
+  if (statoCorrente === StatoPartita.PRIMO_TEMPO) {
+    setPeriodoCartellino(1);
+  } else if (statoCorrente === StatoPartita.INTERVALLO) {
+    setPeriodoCartellino(2);
+  } else if (statoCorrente === StatoPartita.SECONDO_TEMPO) {
+    setPeriodoCartellino(3);
+  } else if (
+    statoCorrente === StatoPartita.FINE_TEMPI_REGOLAMENTARI
+  ) {
+    setPeriodoCartellino(4);
+  } else if (
+    statoCorrente === StatoPartita.PRIMO_TEMPO_SUPPLEMENTARE
+  ) {
+    setPeriodoCartellino(5);
+  } else if (
+    statoCorrente === StatoPartita.INTERVALLO_SUPPLEMENTARI
+  ) {
+    setPeriodoCartellino(6);
+  } else if (
+    statoCorrente === StatoPartita.SECONDO_TEMPO_SUPPLEMENTARE
+  ) {
+    setPeriodoCartellino(7);
+  } else if (statoCorrente === StatoPartita.RIGORI) {
+    setPeriodoCartellino(8);
+  } else if (statoCorrente === StatoPartita.FINE_PARTITA) {
+    setPeriodoCartellino(9);
+  } else {
+    setPeriodoCartellino(null);
+  }
+}}
     className={`px-5 py-2 rounded-full text-2xl ${
       tipoEvento === "rosso"
         ? "bg-montecarlo-secondary text-white"
