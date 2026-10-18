@@ -129,6 +129,7 @@ const [tiriRigori, setTiriRigori] = useState<
   assist_giocatore_stagione_id?: string | null;
   portiere_subisce_id?: string | null;
   squadra_segnante_id?: string | null;
+  autogol_giocatore_stagione_id?: string | null;
   id_supabase?: string;
 }[]
   >
@@ -353,7 +354,7 @@ setRigoriOspite(p.rigori_b ?? 0);
     // 6) Marcatori
     const { data: marcatoriDB } = await supabase
       .from("marcatori")
-      .select("giocatore_stagione_id, giocatore_avversario_id, assist_giocatore_stagione_id, periodo, goal_tempo, tempo_sec, tipo_goal, portiere_subisce_id, squadra_segnante_id, id")
+      .select("giocatore_stagione_id, giocatore_avversario_id, assist_giocatore_stagione_id, periodo, goal_tempo, tempo_sec, tipo_goal, portiere_subisce_id, squadra_segnante_id, autogol_giocatore_stagione_id, id")
       .eq("partita_id", p.id);
 
     const perPeriodo: Record<number, any[]> = {};
@@ -367,6 +368,7 @@ giocatore_avversario_id: m.giocatore_avversario_id,
   assist_giocatore_stagione_id: m.assist_giocatore_stagione_id,
   portiere_subisce_id: m.portiere_subisce_id,
   squadra_segnante_id: m.squadra_segnante_id,
+  autogol_giocatore_stagione_id: m.autogol_giocatore_stagione_id,
   id_supabase: m.id,
 });
     });
@@ -2181,6 +2183,7 @@ const eliminaTiroRigore = async (
       giocatore_stagione_id: data.giocatore_stagione_id,
       portiere_subisce_id: data.portiere_subisce_id,
       squadra_segnante_id: data.squadra_segnante_id,
+      autogol_giocatore_stagione_id: data.autogol_giocatore_stagione_id,
       id_supabase: data.id,
     },
   ]);
@@ -2239,11 +2242,12 @@ return null;
         giocatore_stagione_id: null, // non è un marcatore MC
         giocatore_avversario_id: null,
         giocatore_uid: null,
+        autogol_giocatore_stagione_id: null,
         portiere_subisce_id: portiereInCampo?.id ?? null,
         squadra_segnante_id: squadraSegnanteId,
       })
       .select(
-  "id, periodo, goal_tempo, tempo_sec, tipo_goal, giocatore_stagione_id, portiere_subisce_id, squadra_segnante_id"
+  "id, periodo, goal_tempo, tempo_sec, tipo_goal, giocatore_stagione_id, portiere_subisce_id, squadra_segnante_id, autogol_giocatore_stagione_id"
 )
       .single();
 
@@ -2439,22 +2443,25 @@ const selezionaMarcatoreAvversario = async (
 ) => {
   if (!partita) return;
 
-  // update locale
   setMarcatori((prev) => {
     const aggiornata = (prev[periodo] || []).map((m) =>
       m.goal_tempo === goal_tempo
-        ? { ...m, giocatore_avversario_id: giocatoreAvversarioId || null }
+        ? {
+            ...m,
+            giocatore_avversario_id: giocatoreAvversarioId || null,
+            autogol_giocatore_stagione_id: null,
+          }
         : m
     );
 
     return { ...prev, [periodo]: aggiornata };
   });
 
-  // update DB
   const { error } = await supabase
     .from("marcatori")
     .update({
       giocatore_avversario_id: giocatoreAvversarioId || null,
+      autogol_giocatore_stagione_id: null,
     })
     .eq("partita_id", partita.id)
     .eq("periodo", periodo)
@@ -2462,6 +2469,44 @@ const selezionaMarcatoreAvversario = async (
 
   if (error) {
     console.error("Errore aggiornamento marcatore avversario:", error.message);
+  }
+};
+
+const selezionaAutogol = async (
+  periodo: number,
+  goal_tempo: number,
+  giocatoreStagioneId: string
+) => {
+  if (!partita) return;
+
+  const autogolId = giocatoreStagioneId || null;
+
+  setMarcatori((prev) => {
+    const aggiornata = (prev[periodo] || []).map((m) =>
+      m.goal_tempo === goal_tempo
+        ? {
+            ...m,
+            autogol_giocatore_stagione_id: autogolId,
+            giocatore_avversario_id: null,
+          }
+        : m
+    );
+
+    return { ...prev, [periodo]: aggiornata };
+  });
+
+  const { error } = await supabase
+    .from("marcatori")
+    .update({
+      autogol_giocatore_stagione_id: autogolId,
+      giocatore_avversario_id: null,
+    })
+    .eq("partita_id", partita.id)
+    .eq("periodo", periodo)
+    .eq("goal_tempo", goal_tempo);
+
+  if (error) {
+    console.error("Errore aggiornamento autogol:", error.message);
   }
 };
 
@@ -3019,6 +3064,23 @@ setOrdineEntrati((prev) => [
           #{g.numero_maglia} {(g.nome || "").trim()} {(g.cognome || "").trim()}
         </option>
       ))}
+    </select>
+
+    <select
+      value={m.autogol_giocatore_stagione_id || ""}
+      onChange={(e) =>
+        selezionaAutogol(tempo, m.goal_tempo, e.target.value)
+      }
+      className="w-full border rounded px-2 py-1"
+    >
+      <option value="">-- Autogol di un giocatore Montecarlo --</option>
+      {giocatori
+        .filter((g) => convocatiSet.has(g.id))
+        .map((g) => (
+          <option key={g.id} value={g.id}>
+            {(g.cognome || "").trim()} {(g.nome || "").trim()}
+          </option>
+        ))}
     </select>
 
     {/* Portiere che subisce */}

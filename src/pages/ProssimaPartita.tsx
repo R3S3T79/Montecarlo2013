@@ -59,6 +59,7 @@ interface Marcatore {
   partita_id: string;
   stagione_id: string;
   squadra_segnante_id: string | null;
+  autogol_giocatore_stagione_id: string | null;
 }
 
 interface Giocatore {
@@ -264,6 +265,7 @@ setGiocatoriStagione(mapped);
     partita_id: row.partita_id,
     stagione_id: row.stagione_id,
     squadra_segnante_id: row.squadra_segnante_id ?? null,
+    autogol_giocatore_stagione_id: row.autogol_giocatore_stagione_id ?? null,
   });
 
   // 4) fetch marcatori
@@ -272,7 +274,7 @@ setGiocatoriStagione(mapped);
     (async () => {
       const { data } = await supabase
         .from("marcatori")
-        .select("id,periodo,goal_tempo,giocatore_uid,giocatore_stagione_id,assist_giocatore_stagione_id,partita_id,stagione_id,squadra_segnante_id")
+        .select("id,periodo,goal_tempo,giocatore_uid,giocatore_stagione_id,assist_giocatore_stagione_id,partita_id,stagione_id,squadra_segnante_id,autogol_giocatore_stagione_id")
         .eq("partita_id", partita.id)
         .order("periodo", { ascending: true });
 
@@ -547,6 +549,15 @@ setGiocatoriStagione(mapped);
   const isMontecarloOspite = partita.ospite.id === MONTECARLO_ID;
 
   const renderNomeMarcatore = (m: Marcatore) => {
+    if (m.autogol_giocatore_stagione_id) {
+      const autore = giocatoriStagione.find(
+        (g) => g.record_id === m.autogol_giocatore_stagione_id
+      );
+      return autore
+        ? `Autogol ${autore.cognome} ${autore.nome}`
+        : "Autogol";
+    }
+
     const byPlayer = giocatoriStagione.find((g) => g.giocatore_uid === m.giocatore_uid);
     const byRecord = giocatoriStagione.find((g) => g.record_id === m.giocatore_uid);
     const pl = byPlayer || byRecord;
