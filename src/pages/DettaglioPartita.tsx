@@ -19,6 +19,7 @@ interface MarcatoriEntry {
   assist_giocatore_stagione_id: string | null
   assist_nome: string
   assist_cognome: string
+  autogol: boolean
 }
 interface TiroRigore {
   id: string
@@ -244,9 +245,9 @@ casa: squadra_casa_id ( id, nome, logo_url ),
       }
 
       const { data: marcatoriData, error: errMd } = await supabase
-        .from('marcatori_alias')
-        .select('periodo, tempo_sec, giocatore_stagione_id, squadra_segnante_id, giocatore_nome, giocatore_cognome, avversario_nome, avversario_cognome, avversario_numero_maglia, tipo_goal, assist_giocatore_stagione_id, assist_nome, assist_cognome')
-        .eq('partita_id', id)
+  .from('marcatori_alias')
+  .select('periodo, tempo_sec, giocatore_stagione_id, squadra_segnante_id, giocatore_nome, giocatore_cognome, avversario_nome, avversario_cognome, avversario_numero_maglia, tipo_goal, assist_giocatore_stagione_id, assist_nome, assist_cognome, autogol_giocatore_stagione_id, autogol_nome, autogol_cognome')
+  .eq('partita_id', id)
 
       if (errMd) console.error(errMd)
 
@@ -457,11 +458,12 @@ setInizioSecondoTempo(
       }
 
       const marcatori: MarcatoriEntry[] = (marcatoriData || [])
-  .filter(m =>
+    .filter(m =>
     m.giocatore_nome ||
     m.giocatore_cognome ||
     m.avversario_nome ||
-    m.avversario_cognome
+    m.avversario_cognome ||
+    m.autogol_giocatore_stagione_id
   )
   .map(m => ({
     periodo: m.periodo,
@@ -469,17 +471,22 @@ setInizioSecondoTempo(
     avversario: m.squadra_segnante_id
       ? m.squadra_segnante_id === (pd as any).ospite.id
       : !!(m.avversario_nome || m.avversario_cognome) === ((pd as any).casa.id === 'a16a8645-9f86-41d9-a81f-a92931f1cc67'),
-    giocatore: {
-  nome: m.giocatore_nome || (m.avversario_nome
-    ? m.avversario_nome.charAt(0).toUpperCase() + m.avversario_nome.slice(1).toLowerCase()
-    : ''),
-  cognome: m.giocatore_cognome || (m.avversario_cognome
-    ? m.avversario_cognome.charAt(0).toUpperCase() + m.avversario_cognome.slice(1).toLowerCase()
-    : '')
+        giocatore: {
+  nome: m.autogol_giocatore_stagione_id
+    ? (m.autogol_nome || '')
+    : m.giocatore_nome || (m.avversario_nome
+      ? m.avversario_nome.charAt(0).toUpperCase() + m.avversario_nome.slice(1).toLowerCase()
+      : ''),
+  cognome: m.autogol_giocatore_stagione_id
+    ? (m.autogol_cognome || '')
+    : m.giocatore_cognome || (m.avversario_cognome
+      ? m.avversario_cognome.charAt(0).toUpperCase() + m.avversario_cognome.slice(1).toLowerCase()
+      : '')
 },
 assist_giocatore_stagione_id: m.assist_giocatore_stagione_id ?? null,
 assist_nome: m.assist_nome || '',
 assist_cognome: m.assist_cognome || '',
+autogol: !!m.autogol_giocatore_stagione_id,
   }))
   .sort((a, b) => (a.tempo_sec ?? 0) - (b.tempo_sec ?? 0))
 
@@ -596,15 +603,16 @@ const goalOspiteArr = [
 
 const eventiSintesi = [
   ...partita.marcatori.map((m) => ({
-    tipoEvento: 'goal' as const,
-    periodo: m.periodo,
-    tempo_sec: m.tempo_sec,
-    avversario: m.avversario,
-    nome: m.giocatore?.nome || '',
-    cognome: m.giocatore?.cognome || '',
-    assist_nome: m.assist_nome || '',
-assist_cognome: m.assist_cognome || '',
-  })),
+  tipoEvento: 'goal' as const,
+  periodo: m.periodo,
+  tempo_sec: m.tempo_sec,
+  avversario: m.avversario,
+  nome: m.giocatore?.nome || '',
+  cognome: m.giocatore?.cognome || '',
+  assist_nome: m.assist_nome || '',
+  assist_cognome: m.assist_cognome || '',
+  autogol: m.autogol,
+})),
 
   ...cartellini.map((c) => ({
     tipoEvento: 'cartellino' as const,
@@ -620,14 +628,12 @@ assist_cognome: m.assist_cognome || '',
           : c.periodo,
     tempo_sec: c.tempo_sec ?? null,
     avversario: !!c.giocatore_avversario_id === (partita.casa.id === 'a16a8645-9f86-41d9-a81f-a92931f1cc67'),
-    nome:
-      c.giocatore_avversario?.nome ||
-      c.giocatore?.nome ||
-      '',
-    cognome:
-      c.giocatore_avversario?.cognome ||
-      c.giocatore?.cognome ||
-      '',
+        nome: c.giocatore_avversario?.nome
+      ? c.giocatore_avversario.nome.toLocaleLowerCase('it-IT').replace(/\b\p{L}/gu, letter => letter.toLocaleUpperCase('it-IT'))
+      : c.giocatore?.nome || '',
+    cognome: c.giocatore_avversario?.cognome
+      ? c.giocatore_avversario.cognome.toLocaleLowerCase('it-IT').replace(/\b\p{L}/gu, letter => letter.toLocaleUpperCase('it-IT'))
+      : c.giocatore?.cognome || '',
     tipoCartellino: c.tipo,
   })),
 ].sort((a, b) => {
@@ -764,8 +770,9 @@ assist_cognome: m.assist_cognome || '',
 
                       <div>
                         <div className="text-[14px] font-bold text-[#181818]">
-                          {evento.cognome} {evento.nome}
-                        </div>
+  {evento.tipoEvento === 'goal' && evento.autogol ? 'Aut. ' : ''}
+  {evento.cognome} {evento.nome}
+</div>
 
                         {evento.tipoEvento === 'goal' &&
                           (evento.assist_nome || evento.assist_cognome) && (
