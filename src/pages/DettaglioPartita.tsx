@@ -15,6 +15,7 @@ interface MarcatoriEntry {
   periodo: number
   tempo_sec: number | null
     avversario: boolean
+  autogol: boolean
   giocatore: { nome: string; cognome: string }
   assist_giocatore_stagione_id: string | null
   assist_nome: string
@@ -245,7 +246,7 @@ casa: squadra_casa_id ( id, nome, logo_url ),
 
       const { data: marcatoriData, error: errMd } = await supabase
         .from('marcatori_alias')
-        .select('periodo, tempo_sec, giocatore_stagione_id, squadra_segnante_id, giocatore_nome, giocatore_cognome, avversario_nome, avversario_cognome, avversario_numero_maglia, tipo_goal, assist_giocatore_stagione_id, assist_nome, assist_cognome')
+        .select('periodo, tempo_sec, giocatore_stagione_id, squadra_segnante_id, giocatore_nome, giocatore_cognome, avversario_nome, avversario_cognome, avversario_numero_maglia, tipo_goal, assist_giocatore_stagione_id, assist_nome, assist_cognome, autogol_giocatore_stagione_id, autogol_nome, autogol_cognome')
         .eq('partita_id', id)
 
       if (errMd) console.error(errMd)
@@ -460,6 +461,8 @@ setInizioSecondoTempo(
   .filter(m =>
     m.giocatore_nome ||
     m.giocatore_cognome ||
+    m.autogol_nome ||
+    m.autogol_cognome ||
     m.avversario_nome ||
     m.avversario_cognome
   )
@@ -469,11 +472,12 @@ setInizioSecondoTempo(
     avversario: m.squadra_segnante_id
       ? m.squadra_segnante_id === (pd as any).ospite.id
       : !!(m.avversario_nome || m.avversario_cognome) === ((pd as any).casa.id === 'a16a8645-9f86-41d9-a81f-a92931f1cc67'),
+    autogol: !!(m.autogol_nome || m.autogol_cognome),
     giocatore: {
-  nome: m.giocatore_nome || (m.avversario_nome
+  nome: m.autogol_nome || m.giocatore_nome || (m.avversario_nome
     ? m.avversario_nome.charAt(0).toUpperCase() + m.avversario_nome.slice(1).toLowerCase()
     : ''),
-  cognome: m.giocatore_cognome || (m.avversario_cognome
+  cognome: m.autogol_cognome || m.giocatore_cognome || (m.avversario_cognome
     ? m.avversario_cognome.charAt(0).toUpperCase() + m.avversario_cognome.slice(1).toLowerCase()
     : '')
 },
@@ -602,6 +606,7 @@ const eventiSintesi = [
     avversario: m.avversario,
     nome: m.giocatore?.nome || '',
     cognome: m.giocatore?.cognome || '',
+    autogol: m.autogol,
     assist_nome: m.assist_nome || '',
 assist_cognome: m.assist_cognome || '',
   })),
@@ -629,6 +634,7 @@ assist_cognome: m.assist_cognome || '',
       c.giocatore?.cognome ||
       '',
     tipoCartellino: c.tipo,
+    autogol: false,
   })),
 ].sort((a, b) => {
   const secondoA = a.tempo_sec === null
@@ -764,7 +770,7 @@ assist_cognome: m.assist_cognome || '',
 
                       <div>
                         <div className="text-[14px] font-bold text-[#181818]">
-                          {evento.cognome} {evento.nome}
+                          {evento.autogol ? 'Autogol ' : ''}{evento.cognome} {evento.nome}
                         </div>
 
                         {evento.tipoEvento === 'goal' &&
