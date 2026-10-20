@@ -123,8 +123,10 @@ const [tiriRigori, setTiriRigori] = useState<
     {
   goal_tempo: number;
   tempo_sec?: number | null;
-  tipo_goal?: "azione" | "rigore";
+  tipo_goal?: "azione" | "rigore" | "autogol";
   giocatore_stagione_id: string | null;
+  is_autogol?: boolean;
+  autogol_giocatore_stagione_id?: string | null;
   giocatore_avversario_id?: string | null;
   assist_giocatore_stagione_id?: string | null;
   portiere_subisce_id?: string | null;
@@ -353,7 +355,7 @@ setRigoriOspite(p.rigori_b ?? 0);
     // 6) Marcatori
     const { data: marcatoriDB } = await supabase
       .from("marcatori")
-      .select("giocatore_stagione_id, giocatore_avversario_id, assist_giocatore_stagione_id, periodo, goal_tempo, tempo_sec, tipo_goal, portiere_subisce_id, squadra_segnante_id, id")
+      .select("giocatore_stagione_id, giocatore_avversario_id, assist_giocatore_stagione_id, periodo, goal_tempo, tempo_sec, tipo_goal, autogol_giocatore_stagione_id, autogol_giocatore_avversario_id, is_autogol, portiere_subisce_id, squadra_segnante_id, id")
       .eq("partita_id", p.id);
 
     const perPeriodo: Record<number, any[]> = {};
@@ -362,11 +364,20 @@ setRigoriOspite(p.rigori_b ?? 0);
       perPeriodo[m.periodo].push({
   goal_tempo: m.goal_tempo,
   tempo_sec: m.tempo_sec,
+  tipo_goal:
+  m.is_autogol ||
+  m.autogol_giocatore_stagione_id ||
+  m.autogol_giocatore_avversario_id
+    ? "autogol"
+    : m.tipo_goal,
   giocatore_stagione_id: m.giocatore_stagione_id,
 giocatore_avversario_id: m.giocatore_avversario_id,
   assist_giocatore_stagione_id: m.assist_giocatore_stagione_id,
   portiere_subisce_id: m.portiere_subisce_id,
   squadra_segnante_id: m.squadra_segnante_id,
+  autogol_giocatore_stagione_id: m.autogol_giocatore_stagione_id,
+  autogol_giocatore_avversario_id: m.autogol_giocatore_avversario_id,
+  is_autogol: m.is_autogol,
   id_supabase: m.id,
 });
     });
@@ -440,7 +451,7 @@ if (cartelliniErr) {
         async () => {
           const { data: live } = await supabase
             .from("marcatori")
-            .select("giocatore_stagione_id, giocatore_avversario_id, assist_giocatore_stagione_id, periodo, goal_tempo, tempo_sec, tipo_goal, portiere_subisce_id, squadra_segnante_id, id")
+            .select("giocatore_stagione_id, giocatore_avversario_id, assist_giocatore_stagione_id, periodo, goal_tempo, tempo_sec, tipo_goal, autogol_giocatore_stagione_id, autogol_giocatore_avversario_id, is_autogol, portiere_subisce_id, squadra_segnante_id, id")
             .eq("partita_id", p.id);
           const perLive: Record<number, any[]> = {};
           live?.forEach((m) => {
@@ -448,12 +459,20 @@ if (cartelliniErr) {
             perLive[m.periodo].push({
   goal_tempo: m.goal_tempo,
   tempo_sec: m.tempo_sec,
-  tipo_goal: m.tipo_goal,
+  tipo_goal:
+  m.is_autogol ||
+  m.autogol_giocatore_stagione_id ||
+  m.autogol_giocatore_avversario_id
+    ? "autogol"
+    : m.tipo_goal,
   giocatore_stagione_id: m.giocatore_stagione_id,
 giocatore_avversario_id: m.giocatore_avversario_id,
   assist_giocatore_stagione_id: m.assist_giocatore_stagione_id,
   portiere_subisce_id: m.portiere_subisce_id,
   squadra_segnante_id: m.squadra_segnante_id,
+  autogol_giocatore_stagione_id: m.autogol_giocatore_stagione_id,
+  autogol_giocatore_avversario_id: m.autogol_giocatore_avversario_id,
+  is_autogol: m.is_autogol,
   id_supabase: m.id,
 });
           });
@@ -2432,6 +2451,44 @@ return null;
 };
 
 // Assegna marcatore avversario
+// =====================
+// MARCATORI - Selezione autore autogol avversario
+// =====================
+const selezionaAutogolAvversario = async (
+  periodo: number,
+  goal_tempo: number,
+  giocatoreAvversarioId: string
+) => {
+  if (!partita) return;
+
+  const autogolId = giocatoreAvversarioId || null;
+
+  // Aggiornamento locale
+  setMarcatori((prev) => {
+    const aggiornata = (prev[periodo] || []).map((m) =>
+      m.goal_tempo === goal_tempo
+        ? { ...m, autogol_giocatore_avversario_id: autogolId }
+        : m
+    );
+
+    return { ...prev, [periodo]: aggiornata };
+  });
+
+  // Aggiornamento Supabase
+  const { error } = await supabase
+    .from("marcatori")
+    .update({
+      autogol_giocatore_avversario_id: autogolId,
+      giocatore_avversario_id: null,
+    })
+    .eq("partita_id", partita.id)
+    .eq("periodo", periodo)
+    .eq("goal_tempo", goal_tempo);
+
+  if (error) {
+    console.error("Errore salvataggio autogol avversario:", error.message);
+  }
+};
 const selezionaMarcatoreAvversario = async (
   periodo: number,
   goal_tempo: number,
@@ -2466,6 +2523,45 @@ const selezionaMarcatoreAvversario = async (
 };
 
   // Assegna marcatore (solo per gol segnati da MC)
+  // =====================
+// MARCATORI - Selezione autore autogol Montecarlo
+// =====================
+const selezionaAutogolMontecarlo = async (
+  periodo: number,
+  goal_tempo: number,
+  giocatoreStagioneId: string
+) => {
+  if (!partita) return;
+
+  const autogolId = giocatoreStagioneId || null;
+
+  // Aggiornamento locale
+  setMarcatori((prev) => {
+    const aggiornata = (prev[periodo] || []).map((m) =>
+      m.goal_tempo === goal_tempo
+        ? { ...m, autogol_giocatore_stagione_id: autogolId }
+        : m
+    );
+
+    return { ...prev, [periodo]: aggiornata };
+  });
+
+  // Aggiornamento Supabase
+  const { error } = await supabase
+    .from("marcatori")
+    .update({
+      autogol_giocatore_stagione_id: autogolId,
+      giocatore_stagione_id: null,
+      giocatore_uid: null,
+    })
+    .eq("partita_id", partita.id)
+    .eq("periodo", periodo)
+    .eq("goal_tempo", goal_tempo);
+
+  if (error) {
+    console.error("Errore salvataggio autogol Montecarlo:", error.message);
+  }
+};
   const selezionaMarcatore = async (periodo: number, goal_tempo: number, gStagioneId: string) => {
     if (!partita) return;
     const gioc = giocatori.find((g) => g.id === gStagioneId);
@@ -2555,6 +2651,7 @@ const modificaTempoGoal = async (
   tempoSec: number
 ) => {
   if (!partita) return;
+  
 
   setMarcatori((prev) => {
     const aggiornata = (prev[periodo] || []).map((m) =>
@@ -2599,19 +2696,40 @@ const modificaTempoGoal = async (
 const modificaTipoGoal = async (
   periodo: number,
   goal_tempo: number,
-  tipoGoal: "azione" | "rigore"
+  tipoGoal: "azione" | "rigore" | "autogol"
 ) => {
   if (!partita) return;
+  const entryCorrente = (marcatori[periodo] || []).find(
+  (m) => m.goal_tempo === goal_tempo
+);
+
+const eraAutogol = entryCorrente?.tipo_goal === "autogol";
+const diventaAutogol = tipoGoal === "autogol";
+const cambiaCategoria = eraAutogol !== diventaAutogol;
+  
 
   setMarcatori((prev) => {
-    const aggiornata = (prev[periodo] || []).map((m) =>
-      m.goal_tempo === goal_tempo
-        ? { ...m, tipo_goal: tipoGoal }
-        : m
-    );
+  const aggiornata = (prev[periodo] || []).map((m) =>
+    m.goal_tempo === goal_tempo
+      ? {
+    ...m,
+    tipo_goal: tipoGoal,
+    is_autogol: tipoGoal === "autogol",
+    ...(cambiaCategoria
+      ? {
+          giocatore_stagione_id: null,
+          giocatore_avversario_id: null,
+          autogol_giocatore_stagione_id: null,
+          autogol_giocatore_avversario_id: null,
+          assist_giocatore_stagione_id: null,
+        }
+      : {}),
+  }
+      : m
+  );
 
-    return { ...prev, [periodo]: aggiornata };
-  });
+  return { ...prev, [periodo]: aggiornata };
+});
 
   const entry = (marcatori[periodo] || []).find(
     (m) => m.goal_tempo === goal_tempo
@@ -2620,7 +2738,20 @@ const modificaTipoGoal = async (
   if (entry?.id_supabase) {
     const { error } = await supabase
       .from("marcatori")
-      .update({ tipo_goal: tipoGoal })
+      .update({
+  tipo_goal: tipoGoal === "autogol" ? "azione" : tipoGoal,
+    is_autogol: tipoGoal === "autogol",
+  ...(cambiaCategoria
+    ? {
+        giocatore_stagione_id: null,
+        giocatore_avversario_id: null,
+        giocatore_uid: null,
+        autogol_giocatore_stagione_id: null,
+        autogol_giocatore_avversario_id: null,
+        assist_giocatore_stagione_id: null,
+      }
+    : {}),
+})
       .eq("id", entry.id_supabase);
 
     if (error) {
@@ -2629,7 +2760,20 @@ const modificaTipoGoal = async (
   } else {
     const { error } = await supabase
       .from("marcatori")
-      .update({ tipo_goal: tipoGoal })
+      .update({
+  tipo_goal: tipoGoal === "autogol" ? "azione" : tipoGoal,
+    is_autogol: tipoGoal === "autogol",
+  ...(cambiaCategoria
+    ? {
+        giocatore_stagione_id: null,
+        giocatore_avversario_id: null,
+        giocatore_uid: null,
+        autogol_giocatore_stagione_id: null,
+        autogol_giocatore_avversario_id: null,
+        assist_giocatore_stagione_id: null,
+      }
+    : {}),
+})
       .eq("partita_id", partita.id)
       .eq("periodo", periodo)
       .eq("goal_tempo", goal_tempo);
@@ -2909,18 +3053,42 @@ setOrdineEntrati((prev) => [
       modificaTipoGoal(
         tempo,
         m.goal_tempo,
-        e.target.value as "azione" | "rigore"
+        e.target.value as "azione" | "rigore" | "autogol"
       )
     }
     className="border rounded px-2 py-1"
   >
     <option value="azione">⚽ Azione</option>
-    <option value="rigore">🥅 Rigore</option>
+<option value="rigore">🥅 Rigore</option>
+<option value="autogol">⚽ Autogol</option>
   </select>
 </div>
 
+{/* Autogol avversario */}
+{m.tipo_goal === "autogol" && (
+  <select
+    value={m.autogol_giocatore_avversario_id || ""}
+    onChange={(e) =>
+      selezionaAutogolAvversario(
+        tempo,
+        m.goal_tempo,
+        e.target.value
+      )
+    }
+    className="w-full border rounded px-2 py-1"
+  >
+    <option value="">-- Seleziona autore autogol --</option>
+    {giocatoriAvversari.map((g) => (
+      <option key={g.id} value={g.id}>
+        #{g.numero_maglia} {(g.cognome || "").trim()} {(g.nome || "").trim()}
+      </option>
+    ))}
+  </select>
+)}
+
         {/* Marcatore */}
-    <select
+{m.tipo_goal !== "autogol" && (
+<select
       value={m.giocatore_stagione_id || ""}
       onChange={(e) =>
         selezionaMarcatore(tempo, m.goal_tempo, e.target.value)
@@ -2933,9 +3101,11 @@ setOrdineEntrati((prev) => [
           {(g.cognome || "").trim()} {(g.nome || "").trim()}
         </option>
       ))}
-    </select>
+      </select>
+)}
 
-    {/* Assist */}
+  {/* Assist */}
+  {m.tipo_goal !== "autogol" && (
     <select
       value={m.assist_giocatore_stagione_id || ""}
       onChange={(e) =>
@@ -2950,6 +3120,7 @@ setOrdineEntrati((prev) => [
         </option>
       ))}
     </select>
+    )}
   </div>
 ))}
       </div>
@@ -2991,17 +3162,41 @@ setOrdineEntrati((prev) => [
           modificaTipoGoal(
             tempo,
             m.goal_tempo,
-            e.target.value as "azione" | "rigore"
+            e.target.value as "azione" | "rigore" | "autogol"
           )
         }
         className="border rounded px-2 py-1"
       >
         <option value="azione">⚽ Azione</option>
-        <option value="rigore">🥅 Rigore</option>
+<option value="rigore">🥅 Rigore</option>
+<option value="autogol">⚽ Autogol</option>
       </select>
     </div>
 
+    {/* Autogol Montecarlo */}
+{m.tipo_goal === "autogol" && (
+  <select
+    value={m.autogol_giocatore_stagione_id || ""}
+    onChange={(e) =>
+      selezionaAutogolMontecarlo(
+        tempo,
+        m.goal_tempo,
+        e.target.value
+      )
+    }
+    className="w-full border rounded px-2 py-1"
+  >
+    <option value="">-- Seleziona autore autogol --</option>
+    {giocatori.map((g) => (
+      <option key={g.id} value={g.id}>
+        {(g.cognome || "").trim()} {(g.nome || "").trim()}
+      </option>
+    ))}
+  </select>
+)}
+
         {/* Marcatore avversario */}
+        {m.tipo_goal !== "autogol" && (
     <select
       value={m.giocatore_avversario_id || ""}
       onChange={(e) =>
@@ -3020,6 +3215,7 @@ setOrdineEntrati((prev) => [
         </option>
       ))}
     </select>
+    )}
 
     {/* Portiere che subisce */}
     <select
