@@ -48,6 +48,47 @@ const [marcatoriPerTempo, setMarcatoriPerTempo] = useState<string[][]>([[], [], 
 // 1. Assist per ogni goal e per ogni tempo
 const [assistPerTempo, setAssistPerTempo] = useState<string[][]>([[], [], [], []]);
 const [minutiGoalPerTempo, setMinutiGoalPerTempo] = useState<string[][]>([[], [], [], []]);
+const [tipiGoalPerTempo, setTipiGoalPerTempo] = useState<
+  ("azione" | "rigore" | "autogol")[][]
+>([[], [], [], []]);
+
+const [autogolPerTempo, setAutogolPerTempo] = useState<string[][]>([
+  [],
+  [],
+  [],
+  [],
+]);
+const [idsGoalPerTempo, setIdsGoalPerTempo] = useState<(string | null)[][]>([
+  [],
+  [],
+  [],
+  [],
+]);
+
+const [idsGoalSubitiPerTempo, setIdsGoalSubitiPerTempo] = useState<
+  (string | null)[][]
+>([
+  [],
+  [],
+  [],
+  [],
+]);
+const [tipiGoalSubitiPerTempo, setTipiGoalSubitiPerTempo] = useState<
+  ("azione" | "rigore" | "autogol")[][]
+>([[], [], [], []]);
+
+const [autogolSubitiPerTempo, setAutogolSubitiPerTempo] = useState<string[][]>([
+  [],
+  [],
+  [],
+  [],
+]);
+const [minutiGoalSubitiPerTempo, setMinutiGoalSubitiPerTempo] = useState<string[][]>([
+  [],
+  [],
+  [],
+  [],
+]);
 const [portieriPerTempo, setPortieriPerTempo] = useState<string[][]>([[], [], [], []]);
   const [giocatoriStagione, setGiocatoriStagione] = useState<Giocatore[]>([]);
   const [portieriStagione, setPortieriStagione] = useState<Giocatore[]>([]);
@@ -216,29 +257,84 @@ if (rigoriPartita) {
 
       const { data: md } = await supabase
         .from("marcatori")
-.select("periodo, giocatore_stagione_id, assist_giocatore_stagione_id, portiere_subisce_id, tempo_sec")
-.eq("partita_id", id);
+.select("id, periodo, squadra_segnante_id, giocatore_stagione_id, assist_giocatore_stagione_id, portiere_subisce_id, tempo_sec, tipo_goal, is_autogol, autogol_giocatore_stagione_id, autogol_giocatore_avversario_id")
+.eq("partita_id", id)
+.order("tempo_sec", { ascending: true, nullsFirst: false });
       if (md) {
-  const marcArr: string[][] = [[], [], [], []];
-  const assistArr: string[][] = [[], [], [], []];
-  const minutiArr: string[][] = [[], [], [], []];
-  const portArr: string[][] = [[], [], [], []];
+ const marcArr: string[][] = [[], [], [], []];
+const assistArr: string[][] = [[], [], [], []];
+const minutiArr: string[][] = [[], [], [], []];
+const tipiArr: ("azione" | "rigore" | "autogol")[][] = [[], [], [], []];
+const autogolArr: string[][] = [[], [], [], []];
+const tipiSubitiArr: ("azione" | "rigore" | "autogol")[][] = [[], [], [], []];
+const autogolSubitiArr: string[][] = [[], [], [], []];
+const minutiSubitiArr: string[][] = [[], [], [], []];
+const portArr: string[][] = [[], [], [], []];
+const idsGoalArr: (string | null)[][] = [[], [], [], []];
+const idsGoalSubitiArr: (string | null)[][] = [[], [], [], []];
         md.forEach((m) => {
           if (m.periodo >= 1 && m.periodo <= 4) {
-            if (m.giocatore_stagione_id) {
-  marcArr[m.periodo - 1].push(m.giocatore_stagione_id);
-  assistArr[m.periodo - 1].push(m.assist_giocatore_stagione_id || "");
+            const squadraMontecarloId =
+  sq?.find((x) => x.nome.toLowerCase() === "montecarlo")?.id || "";
+
+if (m.squadra_segnante_id === squadraMontecarloId) {
+  idsGoalArr[m.periodo - 1].push(m.id);
+  marcArr[m.periodo - 1].push(m.giocatore_stagione_id || "");
+
+  assistArr[m.periodo - 1].push(
+    m.is_autogol ? "" : m.assist_giocatore_stagione_id || ""
+  );
+
   minutiArr[m.periodo - 1].push(
     m.tempo_sec != null ? String(Math.floor(m.tempo_sec / 60)) : ""
   );
+
+  tipiArr[m.periodo - 1].push(
+    m.is_autogol || m.autogol_giocatore_avversario_id
+      ? "autogol"
+      : m.tipo_goal === "rigore"
+      ? "rigore"
+      : "azione"
+  );
+
+  autogolArr[m.periodo - 1].push(
+    m.autogol_giocatore_avversario_id || ""
+  );
+} else {
+  idsGoalSubitiArr[m.periodo - 1].push(m.id);
+  minutiSubitiArr[m.periodo - 1].push(
+  m.tempo_sec != null ? String(Math.floor(m.tempo_sec / 60)) : ""
+);
+  tipiSubitiArr[m.periodo - 1].push(
+    m.is_autogol || m.autogol_giocatore_stagione_id
+      ? "autogol"
+      : m.tipo_goal === "rigore"
+      ? "rigore"
+      : "azione"
+  );
+
+  autogolSubitiArr[m.periodo - 1].push(
+    m.autogol_giocatore_stagione_id || ""
+  );
+
+  portArr[m.periodo - 1].push(
+    m.portiere_subisce_id || ""
+  );
 }
-            if (m.portiere_subisce_id) portArr[m.periodo - 1].push(m.portiere_subisce_id);
+
           }
         });
         setMarcatoriPerTempo(marcArr);
 setAssistPerTempo(assistArr);
 setMinutiGoalPerTempo(minutiArr);
+setTipiGoalPerTempo(tipiArr);
+setAutogolPerTempo(autogolArr);
+setTipiGoalSubitiPerTempo(tipiSubitiArr);
+setAutogolSubitiPerTempo(autogolSubitiArr);
+setMinutiGoalSubitiPerTempo(minutiSubitiArr);
 setPortieriPerTempo(portArr);
+setIdsGoalPerTempo(idsGoalArr);
+setIdsGoalSubitiPerTempo(idsGoalSubitiArr);
       }
     }
     fetchData();
@@ -286,6 +382,24 @@ setPortieriPerTempo(portArr);
         return up;
       });
 
+      setTipiGoalPerTempo((prev) => {
+  const up = prev.map((arr) => [...arr]);
+  while (up[t].length < v) up[t].push("azione");
+  return up;
+});
+
+setAutogolPerTempo((prev) => {
+  const up = prev.map((arr) => [...arr]);
+  while (up[t].length < v) up[t].push("");
+  return up;
+});
+
+setIdsGoalPerTempo((prev) => {
+  const up = prev.map((arr) => [...arr]);
+  while (up[t].length < v) up[t].push(null);
+  return up;
+});
+
     } else {
       setPortieriPerTempo((prev) => {
         const up = prev.map((arr) => [...arr]);
@@ -293,8 +407,125 @@ setPortieriPerTempo(portArr);
         while (up[t].length < v) up[t].push("");
         return up;
       });
+      setMinutiGoalSubitiPerTempo((prev) => {
+  const up = prev.map((arr) => [...arr]);
+  up[t] = up[t].slice(0, v);
+  while (up[t].length < v) up[t].push("");
+  return up;
+});
+      setTipiGoalSubitiPerTempo((prev) => {
+  const up = prev.map((arr) => [...arr]);
+  up[t] = up[t].slice(0, v);
+  while (up[t].length < v) up[t].push("azione");
+  return up;
+});
+
+setAutogolSubitiPerTempo((prev) => {
+  const up = prev.map((arr) => [...arr]);
+  up[t] = up[t].slice(0, v);
+  while (up[t].length < v) up[t].push("");
+  return up;
+});
+
+setIdsGoalSubitiPerTempo((prev) => {
+  const up = prev.map((arr) => [...arr]);
+  while (up[t].length < v) up[t].push(null);
+  return up;
+});
     }
   };
+    // 2. Eliminazione singolo goal
+  const handleEliminaGoal = (
+    t: number,
+    idx: number,
+    lato: "casa" | "ospite"
+  ) => {
+    const sid = lato === "casa" ? squadraCasa : squadraOspite;
+    const montecarlo = isMontecarlo(sid);
+
+    if (montecarlo) {
+      setMarcatoriPerTempo((prev) => {
+        const up = prev.map((arr) => [...arr]);
+        up[t].splice(idx, 1);
+        return up;
+      });
+
+      setAssistPerTempo((prev) => {
+        const up = prev.map((arr) => [...arr]);
+        up[t].splice(idx, 1);
+        return up;
+      });
+
+      setMinutiGoalPerTempo((prev) => {
+        const up = prev.map((arr) => [...arr]);
+        up[t].splice(idx, 1);
+        return up;
+      });
+
+      setTipiGoalPerTempo((prev) => {
+        const up = prev.map((arr) => [...arr]);
+        up[t].splice(idx, 1);
+        return up;
+      });
+
+      setAutogolPerTempo((prev) => {
+        const up = prev.map((arr) => [...arr]);
+        up[t].splice(idx, 1);
+        return up;
+      });
+
+      setIdsGoalPerTempo((prev) => {
+        const up = prev.map((arr) => [...arr]);
+        up[t].splice(idx, 1);
+        return up;
+      });
+        } else {
+      setPortieriPerTempo((prev) => {
+        const up = prev.map((arr) => [...arr]);
+        up[t].splice(idx, 1);
+        return up;
+      });
+
+      setMinutiGoalSubitiPerTempo((prev) => {
+        const up = prev.map((arr) => [...arr]);
+        up[t].splice(idx, 1);
+        return up;
+      });
+
+      setTipiGoalSubitiPerTempo((prev) => {
+        const up = prev.map((arr) => [...arr]);
+        up[t].splice(idx, 1);
+        return up;
+      });
+
+      setAutogolSubitiPerTempo((prev) => {
+        const up = prev.map((arr) => [...arr]);
+        up[t].splice(idx, 1);
+        return up;
+      });
+
+      setIdsGoalSubitiPerTempo((prev) => {
+        const up = prev.map((arr) => [...arr]);
+        up[t].splice(idx, 1);
+        return up;
+      });
+    }
+
+    if (lato === "casa") {
+      setGoalCasa((prev) => {
+        const up = [...prev];
+        up[t] = Math.max(0, up[t] - 1);
+        return up;
+      });
+    } else {
+      setGoalOspite((prev) => {
+        const up = [...prev];
+        up[t] = Math.max(0, up[t] - 1);
+        return up;
+      });
+    }
+  };
+
 
   const handleMarcatore = (t: number, idx: number, gid: string) => {
     setMarcatoriPerTempo((prev) => {
@@ -415,46 +646,83 @@ rigori_b: totaleRigoriOspite,
        const squadraMontecarlo = isMontecarlo(squadraCasa)
       ? squadraCasa
       : squadraOspite;
-
+const squadraAvversaria = isMontecarlo(squadraCasa)
+  ? squadraOspite
+  : squadraCasa;
     for (let i = 0; i < 4; i++) {
       const periodo = i + 1;
 
-      const marcatoriSelezionati = marcatoriPerTempo[i].filter(
-        (gid) => !!gid
-      );
+      const numeroGoalAvversario = isMontecarlo(squadraCasa)
+  ? goalOspite[i]
+  : goalCasa[i];
+
+const { data: goalAvversariEsistenti } = await supabase
+  .from("marcatori")
+  .select(
+    "id, giocatore_stagione_id, giocatore_uid, giocatore_avversario_id, assist_giocatore_stagione_id, portiere_subisce_id, tempo_sec, tipo_goal, is_autogol, autogol_giocatore_stagione_id, autogol_giocatore_avversario_id"
+  )
+  .eq("partita_id", id)
+  .eq("periodo", periodo)
+  .eq("squadra_segnante_id", squadraAvversaria)
+  .order("tempo_sec", { ascending: true, nullsFirst: false });
+
+const goalAvversari = goalAvversariEsistenti || [];
+
+      const numeroGoalMontecarlo = isMontecarlo(squadraCasa)
+  ? goalCasa[i]
+  : goalOspite[i];
+
+const marcatoriSelezionati = Array.from(
+  { length: numeroGoalMontecarlo },
+  (_, idx) => marcatoriPerTempo[i][idx] || ""
+);
 
       const { data: marcatoriEsistenti } = await supabase
-        .from("marcatori")
-        .select(
-          "id, giocatore_stagione_id, assist_giocatore_stagione_id, tempo_sec, tipo_goal"
-        )
-        .eq("partita_id", id)
-        .eq("periodo", periodo)
-        .eq("squadra_segnante_id", squadraMontecarlo)
-        .not("giocatore_stagione_id", "is", null)
-        .order("tempo_sec", { ascending: true, nullsFirst: false });
+  .from("marcatori")
+  .select(
+    "id, giocatore_stagione_id, assist_giocatore_stagione_id, tempo_sec, tipo_goal, is_autogol, autogol_giocatore_stagione_id, autogol_giocatore_avversario_id"
+  )
+  .eq("partita_id", id)
+  .eq("periodo", periodo)
+  .eq("squadra_segnante_id", squadraMontecarlo)
+  .order("tempo_sec", { ascending: true, nullsFirst: false });
 
       const esistenti = marcatoriEsistenti || [];
 
       for (let idx = 0; idx < marcatoriSelezionati.length; idx++) {
         const gid = marcatoriSelezionati[idx];
 
-        const { data: info } = await supabase
-          .from("giocatori_stagioni_view")
-          .select("giocatore_uid")
-          .eq("id", gid)
-          .single();
+const tipoGoal = tipiGoalPerTempo[i][idx] || "azione";
+const isAutogol = tipoGoal === "autogol";
+const autoreAutogol = autogolPerTempo[i][idx] || null;
+if (!isAutogol && !gid) continue;
+let info: { giocatore_uid: string } | null = null;
 
-        if (!info) continue;
+if (!isAutogol && gid) {
+  const { data } = await supabase
+    .from("giocatori_stagioni_view")
+    .select("giocatore_uid")
+    .eq("id", gid)
+    .single();
+
+  info = data;
+
+  if (!info) continue;
+}
 
         if (esistenti[idx]) {
           await supabase
             .from("marcatori")
             .update({
-  giocatore_stagione_id: gid,
-  giocatore_uid: info.giocatore_uid,
+  giocatore_stagione_id: isAutogol ? null : gid,
+  giocatore_uid: isAutogol ? null : info?.giocatore_uid || null,
   assist_giocatore_stagione_id:
-    assistPerTempo[i][idx] || null,
+    isAutogol ? null : assistPerTempo[i][idx] || null,
+  tipo_goal: isAutogol ? "azione" : tipoGoal,
+  is_autogol: isAutogol,
+  autogol_giocatore_stagione_id: null,
+  autogol_giocatore_avversario_id:
+    isAutogol ? autoreAutogol : null,
   tempo_sec:
     minutiGoalPerTempo[i][idx] !== ""
       ? Number(minutiGoalPerTempo[i][idx]) * 60
@@ -463,20 +731,25 @@ rigori_b: totaleRigoriOspite,
             .eq("id", esistenti[idx].id);
                 } else {
           await supabase.from("marcatori").insert({
-            partita_id: id!,
-            giocatore_stagione_id: gid,
-            giocatore_uid: info.giocatore_uid,
-            assist_giocatore_stagione_id:
-              assistPerTempo[i][idx] || null,
-            periodo,
-            stagione_id: stagioneId,
-            squadra_segnante_id: squadraMontecarlo,
-            portiere_subisce_id: null,
-            tempo_sec:
-              minutiGoalPerTempo[i][idx] !== ""
-                ? Number(minutiGoalPerTempo[i][idx]) * 60
-                : null,
-          });
+  partita_id: id!,
+  giocatore_stagione_id: isAutogol ? null : gid,
+  giocatore_uid: isAutogol ? null : info?.giocatore_uid || null,
+  assist_giocatore_stagione_id:
+    isAutogol ? null : assistPerTempo[i][idx] || null,
+  periodo,
+  stagione_id: stagioneId,
+  squadra_segnante_id: squadraMontecarlo,
+  portiere_subisce_id: null,
+  tipo_goal: isAutogol ? "azione" : tipoGoal,
+  is_autogol: isAutogol,
+  autogol_giocatore_stagione_id: null,
+  autogol_giocatore_avversario_id:
+    isAutogol ? autoreAutogol : null,
+  tempo_sec:
+    minutiGoalPerTempo[i][idx] !== ""
+      ? Number(minutiGoalPerTempo[i][idx]) * 60
+      : null,
+});
         }
       }
 
@@ -490,6 +763,77 @@ rigori_b: totaleRigoriOspite,
           .delete()
           .in("id", idsDaEliminare);
       }
+      for (let idx = 0; idx < numeroGoalAvversario; idx++) {
+        
+  const tipoGoalSubito =
+    tipiGoalSubitiPerTempo[i][idx] || "azione";
+
+  const isAutogolSubito = tipoGoalSubito === "autogol";
+
+  const autoreAutogolSubito =
+    autogolSubitiPerTempo[i][idx] || null;
+
+  const portiereSubisce =
+    portieriPerTempo[i][idx] || null;
+
+  if (goalAvversari[idx]) {
+    await supabase
+      .from("marcatori")
+      .update({
+        tipo_goal: isAutogolSubito ? "azione" : tipoGoalSubito,
+        is_autogol: isAutogolSubito,
+        autogol_giocatore_stagione_id:
+          isAutogolSubito ? autoreAutogolSubito : null,
+        autogol_giocatore_avversario_id: null,
+        giocatore_stagione_id: null,
+        giocatore_uid: null,
+        giocatore_avversario_id:
+          isAutogolSubito ? null : goalAvversari[idx].giocatore_avversario_id,
+        assist_giocatore_stagione_id: null,
+        portiere_subisce_id:
+          isAutogolSubito ? null : portiereSubisce,
+      })
+      .eq("id", goalAvversari[idx].id);
+  } else {
+  await supabase
+    .from("marcatori")
+    .insert({
+      partita_id: id!,
+      periodo,
+      stagione_id: stagioneId,
+      squadra_segnante_id: squadraAvversaria,
+      giocatore_stagione_id: null,
+      giocatore_uid: null,
+      giocatore_avversario_id: null,
+      assist_giocatore_stagione_id: null,
+      portiere_subisce_id:
+        isAutogolSubito ? null : portiereSubisce,
+        tempo_sec:
+  minutiGoalSubitiPerTempo[i][idx] !== ""
+    ? Number(minutiGoalSubitiPerTempo[i][idx]) * 60
+    : goalAvversari[idx].tempo_sec,
+      tipo_goal: isAutogolSubito ? "azione" : tipoGoalSubito,
+      is_autogol: isAutogolSubito,
+      autogol_giocatore_stagione_id:
+        isAutogolSubito ? autoreAutogolSubito : null,
+      autogol_giocatore_avversario_id: null,
+tempo_sec:
+  minutiGoalSubitiPerTempo[i][idx] !== ""
+    ? Number(minutiGoalSubitiPerTempo[i][idx]) * 60
+    : null,
+    });
+}
+}
+if (goalAvversari.length > numeroGoalAvversario) {
+  const idsDaEliminare = goalAvversari
+    .slice(numeroGoalAvversario)
+    .map((m) => m.id);
+
+  await supabase
+    .from("marcatori")
+    .delete()
+    .in("id", idsDaEliminare);
+}
     }
 
     // await supabase.from("presenze").delete().eq("partita_id", id).eq("stagione_id", stagioneId);
@@ -788,6 +1132,25 @@ tempo_sec: cartellino.tempo_sec,
             {isMontecarlo(squadraCasa) &&
   marcatoriPerTempo[t].slice(0, goalCasa[t]).map((m, i) => (
     <div key={i} className="flex flex-col sm:flex-row gap-2 mb-2">
+          <select
+        value={tipiGoalPerTempo[t][i] || "azione"}
+        onChange={(e) => {
+          const tipo = e.target.value as "azione" | "rigore" | "autogol";
+
+          setTipiGoalPerTempo((prev) => {
+            const up = prev.map((arr) => [...arr]);
+            up[t][i] = tipo;
+            return up;
+          });
+        }}
+        className="w-full sm:w-32 p-2 border border-gray-300 rounded text-sm"
+      >
+        <option value="azione">⚽ Azione</option>
+        <option value="rigore">🥅 Rigore</option>
+        <option value="autogol">⚽ Autogol</option>
+      </select>
+            {tipiGoalPerTempo[t][i] !== "autogol" && (
+        <>
       <select
         value={m}
         onChange={(e) => handleMarcatore(t, i, e.target.value)}
@@ -825,8 +1188,33 @@ tempo_sec: cartellino.tempo_sec,
             </option>
           ))}
             </select>
+                    </>
+      )}
 
-      <input
+            {tipiGoalPerTempo[t][i] === "autogol" && (
+        <select
+          value={autogolPerTempo[t][i] || ""}
+          onChange={(e) => {
+            const gid = e.target.value;
+
+            setAutogolPerTempo((prev) => {
+              const up = prev.map((arr) => [...arr]);
+              up[t][i] = gid;
+              return up;
+            });
+          }}
+          className="w-full sm:w-60 p-2 border border-gray-300 rounded text-sm"
+        >
+          <option value="">-- Seleziona autore autogol --</option>
+          {giocatoriAvversari.map((g) => (
+  <option key={g.id} value={g.id}>
+    #{g.numero_maglia} {(g.cognome || "").trim()} {(g.nome || "").trim()}
+  </option>
+))}
+        </select>
+      )}
+
+            <input
         type="number"
         min="0"
         placeholder="Minuto"
@@ -842,12 +1230,79 @@ tempo_sec: cartellino.tempo_sec,
         }}
         className="w-full sm:w-24 p-2 border border-gray-300 rounded text-sm"
       />
+
+      <button
+        type="button"
+        onClick={() => handleEliminaGoal(t, i, "casa")}
+        className="p-2 text-red-600 hover:text-red-800"
+        aria-label="Elimina goal"
+      >
+        🗑️
+      </button>
     </div>
   ))}
             {!isMontecarlo(squadraCasa) &&
               portieriPerTempo[t].map((pid, i) => (
-                <select
-                  key={i}
+                <div key={i} className="flex flex-col sm:flex-row gap-2 mb-2">
+  <select
+    value={tipiGoalSubitiPerTempo[t][i] || "azione"}
+    onChange={(e) => {
+      const tipo = e.target.value as "azione" | "rigore" | "autogol";
+
+      setTipiGoalSubitiPerTempo((prev) => {
+        const up = prev.map((arr) => [...arr]);
+        up[t][i] = tipo;
+        return up;
+      });
+    }}
+    className="w-full sm:w-32 p-2 border border-gray-300 rounded text-sm"
+  >
+    <option value="azione">⚽ Azione</option>
+    <option value="rigore">🥅 Rigore</option>
+    <option value="autogol">⚽ Autogol</option>
+  </select>
+{tipiGoalSubitiPerTempo[t][i] === "autogol" && (
+  <select
+    value={autogolSubitiPerTempo[t][i] || ""}
+    onChange={(e) => {
+      const gid = e.target.value;
+
+      setAutogolSubitiPerTempo((prev) => {
+        const up = prev.map((arr) => [...arr]);
+        up[t][i] = gid;
+        return up;
+      });
+    }}
+    className="w-full sm:w-60 p-2 border border-gray-300 rounded text-sm"
+  >
+    <option value="">-- Autore autogol --</option>
+    {giocatoriStagione
+      .filter((g) => formazione.includes(g.id))
+      .map((pl) => (
+        <option key={pl.id} value={pl.id}>
+          {pl.cognome} {pl.nome}
+        </option>
+      ))}
+  </select>
+)}
+<input
+  type="number"
+  min="0"
+  placeholder="Minuto"
+  value={minutiGoalSubitiPerTempo[t][i] || ""}
+  onChange={(e) => {
+    const minuto = e.target.value;
+
+    setMinutiGoalSubitiPerTempo((prev) => {
+      const up = prev.map((arr) => [...arr]);
+      up[t][i] = minuto;
+      return up;
+    });
+  }}
+  className="w-full sm:w-24 p-2 border border-gray-300 rounded text-sm"
+/>
+{tipiGoalSubitiPerTempo[t][i] !== "autogol" && (
+  <select
                   value={pid}
                   onChange={(e) => {
                     const gid = e.target.value;
@@ -864,6 +1319,8 @@ tempo_sec: cartellino.tempo_sec,
                     <option key={pl.id} value={pl.id}>{pl.cognome} {pl.nome}</option>
                   ))}
                 </select>
+                )}
+                </div>
               ))}
 
             {/* Ospite */}
@@ -880,6 +1337,25 @@ tempo_sec: cartellino.tempo_sec,
             {isMontecarlo(squadraOspite) &&
   marcatoriPerTempo[t].slice(0, goalOspite[t]).map((m, i) => (
     <div key={i} className="flex flex-col sm:flex-row gap-2 mb-2">
+          <select
+        value={tipiGoalPerTempo[t][i] || "azione"}
+        onChange={(e) => {
+          const tipo = e.target.value as "azione" | "rigore" | "autogol";
+
+          setTipiGoalPerTempo((prev) => {
+            const up = prev.map((arr) => [...arr]);
+            up[t][i] = tipo;
+            return up;
+          });
+        }}
+        className="w-full sm:w-32 p-2 border border-gray-300 rounded text-sm"
+      >
+        <option value="azione">⚽ Azione</option>
+        <option value="rigore">🥅 Rigore</option>
+        <option value="autogol">⚽ Autogol</option>
+      </select>
+            {tipiGoalPerTempo[t][i] !== "autogol" && (
+        <>
       <select
         value={m}
         onChange={(e) => handleMarcatore(t, i, e.target.value)}
@@ -917,8 +1393,31 @@ tempo_sec: cartellino.tempo_sec,
             </option>
           ))}
             </select>
+        </>
+      )}
+            {tipiGoalPerTempo[t][i] === "autogol" && (
+        <select
+          value={autogolPerTempo[t][i] || ""}
+          onChange={(e) => {
+            const gid = e.target.value;
 
-      <input
+            setAutogolPerTempo((prev) => {
+              const up = prev.map((arr) => [...arr]);
+              up[t][i] = gid;
+              return up;
+            });
+          }}
+          className="w-full sm:w-60 p-2 border border-gray-300 rounded text-sm"
+        >
+          <option value="">-- Seleziona autore autogol --</option>
+          {giocatoriAvversari.map((g) => (
+            <option key={g.id} value={g.id}>
+              #{g.numero_maglia} {(g.cognome || "").trim()} {(g.nome || "").trim()}
+            </option>
+          ))}
+        </select>
+      )}
+            <input
         type="number"
         min="0"
         placeholder="Minuto"
@@ -934,29 +1433,109 @@ tempo_sec: cartellino.tempo_sec,
         }}
         className="w-full sm:w-24 p-2 border border-gray-300 rounded text-sm"
       />
+
+      <button
+        type="button"
+        onClick={() => handleEliminaGoal(t, i, "ospite")}
+        className="p-2 text-red-600 hover:text-red-800"
+        aria-label="Elimina goal"
+      >
+        🗑️
+      </button>
     </div>
   ))}
             {!isMontecarlo(squadraOspite) &&
-              portieriPerTempo[t].map((pid, i) => (
-                <select
-                  key={i}
-                  value={pid}
-                  onChange={(e) => {
-                    const gid = e.target.value;
-                    setPortieriPerTempo((prev) => {
-                      const up = prev.map((arr) => [...arr]);
-                      up[t][i] = gid;
-                      return up;
-                    });
-                  }}
-                  className="w-full sm:w-60 mb-2 p-2 border border-gray-300 rounded text-sm"
-                >
-                  <option value="">-- Seleziona portiere --</option>
-                  {portieriStagione.map((pl) => (
-                    <option key={pl.id} value={pl.id}>{pl.cognome} {pl.nome}</option>
-                  ))}
-                </select>
-              ))}
+  portieriPerTempo[t].map((pid, i) => (
+    <div key={i} className="flex flex-col sm:flex-row gap-2 mb-2">
+      <select
+        value={tipiGoalSubitiPerTempo[t][i] || "azione"}
+        onChange={(e) => {
+          const tipo = e.target.value as "azione" | "rigore" | "autogol";
+
+          setTipiGoalSubitiPerTempo((prev) => {
+            const up = prev.map((arr) => [...arr]);
+            up[t][i] = tipo;
+            return up;
+          });
+        }}
+        className="w-full sm:w-32 p-2 border border-gray-300 rounded text-sm"
+      >
+        <option value="azione">⚽ Azione</option>
+        <option value="rigore">🥅 Rigore</option>
+        <option value="autogol">⚽ Autogol</option>
+      </select>
+
+      {tipiGoalSubitiPerTempo[t][i] === "autogol" && (
+        <select
+          value={autogolSubitiPerTempo[t][i] || ""}
+          onChange={(e) => {
+            const gid = e.target.value;
+
+            setAutogolSubitiPerTempo((prev) => {
+              const up = prev.map((arr) => [...arr]);
+              up[t][i] = gid;
+              return up;
+            });
+          }}
+          className="w-full sm:w-60 p-2 border border-gray-300 rounded text-sm"
+        >
+          <option value="">-- Autore autogol --</option>
+          {giocatoriStagione
+            .filter((g) => formazione.includes(g.id))
+            .map((pl) => (
+              <option key={pl.id} value={pl.id}>
+                {pl.cognome} {pl.nome}
+              </option>
+            ))}
+        </select>
+      )}
+
+            <input
+        type="number"
+        min="0"
+        placeholder="Minuto"
+        value={minutiGoalSubitiPerTempo[t][i] || ""}
+        onChange={(e) => {
+          const minuto = e.target.value;
+
+          setMinutiGoalSubitiPerTempo((prev) => {
+            const up = prev.map((arr) => [...arr]);
+            up[t][i] = minuto;
+            return up;
+          });
+        }}
+        className="w-full sm:w-24 p-2 border border-gray-300 rounded text-sm"
+      />
+
+      {tipiGoalSubitiPerTempo[t][i] !== "autogol" && (
+        <select
+          value={pid}
+          onChange={(e) => {
+            const gid = e.target.value;
+            setPortieriPerTempo((prev) => {
+              const up = prev.map((arr) => [...arr]);
+              up[t][i] = gid;
+              return up;
+            });
+          }}
+          className="w-full sm:w-60 mb-2 p-2 border border-gray-300 rounded text-sm"
+        >
+          <option value="">-- Seleziona portiere --</option>
+          {portieriStagione.map((pl) => (
+            <option key={pl.id} value={pl.id}>{pl.cognome} {pl.nome}</option>
+          ))}
+        </select>
+      )}
+            <button
+        type="button"
+        onClick={() => handleEliminaGoal(t, i, "ospite")}
+        className="p-2 text-red-600 hover:text-red-800"
+        aria-label="Elimina goal"
+      >
+        🗑️
+      </button>
+    </div>
+  ))}
           </div>
         ))}
 

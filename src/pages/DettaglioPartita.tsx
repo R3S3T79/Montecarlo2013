@@ -246,7 +246,7 @@ casa: squadra_casa_id ( id, nome, logo_url ),
 
       const { data: marcatoriData, error: errMd } = await supabase
   .from('marcatori_alias')
-  .select('periodo, tempo_sec, giocatore_stagione_id, squadra_segnante_id, giocatore_nome, giocatore_cognome, avversario_nome, avversario_cognome, avversario_numero_maglia, tipo_goal, assist_giocatore_stagione_id, assist_nome, assist_cognome, autogol_giocatore_stagione_id, autogol_nome, autogol_cognome')
+  .select('periodo, tempo_sec, giocatore_stagione_id, squadra_segnante_id, giocatore_nome, giocatore_cognome, avversario_nome, avversario_cognome, avversario_numero_maglia, tipo_goal, assist_giocatore_stagione_id, assist_nome, assist_cognome, autogol_giocatore_stagione_id, autogol_nome, autogol_cognome, autogol_giocatore_avversario_id, autogol_avversario_nome, autogol_avversario_cognome')
   .eq('partita_id', id)
 
       if (errMd) console.error(errMd)
@@ -463,7 +463,8 @@ setInizioSecondoTempo(
     m.giocatore_cognome ||
     m.avversario_nome ||
     m.avversario_cognome ||
-    m.autogol_giocatore_stagione_id
+    m.autogol_giocatore_stagione_id ||
+    m.autogol_giocatore_avversario_id
   )
   .map(m => ({
     periodo: m.periodo,
@@ -474,19 +475,28 @@ setInizioSecondoTempo(
         giocatore: {
   nome: m.autogol_giocatore_stagione_id
     ? (m.autogol_nome || '')
-    : m.giocatore_nome || (m.avversario_nome
-      ? m.avversario_nome.charAt(0).toUpperCase() + m.avversario_nome.slice(1).toLowerCase()
-      : ''),
+    : m.autogol_giocatore_avversario_id
+      ? (m.autogol_avversario_nome || '')
+      : m.giocatore_nome || (m.avversario_nome
+        ? m.avversario_nome.charAt(0).toUpperCase() + m.avversario_nome.slice(1).toLowerCase()
+        : ''),
   cognome: m.autogol_giocatore_stagione_id
     ? (m.autogol_cognome || '')
-    : m.giocatore_cognome || (m.avversario_cognome
-      ? m.avversario_cognome.charAt(0).toUpperCase() + m.avversario_cognome.slice(1).toLowerCase()
+    : m.autogol_giocatore_avversario_id
+  ? (m.autogol_avversario_cognome
+      ? m.autogol_avversario_cognome.charAt(0).toUpperCase() + m.autogol_avversario_cognome.slice(1).toLowerCase()
       : '')
+      : m.giocatore_cognome || (m.avversario_cognome
+        ? m.avversario_cognome.charAt(0).toUpperCase() + m.avversario_cognome.slice(1).toLowerCase()
+        : '')
 },
 assist_giocatore_stagione_id: m.assist_giocatore_stagione_id ?? null,
 assist_nome: m.assist_nome || '',
 assist_cognome: m.assist_cognome || '',
-autogol: !!m.autogol_giocatore_stagione_id,
+autogol: !!(
+  m.autogol_giocatore_stagione_id ||
+  m.autogol_giocatore_avversario_id
+),
   }))
   .sort((a, b) => (a.tempo_sec ?? 0) - (b.tempo_sec ?? 0))
 
