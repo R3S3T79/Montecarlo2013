@@ -47,6 +47,7 @@ const [goalOspite, setGoalOspite] = useState<number[]>([0, 0, 0, 0]);
 const [marcatoriPerTempo, setMarcatoriPerTempo] = useState<string[][]>([[], [], [], []]);
 // 1. Assist per ogni goal e per ogni tempo
 const [assistPerTempo, setAssistPerTempo] = useState<string[][]>([[], [], [], []]);
+const [minutiGoalPerTempo, setMinutiGoalPerTempo] = useState<string[][]>([[], [], [], []]);
 const [portieriPerTempo, setPortieriPerTempo] = useState<string[][]>([[], [], [], []]);
   const [giocatoriStagione, setGiocatoriStagione] = useState<Giocatore[]>([]);
   const [portieriStagione, setPortieriStagione] = useState<Giocatore[]>([]);
@@ -215,23 +216,28 @@ if (rigoriPartita) {
 
       const { data: md } = await supabase
         .from("marcatori")
-.select("periodo, giocatore_stagione_id, assist_giocatore_stagione_id, portiere_subisce_id")
+.select("periodo, giocatore_stagione_id, assist_giocatore_stagione_id, portiere_subisce_id, tempo_sec")
 .eq("partita_id", id);
       if (md) {
   const marcArr: string[][] = [[], [], [], []];
   const assistArr: string[][] = [[], [], [], []];
+  const minutiArr: string[][] = [[], [], [], []];
   const portArr: string[][] = [[], [], [], []];
         md.forEach((m) => {
           if (m.periodo >= 1 && m.periodo <= 4) {
             if (m.giocatore_stagione_id) {
   marcArr[m.periodo - 1].push(m.giocatore_stagione_id);
   assistArr[m.periodo - 1].push(m.assist_giocatore_stagione_id || "");
+  minutiArr[m.periodo - 1].push(
+    m.tempo_sec != null ? String(Math.floor(m.tempo_sec / 60)) : ""
+  );
 }
             if (m.portiere_subisce_id) portArr[m.periodo - 1].push(m.portiere_subisce_id);
           }
         });
         setMarcatoriPerTempo(marcArr);
 setAssistPerTempo(assistArr);
+setMinutiGoalPerTempo(minutiArr);
 setPortieriPerTempo(portArr);
       }
     }
@@ -262,19 +268,23 @@ setPortieriPerTempo(portArr);
     const sid = lato === "casa" ? squadraCasa : squadraOspite;
 
     if (isMontecarlo(sid)) {
-      setMarcatoriPerTempo((prev) => {
+            setMarcatoriPerTempo((prev) => {
         const up = prev.map((arr) => [...arr]);
-        up[t] = up[t].slice(0, v);
         while (up[t].length < v) up[t].push("");
         return up;
       });
 
-      setAssistPerTempo((prev) => {
+            setAssistPerTempo((prev) => {
   const up = prev.map((arr) => [...arr]);
-  up[t] = up[t].slice(0, v);
   while (up[t].length < v) up[t].push("");
   return up;
 });
+
+            setMinutiGoalPerTempo((prev) => {
+        const up = prev.map((arr) => [...arr]);
+        while (up[t].length < v) up[t].push("");
+        return up;
+      });
 
     } else {
       setPortieriPerTempo((prev) => {
@@ -402,50 +412,85 @@ rigori_b: totaleRigoriOspite,
       })
       .eq("id", id);
 
-   // await supabase.from("marcatori").delete().eq("partita_id", id);
+       const squadraMontecarlo = isMontecarlo(squadraCasa)
+      ? squadraCasa
+      : squadraOspite;
 
-    /*const nuoviMarc: any[] = [];
     for (let i = 0; i < 4; i++) {
       const periodo = i + 1;
 
-      for (const [idx, gid] of marcatoriPerTempo[i].entries()) {
-        if (!gid) continue;
+      const marcatoriSelezionati = marcatoriPerTempo[i].filter(
+        (gid) => !!gid
+      );
+
+      const { data: marcatoriEsistenti } = await supabase
+        .from("marcatori")
+        .select(
+          "id, giocatore_stagione_id, assist_giocatore_stagione_id, tempo_sec, tipo_goal"
+        )
+        .eq("partita_id", id)
+        .eq("periodo", periodo)
+        .eq("squadra_segnante_id", squadraMontecarlo)
+        .not("giocatore_stagione_id", "is", null)
+        .order("tempo_sec", { ascending: true, nullsFirst: false });
+
+      const esistenti = marcatoriEsistenti || [];
+
+      for (let idx = 0; idx < marcatoriSelezionati.length; idx++) {
+        const gid = marcatoriSelezionati[idx];
+
         const { data: info } = await supabase
           .from("giocatori_stagioni_view")
           .select("giocatore_uid")
           .eq("id", gid)
           .single();
+
         if (!info) continue;
-        const squadraSegnante = isMontecarlo(squadraCasa) ? squadraCasa : squadraOspite;
-        nuoviMarc.push({
-  partita_id: id!,
+
+        if (esistenti[idx]) {
+          await supabase
+            .from("marcatori")
+            .update({
   giocatore_stagione_id: gid,
   giocatore_uid: info.giocatore_uid,
-  assist_giocatore_stagione_id: assistPerTempo[i][idx] || null,
-  periodo,
-  stagione_id: stagioneId,
-  squadra_segnante_id: squadraSegnante,
-  portiere_subisce_id: null,
-});
+  assist_giocatore_stagione_id:
+    assistPerTempo[i][idx] || null,
+  tempo_sec:
+    minutiGoalPerTempo[i][idx] !== ""
+      ? Number(minutiGoalPerTempo[i][idx]) * 60
+      : esistenti[idx].tempo_sec,
+})
+            .eq("id", esistenti[idx].id);
+                } else {
+          await supabase.from("marcatori").insert({
+            partita_id: id!,
+            giocatore_stagione_id: gid,
+            giocatore_uid: info.giocatore_uid,
+            assist_giocatore_stagione_id:
+              assistPerTempo[i][idx] || null,
+            periodo,
+            stagione_id: stagioneId,
+            squadra_segnante_id: squadraMontecarlo,
+            portiere_subisce_id: null,
+            tempo_sec:
+              minutiGoalPerTempo[i][idx] !== ""
+                ? Number(minutiGoalPerTempo[i][idx]) * 60
+                : null,
+          });
+        }
       }
 
-      for (const pid of portieriPerTempo[i]) {
-        if (!pid) continue;
-        const squadraSegnante = !isMontecarlo(squadraCasa) ? squadraCasa : squadraOspite;
-        nuoviMarc.push({
-          partita_id: id!,
-          giocatore_stagione_id: null,
-          giocatore_uid: null,
-          periodo,
-          stagione_id: stagioneId,
-          squadra_segnante_id: squadraSegnante,
-          portiere_subisce_id: pid,
-        });
+      if (esistenti.length > marcatoriSelezionati.length) {
+        const idsDaEliminare = esistenti
+          .slice(marcatoriSelezionati.length)
+          .map((m) => m.id);
+
+        await supabase
+          .from("marcatori")
+          .delete()
+          .in("id", idsDaEliminare);
       }
     }
-    if (nuoviMarc.length) {
-      await supabase.from("marcatori").insert(nuoviMarc);
-    }*/
 
     // await supabase.from("presenze").delete().eq("partita_id", id).eq("stagione_id", stagioneId);
     /*
@@ -741,7 +786,7 @@ tempo_sec: cartellino.tempo_sec,
               />
             </div>
             {isMontecarlo(squadraCasa) &&
-  marcatoriPerTempo[t].map((m, i) => (
+  marcatoriPerTempo[t].slice(0, goalCasa[t]).map((m, i) => (
     <div key={i} className="flex flex-col sm:flex-row gap-2 mb-2">
       <select
         value={m}
@@ -779,7 +824,24 @@ tempo_sec: cartellino.tempo_sec,
               {pl.cognome} {pl.nome}
             </option>
           ))}
-      </select>
+            </select>
+
+      <input
+        type="number"
+        min="0"
+        placeholder="Minuto"
+        value={minutiGoalPerTempo[t][i] || ""}
+        onChange={(e) => {
+          const minuto = e.target.value;
+
+          setMinutiGoalPerTempo((prev) => {
+            const up = prev.map((arr) => [...arr]);
+            up[t][i] = minuto;
+            return up;
+          });
+        }}
+        className="w-full sm:w-24 p-2 border border-gray-300 rounded text-sm"
+      />
     </div>
   ))}
             {!isMontecarlo(squadraCasa) &&
@@ -816,7 +878,7 @@ tempo_sec: cartellino.tempo_sec,
               />
             </div>
             {isMontecarlo(squadraOspite) &&
-  marcatoriPerTempo[t].map((m, i) => (
+  marcatoriPerTempo[t].slice(0, goalOspite[t]).map((m, i) => (
     <div key={i} className="flex flex-col sm:flex-row gap-2 mb-2">
       <select
         value={m}
@@ -854,7 +916,24 @@ tempo_sec: cartellino.tempo_sec,
               {pl.cognome} {pl.nome}
             </option>
           ))}
-      </select>
+            </select>
+
+      <input
+        type="number"
+        min="0"
+        placeholder="Minuto"
+        value={minutiGoalPerTempo[t][i] || ""}
+        onChange={(e) => {
+          const minuto = e.target.value;
+
+          setMinutiGoalPerTempo((prev) => {
+            const up = prev.map((arr) => [...arr]);
+            up[t][i] = minuto;
+            return up;
+          });
+        }}
+        className="w-full sm:w-24 p-2 border border-gray-300 rounded text-sm"
+      />
     </div>
   ))}
             {!isMontecarlo(squadraOspite) &&
