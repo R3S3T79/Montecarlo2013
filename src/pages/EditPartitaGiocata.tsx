@@ -95,6 +95,13 @@ const [portieriPerTempo, setPortieriPerTempo] = useState<string[][]>([[], [], []
   const [showFormazione, setShowFormazione] = useState(false);
   const [minutiGiocati, setMinutiGiocati] = useState<Record<string, number>>({});
   const [haSupplementari, setHaSupplementari] = useState(false);
+  const [tempiAperti, setTempiAperti] = useState<Record<number, boolean>>({
+  0: true,
+  1: true,
+  2: true,
+  3: true,
+});
+const [cartelliniAperti, setCartelliniAperti] = useState(false);
   const [rigoriCasa, setRigoriCasa] = useState(0);
 const [rigoriOspite, setRigoriOspite] = useState(0);
 const [haRigori, setHaRigori] = useState(false);
@@ -1107,31 +1114,57 @@ tempo_sec: cartellino.tempo_sec,
 
         {/* Tempi */}
         {(haSupplementari ? [0, 1, 2, 3] : [0, 1]).map((t) => (
-          <div key={t} className="bg-gray-50 p-4 rounded mb-4 border border-gray-200">
-            <h3 className="font-semibold text-gray-800 mb-2">
-  {t === 0
-    ? "1° Tempo"
-    : t === 1
-    ? "2° Tempo"
-    : t === 2
-    ? "1° Tempo Supplementare"
-    : "2° Tempo Supplementare"}
-</h3>
+          <div
+  key={t}
+  className="bg-white rounded-xl mb-6 border-2 border-gray-300 shadow-sm overflow-hidden"
+>
+            <button
+  type="button"
+  onClick={() =>
+    setTempiAperti((prev) => ({
+      ...prev,
+      [t]: !prev[t],
+    }))
+  }
+  className="w-full bg-gray-800 text-white font-bold text-lg px-4 py-3 mb-4 flex items-center justify-between text-left"
+>
+  <span>
+    {t === 0
+      ? "1° Tempo"
+      : t === 1
+      ? "2° Tempo"
+      : t === 2
+      ? "1° Tempo Supplementare"
+      : "2° Tempo Supplementare"}
+  </span>
+
+  <span>{tempiAperti[t] ? "▼" : "▶"}</span>
+</button>
+
+{tempiAperti[t] && (
+  <>
 
             {/* Casa */}
-            <div className="grid grid-cols-[180px_1fr] items-center mb-2">
-              <label className="font-bold text-gray-800">{getNomeSquadra(squadraCasa)}:</label>
-              <input
-                type="number"
-                value={goalCasa[t]}
-                onChange={(e) => handleChangeGoal(t, "casa", e.target.value)}
-                className="w-20 p-1 border border-gray-300 rounded text-sm"
-                onFocus={(e) => e.target.select()}
-              />
-            </div>
+<div className="flex items-center justify-between gap-3 mb-3 p-3 bg-gray-100 rounded-lg">
+  <label className="font-bold text-gray-800">
+    {getNomeSquadra(squadraCasa)}
+  </label>
+  <input
+    type="number"
+    value={goalCasa[t]}
+    onChange={(e) => handleChangeGoal(t, "casa", e.target.value)}
+    className="w-16 h-10 border border-gray-300 rounded-lg text-center text-lg font-bold"
+    onFocus={(e) => e.target.select()}
+  />
+</div>
             {isMontecarlo(squadraCasa) &&
   marcatoriPerTempo[t].slice(0, goalCasa[t]).map((m, i) => (
-    <div key={i} className="flex flex-col sm:flex-row gap-2 mb-2">
+    <div
+  key={i}
+  className="flex flex-col sm:flex-row gap-3 mb-3 p-3 bg-white border border-gray-300 rounded-lg shadow-sm"
+><label className="text-xs font-semibold text-gray-600">
+  Tipo gol
+</label>
           <select
         value={tipiGoalPerTempo[t][i] || "azione"}
         onChange={(e) => {
@@ -1151,6 +1184,9 @@ tempo_sec: cartellino.tempo_sec,
       </select>
             {tipiGoalPerTempo[t][i] !== "autogol" && (
         <>
+        <label className="text-xs font-semibold text-gray-600">
+  Marcatore
+</label>
       <select
         value={m}
         onChange={(e) => handleMarcatore(t, i, e.target.value)}
@@ -1165,7 +1201,9 @@ tempo_sec: cartellino.tempo_sec,
             </option>
           ))}
       </select>
-
+<label className="text-xs font-semibold text-gray-600">
+  Assist
+</label>
       <select
         value={assistPerTempo[t][i] || ""}
         onChange={(e) => {
@@ -1192,7 +1230,12 @@ tempo_sec: cartellino.tempo_sec,
       )}
 
             {tipiGoalPerTempo[t][i] === "autogol" && (
-        <select
+  <>
+    <label className="text-xs font-semibold text-gray-600">
+      Autore autogol
+    </label>
+
+    <select
           value={autogolPerTempo[t][i] || ""}
           onChange={(e) => {
             const gid = e.target.value;
@@ -1212,8 +1255,11 @@ tempo_sec: cartellino.tempo_sec,
   </option>
 ))}
         </select>
-      )}
-
+  </>
+)}
+<label className="text-xs font-semibold text-gray-600">
+  Minuto
+</label>
             <input
         type="number"
         min="0"
@@ -1234,7 +1280,7 @@ tempo_sec: cartellino.tempo_sec,
       <button
         type="button"
         onClick={() => handleEliminaGoal(t, i, "casa")}
-        className="p-2 text-red-600 hover:text-red-800"
+        className="w-full sm:w-auto p-2 bg-red-50 border border-red-200 rounded-lg text-red-600 hover:bg-red-100 hover:text-red-800"
         aria-label="Elimina goal"
       >
         🗑️
@@ -1243,7 +1289,13 @@ tempo_sec: cartellino.tempo_sec,
   ))}
             {!isMontecarlo(squadraCasa) &&
               portieriPerTempo[t].map((pid, i) => (
-                <div key={i} className="flex flex-col sm:flex-row gap-2 mb-2">
+                <div
+  key={i}
+  className="flex flex-col sm:flex-row gap-3 mb-3 p-3 bg-white border border-gray-300 rounded-lg shadow-sm"
+>
+  <label className="text-xs font-semibold text-gray-600">
+  Tipo gol
+</label>
   <select
     value={tipiGoalSubitiPerTempo[t][i] || "azione"}
     onChange={(e) => {
@@ -1262,7 +1314,12 @@ tempo_sec: cartellino.tempo_sec,
     <option value="autogol">⚽ Autogol</option>
   </select>
 {tipiGoalSubitiPerTempo[t][i] === "autogol" && (
-  <select
+  <>
+    <label className="text-xs font-semibold text-gray-600">
+      Autore autogol
+    </label>
+
+    <select
     value={autogolSubitiPerTempo[t][i] || ""}
     onChange={(e) => {
       const gid = e.target.value;
@@ -1283,8 +1340,12 @@ tempo_sec: cartellino.tempo_sec,
           {pl.cognome} {pl.nome}
         </option>
       ))}
-  </select>
+    </select>
+  </>
 )}
+<label className="text-xs font-semibold text-gray-600">
+  Minuto
+</label>
 <input
   type="number"
   min="0"
@@ -1302,7 +1363,12 @@ tempo_sec: cartellino.tempo_sec,
   className="w-full sm:w-24 p-2 border border-gray-300 rounded text-sm"
 />
 {tipiGoalSubitiPerTempo[t][i] !== "autogol" && (
-  <select
+  <>
+    <label className="text-xs font-semibold text-gray-600">
+      Portiere
+    </label>
+
+    <select
                   value={pid}
                   onChange={(e) => {
                     const gid = e.target.value;
@@ -1319,25 +1385,35 @@ tempo_sec: cartellino.tempo_sec,
                     <option key={pl.id} value={pl.id}>{pl.cognome} {pl.nome}</option>
                   ))}
                 </select>
-                )}
+  </>
+)}
                 </div>
               ))}
 
             {/* Ospite */}
-            <div className="grid grid-cols-[180px_1fr] items-center mt-2">
-              <label className="font-bold text-gray-800">{getNomeSquadra(squadraOspite)}:</label>
-              <input
-                type="number"
-                value={goalOspite[t]}
-                onChange={(e) => handleChangeGoal(t, "ospite", e.target.value)}
-                className="w-20 p-1 border border-gray-300 rounded text-sm"
-                onFocus={(e) => e.target.select()}
-              />
-            </div>
+<div className="flex items-center justify-between gap-3 mt-4 mb-3 p-3 bg-gray-100 rounded-lg">
+  <label className="font-bold text-gray-800">
+    {getNomeSquadra(squadraOspite)}
+  </label>
+  <input
+    type="number"
+    value={goalOspite[t]}
+    onChange={(e) => handleChangeGoal(t, "ospite", e.target.value)}
+    className="w-16 h-10 border border-gray-300 rounded-lg text-center text-lg font-bold"
+    onFocus={(e) => e.target.select()}
+  />
+</div>
             {isMontecarlo(squadraOspite) &&
   marcatoriPerTempo[t].slice(0, goalOspite[t]).map((m, i) => (
-    <div key={i} className="flex flex-col sm:flex-row gap-2 mb-2">
-          <select
+    <div
+  key={i}
+  className="flex flex-col sm:flex-row gap-3 mb-3 p-3 bg-white border border-gray-300 rounded-lg shadow-sm"
+>
+      <label className="text-xs font-semibold text-gray-600">
+        Tipo gol
+      </label>
+
+      <select
         value={tipiGoalPerTempo[t][i] || "azione"}
         onChange={(e) => {
           const tipo = e.target.value as "azione" | "rigore" | "autogol";
@@ -1356,6 +1432,9 @@ tempo_sec: cartellino.tempo_sec,
       </select>
             {tipiGoalPerTempo[t][i] !== "autogol" && (
         <>
+        <label className="text-xs font-semibold text-gray-600">
+  Marcatore
+</label>
       <select
         value={m}
         onChange={(e) => handleMarcatore(t, i, e.target.value)}
@@ -1370,7 +1449,9 @@ tempo_sec: cartellino.tempo_sec,
             </option>
           ))}
       </select>
-
+<label className="text-xs font-semibold text-gray-600">
+  Assist
+</label>
       <select
         value={assistPerTempo[t][i] || ""}
         onChange={(e) => {
@@ -1396,7 +1477,12 @@ tempo_sec: cartellino.tempo_sec,
         </>
       )}
             {tipiGoalPerTempo[t][i] === "autogol" && (
-        <select
+  <>
+    <label className="text-xs font-semibold text-gray-600">
+      Autore autogol
+    </label>
+
+    <select
           value={autogolPerTempo[t][i] || ""}
           onChange={(e) => {
             const gid = e.target.value;
@@ -1415,8 +1501,12 @@ tempo_sec: cartellino.tempo_sec,
               #{g.numero_maglia} {(g.cognome || "").trim()} {(g.nome || "").trim()}
             </option>
           ))}
-        </select>
-      )}
+                </select>
+  </>
+)}
+      <label className="text-xs font-semibold text-gray-600">
+  Minuto
+</label>
             <input
         type="number"
         min="0"
@@ -1437,7 +1527,7 @@ tempo_sec: cartellino.tempo_sec,
       <button
         type="button"
         onClick={() => handleEliminaGoal(t, i, "ospite")}
-        className="p-2 text-red-600 hover:text-red-800"
+        className="w-full sm:w-auto p-2 bg-red-50 border border-red-200 rounded-lg text-red-600 hover:bg-red-100 hover:text-red-800"
         aria-label="Elimina goal"
       >
         🗑️
@@ -1446,7 +1536,13 @@ tempo_sec: cartellino.tempo_sec,
   ))}
             {!isMontecarlo(squadraOspite) &&
   portieriPerTempo[t].map((pid, i) => (
-    <div key={i} className="flex flex-col sm:flex-row gap-2 mb-2">
+    <div
+  key={i}
+  className="flex flex-col sm:flex-row gap-3 mb-3 p-3 bg-white border border-gray-300 rounded-lg shadow-sm"
+>
+  <label className="text-xs font-semibold text-gray-600">
+  Tipo gol
+</label>
       <select
         value={tipiGoalSubitiPerTempo[t][i] || "azione"}
         onChange={(e) => {
@@ -1466,7 +1562,12 @@ tempo_sec: cartellino.tempo_sec,
       </select>
 
       {tipiGoalSubitiPerTempo[t][i] === "autogol" && (
-        <select
+  <>
+    <label className="text-xs font-semibold text-gray-600">
+      Autore autogol
+    </label>
+
+    <select
           value={autogolSubitiPerTempo[t][i] || ""}
           onChange={(e) => {
             const gid = e.target.value;
@@ -1488,7 +1589,12 @@ tempo_sec: cartellino.tempo_sec,
               </option>
             ))}
         </select>
-      )}
+  </>
+)}
+
+          <label className="text-xs font-semibold text-gray-600">
+  Minuto
+</label>
 
             <input
         type="number"
@@ -1508,7 +1614,12 @@ tempo_sec: cartellino.tempo_sec,
       />
 
       {tipiGoalSubitiPerTempo[t][i] !== "autogol" && (
-        <select
+  <>
+    <label className="text-xs font-semibold text-gray-600">
+      Portiere
+    </label>
+
+    <select
           value={pid}
           onChange={(e) => {
             const gid = e.target.value;
@@ -1524,22 +1635,38 @@ tempo_sec: cartellino.tempo_sec,
           {portieriStagione.map((pl) => (
             <option key={pl.id} value={pl.id}>{pl.cognome} {pl.nome}</option>
           ))}
-        </select>
-      )}
+                </select>
+  </>
+)}
             <button
         type="button"
         onClick={() => handleEliminaGoal(t, i, "ospite")}
-        className="p-2 text-red-600 hover:text-red-800"
+        className="w-full sm:w-auto p-2 bg-red-50 border border-red-200 rounded-lg text-red-600 hover:bg-red-100 hover:text-red-800"
         aria-label="Elimina goal"
       >
         🗑️
       </button>
-    </div>
+        </div>
   ))}
-          </div>
-        ))}
+
+  </>
+)}
+
+</div>
+
+))}
 
         {/* 1. Cartellini */}
+        <button
+  type="button"
+  onClick={() => setCartelliniAperti((prev) => !prev)}
+  className="w-full bg-gray-800 text-white font-bold text-lg px-4 py-3 mb-4 flex items-center justify-between text-left rounded-lg"
+>
+  <span>Cartellini</span>
+  <span>{cartelliniAperti ? "▼" : "▶"}</span>
+</button>
+{cartelliniAperti && (
+  <>
 <div className="flex justify-center mb-4">
   <button
     type="button"
@@ -1570,7 +1697,7 @@ tempo_sec: cartellino.tempo_sec,
       {cartellini.map((cartellino) => (
         <div
           key={cartellino.id}
-          className="flex items-center gap-2"
+          className="grid grid-cols-1 gap-2 p-3 bg-white border border-gray-300 rounded-lg shadow-sm"
         >
 
           <select
@@ -1707,7 +1834,7 @@ tempo_sec: cartellino.tempo_sec,
       )
     );
   }}
-  className="w-20 p-2 border border-gray-300 rounded text-sm"
+  className="w-full p-2 border border-gray-300 rounded text-sm"
   placeholder="Min."
 />
           <button
@@ -1725,7 +1852,7 @@ tempo_sec: cartellino.tempo_sec,
       prev.filter((c) => c.id !== cartellino.id)
     );
   }}
-  className="p-2 text-red-600 hover:text-red-800"
+  className="w-full sm:w-auto p-2 bg-red-50 border border-red-200 rounded-lg text-red-600 hover:bg-red-100 hover:text-red-800"
   aria-label="Elimina Cartellino"
 >
   🗑️
@@ -1734,6 +1861,8 @@ tempo_sec: cartellino.tempo_sec,
       ))}
     </div>
   </div>
+)}
+  </>
 )}
 
                 {!haRigori && !mostraRigori && (
